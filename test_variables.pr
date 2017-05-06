@@ -1,0 +1,2 @@
+teste : int = 1 + 2 * 3 && variable / 7 ^ 14 * 3;
+teste2 : int = 16/8*2;
