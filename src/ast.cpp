@@ -3,6 +3,19 @@
 
 #define ALLOC_AST(A) (Ast*)A->allocate(sizeof(Ast))
 
+UnaryOperation get_unary_op(Token* token)
+{
+	Token_Type t = token->type;
+	switch (t) {
+	case '-':			return UNARY_OP_MINUS;
+	case '+':			return UNARY_OP_PLUS;
+	case '*':			return UNARY_OP_DEREFERENCE;
+	case '&':			return UNARY_OP_ADDRESS_OF;
+	case '[':			return UNARY_OP_VECTOR_ACCESS;
+	case '~':			return UNARY_OP_NOT_BITWISE;
+	case TOKEN_CAST:	return UNARY_OP_CAST;
+	}
+}
 
 BinaryOperation get_binary_op(Token* token)
 {
@@ -30,13 +43,14 @@ BinaryOperation get_binary_op(Token* token)
 	}
 }
 
-Ast* create_proc(Memory_Arena* arena, Token* name, Type* return_type, Ast* arguments, int nargs, Ast* body) {
+Ast* create_proc(Memory_Arena* arena, Token* name, Type* return_type, Ast* arguments, int nargs, Ast* body, Scope* scope) {
 	Ast* proc = ALLOC_AST(arena);
 
 	proc->node = AST_NODE_PROC_DECLARATION;
 	proc->is_decl = true;
 	proc->return_type = 0;
 
+	proc->proc_decl.scope = scope;
 	proc->proc_decl.name = name;
 	proc->proc_decl.proc_ret_type = return_type;
 	proc->proc_decl.arguments = arguments;
@@ -62,7 +76,7 @@ Ast* create_named_argument(Memory_Arena* arena, Token* name, Type* type, Ast* de
 	return narg;
 }
 
-Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type* type, Ast* assign_val)
+Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type* type, Ast* assign_val, Scope* scope)
 {
 	Ast* vdecl = ALLOC_AST(arena);
 
@@ -70,6 +84,7 @@ Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type* type, Ast* ass
 	vdecl->is_decl = true;
 	vdecl->return_type = 0;
 
+	vdecl->var_decl.scope = scope;
 	vdecl->var_decl.name = name;
 	vdecl->var_decl.alignment = 4;
 	vdecl->var_decl.assignment = assign_val;
@@ -95,7 +110,7 @@ Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok)
 	return lit;
 }
 
-Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, Token* op)
+Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, Token* op, Precedence precedence, Scope* scope)
 {
 	Ast* binop = ALLOC_AST(arena);
 
@@ -107,6 +122,8 @@ Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, T
 	binop->expression.binary_exp.left = left_op;
 	binop->expression.binary_exp.right = right_op;
 	binop->expression.binary_exp.op = get_binary_op(op);
+	binop->expression.binary_exp.scope = scope;
+	binop->expression.binary_exp.precedence = precedence;
 
 	return binop;
 }
@@ -128,6 +145,136 @@ Ast* create_variable(Memory_Arena* arena, Token* var_token, Scope* scope)
 	return var;
 }
 
+Ast* create_var_assignment(Memory_Arena* arena, Ast* lvalue, Ast* rvalue, AssignmentOperation assign_op, Scope* scope)
+{
+	Ast* vassign = ALLOC_AST(arena);
+
+	vassign->node = AST_NODE_VARIABLE_ASSIGNMENT;
+	vassign->is_decl = false;
+	vassign->return_type = 0;
+
+	vassign->var_assign.assign_op = assign_op;
+	vassign->var_assign.lvalue = lvalue;
+	vassign->var_assign.rvalue = rvalue;
+	vassign->var_assign.scope = scope;
+
+	return vassign;
+}
+
+Ast* create_block(Memory_Arena* arena, Scope* scope)
+{
+	Ast* block = ALLOC_AST(arena);
+	block->node = AST_NODE_BLOCK;
+	block->is_decl = false;
+	block->return_type = 0;
+
+	block->block.scope = create_scope(scope->level + 1, scope);
+	block->block.commands = create_array(Ast*, 16);
+
+	return block;
+}
+
+Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope)
+{
+	Ast* proc_call = ALLOC_AST(arena);
+	proc_call->node = AST_NODE_PROCEDURE_CALL;
+	proc_call->is_decl = false;
+	proc_call->return_type = 0;
+
+	proc_call->expression.expression_type = EXPRESSION_TYPE_PROC_CALL;
+
+	proc_call->expression.proc_call.name = name;
+	proc_call->expression.proc_call.args = args;
+	proc_call->expression.proc_call.scope = scope;
+
+	return proc_call;
+}
+
+Ast* create_if(Memory_Arena* arena, Ast* bool_exp, Ast* body, Ast* else_stmt, Scope* scope)
+{
+	Ast* if_stmt = ALLOC_AST(arena);
+	if_stmt->node = AST_NODE_IF_STATEMENT;
+	if_stmt->is_decl = false;
+	if_stmt->return_type = 0;
+
+	if_stmt->if_stmt.bool_exp = bool_exp;
+	if_stmt->if_stmt.body = body;
+	if_stmt->if_stmt.scope = scope;
+	if_stmt->if_stmt.else_exp = else_stmt;
+
+	return if_stmt;
+}
+
+Ast* create_while(Memory_Arena* arena, Ast* bool_exp, Ast* body, Scope* scope)
+{
+	Ast* while_stmt = ALLOC_AST(arena);
+	while_stmt->node = AST_NODE_WHILE_STATEMENT;
+	while_stmt->is_decl = false;
+	while_stmt->return_type = 0;
+
+	while_stmt->while_stmt.bool_exp = bool_exp;
+	while_stmt->while_stmt.body = body;
+	while_stmt->while_stmt.scope = scope;
+
+	return while_stmt;
+}
+
+Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope)
+{
+	Ast* ret_stmt = ALLOC_AST(arena);
+	ret_stmt->node = AST_NODE_RETURN_STATEMENT;
+	ret_stmt->is_decl = false;
+	ret_stmt->return_type = 0;
+
+	ret_stmt->ret_stmt.expr = exp;
+	ret_stmt->ret_stmt.scope = scope;
+	
+	return ret_stmt;
+}
+
+Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, u32 flags, Type* cast_type, Precedence precedence, Scope* scope)
+{
+	Ast* unop = ALLOC_AST(arena);
+
+	unop->node = AST_NODE_UNARY_EXPRESSION;
+	unop->is_decl = false;
+	unop->return_type = 0;
+
+	unop->expression.expression_type = EXPRESSION_TYPE_UNARY;
+	unop->expression.unary_exp.op = op;
+	unop->expression.unary_exp.operand = operand;
+	unop->expression.unary_exp.cast_type = cast_type;
+	unop->expression.unary_exp.precedence = precedence;
+	unop->expression.unary_exp.flags = flags;
+	unop->expression.unary_exp.scope = scope;
+
+	return unop;
+}
+
+void block_push_command(Ast* block, Ast* command)
+{
+	push_array(block->block.commands, &command);
+}
+
+void push_ast_list(Ast** list, Ast* arg)
+{
+	push_array(list, &arg);
+}
+
+s64 generate_scope_id()
+{
+	scope_manager.current_id++;
+	return scope_manager.current_id - 1;
+}
+
+Scope* create_scope(s32 level, Scope* parent)
+{
+	Scope* res = (Scope*)malloc(sizeof(Scope));
+	res->id = generate_scope_id();
+	res->level = level;
+	res->parent = parent;
+	return res;
+}
 
 
 
@@ -163,6 +310,17 @@ void DEBUG_print_type(FILE* out, Type* type) {
 	}
 }
 
+void DEBUG_print_block(FILE* out, Ast* block)
+{
+	size_t num_commands = get_arr_length(block->block.commands);
+	fprintf(out, "{\n");
+	for (size_t i = 0; i < num_commands; ++i) {
+		DEBUG_print_node(out, block->block.commands[i]);
+		fprintf(out, ";\n");
+	}
+	fprintf(out, "\n}");
+}
+
 void DEBUG_print_proc(FILE* out, Ast* proc_node) {
 	fprintf(out, "%.*s :: (", TOKEN_STR(proc_node->proc_decl.name));
 	for (int i = 0; i < proc_node->proc_decl.num_args; ++i) {
@@ -173,9 +331,9 @@ void DEBUG_print_proc(FILE* out, Ast* proc_node) {
 	}
 	fprintf(out, ")");
 	if (proc_node->proc_decl.body == 0) {
-		fprintf(out, "{(empty)}");
+		fprintf(out, "{}");
 	} else {
-		fprintf(out, "{...}");
+		DEBUG_print_block(out, proc_node->proc_decl.body);
 	}
 }
 
@@ -212,12 +370,59 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 		fprintf(out, ")");
 	} break;
 	case EXPRESSION_TYPE_UNARY: {
-		fprintf(out, "ERROR_UNARY_EXP");
+		if (node->expression.unary_exp.flags & UNARY_EXP_FLAG_PREFIXED) {
+			switch (node->expression.unary_exp.op) {
+			case UNARY_OP_MINUS:		fprintf(out, "-"); break;
+			case UNARY_OP_DEREFERENCE:	fprintf(out, "*"); break;
+			case UNARY_OP_NOT_BITWISE:	fprintf(out, "~"); break;
+			case UNARY_OP_NOT_LOGICAL:	fprintf(out, "!"); break;
+			case UNARY_OP_PLUS:			fprintf(out, "+"); break;
+			case UNARY_OP_CAST: {
+				fprintf(out, "cast (");
+				DEBUG_print_type(out, node->expression.unary_exp.cast_type);
+				fprintf(out, ")");
+			}break;
+			}
+			DEBUG_print_expression(out, node->expression.unary_exp.operand);
+		}
+		else {
+			fprintf(out, "ERROR POSTFIXED");
+		}
 	}break;
 	case EXPRESSION_TYPE_VARIABLE: {
 		fprintf(out, "%.*s", TOKEN_STR(node->expression.variable_exp.name));
 	} break;
+	case EXPRESSION_TYPE_PROC_CALL: {
+		int num_args = 0;
+		if (node->expression.proc_call.args) {
+			num_args = get_arr_length(node->expression.proc_call.args);
+		}
+		fprintf(out, "%.*s(", TOKEN_STR(node->expression.proc_call.name));
+		for (int i = 0; i < num_args; ++i) {
+			DEBUG_print_expression(out, node->expression.proc_call.args[i]);
+			if(i + 1 != num_args) fprintf(out, ", ");
+		}
+		fprintf(out, ")");
+	} break;
 	}
+}
+
+void DEBUG_print_assignment(FILE* out, Ast* node)
+{
+	DEBUG_print_expression(out, node->var_assign.lvalue);
+	switch (node->var_assign.assign_op) {
+	case ASSIGNMENT_OPERATION_EQUAL:		fprintf(out, " = "); break;
+	case ASSIGNMENT_OPERATION_PLUS_EQUAL:	fprintf(out, " += "); break;
+	case ASSIGNMENT_OPERATION_MINUS_EQUAL:	fprintf(out, " -= "); break;
+	case ASSIGNMENT_OPERATION_TIMES_EQUAL:	fprintf(out, " *= "); break;
+	case ASSIGNMENT_OPERATION_DIVIDE_EQUAL: fprintf(out, " /= "); break;
+	case ASSIGNMENT_OPERATION_OR_EQUAL:		fprintf(out, " |= "); break;
+	case ASSIGNMENT_OPERATION_AND_EQUAL:	fprintf(out, " &= "); break;
+	case ASSIGNMENT_OPERATION_XOR_EQUAL:	fprintf(out, " ^= "); break;
+	case ASSIGNMENT_OPERATION_SHL_EQUAL:	fprintf(out, " <<= "); break;
+	case ASSIGNMENT_OPERATION_SHR_EQUAL:	fprintf(out, " >>= "); break;
+	}
+	DEBUG_print_expression(out, node->var_assign.rvalue);
 }
 
 void DEBUG_print_var_decl(FILE* out, Ast* node) {
@@ -229,12 +434,45 @@ void DEBUG_print_var_decl(FILE* out, Ast* node) {
 	}
 }
 
+void DEBUG_print_if_statement(FILE* out, Ast* node)
+{
+	fprintf(out, "if (");
+	DEBUG_print_expression(out, node->if_stmt.bool_exp);
+	fprintf(out, ")");
+	DEBUG_print_node(out, node->if_stmt.body);
+	if (node->if_stmt.else_exp) {
+		fprintf(out, "else");
+		DEBUG_print_node(out, node->if_stmt.else_exp);
+	}
+}
+
+void DEBUG_print_while_statement(FILE* out, Ast* node)
+{
+	fprintf(out, "while (");
+	DEBUG_print_expression(out, node->while_stmt.bool_exp);
+	fprintf(out, ")");
+	DEBUG_print_node(out, node->while_stmt.body);
+}
+
+void DEBUG_print_return_statement(FILE* out, Ast* node)
+{
+	fprintf(out, "return ");
+	if (node->ret_stmt.expr) {
+		DEBUG_print_expression(out, node->ret_stmt.expr);
+	}
+}
+
 void DEBUG_print_node(FILE* out, Ast* node) {
 	switch (node->node) {
-	case AST_NODE_PROC_DECLARATION:		fprintf(stdout, "PROCEDURE DECLARATION: "); DEBUG_print_proc(out, node); break;
-	case AST_NODE_NAMED_ARGUMENT:		fprintf(stdout, "NAMED ARGUMENT"); break;
-	case AST_NODE_VARIABLE_DECL:		fprintf(stdout, "VARIABLE DECLARATION: "); DEBUG_print_var_decl(out, node); break;
+	case AST_NODE_PROC_DECLARATION:		DEBUG_print_proc(out, node); break;
+	case AST_NODE_VARIABLE_DECL:		DEBUG_print_var_decl(out, node); break;
 	case AST_NODE_BINARY_EXPRESSION:	DEBUG_print_expression(out, node); break;
+	case AST_NODE_BLOCK:				DEBUG_print_block(out, node); break;
+	case AST_NODE_VARIABLE_ASSIGNMENT:	DEBUG_print_assignment(out, node); break;
+	case AST_NODE_IF_STATEMENT:			DEBUG_print_if_statement(out, node); break;
+	case AST_NODE_WHILE_STATEMENT:		DEBUG_print_while_statement(out, node); break;
+	case AST_NODE_PROCEDURE_CALL:		DEBUG_print_expression(out, node); break;
+	case AST_NODE_RETURN_STATEMENT:		DEBUG_print_return_statement(out, node); break;
 	}
 }
 

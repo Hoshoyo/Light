@@ -20,15 +20,22 @@ struct Parser {
 	Parser(Lexer* lexer);
 
 	Ast** parse_top_level();
-	Ast* parse_declaration();
-	Ast* parse_expression(Precedence caller_prec = PRECEDENCE_0);
-	Ast* parse_block();
-	Ast* parse_variable_decl(Token* name);
-	Ast* parse_proc(Token* name);
+	Ast* parse_declaration(Scope* scope);
+	Ast* parse_expression(Scope* scope, Precedence caller_prec = PRECEDENCE_0, bool quit_on_precedence = false);
+	Ast* parse_block(Scope* scope);
+	Ast* parse_variable_decl(Token* name, Scope* scope);
+	Ast* parse_proc(Token* name, Scope* scope);
 	Ast* parse_literal();
+	Ast* parse_variable_assignment(Scope* scope);
+	Ast* parse_command(Scope* scope);
+	Ast* parse_proc_call(Scope* scope);
 
-	Precedence get_precedence_level(Token_Type tt, bool postfixed, bool unary);
+	Precedence get_precedence_level(Token_Type type, bool postfixed, bool unary);
+	Precedence get_precedence_level(UnaryOperation uo, bool prefixed);
 	Precedence get_precedence_level(BinaryOperation bo);
+	AssignmentOperation get_assignment_op(Token_Type tt);
+	bool is_loop_control_flow_command(Token_Type tt);
+	bool is_control_flow_statement(Token_Type tt);
 
 	Type* parse_type();
 

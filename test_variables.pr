@@ -1,2 +1,18 @@
+//sal : int = -1 + 2;
+teste : int = -hello.world * 2 + *(i * 5);
+//teste : int = -hello.world * 2 + 2;
+hello : int = hey(world.scale.x + 1, 5 * fast());
+
+/*
 teste : int = 1 + 2 * 3 && variable / 7 ^ 14 * 3;
 teste2 : int = 16/8*2;
+
+proc :: () {
+}
+
+main :: (argc: int, argv: ^^char){
+	if(argc > 1) return -1;
+	
+	return proc() + 1;
+}
+*/

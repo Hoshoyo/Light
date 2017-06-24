@@ -42,6 +42,7 @@ Type* get_type(Token_Type t) {
 	case TOKEN_UINT16:	type = &prim_types[TYPE_PRIMITIVE_U16];		break;
 	case TOKEN_UINT32:	type = &prim_types[TYPE_PRIMITIVE_U32];		break;
 	case TOKEN_UINT64:	type = &prim_types[TYPE_PRIMITIVE_U64];		break;
+	case TOKEN_CHAR:
 	case TOKEN_SINT8:	type = &prim_types[TYPE_PRIMITIVE_S8];		break;
 	case TOKEN_SINT16:	type = &prim_types[TYPE_PRIMITIVE_S16];		break;
 	case TOKEN_INT:

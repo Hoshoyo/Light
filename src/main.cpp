@@ -21,6 +21,8 @@ int main(int argc, char** argv) {
 	Parser parser(&lexer);
 	Ast** ast = parser.parse_top_level();
 
+
+
 	DEBUG_print_ast(stdout, ast);
 
 	return 0;
