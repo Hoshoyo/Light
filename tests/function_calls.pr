@@ -1,0 +1,7 @@
+main :: () -> int{
+	x : int = foo();
+}
+
+foo :: () -> int {
+	return 4 + 5;
+}

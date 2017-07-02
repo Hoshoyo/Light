@@ -19,6 +19,11 @@ typedef double r64;
 
 #if defined(_WIN32) || defined(_WIN64)
 #include "ho_windows.h"
+#elif defined(__linux__)
+#define HO_API
+#include <stdlib.h>
+#include <string.h>
+#include "ho_linux.h"
 #endif
 
 struct array;

@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include <ho_system.h>
+#include <stdio.h>
 
 s32 Lexer::start(const char* filename)
 {

@@ -3,6 +3,7 @@
 #include "lexer.h"
 #include "type.h"
 #include "memory.h"
+#include <stdio.h>
 
 struct Ast_ProcDecl;
 struct Ast_VarDecl;
@@ -246,7 +247,7 @@ struct Scope_Manager {
 	s64 current_id = 0;
 };
 
-static Scope_Manager scope_manager = { 0 };
+static Scope_Manager scope_manager = { };
 
 s64 generate_scope_id();
 Scope* create_scope(s32 level, Scope* parent);
