@@ -380,16 +380,26 @@ Ast* Parser::parse_command(Scope* scope)
 		command = create_while(&arena, bool_exp, body, scope);
 	}
 	else if (first->type == TOKEN_FOR_STATEMENT) {
-
+		assert(0);
 	}
 	else if (first->type == TOKEN_SWITCH_STATEMENT) {
-
+		assert(0);
 	}
 	else if (first->type == TOKEN_DO_STATEMENT) {
-
+		assert(0);
 	}
 	else if (first->type == (Token_Type)'{') {
 		command = parse_block(scope);
+	}
+	else if (first->type == TOKEN_BREAK_STATEMENT) {
+		lexer->eat_token();
+		command = create_break(&arena, scope);
+		require_and_eat((Token_Type)';');
+	}
+	else if (first->type == TOKEN_CONTINUE_STATEMENT) {
+		lexer->eat_token();
+		command = create_continue(&arena, scope);
+		require_and_eat((Token_Type)';');
 	}
 	else if (first->type == TOKEN_RETURN_STATEMENT) {
 		lexer->eat_token();
@@ -408,7 +418,7 @@ Ast* Parser::parse_command(Scope* scope)
 	}
 
 	if (command == 0) {
-		assert(0);
+		//assert(0);
 	}
 	return command;
 }

@@ -251,6 +251,32 @@ Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation o
 	return unop;
 }
 
+Ast* create_break(Memory_Arena* arena, Scope* scope)
+{
+	Ast* break_stmt = ALLOC_AST(arena);
+
+	break_stmt->is_decl = false;
+	break_stmt->node = AST_NODE_BREAK_STATEMENT;
+	break_stmt->return_type = 0;
+
+	break_stmt->break_stmt.scope = scope;
+
+	return break_stmt;
+}
+
+Ast* create_continue(Memory_Arena* arena, Scope* scope)
+{
+	Ast* continue_stmt = ALLOC_AST(arena);
+
+	continue_stmt->is_decl = false;
+	continue_stmt->node = AST_NODE_CONTINUE_STATEMENT;
+	continue_stmt->return_type = 0;
+
+	continue_stmt->continue_stmt.scope = scope;
+
+	return continue_stmt;
+}
+
 void block_push_command(Ast* block, Ast* command)
 {
 	push_array(block->block.commands, &command);
@@ -439,10 +465,22 @@ void DEBUG_print_if_statement(FILE* out, Ast* node)
 	fprintf(out, "if (");
 	DEBUG_print_expression(out, node->if_stmt.bool_exp);
 	fprintf(out, ")");
-	DEBUG_print_node(out, node->if_stmt.body);
+	if (node->if_stmt.body->node == AST_NODE_BLOCK) {
+		DEBUG_print_node(out, node->if_stmt.body);
+	} else {
+		fprintf(out, " ");
+		DEBUG_print_node(out, node->if_stmt.body);
+		fprintf(out, ";\n");
+	}
 	if (node->if_stmt.else_exp) {
 		fprintf(out, "else");
-		DEBUG_print_node(out, node->if_stmt.else_exp);
+		if (node->if_stmt.body->node == AST_NODE_BLOCK) {
+			DEBUG_print_node(out, node->if_stmt.else_exp);
+		} else {
+			fprintf(out, " ");
+			DEBUG_print_node(out, node->if_stmt.else_exp);
+			fprintf(out, ";\n");
+		}
 	}
 }
 
@@ -462,6 +500,16 @@ void DEBUG_print_return_statement(FILE* out, Ast* node)
 	}
 }
 
+void DEBUG_print_break_statement(FILE* out, Ast* node) 
+{
+	fprintf(out, "break");
+}
+
+void DEBUG_print_continue_statement(FILE* out, Ast* node)
+{
+	fprintf(out, "continue");
+}
+
 void DEBUG_print_node(FILE* out, Ast* node) {
 	switch (node->node) {
 	case AST_NODE_PROC_DECLARATION:		DEBUG_print_proc(out, node); break;
@@ -473,6 +521,8 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 	case AST_NODE_WHILE_STATEMENT:		DEBUG_print_while_statement(out, node); break;
 	case AST_NODE_PROCEDURE_CALL:		DEBUG_print_expression(out, node); break;
 	case AST_NODE_RETURN_STATEMENT:		DEBUG_print_return_statement(out, node); break;
+	case AST_NODE_BREAK_STATEMENT:		DEBUG_print_break_statement(out, node); break;
+	case AST_NODE_CONTINUE_STATEMENT:	DEBUG_print_continue_statement(out, node); break;
 	}
 }
 

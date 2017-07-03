@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv) {
 	if (argc <= 1) {
-		fprintf(stderr, "No files were given.\nusage: prism [option ...] filename");
+		fprintf(stderr, "No files were given.\nusage: prism [option ...] filename\n");
 		return -1;
 	}
 
@@ -20,8 +20,6 @@ int main(int argc, char** argv) {
 
 	Parser parser(&lexer);
 	Ast** ast = parser.parse_top_level();
-
-
 
 	DEBUG_print_ast(stdout, ast);
 

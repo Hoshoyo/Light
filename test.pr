@@ -1,0 +1,11 @@
+print :: (str : ^char, val : int) -> void {
+	printf(str, val);
+}
+
+main :: () -> int{
+	i : int = 0;
+	while(i < 10){
+		print("%d", i);
+	}
+	list : ^^char = 0;
+}

@@ -29,6 +29,8 @@ enum Node_Type {
 	AST_NODE_IF_STATEMENT,
 	AST_NODE_WHILE_STATEMENT,
 	AST_NODE_RETURN_STATEMENT,
+	AST_NODE_BREAK_STATEMENT,
+	AST_NODE_CONTINUE_STATEMENT,
 };
 
 enum Precedence
@@ -218,6 +220,14 @@ struct Ast_Return {
 	Scope* scope;
 };
 
+struct Ast_Break {
+	Scope* scope;
+};
+
+struct Ast_Continue {
+	Scope* scope;
+};
+
 struct Ast {
 	Node_Type node;
 	Type* return_type;
@@ -232,6 +242,8 @@ struct Ast {
 		Ast_If if_stmt;
 		Ast_While while_stmt;
 		Ast_Return ret_stmt;
+		Ast_Break break_stmt;
+		Ast_Continue continue_stmt;
 
 		Ast_Expression expression;
 	};
@@ -265,6 +277,8 @@ Ast* create_while(Memory_Arena* arena, Ast* bool_exp, Ast* body, Scope* scope);
 Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope);
 Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, u32 flags, Type* cast_type, Precedence precedence, Scope* scope);
 Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, Token* op, Precedence precedence, Scope* scope);
+Ast* create_break(Memory_Arena* arena, Scope* scope);
+Ast* create_continue(Memory_Arena* arena, Scope* scope);
 
 UnaryOperation get_unary_op(Token* token);
 BinaryOperation get_binary_op(Token* token);
