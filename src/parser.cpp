@@ -95,20 +95,20 @@ Precedence Parser::get_precedence_level(Token_Type type, bool postfixed, bool un
 	if (unary) {
 		if (postfixed) {
 			if (type == TOKEN_PLUS_PLUS)
-				return PRECEDENCE_5;
+				return PRECEDENCE_6;
 			if (type == TOKEN_MINUS_MINUS)
-				return PRECEDENCE_5;
+				return PRECEDENCE_6;
 		}
 		else {
-			if (type == '*') return PRECEDENCE_6;	// dereference
-			if (type == '&') return PRECEDENCE_6;	// address of
-			if (type == '!') return PRECEDENCE_6;	// not
-			if (type == '~') return PRECEDENCE_5;	// xor
-			if (type == '-') return PRECEDENCE_6;	// minus
+			if (type == '*') return PRECEDENCE_7;	// dereference
+			if (type == '&') return PRECEDENCE_7;	// address of
+			if (type == '!') return PRECEDENCE_7;	// not
+			if (type == '~') return PRECEDENCE_6;	// xor
+			if (type == '-') return PRECEDENCE_7;	// minus
 			if (type == TOKEN_PLUS_PLUS)
-				return PRECEDENCE_6;
+				return PRECEDENCE_7;
 			if (type == TOKEN_MINUS_MINUS)
-				return PRECEDENCE_6;
+				return PRECEDENCE_7;
 		}
 	}
 
@@ -116,29 +116,40 @@ Precedence Parser::get_precedence_level(Token_Type type, bool postfixed, bool un
 	{
 	case TOKEN_LOGIC_AND:
 	case TOKEN_LOGIC_OR:
-		return PRECEDENCE_0;
+		return PRECEDENCE_1;
 	case TOKEN_EQUAL_COMPARISON:
 	case TOKEN_LESS_EQUAL:
 	case TOKEN_GREATER_EQUAL:
 	case TOKEN_NOT_EQUAL:
 	case '>':
 	case '<':
-		return PRECEDENCE_1;
+		return PRECEDENCE_2;
 	case '^':
 	case '|':
 	case '&':
 	case TOKEN_BITSHIFT_LEFT:
 	case TOKEN_BITSHIFT_RIGHT:
-		return PRECEDENCE_2;
+		return PRECEDENCE_3;
 	case '+':
 	case '-':
-		return PRECEDENCE_3;
+		return PRECEDENCE_4;
 	case '*':
 	case '/':
 	case '%':
-		return PRECEDENCE_4;
+		return PRECEDENCE_5;
 	case '.':
-		return PRECEDENCE_7;
+		return PRECEDENCE_8;
+	case '=':
+	case TOKEN_PLUS_EQUAL:
+	case TOKEN_MINUS_EQUAL:
+	case TOKEN_TIMES_EQUAL:
+	case TOKEN_DIV_EQUAL:
+	case TOKEN_AND_EQUAL:
+	case TOKEN_OR_EQUAL:
+	case TOKEN_XOR_EQUAL:
+	case TOKEN_SHL_EQUAL:
+	case TOKEN_SHR_EQUAL:
+		return PRECEDENCE_0;
 	default:
 		return PRECEDENCE_0;
 	}
@@ -158,12 +169,12 @@ Precedence Parser::get_precedence_level(UnaryOperation unop, bool prefixed)
 	*/
 	if (prefixed)
 	{
-		if (unop == UNARY_OP_DEREFERENCE)	return PRECEDENCE_6;	// dereference
-		if (unop == UNARY_OP_ADDRESS_OF)	return PRECEDENCE_6;	// address of
-		if (unop == UNARY_OP_NOT_BITWISE)	return PRECEDENCE_6;	// not
-		if (unop == UNARY_OP_MINUS)			return PRECEDENCE_6;	// minus
-		if (unop == UNARY_OP_NOT_LOGICAL)	return PRECEDENCE_6;	// not logic
-		if (unop == UNARY_OP_CAST)			return PRECEDENCE_6;	// cast
+		if (unop == UNARY_OP_DEREFERENCE)	return PRECEDENCE_7;	// dereference
+		if (unop == UNARY_OP_ADDRESS_OF)	return PRECEDENCE_7;	// address of
+		if (unop == UNARY_OP_NOT_BITWISE)	return PRECEDENCE_7;	// not
+		if (unop == UNARY_OP_MINUS)			return PRECEDENCE_7;	// minus
+		if (unop == UNARY_OP_NOT_LOGICAL)	return PRECEDENCE_7;	// not logic
+		if (unop == UNARY_OP_CAST)			return PRECEDENCE_7;	// cast
 	}
 	else {
 		assert(0);
@@ -174,25 +185,36 @@ Precedence Parser::get_precedence_level(BinaryOperation bo)
 {
 	Precedence p = PRECEDENCE_0;
 	switch (bo) {
-	case BINARY_OP_PLUS:			 p = PRECEDENCE_3; break;
-	case BINARY_OP_MINUS:			 p = PRECEDENCE_3; break;
-	case BINARY_OP_MULT:			 p = PRECEDENCE_4; break;
-	case BINARY_OP_DIV:				 p = PRECEDENCE_4; break;
-	case BINARY_OP_AND:				 p = PRECEDENCE_2; break;
-	case BINARY_OP_OR:				 p = PRECEDENCE_2; break;
-	case BINARY_OP_XOR:				 p = PRECEDENCE_2; break;
-	case BINARY_OP_MOD:				 p = PRECEDENCE_4; break;
-	case BINARY_OP_LOGIC_AND:		 p = PRECEDENCE_0; break;
-	case BINARY_OP_LOGIC_OR:		 p = PRECEDENCE_0; break;
-	case BINARY_OP_BITSHIFT_LEFT:	 p = PRECEDENCE_2; break;
-	case BINARY_OP_BITSHIFT_RIGHT:	 p = PRECEDENCE_2; break;
-	case BINARY_OP_LESS_THAN:		 p = PRECEDENCE_1; break;
-	case BINARY_OP_GREATER_THAN:	 p = PRECEDENCE_1; break;
-	case BINARY_OP_LESS_EQUAL:		 p = PRECEDENCE_1; break;
-	case BINARY_OP_GREATER_EQUAL:	 p = PRECEDENCE_1; break;
-	case BINARY_OP_EQUAL_EQUAL:		 p = PRECEDENCE_1; break;
-	case BINARY_OP_NOT_EQUAL:		 p = PRECEDENCE_1; break;
-	case BINARY_OP_DOT:				 p = PRECEDENCE_7; break;
+	case BINARY_OP_PLUS:			 p = PRECEDENCE_4; break;
+	case BINARY_OP_MINUS:			 p = PRECEDENCE_4; break;
+	case BINARY_OP_MULT:			 p = PRECEDENCE_5; break;
+	case BINARY_OP_DIV:				 p = PRECEDENCE_5; break;
+	case BINARY_OP_AND:				 p = PRECEDENCE_3; break;
+	case BINARY_OP_OR:				 p = PRECEDENCE_3; break;
+	case BINARY_OP_XOR:				 p = PRECEDENCE_3; break;
+	case BINARY_OP_MOD:				 p = PRECEDENCE_5; break;
+	case BINARY_OP_LOGIC_AND:		 p = PRECEDENCE_1; break;
+	case BINARY_OP_LOGIC_OR:		 p = PRECEDENCE_1; break;
+	case BINARY_OP_BITSHIFT_LEFT:	 p = PRECEDENCE_3; break;
+	case BINARY_OP_BITSHIFT_RIGHT:	 p = PRECEDENCE_3; break;
+	case BINARY_OP_LESS_THAN:		 p = PRECEDENCE_2; break;
+	case BINARY_OP_GREATER_THAN:	 p = PRECEDENCE_2; break;
+	case BINARY_OP_LESS_EQUAL:		 p = PRECEDENCE_2; break;
+	case BINARY_OP_GREATER_EQUAL:	 p = PRECEDENCE_2; break;
+	case BINARY_OP_EQUAL_EQUAL:		 p = PRECEDENCE_2; break;
+	case BINARY_OP_NOT_EQUAL:		 p = PRECEDENCE_2; break;
+	case BINARY_OP_DOT:				 p = PRECEDENCE_8; break;
+
+	case ASSIGNMENT_OPERATION_EQUAL:		p = PRECEDENCE_0; break;
+	case ASSIGNMENT_OPERATION_PLUS_EQUAL:	p = PRECEDENCE_0; break;
+	case ASSIGNMENT_OPERATION_MINUS_EQUAL:	p = PRECEDENCE_0; break;
+	case ASSIGNMENT_OPERATION_TIMES_EQUAL:	p = PRECEDENCE_0; break;
+	case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:	p = PRECEDENCE_0; break;
+	case ASSIGNMENT_OPERATION_AND_EQUAL:	p = PRECEDENCE_0; break;
+	case ASSIGNMENT_OPERATION_OR_EQUAL:		p = PRECEDENCE_0; break;
+	case ASSIGNMENT_OPERATION_XOR_EQUAL:	p = PRECEDENCE_0; break;
+	case ASSIGNMENT_OPERATION_SHL_EQUAL:	p = PRECEDENCE_0; break;
+	case ASSIGNMENT_OPERATION_SHR_EQUAL:	p = PRECEDENCE_0; break;
 	}
 	return p;
 }
@@ -217,24 +239,6 @@ Type_Primitive get_primitive_type(Token* tok)
 	case TOKEN_VOID:	return Type_Primitive::TYPE_PRIMITIVE_VOID; break;
 	default: return Type_Primitive::TYPE_PRIMITIVE_UNKNOWN; break;
 	}
-}
-
-AssignmentOperation Parser::get_assignment_op(Token_Type tt)
-{
-	AssignmentOperation assop = ASSIGNMENT_OPERATION_UNKNOWN;
-	switch (tt) {
-	case '=':				assop = ASSIGNMENT_OPERATION_EQUAL; break;
-	case TOKEN_PLUS_EQUAL:	assop = ASSIGNMENT_OPERATION_PLUS_EQUAL; break;
-	case TOKEN_MINUS_EQUAL:	assop = ASSIGNMENT_OPERATION_MINUS_EQUAL; break;
-	case TOKEN_TIMES_EQUAL:	assop = ASSIGNMENT_OPERATION_TIMES_EQUAL; break;
-	case TOKEN_DIV_EQUAL:	assop = ASSIGNMENT_OPERATION_DIVIDE_EQUAL; break;
-	case TOKEN_AND_EQUAL:	assop = ASSIGNMENT_OPERATION_AND_EQUAL; break;
-	case TOKEN_OR_EQUAL:	assop = ASSIGNMENT_OPERATION_OR_EQUAL; break;
-	case TOKEN_XOR_EQUAL:	assop = ASSIGNMENT_OPERATION_XOR_EQUAL; break;
-	case TOKEN_SHL_EQUAL:	assop = ASSIGNMENT_OPERATION_SHL_EQUAL; break;
-	case TOKEN_SHR_EQUAL:	assop = ASSIGNMENT_OPERATION_SHR_EQUAL; break;
-	}
-	return assop;
 }
 
 Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on_precedence)
@@ -270,7 +274,7 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 	}
 
 	Token* optor = lexer->eat_token();
-	if (optor->flags & TOKEN_FLAG_BINARY_OPERATOR) {
+	if (optor->flags & TOKEN_FLAG_BINARY_OPERATOR || optor->flags & TOKEN_FLAG_ASSIGNMENT_OPERATOR) {
 		Precedence bop_precedence = get_precedence_level(get_binary_op(optor));
 		if (bop_precedence < caller_prec && quit_on_precedence) {
 			lexer->rewind();
@@ -279,7 +283,11 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 		Ast* right_op = parse_expression(scope, bop_precedence, quit_on_precedence);
 		Ast* binop = create_binary_operation(&arena, left_op, right_op, optor, bop_precedence, scope);
 		if (right_op->node == AST_NODE_BINARY_EXPRESSION) {
-			if (get_precedence_level(optor->type, false, false) >= get_precedence_level(right_op->expression.binary_exp.op)) {
+			//
+			//	if it is an assignment operator, be right associative
+			//
+			if (get_precedence_level(optor->type, false, false) >= get_precedence_level(right_op->expression.binary_exp.op) &&
+				!(optor->flags & TOKEN_FLAG_ASSIGNMENT_OPERATOR)) {
 				binop->expression.binary_exp.right = right_op->expression.binary_exp.left;
 				right_op->expression.binary_exp.left = binop;
 				return right_op;
@@ -290,27 +298,6 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 		lexer->rewind();
 		return left_op;
 	}
-}
-
-Ast* Parser::parse_variable_assignment(Scope* scope)
-{
-	Ast* vassign = 0;
-	Ast* lvalue = parse_expression(scope);
-	Token* eqsign = lexer->eat_token();
-	AssignmentOperation assign_op = ASSIGNMENT_OPERATION_UNKNOWN;
-	assign_op = get_assignment_op(eqsign->type);
-	
-	if (assign_op == ASSIGNMENT_OPERATION_UNKNOWN) {
-		print_error_loc(stderr, filename, eqsign->line, eqsign->column);
-		fprintf(stderr, "Syntax error: '%.*s' assignment operation is invalid.\n", TOKEN_STR(eqsign));
-		return 0;
-	}
-
-	Ast* rvalue = parse_expression(scope);
-	
-	vassign = create_var_assignment(&arena, lvalue, rvalue, assign_op, scope);
-
-	return vassign;
 }
 
 bool Parser::is_loop_control_flow_command(Token_Type tt)
@@ -389,21 +376,13 @@ Ast* Parser::parse_command(Scope* scope)
 			require_and_eat((Token_Type)';');
 			command = call;
 		}
-		// variable assignment
-		else if (get_assignment_op(lexer->peek_token_type(1)) != ASSIGNMENT_OPERATION_UNKNOWN) {
-			Ast* assign_op = parse_variable_assignment(scope);
-			require_and_eat((Token_Type)';');
-			command = assign_op;
-		} else if (lexer->peek_token_type(1) == TOKEN_COLON_COLON) {
+		else if (lexer->peek_token_type(1) == TOKEN_COLON_COLON) {
 			// proc declaration
 			Token* name = lexer->eat_token();
 			command = parse_proc_decl(name, scope);
-		} else {
-			report_syntax_error("Identifier %.*s could not be resolved to a command or declaration.\n", TOKEN_STR(first));
-			return 0;
 		}
 	}
-	else if (first->type == TOKEN_IF_STATEMENT) {
+	if (first->type == TOKEN_IF_STATEMENT) {
 		lexer->eat_token();
 		Ast* bool_exp = parse_expression(scope);
 		Ast* body = parse_command(scope);
@@ -457,6 +436,7 @@ Ast* Parser::parse_command(Scope* scope)
 	}
 	else {
 		command = parse_expression(scope);
+		require_and_eat((Token_Type)';');
 	}
 
 	if (command == 0) {

@@ -26,5 +26,6 @@ int main(int argc, char** argv) {
 		printf("\n*** Code preview ***\n\n");
 		DEBUG_print_ast(stdout, ast);
 	}
+
 	return 0;
 }

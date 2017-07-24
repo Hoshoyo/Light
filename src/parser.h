@@ -26,7 +26,6 @@ struct Parser {
 	Ast* parse_variable_decl(Token* name, Scope* scope);
 	Ast* parse_proc_decl(Token* name, Scope* scope);
 	Ast* parse_literal();
-	Ast* parse_variable_assignment(Scope* scope);
 	Ast* parse_command(Scope* scope);
 	Ast* parse_proc_call(Scope* scope);
 	Ast* parse_struct(Token* name, Scope* scope);
@@ -34,7 +33,6 @@ struct Parser {
 	Precedence get_precedence_level(Token_Type type, bool postfixed, bool unary);
 	Precedence get_precedence_level(UnaryOperation uo, bool prefixed);
 	Precedence get_precedence_level(BinaryOperation bo);
-	AssignmentOperation get_assignment_op(Token_Type tt);
 	bool is_loop_control_flow_command(Token_Type tt);
 	bool is_control_flow_statement(Token_Type tt);
 

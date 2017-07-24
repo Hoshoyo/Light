@@ -42,6 +42,16 @@ BinaryOperation get_binary_op(Token* token)
 	case '/':						return BINARY_OP_DIV;
 	case '%':						return BINARY_OP_MOD;
 	case '.':						return BINARY_OP_DOT;
+	case '=':						return ASSIGNMENT_OPERATION_EQUAL;
+	case TOKEN_PLUS_EQUAL:			return ASSIGNMENT_OPERATION_PLUS_EQUAL;
+	case TOKEN_MINUS_EQUAL:			return ASSIGNMENT_OPERATION_MINUS_EQUAL;
+	case TOKEN_TIMES_EQUAL:			return ASSIGNMENT_OPERATION_TIMES_EQUAL;
+	case TOKEN_DIV_EQUAL:			return ASSIGNMENT_OPERATION_DIVIDE_EQUAL;
+	case TOKEN_AND_EQUAL:			return ASSIGNMENT_OPERATION_AND_EQUAL;
+	case TOKEN_OR_EQUAL:			return ASSIGNMENT_OPERATION_OR_EQUAL;
+	case TOKEN_XOR_EQUAL:			return ASSIGNMENT_OPERATION_XOR_EQUAL;
+	case TOKEN_SHL_EQUAL:			return ASSIGNMENT_OPERATION_SHL_EQUAL;
+	case TOKEN_SHR_EQUAL:			return ASSIGNMENT_OPERATION_SHR_EQUAL;
 	}
 }
 
@@ -159,22 +169,6 @@ Ast* create_variable(Memory_Arena* arena, Token* var_token, Scope* scope)
 	var->expression.variable_exp.scope = scope;
 	
 	return var;
-}
-
-Ast* create_var_assignment(Memory_Arena* arena, Ast* lvalue, Ast* rvalue, AssignmentOperation assign_op, Scope* scope)
-{
-	Ast* vassign = ALLOC_AST(arena);
-
-	vassign->node = AST_NODE_VARIABLE_ASSIGNMENT;
-	vassign->is_decl = false;
-	vassign->return_type = 0;
-
-	vassign->var_assign.assign_op = assign_op;
-	vassign->var_assign.lvalue = lvalue;
-	vassign->var_assign.rvalue = rvalue;
-	vassign->var_assign.scope = scope;
-
-	return vassign;
 }
 
 Ast* create_block(Memory_Arena* arena, Scope* scope)
@@ -435,6 +429,16 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 		case BINARY_OP_EQUAL_EQUAL:		 fprintf(out, "=="); break;
 		case BINARY_OP_NOT_EQUAL:		 fprintf(out, "!="); break;
 		case BINARY_OP_DOT:				 fprintf(out, "."); break;
+		case ASSIGNMENT_OPERATION_EQUAL:		fprintf(out, "="); break;
+		case ASSIGNMENT_OPERATION_PLUS_EQUAL:	fprintf(out, "+="); break;
+		case ASSIGNMENT_OPERATION_MINUS_EQUAL:	fprintf(out, "-="); break;
+		case ASSIGNMENT_OPERATION_TIMES_EQUAL:	fprintf(out, "*="); break;
+		case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:	fprintf(out, "/="); break;
+		case ASSIGNMENT_OPERATION_AND_EQUAL:	fprintf(out, "&="); break;
+		case ASSIGNMENT_OPERATION_OR_EQUAL:		fprintf(out, "|="); break;
+		case ASSIGNMENT_OPERATION_XOR_EQUAL:	fprintf(out, "^="); break;
+		case ASSIGNMENT_OPERATION_SHL_EQUAL:	fprintf(out, "<<="); break;
+		case ASSIGNMENT_OPERATION_SHR_EQUAL:	fprintf(out, ">>="); break;
 		}
 		DEBUG_print_expression(out, node->expression.binary_exp.right);
 		fprintf(out, ")");
@@ -477,23 +481,6 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 	}
 }
 
-void DEBUG_print_assignment(FILE* out, Ast* node)
-{
-	DEBUG_print_expression(out, node->var_assign.lvalue);
-	switch (node->var_assign.assign_op) {
-	case ASSIGNMENT_OPERATION_EQUAL:		fprintf(out, " = "); break;
-	case ASSIGNMENT_OPERATION_PLUS_EQUAL:	fprintf(out, " += "); break;
-	case ASSIGNMENT_OPERATION_MINUS_EQUAL:	fprintf(out, " -= "); break;
-	case ASSIGNMENT_OPERATION_TIMES_EQUAL:	fprintf(out, " *= "); break;
-	case ASSIGNMENT_OPERATION_DIVIDE_EQUAL: fprintf(out, " /= "); break;
-	case ASSIGNMENT_OPERATION_OR_EQUAL:		fprintf(out, " |= "); break;
-	case ASSIGNMENT_OPERATION_AND_EQUAL:	fprintf(out, " &= "); break;
-	case ASSIGNMENT_OPERATION_XOR_EQUAL:	fprintf(out, " ^= "); break;
-	case ASSIGNMENT_OPERATION_SHL_EQUAL:	fprintf(out, " <<= "); break;
-	case ASSIGNMENT_OPERATION_SHR_EQUAL:	fprintf(out, " >>= "); break;
-	}
-	DEBUG_print_expression(out, node->var_assign.rvalue);
-}
 
 void DEBUG_print_var_decl(FILE* out, Ast* node) {
 	fprintf(out, "%.*s : ", TOKEN_STR(node->var_decl.name));
@@ -573,7 +560,6 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 	case AST_NODE_VARIABLE_DECL:		DEBUG_print_var_decl(out, node); break;
 	case AST_NODE_BINARY_EXPRESSION:	DEBUG_print_expression(out, node); break;
 	case AST_NODE_BLOCK:				DEBUG_print_block(out, node); break;
-	case AST_NODE_VARIABLE_ASSIGNMENT:	DEBUG_print_assignment(out, node); break;
 	case AST_NODE_IF_STATEMENT:			DEBUG_print_if_statement(out, node); break;
 	case AST_NODE_WHILE_STATEMENT:		DEBUG_print_while_statement(out, node); break;
 	case AST_NODE_PROCEDURE_CALL:		DEBUG_print_expression(out, node); break;

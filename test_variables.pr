@@ -50,9 +50,8 @@ main :: () {
 }
 */
 
-proc :: (v : int, v : float) -> int {
-	
-	return v;
+proc :: () -> void {
+	a += b = c;
 }
 
 

@@ -59,7 +59,9 @@ int check_declarations(Ast* node, Scope* scope) {
 		switch (node->node) {
 		case AST_NODE_VARIABLE_DECL: {
 			assert(scope->symb_table);
+			//
 			// check if variable exist on this scope
+			//
 			s64 hash = scope->symb_table->entry_exist(node->var_decl.name);
 			if (hash == -1) {
 				hash = scope->symb_table->insert(scope, node->var_decl.name, node);
@@ -71,6 +73,9 @@ int check_declarations(Ast* node, Scope* scope) {
 		}break;
 		case AST_NODE_PROC_DECLARATION: {
 			assert(scope->symb_table);
+			//
+			// check if the proc decl is not redefined in the same scope
+			//
 			s64 hash = scope->symb_table->entry_exist(node->proc_decl.name);
 			if (hash == -1) {
 				hash = scope->symb_table->insert(scope, node->proc_decl.name, node);
@@ -79,16 +84,22 @@ int check_declarations(Ast* node, Scope* scope) {
 				report_declaration_site(scope->symb_table->entries[hash].node);
 				return 0;
 			}
+			//
+			// check for duplicate arguments
+			//
 			int num_args = node->proc_decl.num_args;
 			int error = DECL_CHECK_PASSED;
 			if (num_args > 0) {
 				node->proc_decl.scope->symb_table = new Symbol_Table(num_args * declaration_ratio);
 				printf("Proc (%d - level[%d]) has %d arguments.\n", node->proc_decl.scope->id, node->proc_decl.scope->level, node->proc_decl.scope->num_declarations);
 				for (int i = 0; i < num_args; ++i) {
-					error = check_declarations(node->proc_decl.arguments[i], node->proc_decl.scope);
+					int ret = check_declarations(node->proc_decl.arguments[i], node->proc_decl.scope);
+					if (ret != DECL_CHECK_PASSED) error = DECL_CHECK_FAILED;
 				}
 			}
-			return check_declarations(node->proc_decl.body, node->proc_decl.scope);
+			int ret = check_declarations(node->proc_decl.body, node->proc_decl.scope);
+			if (ret != DECL_CHECK_PASSED) error = DECL_CHECK_FAILED;
+			if (error == DECL_CHECK_FAILED) return DECL_CHECK_FAILED;
 		}break;
 		case AST_NODE_STRUCT_DECLARATION: {
 			Scope* struct_scope = node->struct_decl.scope;
@@ -96,13 +107,16 @@ int check_declarations(Ast* node, Scope* scope) {
 		}break;
 
 		case AST_NODE_NAMED_ARGUMENT: {
+			//
+			// check for duplicate named arguments from within a function
+			//
 			assert(scope->symb_table);
 			s64 hash = scope->symb_table->entry_exist(node->named_arg.arg_name);
 			if (hash == -1) {
 				hash = scope->symb_table->insert(scope, node->named_arg.arg_name, node);
 			} else {
-				report_semantic_error(&node->named_arg.site, "Procedure argument %.*s redefinition.\n", node->proc_decl.name->value.length, node->proc_decl.name->value.data);
-				report_declaration_site(scope->symb_table->entries[hash].node);
+				report_semantic_error(&node->named_arg.site, "Procedure argument %.*s redefinition.\n", node->named_arg.arg_name->value.length, node->named_arg.arg_name->value.data);
+				fprintf(stderr, "Previously defined as argument #%d in the procedure.\n", scope->symb_table->entries[hash].node->named_arg.index + 1);
 				return 0;
 			}
 		}break;
@@ -116,6 +130,9 @@ int check_declarations(Ast* node, Scope* scope) {
 		}
 	}
 	if (node->node == AST_NODE_BLOCK) {
+		//
+		// check recursively for all the declarations and commands of this block
+		//
 		Scope* block_scope = node->block.scope;
 		printf("Block (%d - level[%d]) has %d declarations.\n", block_scope->id, block_scope->level, block_scope->num_declarations);
 

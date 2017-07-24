@@ -25,7 +25,6 @@ enum Node_Type {
 	AST_NODE_LITERAL_EXPRESSION,
 	AST_NODE_VARIABLE_EXPRESSION,
 	AST_NODE_BLOCK,
-	AST_NODE_VARIABLE_ASSIGNMENT,
 	AST_NODE_PROCEDURE_CALL,
 	AST_NODE_IF_STATEMENT,
 	AST_NODE_WHILE_STATEMENT,
@@ -33,35 +32,21 @@ enum Node_Type {
 	AST_NODE_BREAK_STATEMENT,
 	AST_NODE_CONTINUE_STATEMENT,
 	AST_NODE_STRUCT_DECLARATION,
+	AST_NODE_EXPRESSION_ASSIGNMENT,
 };
 
 enum Precedence
 {
-	PRECEDENCE_0 = 0,	//	 || &&
-	PRECEDENCE_1 = 1,	//	 == >= <= != > <
-	PRECEDENCE_2 = 2,	//	 ^ | & >> <<
-	PRECEDENCE_3 = 3,	//	 + -
-	PRECEDENCE_4 = 4,	//	 * / %
-	PRECEDENCE_5 = 5,	//	 &(addressof) ~ ++POST --POST
-	PRECEDENCE_6 = 6,	//	 *(dereference)	cast ! ++PRE --PRE
-	PRECEDENCE_7 = 7,	//	 .
-	PRECEDENCE_MAX = 8,
-};
-
-enum AssignmentOperation 
-{
-	ASSIGNMENT_OPERATION_UNKNOWN,
-
-	ASSIGNMENT_OPERATION_EQUAL,
-	ASSIGNMENT_OPERATION_PLUS_EQUAL,
-	ASSIGNMENT_OPERATION_MINUS_EQUAL,
-	ASSIGNMENT_OPERATION_TIMES_EQUAL,
-	ASSIGNMENT_OPERATION_DIVIDE_EQUAL,
-	ASSIGNMENT_OPERATION_AND_EQUAL,
-	ASSIGNMENT_OPERATION_OR_EQUAL,
-	ASSIGNMENT_OPERATION_XOR_EQUAL,
-	ASSIGNMENT_OPERATION_SHL_EQUAL,
-	ASSIGNMENT_OPERATION_SHR_EQUAL,
+	PRECEDENCE_0 = 0,	//	 assignments
+	PRECEDENCE_1 = 1,	//	 || &&
+	PRECEDENCE_2 = 2,	//	 == >= <= != > <
+	PRECEDENCE_3 = 3,	//	 ^ | & >> <<
+	PRECEDENCE_4 = 4,	//	 + -
+	PRECEDENCE_5 = 5,	//	 * / %
+	PRECEDENCE_6 = 6,	//	 &(addressof) ~ ++POST --POST
+	PRECEDENCE_7 = 7,	//	 *(dereference)	cast ! ++PRE --PRE
+	PRECEDENCE_8 = 8,	//	 .
+	PRECEDENCE_MAX,
 };
 
 enum BinaryOperation
@@ -89,6 +74,17 @@ enum BinaryOperation
 	BINARY_OP_NOT_EQUAL = 18,
 
 	BINARY_OP_DOT = 19,
+
+	ASSIGNMENT_OPERATION_EQUAL,
+	ASSIGNMENT_OPERATION_PLUS_EQUAL,
+	ASSIGNMENT_OPERATION_MINUS_EQUAL,
+	ASSIGNMENT_OPERATION_TIMES_EQUAL,
+	ASSIGNMENT_OPERATION_DIVIDE_EQUAL,
+	ASSIGNMENT_OPERATION_AND_EQUAL,
+	ASSIGNMENT_OPERATION_OR_EQUAL,
+	ASSIGNMENT_OPERATION_XOR_EQUAL,
+	ASSIGNMENT_OPERATION_SHL_EQUAL,
+	ASSIGNMENT_OPERATION_SHR_EQUAL,
 };
 
 enum UnaryOperation
@@ -215,13 +211,6 @@ struct Ast_Block {
 	Ast** commands;
 };
 
-struct Ast_VarAssign {
-	Scope* scope;
-	Ast* lvalue;
-	Ast* rvalue;
-	AssignmentOperation assign_op;
-};
-
 struct Ast_If {
 	Ast* bool_exp;
 	Ast* body;
@@ -258,7 +247,6 @@ struct Ast {
 		Ast_StructDecl struct_decl;
 		Ast_NamedArgument named_arg;
 		Ast_Block block;
-		Ast_VarAssign var_assign;
 		Ast_If if_stmt;
 		Ast_While while_stmt;
 		Ast_Return ret_stmt;
@@ -297,7 +285,6 @@ Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type,
 Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok);
 Ast* create_variable(Memory_Arena* arena, Token* var_token, Scope* scope);
 Ast* create_block(Memory_Arena* arena, Scope* scope);
-Ast* create_var_assignment(Memory_Arena* arena, Ast* lvalue, Ast* rvalue, AssignmentOperation assign_op, Scope* scope);
 Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope);
 Ast* create_if(Memory_Arena* arena, Ast* bool_exp, Ast* body, Ast* else_stmt, Scope* scope);
 Ast* create_while(Memory_Arena* arena, Ast* bool_exp, Ast* body, Scope* scope);
