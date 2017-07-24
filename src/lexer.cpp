@@ -203,10 +203,10 @@ bool Lexer::read_token(char** begin)
 	token.filename = filename;
 
 	switch (ch_1) {
-	case '[': type = TOKEN_SYMBOL_OPEN_BRACE;		flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_POSTFIXED; break;
-	case ']': type = TOKEN_SYMBOL_CLOSE_BRACE;		break;
-	case '{': type = TOKEN_SYMBOL_OPEN_BRACKET;		break;
-	case '}': type = TOKEN_SYMBOL_CLOSE_BRACKET;	break;
+	case '{': type = TOKEN_SYMBOL_OPEN_BRACE;		flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_POSTFIXED; break;
+	case '}': type = TOKEN_SYMBOL_CLOSE_BRACE;		break;
+	case '[': type = TOKEN_SYMBOL_OPEN_BRACKET;		break;
+	case ']': type = TOKEN_SYMBOL_CLOSE_BRACKET;	break;
 	case '(': type = TOKEN_SYMBOL_OPEN_PAREN;		break;
 	case ')': type = TOKEN_SYMBOL_CLOSE_PAREN;		break;
 	case ',': type = TOKEN_SYMBOL_COMMA;			break;
@@ -534,13 +534,13 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_SYMBOL_GREATER:			return  make_null_term_string(">"); break;
 	case TOKEN_SYMBOL_INTERROGATION:	return  make_null_term_string("?"); break;
 	case TOKEN_SYMBOL_AT:				return  make_null_term_string("@"); break;
-	case TOKEN_SYMBOL_OPEN_BRACKET:		return  make_null_term_string("{"); break;
-	case TOKEN_SYMBOL_CLOSE_BRACKET:	return  make_null_term_string("}"); break;
+	case TOKEN_SYMBOL_OPEN_BRACKET:		return  make_null_term_string("["); break;
+	case TOKEN_SYMBOL_CLOSE_BRACKET:	return  make_null_term_string("]"); break;
 	case TOKEN_SYMBOL_CARAT:			return  make_null_term_string("^"); break;
 	case TOKEN_SYMBOL_BACK_TICK:		return  make_null_term_string("`"); break;
-	case TOKEN_SYMBOL_OPEN_BRACE:		return  make_null_term_string("["); break;
+	case TOKEN_SYMBOL_OPEN_BRACE:		return  make_null_term_string("{"); break;
 	case TOKEN_SYMBOL_PIPE:				return  make_null_term_string("|"); break;
-	case TOKEN_SYMBOL_CLOSE_BRACE:		return  make_null_term_string("]"); break;
+	case TOKEN_SYMBOL_CLOSE_BRACE:		return  make_null_term_string("}"); break;
 	case TOKEN_SYMBOL_TILDE:			return  make_null_term_string("~"); break;
 
 	case TOKEN_ARROW:				return  make_null_term_string("->"); break;

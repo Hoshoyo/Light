@@ -13,6 +13,7 @@ struct Ast_Unary_Exp;
 struct Ast_ProcDecl;
 struct Ast;
 
+struct Symbol_Table;
 struct Scope;
 
 enum Node_Type {
@@ -31,6 +32,7 @@ enum Node_Type {
 	AST_NODE_RETURN_STATEMENT,
 	AST_NODE_BREAK_STATEMENT,
 	AST_NODE_CONTINUE_STATEMENT,
+	AST_NODE_STRUCT_DECLARATION,
 };
 
 enum Precedence
@@ -103,28 +105,44 @@ enum UnaryOperation
 	UNARY_OP_CAST,
 };
 
+struct Decl_Site {
+	string filename;
+	int line;
+	int column;
+};
+
+
 // declarations
 struct Ast_ProcDecl {
 	Token* name;
-	Ast* arguments;
+	Ast** arguments;
 	Ast* body;
 	int num_args;
-	Type* proc_ret_type;
+	Type_Instance* proc_ret_type;
 	Scope* scope;
+	Decl_Site site;
+	u32 symbol_hash;
 };
 struct Ast_VarDecl {
 	Token* name;
 	Ast* assignment;
-	Type* type;
+	Type_Instance* type;
 	Scope* scope;
 	s32 size_bytes;
 	s32 alignment;
+	Decl_Site site;
+	u32 symbol_hash;
 };
 struct Ast_StructDecl {
 	Token* name;
-	Ast_VarDecl** fields;
-	s64 size_bytes;
+	Ast** fields;
+	int num_fields;
 	s32 alignment;
+	s64 size_bytes;
+	Type_Instance* type_info;
+	Scope* scope;
+	Decl_Site site;
+	u32 symbol_hash;
 };
 
 struct Ast_Binary_Exp {
@@ -142,7 +160,7 @@ struct Ast_Unary_Exp {
 	u32 flags;
 	UnaryOperation op;
 	Ast* operand;
-	Type* cast_type;
+	Type_Instance* cast_type;
 	Scope* scope;
 };
 
@@ -150,12 +168,12 @@ const u32 LITERAL_FLAG_IS_REGSIZE = FLAG(0);
 struct Ast_Literal {
 	u32 flags;
 	Token* lit_tok;
-	Type* type;
+	Type_Instance* type;
 };
 
 struct Ast_Variable {
 	Token* name;
-	Type* type;
+	Type_Instance* type;
 	Scope* scope;
 };
 
@@ -184,10 +202,12 @@ struct Ast_Expression {
 
 struct Ast_NamedArgument {
 	Token* arg_name;
-	Type* arg_type;
+	Type_Instance* arg_type;
 	Ast* default_value;
 	int index;
 	Ast* next;
+	Scope* scope;
+	Decl_Site site;
 };
 
 struct Ast_Block {
@@ -230,7 +250,7 @@ struct Ast_Continue {
 
 struct Ast {
 	Node_Type node;
-	Type* return_type;
+	Type_Instance* return_type;
 	bool is_decl;
 	union {
 		Ast_ProcDecl proc_decl;
@@ -249,9 +269,16 @@ struct Ast {
 	};
 };
 
+const u32 SCOPE_FLAG_STRUCT_SCOPE = FLAG(1);
+const u32 SCOPE_FLAG_PROC_SCOPE = FLAG(2);
+const u32 SCOPE_FLAG_BLOCK_SCOPE = FLAG(3);
+
 struct Scope {
 	s64 id;
 	s32 level;
+	u32 flags;
+	s32 num_declarations;
+	Symbol_Table* symb_table;
 	Scope* parent;
 };
 
@@ -262,11 +289,11 @@ struct Scope_Manager {
 static Scope_Manager scope_manager = { };
 
 s64 generate_scope_id();
-Scope* create_scope(s32 level, Scope* parent);
+Scope* create_scope(s32 level, Scope* parent, u32 flags);
 
-Ast* create_proc(Memory_Arena* arena, Token* name, Type* return_type, Ast* arguments, int nargs, Ast* body, Scope* scope);
-Ast* create_named_argument(Memory_Arena* arena, Token* name, Type* type, Ast* default_val, int index);
-Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type* type, Ast* assign_val, Scope* scope);
+Ast* create_proc(Memory_Arena* arena, Token* name, Type_Instance* return_type, Ast** arguments, int nargs, Ast* body, Scope* scope, Decl_Site* site);
+Ast* create_named_argument(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* default_val, int index, Scope* scope, Decl_Site* site);
+Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* assign_val, Scope* scope, Decl_Site* site);
 Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok);
 Ast* create_variable(Memory_Arena* arena, Token* var_token, Scope* scope);
 Ast* create_block(Memory_Arena* arena, Scope* scope);
@@ -275,10 +302,11 @@ Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope
 Ast* create_if(Memory_Arena* arena, Ast* bool_exp, Ast* body, Ast* else_stmt, Scope* scope);
 Ast* create_while(Memory_Arena* arena, Ast* bool_exp, Ast* body, Scope* scope);
 Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope);
-Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, u32 flags, Type* cast_type, Precedence precedence, Scope* scope);
+Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, u32 flags, Type_Instance* cast_type, Precedence precedence, Scope* scope);
 Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, Token* op, Precedence precedence, Scope* scope);
 Ast* create_break(Memory_Arena* arena, Scope* scope);
 Ast* create_continue(Memory_Arena* arena, Scope* scope);
+Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_fields, Scope* struct_scope, Decl_Site* site);
 
 UnaryOperation get_unary_op(Token* token);
 BinaryOperation get_binary_op(Token* token);

@@ -1,3 +1,8 @@
+hello : ^^int = 1;
+world : int = 8;
+my : float = 1.0;
+name : double = 3.0;
+is : float = 3.5;
 print :: (str : ^char, val : int) -> void {
 	printf(str, val);
 }

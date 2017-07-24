@@ -1,5 +1,7 @@
 #include "parser.h"
 #include "ast.h"
+#include <stdarg.h>
+#include "symbol_table.h"
 
 Parser::Parser(Lexer* lexer) 
 	: arena(65536), lexer(lexer)
@@ -9,6 +11,16 @@ Parser::Parser(Lexer* lexer)
 
 void print_error_loc(FILE* out, string filename, int line, int column) {
 	fprintf(out, "%.*s (%d:%d) ", filename.length, filename.data, line, column);
+}
+
+int Parser::report_syntax_error(char* msg, ...)
+{
+	va_list args;
+	va_start(args, msg);
+	fprintf(stderr, "Syntax Error: ");
+	vfprintf(stderr, msg, args);
+	va_end(args);
+	return 0;
 }
 
 Token* Parser::require_and_eat(Token_Type t)
@@ -35,10 +47,11 @@ int Parser::require_token_type(Token* tok, Token_Type type)
 	return 0;
 }
 
-Ast** Parser::parse_top_level() 
+Ast** Parser::parse_top_level(Scope** g_scope) 
 {
-	top_level = create_array(Ast*, 512);	// @todo estimate size here
-	Scope* global_scope = create_scope(0, 0);
+	top_level = create_array(Ast*, 2048);	// @todo estimate size here @important
+	Scope* global_scope = create_scope(0, 0, 0);
+	*g_scope = global_scope;
 
 	int error = PARSER_NO_ERROR;
 	while (error == PARSER_NO_ERROR && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
@@ -184,6 +197,28 @@ Precedence Parser::get_precedence_level(BinaryOperation bo)
 	return p;
 }
 
+Type_Primitive get_primitive_type(Token* tok)
+{
+	switch (tok->type) {
+	case TOKEN_BOOL:	return Type_Primitive::TYPE_PRIMITIVE_BOOL; break;
+	case TOKEN_SINT8:	return Type_Primitive::TYPE_PRIMITIVE_S8; break;
+	case TOKEN_SINT16:	return Type_Primitive::TYPE_PRIMITIVE_S16; break;
+	case TOKEN_SINT32:	return Type_Primitive::TYPE_PRIMITIVE_S32; break;
+	case TOKEN_SINT64:	return Type_Primitive::TYPE_PRIMITIVE_S64; break;
+	case TOKEN_UINT8:	return Type_Primitive::TYPE_PRIMITIVE_U8; break;
+	case TOKEN_UINT16:	return Type_Primitive::TYPE_PRIMITIVE_U16; break;
+	case TOKEN_UINT32:	return Type_Primitive::TYPE_PRIMITIVE_U32; break;
+	case TOKEN_UINT64:	return Type_Primitive::TYPE_PRIMITIVE_U64; break;
+	case TOKEN_INT:		return Type_Primitive::TYPE_PRIMITIVE_S32; break;
+	case TOKEN_CHAR:	return Type_Primitive::TYPE_PRIMITIVE_S8; break;
+	case TOKEN_FLOAT:	return Type_Primitive::TYPE_PRIMITIVE_R32; break;
+	case TOKEN_REAL32:	return Type_Primitive::TYPE_PRIMITIVE_R32; break;
+	case TOKEN_DOUBLE:	return Type_Primitive::TYPE_PRIMITIVE_R64; break;
+	case TOKEN_VOID:	return Type_Primitive::TYPE_PRIMITIVE_VOID; break;
+	default: return Type_Primitive::TYPE_PRIMITIVE_UNKNOWN; break;
+	}
+}
+
 AssignmentOperation Parser::get_assignment_op(Token_Type tt)
 {
 	AssignmentOperation assop = ASSIGNMENT_OPERATION_UNKNOWN;
@@ -224,7 +259,7 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 	} else if (first->flags & TOKEN_FLAG_UNARY_OPERATOR) {
 		UnaryOperation uop = get_unary_op(lexer->eat_token());
 		Precedence unop_precedence = get_precedence_level(uop, true);
-		Type* cast_type = 0;
+		Type_Instance* cast_type = 0;
 		if (uop == UNARY_OP_CAST) {
 			require_and_eat((Token_Type)'(');
 			cast_type = parse_type();
@@ -359,6 +394,13 @@ Ast* Parser::parse_command(Scope* scope)
 			Ast* assign_op = parse_variable_assignment(scope);
 			require_and_eat((Token_Type)';');
 			command = assign_op;
+		} else if (lexer->peek_token_type(1) == TOKEN_COLON_COLON) {
+			// proc declaration
+			Token* name = lexer->eat_token();
+			command = parse_proc_decl(name, scope);
+		} else {
+			report_syntax_error("Identifier %.*s could not be resolved to a command or declaration.\n", TOKEN_STR(first));
+			return 0;
 		}
 	}
 	else if (first->type == TOKEN_IF_STATEMENT) {
@@ -418,7 +460,7 @@ Ast* Parser::parse_command(Scope* scope)
 	}
 
 	if (command == 0) {
-		//assert(0);
+		assert(0);
 	}
 	return command;
 }
@@ -430,7 +472,8 @@ Ast* Parser::parse_block(Scope* scope)
 
 	Token* next = 0;
 	do {
-		Ast* command = parse_command(scope);
+		Ast* command = parse_command(block->block.scope);
+		if (!command) return 0;
 		block_push_command(block, command);
 		next = lexer->peek_token();
 	} while (next->type != '}');
@@ -439,7 +482,7 @@ Ast* Parser::parse_block(Scope* scope)
 	return block;
 }
 
-Ast* Parser::parse_proc(Token* name, Scope* scope) 
+Ast* Parser::parse_proc_decl(Token* name, Scope* scope) 
 {
 	if (name == 0) {
 		name = lexer->eat_token();
@@ -450,14 +493,15 @@ Ast* Parser::parse_proc(Token* name, Scope* scope)
 	Token* curr = require_and_eat(TOKEN_COLON_COLON);
 	curr = require_and_eat((Token_Type)'(');
 
-	Ast* args = 0;
-	Ast* first_arg = 0;
+	Scope* proc_scope = create_scope(scope->level + 1, scope, SCOPE_FLAG_PROC_SCOPE);
+
+	Ast** args = create_array(Ast*, 4);
 	int n_args = 0;
-	while (true) {
+	for (;;) {
 		curr = lexer->eat_token();
 		if (curr->type == TOKEN_IDENTIFIER) {
 			require_and_eat((Token_Type)':');
-			Type* arg_type = parse_type();
+			Type_Instance* arg_type = parse_type();
 
 			// possible default value
 			Ast* arg_def_value = 0;
@@ -465,43 +509,46 @@ Ast* Parser::parse_proc(Token* name, Scope* scope)
 				arg_def_value = parse_expression(scope);
 			}
 
+			Decl_Site site;
+			site.filename = filename;
+			site.line = curr->line;
+			site.column = curr->column;
+
 			// create the argument node
-			Ast* argument = create_named_argument(&arena, curr, arg_type, arg_def_value, n_args);
-			if (args == 0) {
-				args = argument;
-				first_arg = args;
-			} else {
-				args->named_arg.next = argument;
-				args = argument;
-			}
+			Ast* argument = create_named_argument(&arena, curr, arg_type, arg_def_value, n_args, proc_scope, &site);
 			n_args++;
+			push_array(args, &argument);
 			if (lexer->peek_token_type() == (Token_Type)',') lexer->eat_token();
 		} else if (curr->type == (Token_Type)')') {
 			break;
 		} else {
 			print_error_loc(stderr, filename, curr->line, curr->column);
-			fprintf(stderr, "Syntax error: argument #%d of proc %.*s cannot be nameless.\n",
-				n_args + 1, TOKEN_STR(name));
-			parser_error = PARSER_ERROR_FATAL;
+			report_syntax_error("argument #%d of proc %.*s cannot be nameless.\n", n_args + 1, TOKEN_STR(name));
 			return 0;
 		}
 	}
 
-	Type* ret_type = 0;
+	Type_Instance* ret_type = 0;
 	if (lexer->peek_token_type() == TOKEN_ARROW) {
 		lexer->eat_token();
 		ret_type = parse_type();
 	} else {
-		ret_type = get_type(TOKEN_VOID);
+		ret_type = get_primitive_type(TYPE_PRIMITIVE_VOID);
 	}
 
 	Ast* body = 0;
-	if (lexer->peek_token_type() == (Token_Type)'{') {
-		Scope* proc_scope = create_scope(scope->level + 1, scope);
+	if (lexer->peek_token_type() == TOKEN_SYMBOL_OPEN_BRACE) {
 		body = parse_block(proc_scope);
 	}
 
-	return create_proc(&arena, name, ret_type, first_arg, n_args, body, scope);
+	Decl_Site site;
+	site.filename = filename;
+	site.line = name->line;
+	site.column = name->column;
+
+	scope->num_declarations += 1;
+	proc_scope->num_declarations += n_args;
+	return create_proc(&arena, name, ret_type, args, n_args, body, proc_scope, &site);
 }
 
 Ast* Parser::parse_variable_decl(Token* name, Scope* scope) 
@@ -512,7 +559,7 @@ Ast* Parser::parse_variable_decl(Token* name, Scope* scope)
 	}
 	require_and_eat((Token_Type)':');
 
-	Type* type = 0;
+	Type_Instance* type = 0;
 	Ast* assign_exp = 0;
 
 	if (lexer->peek_token_type() == (Token_Type)'=') {
@@ -526,8 +573,46 @@ Ast* Parser::parse_variable_decl(Token* name, Scope* scope)
 		}
 	}
 
-	Ast* vardecl = create_variable_decl(&arena, name, type, assign_exp, scope);
+	Decl_Site site;
+	site.filename = filename;
+	site.line = name->line;
+	site.column = name->column;
+
+	scope->num_declarations += 1;
+	Ast* vardecl = create_variable_decl(&arena, name, type, assign_exp, scope, &site);
 	return vardecl;
+}
+
+Ast* Parser::parse_struct(Token* name, Scope* scope)
+{
+	if (name && name->type != TOKEN_IDENTIFIER) {
+		print_error_loc(stderr, filename, name->line, name->column);
+		report_syntax_error("invalid identifier %.*s on struct declaration.\n", TOKEN_STR(name));
+		return 0;
+	}
+	require_and_eat(TOKEN_COLON_COLON);
+	require_and_eat(TOKEN_STRUCT_WORD);
+	require_and_eat(TOKEN_SYMBOL_OPEN_BRACE);
+
+	Ast** fields = create_array(Ast*, 8);
+	int num_fields = 0;
+	Scope* struct_scope = create_scope(1, scope, SCOPE_FLAG_STRUCT_SCOPE);
+	while (true) {
+		Ast* field = parse_declaration(struct_scope);
+		push_array(fields, &field);
+		num_fields++;
+		if (lexer->peek_token_type() == TOKEN_SYMBOL_CLOSE_BRACE) break;
+	}
+
+	Decl_Site site;
+	site.filename = filename;
+	site.line = name->line;
+	site.column = name->column;
+
+	scope->num_declarations += 1;
+	Ast* struct_decl = create_struct_decl(&arena, name, fields, num_fields, struct_scope, &site);
+	require_and_eat(TOKEN_SYMBOL_CLOSE_BRACE);
+	return struct_decl;
 }
 
 Ast* Parser::parse_declaration(Scope* scope)
@@ -535,8 +620,7 @@ Ast* Parser::parse_declaration(Scope* scope)
 	Token* name = lexer->eat_token();
 	if (name->type != TOKEN_IDENTIFIER) {
 		print_error_loc(stderr, filename, name->line, name->column);
-		fprintf(stderr, "Syntax error: invalid identifier %.*s on declaration", TOKEN_STR(name));
-		parser_error = PARSER_ERROR_FATAL;
+		report_syntax_error("invalid identifier %.*s on declaration.\n", TOKEN_STR(name));
 		return 0;
 	}
 
@@ -545,11 +629,11 @@ Ast* Parser::parse_declaration(Scope* scope)
 	if (decl->type == TOKEN_COLON_COLON) {
 		if (lexer->peek_token_type(1) == TOKEN_STRUCT_WORD) {
 			// id :: struct {}
-			//return parse_struct();
-			return 0;
+			return parse_struct(name, scope);
+			//return 0;
 		} else if (lexer->peek_token_type(1) == (Token_Type)'(') {
 			// id :: () {}
-			return parse_proc(name, scope);
+			return parse_proc_decl(name, scope);
 		}
 	} 
 	else if (decl->type == (Token_Type)':') {
@@ -560,24 +644,100 @@ Ast* Parser::parse_declaration(Scope* scope)
 	}
 }
 
-Type* Parser::parse_type()
+Type_Instance* Parser::parse_type()
 {
-	Type* type = 0;
-	Token* t = lexer->eat_token();
+	Token* tok = lexer->eat_token();
+	Type_Instance* ti = new Type_Instance();
+	if (tok->flags & TOKEN_FLAG_PRIMITIVE_TYPE) {
+		// primitive type
+		Type_Primitive primitive = get_primitive_type(tok);
+		ti->flags = 0 | TYPE_FLAG_IS_REGISTER_SIZE | TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED;
+		ti->type = TYPE_PRIMITIVE;
+		ti->primitive = primitive;
+		ti->type_size = get_size_of_primitive_type(primitive);
+	} else if (tok->type == TOKEN_SYMBOL_CARAT) {
+		// pointer type
+		ti->flags = 0 | TYPE_FLAG_IS_REGISTER_SIZE | TYPE_FLAG_IS_SIZE_RESOLVED;
+		ti->type = TYPE_POINTER;
+		ti->type_size = get_size_of_pointer();
+		ti->pointer_to = parse_type();
+	} else if (tok->type == TOKEN_SYMBOL_OPEN_BRACKET) {
+		// array type
+		ti->flags = 0;
+		ti->type = TYPE_ARRAY;
+		ti->type_size = -1;
 
-	// if is primitive
-	if (t->flags & TOKEN_FLAG_PRIMITIVE_TYPE) {
-		type = get_type(t->type);
-		return type;
-	} else if (t->type == (Token_Type)'^') {
-		Type* t = (Type*)malloc(sizeof(Type));
-		t->primitive = TYPE_NOT_PRIMITIVE;
-		t->pointer_to = parse_type();
-		return t;
+		int num_dimensions = 0;
+		Token* f = lexer->peek_token();
+		if (f->type == TOKEN_DOUBLE_DOT) {
+			// dynamic array
+			lexer->eat_token();
+			num_dimensions = 1;
+			ti->flags |= TYPE_FLAG_ARRAY_DYNAMIC;
+			require_and_eat(TOKEN_SYMBOL_CLOSE_BRACKET);
+		} else {
+			ti->flags |= TYPE_FLAG_ARRAY_STATIC;
+			// static array
+			Ast** dimension_sizes = create_array(Ast*, 2);
+			for (int i = 0;; ++i) {
+				Ast* value = parse_expression(0);
+				push_array(dimension_sizes, &value);
+				num_dimensions++;
+				f = lexer->eat_token();
+				if (f->type == TOKEN_SYMBOL_COMMA) continue;
+				else if (f->type == TOKEN_SYMBOL_CLOSE_BRACKET) break;
+				else {
+					parser_error = PARSER_ERROR_FATAL;
+					fprintf(stderr, "Syntax error: expected end of array declaration with ']', got %.*s instead.\n", TOKEN_STR(f));
+					return 0;
+				}
+			}
+			ti->type_array.dimensions_sizes = dimension_sizes;
+		}
+
+		ti->type_array.num_dimensions = num_dimensions;
+		ti->type_array.array_of = parse_type();
+	} else if (tok->type == TOKEN_SYMBOL_OPEN_PAREN) {
+		// function type
+		int num_arguments = 0;
+		if (lexer->peek_token_type() != TOKEN_SYMBOL_CLOSE_PAREN) {
+			Type_Instance** arg_types = create_array(Type_Instance*, 8);
+			for (int i = 0;; ++i) {
+				Type_Instance* value = parse_type();
+				push_array(ti->type_function.arguments_type, &value);
+				num_arguments++;
+			}
+			ti->type_function.arguments_type = arg_types;
+		} else {
+			// no arguments
+			ti->type_function.arguments_type = 0;	
+		}
+		require_and_eat(TOKEN_SYMBOL_CLOSE_PAREN);
+		ti->type_function.num_arguments = num_arguments;
+		if (lexer->peek_token_type() == TOKEN_ARROW) {
+			lexer->eat_token();
+			ti->type_function.return_type = parse_type();
+		} else if (lexer->peek_token_type() == TOKEN_SYMBOL_OPEN_BRACE) {
+			// initiate function body, so return type is void
+			Type_Instance* void_type = ti;
+			void_type->flags = 0 | TYPE_FLAG_IS_REGISTER_SIZE | TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED;
+			void_type->type = TYPE_PRIMITIVE;
+			void_type->primitive = TYPE_PRIMITIVE_VOID;
+			void_type->type_size = get_size_of_primitive_type(TYPE_PRIMITIVE_VOID);
+
+			ti->type_function.return_type = void_type;
+		}
+		ti->type_function.return_type = parse_type();
+	} else if (tok->type == TOKEN_IDENTIFIER) {
+		// struct type
+		Type_Instance* struct_type = ti;
+
+		struct_type->flags = 0;
+		struct_type->type = TYPE_STRUCT;
+		struct_type->type_size = 0;
+		struct_type->type_struct.name = tok->value.data;
+		struct_type->type_struct.name_length = tok->value.length;
+		struct_type->type_struct.struct_descriptor = 0;
 	}
-	else {
-		// not implemented
-		assert(0);
-	}
-	return 0;
+	return ti;
 }

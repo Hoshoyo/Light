@@ -45,3 +45,6 @@ u8  str_to_u8(char* text, int length);
 
 void s32_to_str(s32 val, char* buffer);
 void s64_to_str(s64 val, char* buffer);
+
+u32 djb2_hash(u8 *str, int size);
+

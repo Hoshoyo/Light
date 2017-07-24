@@ -289,3 +289,16 @@ void make_immutable_string(string& dest, string& src)
 	dest.data = src.data;
 	dest.length = src.length;
 }
+
+u32 djb2_hash(u8 *str, int size)
+{
+	u32 hash = 5381;
+	int c;
+	int i = 0;
+	while (i < size) {
+		c = *str++;
+		hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+		++i;
+	}
+	return hash;
+}

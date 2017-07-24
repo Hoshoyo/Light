@@ -1,5 +1,7 @@
 #include "ast.h"
 #include "parser.h"
+#include "type.h"
+#include "symbol_table.h"
 
 #define ALLOC_AST(A) (Ast*)A->allocate(sizeof(Ast))
 
@@ -43,7 +45,7 @@ BinaryOperation get_binary_op(Token* token)
 	}
 }
 
-Ast* create_proc(Memory_Arena* arena, Token* name, Type* return_type, Ast* arguments, int nargs, Ast* body, Scope* scope) {
+Ast* create_proc(Memory_Arena* arena, Token* name, Type_Instance* return_type, Ast** arguments, int nargs, Ast* body, Scope* scope, Decl_Site* site) {
 	Ast* proc = ALLOC_AST(arena);
 
 	proc->node = AST_NODE_PROC_DECLARATION;
@@ -57,10 +59,14 @@ Ast* create_proc(Memory_Arena* arena, Token* name, Type* return_type, Ast* argum
 	proc->proc_decl.body = body;
 	proc->proc_decl.num_args = nargs;
 
+	proc->proc_decl.site.filename = site->filename;
+	proc->proc_decl.site.line = site->line;
+	proc->proc_decl.site.column = site->column;
+
 	return proc;
 }
 
-Ast* create_named_argument(Memory_Arena* arena, Token* name, Type* type, Ast* default_val, int index) 
+Ast* create_named_argument(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* default_val, int index, Scope* scope, Decl_Site* site)
 {
 	Ast* narg = ALLOC_AST(arena);
 
@@ -72,11 +78,16 @@ Ast* create_named_argument(Memory_Arena* arena, Token* name, Type* type, Ast* de
 	narg->named_arg.arg_type = type;
 	narg->named_arg.index = index;
 	narg->named_arg.default_value = default_val;
+	narg->named_arg.scope = scope;
+
+	narg->named_arg.site.filename = site->filename;
+	narg->named_arg.site.line = site->line;
+	narg->named_arg.site.column = site->column;
 
 	return narg;
 }
 
-Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type* type, Ast* assign_val, Scope* scope)
+Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* assign_val, Scope* scope, Decl_Site* site)
 {
 	Ast* vdecl = ALLOC_AST(arena);
 
@@ -89,7 +100,12 @@ Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type* type, Ast* ass
 	vdecl->var_decl.alignment = 4;
 	vdecl->var_decl.assignment = assign_val;
 	vdecl->var_decl.type = type;
-	vdecl->var_decl.size_bytes = get_type_size_bytes(type);
+	
+	vdecl->var_decl.site.filename = site->filename;
+	vdecl->var_decl.site.line = site->line;
+	vdecl->var_decl.site.column = site->column;
+
+	//vdecl->var_decl.size_bytes = get_type_size_bytes(type);
 
 	return vdecl;
 }
@@ -168,7 +184,7 @@ Ast* create_block(Memory_Arena* arena, Scope* scope)
 	block->is_decl = false;
 	block->return_type = 0;
 
-	block->block.scope = create_scope(scope->level + 1, scope);
+	block->block.scope = create_scope(scope->level + 1, scope, SCOPE_FLAG_BLOCK_SCOPE);
 	block->block.commands = create_array(Ast*, 16);
 
 	return block;
@@ -232,7 +248,7 @@ Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope)
 	return ret_stmt;
 }
 
-Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, u32 flags, Type* cast_type, Precedence precedence, Scope* scope)
+Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, u32 flags, Type_Instance* cast_type, Precedence precedence, Scope* scope)
 {
 	Ast* unop = ALLOC_AST(arena);
 
@@ -277,6 +293,29 @@ Ast* create_continue(Memory_Arena* arena, Scope* scope)
 	return continue_stmt;
 }
 
+Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_fields, Scope* struct_scope, Decl_Site* site)
+{
+	Ast* struct_decl = ALLOC_AST(arena);
+
+	struct_decl->is_decl = true;
+	struct_decl->node = AST_NODE_STRUCT_DECLARATION;
+	struct_decl->return_type = 0;
+
+	struct_decl->struct_decl.alignment = 4;
+	struct_decl->struct_decl.fields = fields;
+	struct_decl->struct_decl.name = name;
+	struct_decl->struct_decl.num_fields = num_fields;
+	struct_decl->struct_decl.size_bytes = 0;
+	struct_decl->struct_decl.type_info = 0;
+	struct_decl->struct_decl.scope = struct_scope;
+
+	struct_decl->struct_decl.site.filename = site->filename;
+	struct_decl->struct_decl.site.line = site->line;
+	struct_decl->struct_decl.site.column = site->column;
+
+	return struct_decl;
+}
+
 void block_push_command(Ast* block, Ast* command)
 {
 	push_array(block->block.commands, &command);
@@ -293,12 +332,15 @@ s64 generate_scope_id()
 	return scope_manager.current_id - 1;
 }
 
-Scope* create_scope(s32 level, Scope* parent)
+Scope* create_scope(s32 level, Scope* parent, u32 flags)
 {
 	Scope* res = (Scope*)malloc(sizeof(Scope));
+	res->num_declarations = 0;
+	res->symb_table = 0;
 	res->id = generate_scope_id();
 	res->level = level;
 	res->parent = parent;
+	res->flags = flags;
 	return res;
 }
 
@@ -314,8 +356,9 @@ Scope* create_scope(s32 level, Scope* parent)
 
 ****************************************/
 
-void DEBUG_print_type(FILE* out, Type* type) {
-	if (type->flags & TYPE_FLAG_PRIMITIVE) {
+void DEBUG_print_type(FILE* out, Type_Instance* type) {
+
+	if (type->type == TYPE_PRIMITIVE) {
 		switch (type->primitive) {
 		case TYPE_PRIMITIVE_S64:	fprintf(out, "s64"); break;
 		case TYPE_PRIMITIVE_S32:	fprintf(out, "s32"); break;
@@ -330,10 +373,11 @@ void DEBUG_print_type(FILE* out, Type* type) {
 		case TYPE_PRIMITIVE_R32:	fprintf(out, "r32"); break;
 		case TYPE_PRIMITIVE_VOID:	fprintf(out, "void"); break;
 		}
-	} else if (type->flags & TYPE_FLAG_POINTER) {
+	} else if (type->type == TYPE_POINTER) {
 		fprintf(out, "^");
 		DEBUG_print_type(out, type->pointer_to);
 	}
+
 }
 
 void DEBUG_print_block(FILE* out, Ast* block)
@@ -350,7 +394,7 @@ void DEBUG_print_block(FILE* out, Ast* block)
 void DEBUG_print_proc(FILE* out, Ast* proc_node) {
 	fprintf(out, "%.*s :: (", TOKEN_STR(proc_node->proc_decl.name));
 	for (int i = 0; i < proc_node->proc_decl.num_args; ++i) {
-		Ast* narg = proc_node->proc_decl.arguments;
+		Ast* narg = proc_node->proc_decl.arguments[i];
 		fprintf(out, "%.*s : ", TOKEN_STR(narg->named_arg.arg_name));
 		DEBUG_print_type(out, narg->named_arg.arg_type);
 		if (i + 1 != proc_node->proc_decl.num_args) fprintf(out, ",");
@@ -510,6 +554,19 @@ void DEBUG_print_continue_statement(FILE* out, Ast* node)
 	fprintf(out, "continue");
 }
 
+void DEBUG_print_struct_declaration(FILE* out, Ast* node)
+{
+	Ast_StructDecl* sd = &node->struct_decl;
+	fprintf(out, "%.*s :: struct{\n", TOKEN_STR(sd->name));
+
+	for (int i = 0; i < sd->num_fields; ++i) {
+		DEBUG_print_var_decl(out, sd->fields[i]);
+		fprintf(out, ";\n");
+	}
+
+	fprintf(out, "}\n");
+}
+
 void DEBUG_print_node(FILE* out, Ast* node) {
 	switch (node->node) {
 	case AST_NODE_PROC_DECLARATION:		DEBUG_print_proc(out, node); break;
@@ -523,6 +580,7 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 	case AST_NODE_RETURN_STATEMENT:		DEBUG_print_return_statement(out, node); break;
 	case AST_NODE_BREAK_STATEMENT:		DEBUG_print_break_statement(out, node); break;
 	case AST_NODE_CONTINUE_STATEMENT:	DEBUG_print_continue_statement(out, node); break;
+	case AST_NODE_STRUCT_DECLARATION:	DEBUG_print_struct_declaration(out, node); break;
 	}
 }
 

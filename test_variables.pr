@@ -1,9 +1,10 @@
+/*
 //sal : int = -1 + 2;
 teste : int = -hello.world * 2 + *(i * 5);
 //teste : int = -hello.world * 2 + 2;
 hello : int = hey(world.scale.x + 1, 5 * fast());
 
-/*
+
 teste : int = 1 + 2 * 3 && variable / 7 ^ 14 * 3;
 teste2 : int = 16/8*2;
 
@@ -15,4 +16,47 @@ main :: (argc: int, argv: ^^char){
 	
 	return proc() + 1;
 }
+
+
+hello :: struct{
+	id : int;
+	velocity : float;
+	name : ^char;
+}
+
+Table :: struct {
+	field : int;
+	name : ^char;
+}
+
+proc :: () {
+	var : int = 2;
+	foo :: () -> int{
+		return 1;
+	}
+	
+	{
+		mybuffer : ^char;
+		yourbuffer : ^int;
+	}
+}
+
+main :: () {
+	var : float = 1.0;	
+	hello : int = 10;
+	world : char = 'a';
+	my : s64 = 123456578;
+	name : r64 = 23.99993;
+}
 */
+
+proc :: (v : int, v : float) -> int {
+	
+	return v;
+}
+
+
+
+
+
+

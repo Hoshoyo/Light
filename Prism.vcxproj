@@ -131,6 +131,8 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\memory.cpp" />
     <ClCompile Include="src\parser.cpp" />
+    <ClCompile Include="src\semantic.cpp" />
+    <ClCompile Include="src\symbol_table.cpp" />
     <ClCompile Include="src\type.cpp" />
     <ClCompile Include="src\util.cpp" />
   </ItemGroup>
@@ -139,6 +141,8 @@
     <ClInclude Include="src\lexer.h" />
     <ClInclude Include="src\memory.h" />
     <ClInclude Include="src\parser.h" />
+    <ClInclude Include="src\semantic.h" />
+    <ClInclude Include="src\symbol_table.h" />
     <ClInclude Include="src\type.h" />
     <ClInclude Include="src\util.h" />
   </ItemGroup>

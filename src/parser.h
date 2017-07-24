@@ -19,16 +19,17 @@ struct Parser {
 
 	Parser(Lexer* lexer);
 
-	Ast** parse_top_level();
+	Ast** parse_top_level(Scope** g_scope);
 	Ast* parse_declaration(Scope* scope);
 	Ast* parse_expression(Scope* scope, Precedence caller_prec = PRECEDENCE_0, bool quit_on_precedence = false);
 	Ast* parse_block(Scope* scope);
 	Ast* parse_variable_decl(Token* name, Scope* scope);
-	Ast* parse_proc(Token* name, Scope* scope);
+	Ast* parse_proc_decl(Token* name, Scope* scope);
 	Ast* parse_literal();
 	Ast* parse_variable_assignment(Scope* scope);
 	Ast* parse_command(Scope* scope);
 	Ast* parse_proc_call(Scope* scope);
+	Ast* parse_struct(Token* name, Scope* scope);
 
 	Precedence get_precedence_level(Token_Type type, bool postfixed, bool unary);
 	Precedence get_precedence_level(UnaryOperation uo, bool prefixed);
@@ -37,12 +38,13 @@ struct Parser {
 	bool is_loop_control_flow_command(Token_Type tt);
 	bool is_control_flow_statement(Token_Type tt);
 
-	Type* parse_type();
+	Type_Instance* parse_type();
 
 	Token* require_and_eat(Token_Type t);
 	
 	// returns -1 on error, 0 on success
 	int require_token_type(Token* tok, Token_Type type);
+	int report_syntax_error(char* msg, ...);
 };
 
 #define TOKEN_STR(T) T->value.length, T->value.data

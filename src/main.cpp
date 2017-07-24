@@ -3,6 +3,8 @@
 #include "lexer.h"
 #include "parser.h"
 #include "type.h"
+#include "symbol_table.h"
+#include "semantic.h"
 
 int main(int argc, char** argv) {
 	if (argc <= 1) {
@@ -16,12 +18,13 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	setup_types();
-
 	Parser parser(&lexer);
-	Ast** ast = parser.parse_top_level();
+	Scope* global_scope = 0;
+	Ast** ast = parser.parse_top_level(&global_scope);
 
-	DEBUG_print_ast(stdout, ast);
-
+	if (check_declarations(ast, global_scope) == DECL_CHECK_PASSED) {
+		printf("\n*** Code preview ***\n\n");
+		DEBUG_print_ast(stdout, ast);
+	}
 	return 0;
 }
