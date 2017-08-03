@@ -41,21 +41,35 @@ proc :: () {
 	}
 }
 
-main :: () {
-	var : float = 1.0;	
-	hello : int = 10;
-	world : char = 'a';
-	my : s64 = 123456578;
-	name : r64 = 23.99993;
+Entity :: struct {
+	id : int;
+	name : ^char;
 }
-*/
+
+Table :: struct {
+	entries : ^Entity;
+}
 
 proc :: () -> void {
-	a += b = c;
+	table : Table;
 }
 
+*/
 
-
+main :: () {
+	i1 : int;
+	i2 : int;
+	i3 : int;
+	{
+		i4 : int;
+		f1 : float;
+		f2 : float;
+		c1 : char;
+		c2 : ^char;
+		c2 = 2 - ~2;
+		c2 : s64;
+	}
+}
 
 
 

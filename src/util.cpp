@@ -302,3 +302,16 @@ u32 djb2_hash(u8 *str, int size)
 	}
 	return hash;
 }
+
+u32 djb2_hash(u32 starting_hash, u8 *str, int size)
+{
+	u32 hash = starting_hash;
+	int c;
+	int i = 0;
+	while (i < size) {
+		c = *str++;
+		hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+		++i;
+	}
+	return hash;
+}

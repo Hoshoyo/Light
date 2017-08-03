@@ -81,78 +81,36 @@ s32 get_size_of_pointer();
 
 s32 get_size_of_primitive_type(Type_Primitive primitive);
 
-struct Type_Hash_Entry {
+struct Type_Table_Entry {
 	Type_Instance* entry;
 	bool used;
 	bool collided;
 };
 
-struct Type_Hash {
-	Type_Hash_Entry* entries;
+struct Type_Table {
+	Type_Table_Entry* entries;
 	int max_entries;
 	int num_entries;
 	int num_collisions;
 	
-	Type_Hash() {
-		entries = (Type_Hash_Entry*)calloc(1, 1024 * 1024 * sizeof(Type_Hash_Entry));
+	Type_Table() {
+		entries = (Type_Table_Entry*)calloc(1, 1024 * 1024 * sizeof(Type_Table_Entry));
 		max_entries = 1024 * 1024;
 		num_entries = 0;
 		num_collisions = 0;
 	}
-	/*
-	u32 hash_of_type(Type_Instance* type) {
-		int extra_size = ((s64)&((Type_Instance*)0)->descriptor) - ((s64)&((Type_Instance*)0)->type);
-		u32 hash = djb2_hash((u8*)&type->type, type->size_of_descriptor + extra_size) % max_entries;
-		return hash;
-	}
 
-	s64 entry_exist(Type_Instance* type) {
-		u32 hash = hash_of_type(type);
-		if (entries[hash].used) {
-			if (memcmp(entries[hash].entry, type, entry_size) == 0) {
-				return (s64)hash;
-			} else {
-				while (entries[hash].collided) {
-					hash += 1;
-					if (hash >= max_entries) hash = 0;
-					if (memcmp(entries[hash].entry, type, entry_size) == 0) {
-						return (s64)hash;
-					}
-				}
-			}
-		}
-		return -1;
-	}
-
-	Type_Instance* insert(Type_Instance* type) {
-		if (num_entries == max_entries) return 0;
-
-		u32 hash = hash_of_type(type);
-		if (!entries[hash].used) {
-			int entry_size = 0;
-			bool collided = false;
-			while (entries[hash].used) {
-				collided = true;
-				hash += 1;
-				num_collisions += 1;
-				if (hash >= max_entries) hash = 0;
-			}
-			entries[hash].used = true;
-			entries[hash].collided = collided;
-			entries[hash].entry = type;
-		}
-	}
-	*/
+	u32 type_hash(Type_Instance* instance);
+	bool entry_exist(Type_Instance* instance, s64* hash);
+	bool insert_type(Type_Instance* instance, s64* hash);
 };
-
-extern Type_Hash* type_hash_table;
-extern Type_Instance* DEBUG_types_inserted[1024];
-extern int DBG_index;
-
-struct Type_Allocator {
-
-};
-
-static Type_Allocator type_allocator = {};
 
 Type_Instance* get_primitive_type(Type_Primitive primitive_type);
+
+extern Type_Table type_table;
+
+// creates a type entry on the table and returns its index
+s64 create_type(Type_Instance** instance, bool swap_and_delete);
+Type_Instance* get_type_instance(Type_Instance* instance);
+void update_type_instance(Type_Instance** instance);
+void DEBUG_print_type_table();

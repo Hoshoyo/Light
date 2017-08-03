@@ -161,3 +161,58 @@ int check_declarations(Ast** ast, Scope* global_scope)
 	}
 	return DECL_CHECK_PASSED;
 }
+
+int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
+{
+	if (node->is_decl) {
+		switch (node->node)
+		{
+			case AST_NODE_PROC_DECLARATION: {
+				// proc itself
+
+				// arguments
+				int num_args = node->proc_decl.num_args;
+				for (int i = 0; i < num_args; ++i) {
+					infer_node_types(node->proc_decl.arguments[i], node->proc_decl.scope, table);
+				}
+				// body
+				infer_node_types(node->proc_decl.body, node->proc_decl.scope, table);
+			}break;
+
+			case AST_NODE_VARIABLE_DECL: {
+				create_type(&node->var_decl.type, true);
+			}break;
+		}
+	} else {
+		switch (node->node)
+		{
+			case AST_NODE_PROCEDURE_CALL: {
+
+			}break;
+
+			case AST_NODE_BINARY_EXPRESSION: {
+
+			}break;
+				
+			case AST_NODE_IF_STATEMENT: {
+
+			}break;
+
+			case AST_NODE_BLOCK: {
+				type_inference(node->block.commands, scope, table);
+			}break;
+		}
+	}
+	return 0;
+}
+
+int type_inference(Ast** ast, Scope* global_scope, Type_Table* table)
+{
+	size_t num_nodes = get_arr_length(ast);
+
+	for (size_t i = 0; i < num_nodes; ++i) {
+		Ast* node = ast[i];
+		infer_node_types(node, global_scope, table);
+	}
+	return DECL_CHECK_PASSED;
+}

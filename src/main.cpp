@@ -7,6 +7,7 @@
 #include "semantic.h"
 
 int main(int argc, char** argv) {
+
 	if (argc <= 1) {
 		fprintf(stderr, "No files were given.\nusage: prism [option ...] filename\n");
 		return -1;
@@ -26,6 +27,9 @@ int main(int argc, char** argv) {
 		printf("\n*** Code preview ***\n\n");
 		DEBUG_print_ast(stdout, ast);
 	}
+
+	type_inference(ast, global_scope, &type_table);
+	DEBUG_print_type_table();
 
 	return 0;
 }

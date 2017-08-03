@@ -369,17 +369,20 @@ Ast* Parser::parse_command(Scope* scope)
 			Ast* vdecl = parse_variable_decl(lexer->eat_token(), scope);
 			require_and_eat((Token_Type)';');
 			command = vdecl;
+			return command;
 		}
 		// proc call
 		else if (lexer->peek_token_type(1) == '(') {
 			Ast* call = parse_expression(scope);
 			require_and_eat((Token_Type)';');
 			command = call;
+			return command;
 		}
 		else if (lexer->peek_token_type(1) == TOKEN_COLON_COLON) {
 			// proc declaration
 			Token* name = lexer->eat_token();
 			command = parse_proc_decl(name, scope);
+			return command;
 		}
 	}
 	if (first->type == TOKEN_IF_STATEMENT) {
