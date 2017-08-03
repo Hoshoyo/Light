@@ -1,0 +1,3 @@
+- remove -fpermissive from gcc compilation
+- check memory arena allocation function possible write bug
+

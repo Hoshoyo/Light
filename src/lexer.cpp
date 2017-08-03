@@ -187,7 +187,6 @@ char* Lexer::get_first_char_in_line(s64 line)
 	}
 	return token_array[count].value.data;
 }
-
 bool Lexer::read_token(char** begin)
 {
 	Token& token = this->token_array[current_token];
@@ -200,16 +199,16 @@ bool Lexer::read_token(char** begin)
 	u32 flags = 0;
 
 	char ch_1 = at[0];
-	char ch_2 = at[1];
+	char ch_2 = 0;
+	if(ch_1){
+		ch_2 = at[1];
+	}
 
 	token.filename = filename;
 
 	switch (ch_1) {
 
-	case '\0': {
-		type = TOKEN_END_OF_STREAM;
-	} break;
-
+	case '\0': type = TOKEN_END_OF_STREAM;			break;
 	case '{': type = TOKEN_SYMBOL_OPEN_BRACE;		flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_POSTFIXED; break;
 	case '}': type = TOKEN_SYMBOL_CLOSE_BRACE;		break;
 	case '[': type = TOKEN_SYMBOL_OPEN_BRACKET;		break;

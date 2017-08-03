@@ -3,7 +3,8 @@
 #include "type.h"
 #include "symbol_table.h"
 
-#define ALLOC_AST(A) (Ast*)A->allocate(sizeof(Ast))
+//#define ALLOC_AST(A) (Ast*)A->allocate(sizeof(Ast))
+#define ALLOC_AST(A) (Ast*)malloc(sizeof(Ast))
 
 UnaryOperation get_unary_op(Token* token)
 {
@@ -132,7 +133,6 @@ Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok)
 	lit->expression.literal_exp.flags = flags;
 	lit->expression.literal_exp.lit_tok = lit_tok;
 	lit->expression.literal_exp.type = 0;
-
 	return lit;
 }
 

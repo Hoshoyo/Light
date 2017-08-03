@@ -19,11 +19,11 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-/*
 	Parser parser(&lexer);
 	Scope* global_scope = 0;
 	Ast** ast = parser.parse_top_level(&global_scope);
 
+/*
 	if (check_declarations(ast, global_scope) == DECL_CHECK_PASSED) {
 		printf("\n*** Code preview ***\n\n");
 		DEBUG_print_ast(stdout, ast);
