@@ -13,7 +13,9 @@ s32 Lexer::start(const char* filename)
 	}
 	this->file_size = file_size;
 
-	filedata = (char*)ho_readentirefile(filehandle, file_size, HO_ALLOC);
+	void* file_memory = malloc(file_size + 1);
+	*((char*)file_memory + file_size) = 0;
+	filedata = (char*)ho_readentirefile(filehandle, file_size, file_memory);
 	ho_closefile(filehandle);
 
 	lex_file();
@@ -203,6 +205,11 @@ bool Lexer::read_token(char** begin)
 	token.filename = filename;
 
 	switch (ch_1) {
+
+	case '\0': {
+		type = TOKEN_END_OF_STREAM;
+	} break;
+
 	case '{': type = TOKEN_SYMBOL_OPEN_BRACE;		flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_POSTFIXED; break;
 	case '}': type = TOKEN_SYMBOL_CLOSE_BRACE;		break;
 	case '[': type = TOKEN_SYMBOL_OPEN_BRACKET;		break;
@@ -401,10 +408,6 @@ bool Lexer::read_token(char** begin)
 		if (i == 0) type = TOKEN_UNKNOWN;
 		skip++;
 	}break;
-
-	case '\0': {
-		type = TOKEN_END_OF_STREAM;
-	} break;
 
 	default: {
 		if (is_letter(ch_1) || ch_1 == '_') {

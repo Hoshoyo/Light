@@ -1,4 +1,5 @@
 #include "semantic.h"
+#include <stdarg.h>
 
 static int scope_error = 0;
 static int declaration_ratio = 8;

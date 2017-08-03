@@ -19,6 +19,7 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
+/*
 	Parser parser(&lexer);
 	Scope* global_scope = 0;
 	Ast** ast = parser.parse_top_level(&global_scope);
@@ -30,6 +31,6 @@ int main(int argc, char** argv) {
 
 	type_inference(ast, global_scope, &type_table);
 	DEBUG_print_type_table();
-
+*/
 	return 0;
 }
