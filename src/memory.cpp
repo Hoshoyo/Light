@@ -18,7 +18,7 @@ Memory_Arena::Memory_Arena(s64 block_size)
 	current_using = 0;
 	memset(size, 0, sizeof(int) * MAX_ARENA);
 	size[0] = block_size;
-	memory[0] = _aligned_malloc(size[0], 16);
+	memory[0] = _aligned_malloc(16, size[0]);
 	allocated[0] = 0;
 	free_ptr[0] = memory[0];
 }
@@ -32,7 +32,7 @@ void* Memory_Arena::allocate(int s)
 		if (current_using == MAX_ARENA)
 			return 0;	// error, full arena
 		size[current_using] = block_size;
-		memory[current_using] = _aligned_malloc(block_size, 16);
+		memory[current_using] = _aligned_malloc(16, block_size);
 		allocated[current_using] = 0;
 		free_ptr[current_using] = memory[current_using];
 	}

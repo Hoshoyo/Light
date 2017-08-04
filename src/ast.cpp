@@ -3,8 +3,8 @@
 #include "type.h"
 #include "symbol_table.h"
 
-//#define ALLOC_AST(A) (Ast*)A->allocate(sizeof(Ast))
-#define ALLOC_AST(A) (Ast*)malloc(sizeof(Ast))
+#define ALLOC_AST(A) (Ast*)A->allocate(sizeof(Ast))
+//#define ALLOC_AST(A) (Ast*)malloc(sizeof(Ast))
 
 UnaryOperation get_unary_op(Token* token)
 {
