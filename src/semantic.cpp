@@ -4,6 +4,8 @@
 static int scope_error = 0;
 static int declaration_ratio = 8;
 
+#define TOKEN_STR(X) X->value.length, X->value.data
+
 static int report_semantic_error(Decl_Site* site, char* msg, ...)
 {
 	va_list args;
@@ -148,6 +150,34 @@ int check_declarations(Ast* node, Scope* scope) {
 	return 1;
 }
 
+Type_Instance* get_variable_type(Ast* node, Scope* scope)
+{
+	assert(node->node == AST_NODE_VARIABLE_EXPRESSION);
+	s64 entry = scope->symb_table->entry_exist(node->expression.variable_exp.name);
+	if (entry == -1) {
+		// search on previous scopes
+		while(true) {
+			if (!scope->symb_table) {
+				scope = scope->parent;
+				continue;
+			}
+			entry = scope->symb_table->entry_exist(node->expression.variable_exp.name);
+			if (entry == -1) {
+				scope = scope->parent;
+				continue;
+			}
+			else break;
+			if (scope->level == 0) break;
+			scope = scope->parent;
+		}
+		if (entry == -1) {
+			return 0;
+		}
+	}
+	assert(scope->symb_table->entries[entry].node->node == AST_NODE_VARIABLE_DECL);
+	return scope->symb_table->entries[entry].node->var_decl.type;
+}
+
 int check_declarations(Ast** ast, Scope* global_scope)
 {
 	size_t num_nodes = get_arr_length(ast);
@@ -163,25 +193,141 @@ int check_declarations(Ast** ast, Scope* global_scope)
 	return DECL_CHECK_PASSED;
 }
 
+Type_Instance* infer_node_expression_type(Ast* node, Scope* scope, Type_Table* table)
+{
+	switch (node->node) {
+		case AST_NODE_PROCEDURE_CALL: {
+			assert(0);
+		}break;
+		case AST_NODE_BINARY_EXPRESSION: {
+			Type_Instance* left = infer_node_expression_type(node->expression.binary_exp.left, scope, table);
+			Type_Instance* right = infer_node_expression_type(node->expression.binary_exp.right, scope, table);
+			switch (node->expression.binary_exp.op) {
+			case BINARY_OP_PLUS:			return left;
+			case BINARY_OP_MINUS:			return left;
+			case BINARY_OP_MULT:			return left;
+			case BINARY_OP_DIV:				return left;
+			case BINARY_OP_AND:				return left;
+			case BINARY_OP_OR:				return left;
+			case BINARY_OP_XOR:				return left;
+			case BINARY_OP_MOD:				return left;
+			case BINARY_OP_LOGIC_AND:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+			case BINARY_OP_LOGIC_OR:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+			case BINARY_OP_BITSHIFT_LEFT:	return left;
+			case BINARY_OP_BITSHIFT_RIGHT:	return left;
+			case BINARY_OP_LESS_THAN:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+			case BINARY_OP_GREATER_THAN:	return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+			case BINARY_OP_LESS_EQUAL:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+			case BINARY_OP_GREATER_EQUAL:	return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+			case BINARY_OP_EQUAL_EQUAL:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+			case BINARY_OP_NOT_EQUAL:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+
+			case BINARY_OP_DOT:				return right;
+
+			case ASSIGNMENT_OPERATION_EQUAL:		return left;
+			case ASSIGNMENT_OPERATION_PLUS_EQUAL:	return left;
+			case ASSIGNMENT_OPERATION_MINUS_EQUAL:	return left;
+			case ASSIGNMENT_OPERATION_TIMES_EQUAL:	return left;
+			case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:	return left;
+			case ASSIGNMENT_OPERATION_AND_EQUAL:	return left;
+			case ASSIGNMENT_OPERATION_OR_EQUAL:		return left;
+			case ASSIGNMENT_OPERATION_XOR_EQUAL:	return left;
+			case ASSIGNMENT_OPERATION_SHL_EQUAL:	return left;
+			case ASSIGNMENT_OPERATION_SHR_EQUAL:	return left;
+			}
+		}break;
+		case AST_NODE_UNARY_EXPRESSION: {
+			switch (node->expression.unary_exp.op) {
+				case UNARY_OP_MINUS:			return node->expression.unary_exp.operand->return_type;
+				case UNARY_OP_PLUS:				return node->expression.unary_exp.operand->return_type;
+				case UNARY_OP_DEREFERENCE: {
+					Type_Instance* inst = node->expression.unary_exp.operand->return_type;
+					s64 hash = create_type(&inst->pointer_to, false);
+					return table->entries[hash].entry;
+				}break;
+				case UNARY_OP_ADDRESS_OF: {
+					Type_Instance* inst = node->expression.unary_exp.operand->return_type;
+					Type_Instance* ti = create_ptr_typeof(inst);
+					return ti;
+				}break;
+				case UNARY_OP_VECTOR_ACCESS: assert(0); break;
+				case UNARY_OP_NOT_LOGICAL:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+				case UNARY_OP_NOT_BITWISE:		return node->expression.unary_exp.operand->return_type;
+				case UNARY_OP_CAST:				return node->expression.unary_exp.cast_type;
+			}
+		}break;
+		case AST_NODE_EXPRESSION_ASSIGNMENT: {
+			// this should be deprecated
+			assert(0);
+		}break;
+		case AST_NODE_LITERAL_EXPRESSION: {
+			u32 tok_type = node->expression.literal_exp.lit_tok->type;
+			if (tok_type == TOKEN_FLOAT_LITERAL) {
+				return get_primitive_type(TYPE_PRIMITIVE_R32);
+			} else if (tok_type == TOKEN_INT_LITERAL) {
+				return get_primitive_type(TYPE_PRIMITIVE_S32);
+			} else if (tok_type == TOKEN_CHAR_LITERAL) {
+				return get_primitive_type(TYPE_PRIMITIVE_S32);
+			} else if (tok_type == TOKEN_BOOL_LITERAL) {
+				return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+			} else if (tok_type == TOKEN_STRING_LITERAL) {
+				assert(0);
+			}
+		}break;
+		case AST_NODE_VARIABLE_EXPRESSION: {
+			return get_variable_type(node, scope);
+		}break;
+	}
+}
+
 int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 {
 	if (node->is_decl) {
 		switch (node->node)
 		{
+			case AST_NODE_NAMED_ARGUMENT: {
+				assert(node->named_arg.arg_type);
+				create_type(&node->named_arg.arg_type, true);
+			} break;
 			case AST_NODE_PROC_DECLARATION: {
 				// proc itself
-
+				assert(node->proc_decl.proc_ret_type);
+				Type_Instance* type_instance = new Type_Instance();
 				// arguments
 				int num_args = node->proc_decl.num_args;
+				type_instance->type_function.arguments_type = create_array(Type_Instance*, num_args);
 				for (int i = 0; i < num_args; ++i) {
-					infer_node_types(node->proc_decl.arguments[i], node->proc_decl.scope, table);
+					if (infer_node_types(node->proc_decl.arguments[i], node->proc_decl.scope, table) == -1) {
+						report_semantic_error(&node->proc_decl.arguments[i]->named_arg.site, "Type of argument #%d/%.*s of procedure declaration %.*s could not be inferred.\n",
+							i + 1, TOKEN_STR(node->proc_decl.arguments[i]->named_arg.arg_name), TOKEN_STR(node->proc_decl.name));
+						return -1;
+					}
+					push_array(type_instance->type_function.arguments_type, node->proc_decl.arguments[i]);
 				}
+
+				type_instance->type_function.num_arguments = num_args;
+				type_instance->type_function.return_type = node->proc_decl.proc_ret_type;
+
 				// body
-				infer_node_types(node->proc_decl.body, node->proc_decl.scope, table);
+				if (infer_node_types(node->proc_decl.body, node->proc_decl.scope, table) == -1) {
+					return -1;
+				}
 			}break;
 
 			case AST_NODE_VARIABLE_DECL: {
-				create_type(&node->var_decl.type, true);
+				if (node->var_decl.type) {
+					create_type(&node->var_decl.type, true);
+				} else if(node->var_decl.assignment) {
+					// infer type from rvalue
+					Type_Instance* inst = infer_node_expression_type(node->var_decl.assignment, node->var_decl.scope, table);
+
+					create_type(&inst, true);
+					node->var_decl.assignment->return_type = inst;
+					node->var_decl.type = inst;
+				} else {
+					report_semantic_error(&node->var_decl.site, "type of variable %.*s could not be inferred, since there is no rvalue assignment.\n", TOKEN_STR(node->var_decl.name));
+					return -1;
+				}
 			}break;
 		}
 	} else {

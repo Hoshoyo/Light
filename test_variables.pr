@@ -56,19 +56,15 @@ proc :: () -> void {
 
 */
 
+sum :: (a : int, b : int) -> int{
+	return a + b;
+}
+
+var := 1.0;
+
 main :: () {
-	i1 : int;
-	i2 : int;
-	i3 : int;
-	{
-		i4 : int;
-		f1 : float;
-		f2 : float;
-		c1 : char;
-		c2 : ^char;
-		c2 = 2 - ~2;
-		c2 : s64;
-	}
+	i1 := 1;
+	hello := var;
 }
 
 

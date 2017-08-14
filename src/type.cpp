@@ -2,9 +2,28 @@
 #include "lexer.h"
 #include "util.h"
 
+s32 get_size_of_primitive_type(Type_Primitive primitive);
+
 Type_Instance* get_primitive_type(Type_Primitive primitive_type)
 {
-	return 0;
+	Type_Instance* ti = new Type_Instance();
+	ti->flags = 0 | TYPE_FLAG_IS_REGISTER_SIZE | TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED;
+	ti->type = TYPE_PRIMITIVE;
+	ti->primitive = primitive_type;
+	ti->type_size = get_size_of_primitive_type(primitive_type);
+	create_type(&ti, true);
+	return ti;
+}
+
+Type_Instance* create_ptr_typeof(Type_Instance* inst)
+{
+	Type_Instance* ti = new Type_Instance();
+	ti->flags = 0 | TYPE_FLAG_IS_REGISTER_SIZE | TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED;
+	ti->type = TYPE_POINTER;
+	ti->pointer_to = inst;
+	ti->type_size = get_size_of_pointer();
+	create_type(&ti, true);
+	return ti;
 }
 
 s32 get_size_of_pointer() {
@@ -163,6 +182,15 @@ void delete_type(Type_Instance* instance)
 		case TYPE_STRUCT: {
 			assert(0);	// @todo
 		}break;
+
+		case TYPE_FUNCTION: {
+			int num_args = instance->type_function.num_arguments;
+			for (int i = 0; i < num_args; ++i) {
+				delete_type(instance->type_function.arguments_type[i]);
+			}
+			delete_type(instance->type_function.return_type);
+			delete instance;
+		}break;
 	}
 }
 
@@ -174,7 +202,7 @@ s64 create_type(Type_Instance** instance, bool swap_and_delete)
 		type_table.insert_type(*instance, &index);
 	} else {
 		// if there is then swap it
-		if (swap_and_delete) {
+		if (swap_and_delete && type_table.entries[index].entry != *instance) {
 			delete_type(*instance);
 			*instance = type_table.entries[index].entry;
 		}

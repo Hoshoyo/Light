@@ -351,7 +351,7 @@ Scope* create_scope(s32 level, Scope* parent, u32 flags)
 ****************************************/
 
 void DEBUG_print_type(FILE* out, Type_Instance* type) {
-
+	assert(type);
 	if (type->type == TYPE_PRIMITIVE) {
 		switch (type->primitive) {
 		case TYPE_PRIMITIVE_S64:	fprintf(out, "s64"); break;
