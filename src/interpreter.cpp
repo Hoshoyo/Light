@@ -73,6 +73,7 @@ internal u8* stack;
 internal u8* heap;
 internal u8* code;
 internal bool running;
+s64 reg[NUM_REGS] = {};
 
 void print_instruction(u64 instruction, u64 next_qword);
 void execute(u64 instruction, u64 next_word);
@@ -86,7 +87,6 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 
 int run_interpreter()
 {
-	s64 reg[NUM_REGS] = {};
 	running = true;	
 	while (running) {
 		s64 address = *(s64*)reg[R_IP];
@@ -100,7 +100,79 @@ int run_interpreter()
 
 void execute(u64 instruction, u64 next_word)
 {
+	Instruction inst = *(Instruction*)instruction;
+	s64 left_signed_int, right_signed_int;
+	r64 left_float, right_float;
 
+	switch(inst.addressing){
+		case REG_TO_REG:{
+			left_signed_int = reg[inst.left_reg];
+			right_signed_int = reg[inst.right_reg];
+		}break;
+		case MEM_TO_REG:{
+			left_signed_int = reg[inst.left_reg];
+			right_signed_int = *(s64*)next_word;
+		}break;
+		case REG_TO_MEM:{
+			left_signed_int = *(s64)next_word;
+			right_signed_int = reg[inst.right_reg];
+		}break;
+		case SINGLE_REG:{
+			left_signed_int = reg[inst.left_reg];
+		}break;
+		case SINGLE_MEM:{
+			left_signed_int = *(s64)next_word;
+		}break;
+		case REG_TO_REG_PTR:{
+			if(inst.flags & IMMEDIATE_OFFSET)
+				left_signed_int = *(s64*)(reg[inst.left_reg] + inst.immediate_offset);
+			else if(inst.flags & REGISTER_OFFSET)
+				left_signed_int = *(s64*)(reg[inst.left_reg] + reg[inst.offset_reg]);
+			else
+				left_signed_int = *(s64*)reg[left.left_reg];
+			
+			right_signed_int = reg[inst.right_reg];
+		}break;
+		case REG_PTR_TO_REG:{
+			left_signed_int = reg[inst.left_reg];
+			if(inst.flags & IMMEDIATE_OFFSET)
+				right_signed_int = *(s64*)(reg[inst.right_reg] + inst.immediate_offset);
+			else if(inst.flags & REGISTER_OFFSET)
+				right_singed_int = *(s64*)(reg[inst.right_reg] + reg[inst.offset_reg]);
+			else
+				right_signed_int = *(s64*)reg[inst.right_reg];
+		}break;
+		case MEM_PTR_TO_REG:{
+			left_signed_int = reg[inst.left_reg];
+			if(inst.flags & IMMEDIATE_OFFSET)
+				right_signed_reg = *(s64*)(next_word + inst.immediate_offset);
+			else if(inst.flags & REGISTER_OFFSET)
+				right_signed_reg = *(s64*)(next_word + reg[inst.offset_reg]);
+			else
+				right_signed_reg = *(s64*)next_word;
+		}break;
+		case REG_TO_MEM_PTR:{
+			if(inst.flags & IMMEDIATE_OFFSET)
+				left_signed_int = *(s64)(next_word + inst.immediate_offset);
+			else if(inst.flags & REGISTER_OFFSET)
+				left_signed_int = *(s64*)(next_word + reg[inst.offset_reg]);
+			else
+				left_signed_int = *(s64*)next_word;
+				right_signed_int = reg[inst.right_reg];
+		}break;
+	}
+	switch(inst.type){
+		case ADD:	reg[inst.left_reg] = left_signed_int + right_signed_int; break;
+		case SUB:	reg[inst.left_reg] = left_signed_int - right_signed_int; break;
+		case MUL:	reg[inst.left_reg] = left_signed_int * right_signed_int; break;
+		case DIV:	reg[inst.left_reg] = left_signed_int / right_signed_int; break;
+		case MOD:	reg[inst.left_reg] = left_signed_int % right_signed_int; break;
+			
+		case BEQ:{
+			if(
+			reg[R_IP] += inst.immediate_offset;
+		}break;
+	}
 }
 
 void print_instruction(u64 instruction, u64 next_qword)
