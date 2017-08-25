@@ -139,6 +139,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ast.h" />
+    <ClInclude Include="src\interpreter.h" />
     <ClInclude Include="src\lexer.h" />
     <ClInclude Include="src\memory.h" />
     <ClInclude Include="src\parser.h" />

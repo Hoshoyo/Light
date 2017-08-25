@@ -5,8 +5,12 @@
 #include "type.h"
 #include "symbol_table.h"
 #include "semantic.h"
+#include "interpreter.h"
 
 int main(int argc, char** argv) {
+	printf("teste");
+	init_interpreter();
+	run_interpreter();
 
 	if (argc <= 1) {
 		fprintf(stderr, "No files were given.\nusage: prism [option ...] filename\n");
