@@ -8,7 +8,6 @@
 #include "interpreter.h"
 
 int main(int argc, char** argv) {
-	printf("teste");
 	init_interpreter();
 	run_interpreter();
 
