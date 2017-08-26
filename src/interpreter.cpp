@@ -105,8 +105,8 @@ internal u8* datas;
 internal bool running;
 s64 reg[NUM_REGS] = {};
 
-void print_instruction(u64 instruction, u64 next_qword);
-int execute(u64 instruction, u64 next_word);
+void print_instruction(Instruction instruction, u64 next_qword);
+int execute(Instruction instruction, u64 next_word);
 
 u64 push_instruction(Instruction inst) {
 	*(Instruction*)code_ptr = inst;
@@ -153,13 +153,35 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 	reg[R_SB] = (u64)stack;
 
 	{
-		*(u64*)datas_ptr = (u64)-(8 * 4); datas_ptr += sizeof(u64);
+		//*(u64*)datas_ptr = (u64)-(8 * 4); datas_ptr += sizeof(u64);
 	}
 
+	u64 label = (u64)code_ptr;
+	u64 start = (u64)code_ptr;
+	{
+		// mov r1, 0
+		// mov r2, 10
+		// label:
+		// mov [heap + r1], r2
+		// add r1, 8
+		// sub r2, 1
+		// cmp r2, 0
+		// bgt label
+		// hlt
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 10);
+		push_instruction(make_instruction(MOV, REGISTER_OFFSET | IMMEDIATE_VALUE, REG_TO_MEM_PTR, NO_REG, R_2, R_1, 0), heap);
+		push_instruction(make_instruction(ADD, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 8);
+		push_instruction(make_instruction(SUB, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 1);
+		push_instruction(make_instruction(CMP, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 0);
+		push_instruction(make_instruction(BGT, SIGNED | IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, -64));
+		push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
+
+	}
+	#if 0
 	{
 		// IMMEDIATE_OFFSET | REGISTER_OFFSET | SIGNED | IMMEDIATE_VALUE
-		u64 label = (u64)code_ptr;
-		u64 start = (u64)code_ptr;
 
 		// mov r2, datas_ptr
 		// mov r1, 5
@@ -168,7 +190,7 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 		// cmp r1, 0
 		// bge [r2]
 		// hlt
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_2, NO_REG, 0, 0), (u64)datas_ptr - 8);		// --¬
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), (u64)datas_ptr - 8);		// --Â¬
 		start = push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), 5);					//    |
 		push_instruction(make_instruction(SUB, SIGNED | IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, NO_REG, 0), 1);			// <--
 		label = push_instruction(make_instruction(CMP, SIGNED | IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
@@ -176,6 +198,7 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 		push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
 		
 	}
+	#endif
 }
 
 #define PRINT_INSTRUCTIONS 1
@@ -184,7 +207,11 @@ int run_interpreter()
 	running = true;	
 	while (running) {
 		u64 address = reg[R_IP];
-		u64 instruction = *(u64*)reg[R_IP];
+		Instruction instruction = *(Instruction*)reg[R_IP];
+		if(instruction.flags & IMMEDIATE_OFFSET){
+			instruction.immediate_offset = *((u64*)(address + REG_SIZE));
+			address += REG_SIZE;
+		}
 		u64 immediate = *((u64*)(address + REG_SIZE));
 
 #ifdef PRINT_INSTRUCTIONS
@@ -395,9 +422,8 @@ int execute_instruction(Instruction inst, u64 next_word)
 	return 0;
 }
 
-int execute(u64 instruction, u64 next_word)
+int execute(Instruction inst, u64 next_word)
 {
-	Instruction inst = *(Instruction*)&instruction;
 	int status = 0;
 	if (inst.flags & SIGNED) {
 		if (inst.flags & INSTR_BYTE)
@@ -421,9 +447,8 @@ int execute(u64 instruction, u64 next_word)
 	return status;
 }
 
-void print_instruction(u64 instruction, u64 next_qword)
+void print_instruction(Instruction inst, u64 next_qword)
 {
-	Instruction inst = *(Instruction*)&instruction;
 	switch (inst.type) {
 		case ADD  : printf("ADD "); break;
 		case SUB  : printf("SUB "); break;
