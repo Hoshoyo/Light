@@ -261,7 +261,7 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 	}
 }
 
-#define PRINT_INSTRUCTIONS 0
+#define PRINT_INSTRUCTIONS 0 
 int run_interpreter()
 {
 	running = true;	
