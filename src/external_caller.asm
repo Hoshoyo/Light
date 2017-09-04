@@ -1,5 +1,5 @@
 .data
-.code
+.text
 
 ; rcx  procedure address to call
 ; rdx  pointer to stack
