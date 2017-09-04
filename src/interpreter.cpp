@@ -4,6 +4,12 @@
 #define FLAG(X) (1 << X);
 #define REG_SIZE 8
 
+#define HALT push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0))
+
+// external functions
+extern "C" void call_external(void* proc_address, u8* call_stack_ptr, u64 size_stack);
+extern "C" void call_external_DEBUG(void* proc_address, u8* call_stack_ptr, u64 size_stack);
+
 // Instruction type
 const u16 HLT  = 0;
 const u16 ADD  = 1;
@@ -74,11 +80,12 @@ enum Registers {
 	
 	R_SP = 9,
 	R_SB = 10,
+	R_SS = 11,
 
-	R_FLAGS = 11,
+	R_FLAGS = 12,
 
-	NO_REG = 12,
-	NUM_REGS = 13,
+	NO_REG = 13,
+	NUM_REGS = 14,
 };
 
 struct Instruction {
@@ -136,6 +143,11 @@ Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8
 	return res;
 }
 
+void teste(char* str, int d)
+{
+	printf("%s %d\n", str, d);
+}
+
 void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024) 
 {
 	stack = (u8*)ho_bigalloc_rw(stack_size);
@@ -153,11 +165,14 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 	reg[R_SB] = (u64)stack;
 
 	{
+		const char* str = "iterations :";
+		*(u64*)datas_ptr = (u64)str;
 		//*(u64*)datas_ptr = (u64)-(8 * 4); datas_ptr += sizeof(u64);
 	}
 
 	u64 label = (u64)code_ptr;
 	u64 start = (u64)code_ptr;
+#if 0
 	{
 		// mov r1, 0
 		// mov r2, 10
@@ -171,7 +186,7 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 
 		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
 		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 10);
-		push_instruction(make_instruction(MOV, REGISTER_OFFSET | IMMEDIATE_VALUE, REG_TO_MEM_PTR, NO_REG, R_2, R_1, 0), heap);
+		push_instruction(make_instruction(MOV, REGISTER_OFFSET | IMMEDIATE_VALUE, REG_TO_MEM_PTR, NO_REG, R_2, R_1, 0), (u64)heap);
 		push_instruction(make_instruction(ADD, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 8);
 		push_instruction(make_instruction(SUB, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 1);
 		push_instruction(make_instruction(CMP, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 0);
@@ -179,7 +194,8 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 		push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
 
 	}
-	#if 0
+#endif
+#if 0
 	{
 		// IMMEDIATE_OFFSET | REGISTER_OFFSET | SIGNED | IMMEDIATE_VALUE
 
@@ -190,18 +206,62 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 		// cmp r1, 0
 		// bge [r2]
 		// hlt
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), (u64)datas_ptr - 8);		// --¬
-		start = push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), 5);					//    |
-		push_instruction(make_instruction(SUB, SIGNED | IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, NO_REG, 0), 1);			// <--
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), (u64)datas_ptr - 8);
+		start = push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), 5);
+		push_instruction(make_instruction(SUB, SIGNED | IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, NO_REG, 0), 1);
 		label = push_instruction(make_instruction(CMP, SIGNED | IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
 		push_instruction(make_instruction(BGE, SIGNED, SINGLE_REG_PTR, R_2, NO_REG, 0, 0));
 		push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
 		
 	}
-	#endif
+#endif
+	// PUSH val
+	// mov r1, val
+	// mov [rsp], r1
+	// add rsp, 8
+
+	// POP val
+	// sub rsp, 8
+	// mov val, [rsp]
+
+	{
+		// push datas_ptr
+		// mov r2, 0
+		// mov ss, 8
+	// label:
+		// push r2
+		// extcall printf
+		// sub rsp, 8
+		// add r2, 1
+		// cmp r2, 10
+		// jle label
+		// hlt
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE|INSTR_QWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), *(u64*)datas_ptr);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 0);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 8);
+
+		// label
+		push_instruction(make_instruction(MOV, 0, REG_TO_REG, R_1, R_2, 0, 0));
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(EXTCALL, INSTR_QWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)teste);
+
+		push_instruction(make_instruction(SUB, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 1);
+		push_instruction(make_instruction(CMP, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 10);
+
+		push_instruction(make_instruction(BLE, SIGNED | IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, -80 - 16));
+		HALT;
+	}
 }
 
-#define PRINT_INSTRUCTIONS 1
+#define PRINT_INSTRUCTIONS 0
 int run_interpreter()
 {
 	running = true;	
@@ -214,10 +274,9 @@ int run_interpreter()
 		}
 		u64 immediate = *((u64*)(address + REG_SIZE));
 
-#ifdef PRINT_INSTRUCTIONS
+#if PRINT_INSTRUCTIONS
 		print_instruction(instruction, immediate);
 #endif
-
 		if (execute(instruction, immediate)) break;
 	}
 	return 0;
@@ -396,11 +455,12 @@ int execute_instruction(Instruction inst, u64 next_word)
 	}break;
 	case EXTCALL: {
 		assert(inst.flags & IMMEDIATE_VALUE);
-		// put arguments on the stack
-		// --
-		// call
-		void(*func)() = (void(*)())ui_left;
-		func();
+		// put arguments on the stack and call the function
+#if _DEBUG
+		call_external_DEBUG((void*)ui_left, stack, (u64)reg[R_SS]);
+#else
+		call_external((void*)ui_left, stack, (u64)reg[R_SS]);
+#endif
 	}break;
 	case HLT: {
 		return 1;
@@ -479,26 +539,26 @@ void print_instruction(Instruction inst, u64 next_qword)
 
 	switch (inst.addressing) {
 	case REG_TO_REG	    : printf("R_%d, R_%d", inst.left_reg, inst.right_reg); break;
-	case MEM_TO_REG     : printf("R_%d, 0x%x", inst.left_reg, next_qword); break;
+	case MEM_TO_REG     : printf("R_%d, 0x%llx", inst.left_reg, next_qword); break;
 	case SINGLE_REG		: printf("R_%d", inst.left_reg); break;
-	case SINGLE_MEM		: printf("%x", next_qword); break;
+	case SINGLE_MEM		: printf("%llx", next_qword); break;
 
 	case SINGLE_MEM_PTR: {
 		if (inst.flags & IMMEDIATE_OFFSET) {
 			if (inst.flags & IMMEDIATE_VALUE)
-				printf("[0x%x + 0x%x]", next_qword, inst.immediate_offset);
+				printf("[0x%x + 0x%llx]", next_qword, inst.immediate_offset);
 			else
-				printf("[0x%x]", inst.immediate_offset);
+				printf("[0x%llx]", inst.immediate_offset);
 		} else if(inst.flags & REGISTER_OFFSET) {
-			printf("[0x%x + R_%d]", next_qword, inst.offset_reg);
+			printf("[0x%llx + R_%d]", next_qword, inst.offset_reg);
 		} else {
-			printf("[0x%x]", next_qword);
+			printf("[0x%llx]", next_qword);
 		}
 	}break;
 	case SINGLE_REG_PTR: {
 		if (inst.flags & IMMEDIATE_OFFSET) {
 			if (inst.flags & IMMEDIATE_VALUE)
-				printf("[R_%d + 0x%x]", inst.left_reg, next_qword);
+				printf("[R_%d + 0x%llx]", inst.left_reg, next_qword);
 			else
 				printf("[R_%d]", inst.left_reg);
 		} else if (inst.flags & REGISTER_OFFSET) {
@@ -509,7 +569,7 @@ void print_instruction(Instruction inst, u64 next_qword)
 	}break;
 	case REG_TO_REG_PTR: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			printf("[R_%d + 0x%x], R_%d", inst.left_reg, inst.immediate_offset, inst.right_reg);
+			printf("[R_%d + 0x%llx], R_%d", inst.left_reg, inst.immediate_offset, inst.right_reg);
 		else if(inst.flags & REGISTER_OFFSET)
 			printf("[R_%d + R_%d], R_%d", inst.left_reg, inst.offset_reg, inst.right_reg);
 		else
@@ -517,7 +577,7 @@ void print_instruction(Instruction inst, u64 next_qword)
 	}break;
 	case REG_PTR_TO_REG: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			printf("R_%d, [R_%d + 0x%x]", inst.left_reg, inst.right_reg, inst.immediate_offset);
+			printf("R_%d, [R_%d + 0x%llx]", inst.left_reg, inst.right_reg, inst.immediate_offset);
 		else if(inst.flags & REGISTER_OFFSET)
 			printf("R_%d, [R_%d + R_%d]", inst.left_reg, inst.right_reg, inst.offset_reg);
 		else
@@ -525,23 +585,23 @@ void print_instruction(Instruction inst, u64 next_qword)
 	}break;
 	case MEM_PTR_TO_REG: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			printf("R_%d, [0x%x + 0x%x]", inst.left_reg, next_qword, inst.immediate_offset);
+			printf("R_%d, [0x%llx + 0x%llx]", inst.left_reg, next_qword, inst.immediate_offset);
 		else if(inst.flags & REGISTER_OFFSET)
-			printf("R_%d, [0x%x + R_%d]", inst.left_reg, next_qword, inst.offset_reg);
+			printf("R_%d, [0x%llx + R_%d]", inst.left_reg, next_qword, inst.offset_reg);
 		else
-			printf("R_%d, [0x%x]", inst.left_reg, next_qword);
+			printf("R_%d, [0x%llx]", inst.left_reg, next_qword);
 	}break;
 	case REG_TO_MEM_PTR: {
 		if (inst.flags & IMMEDIATE_OFFSET)
-			printf("[%x + 0x%x], R_%d", next_qword, inst.immediate_offset, inst.right_reg);
+			printf("[%llx + 0x%llx], R_%d", next_qword, inst.immediate_offset, inst.right_reg);
 		else if(inst.flags & REGISTER_OFFSET)
-			printf("[%x + R_%d], R_%d", next_qword, inst.offset_reg, inst.right_reg);
+			printf("[%llx + R_%d], R_%d", next_qword, inst.offset_reg, inst.right_reg);
 		else
-			printf("[0x%x], R_%d", next_qword, inst.right_reg);
+			printf("[0x%llx], R_%d", next_qword, inst.right_reg);
 	}break;
 	case NO_ADDRESSING: {
 		if (inst.flags & IMMEDIATE_OFFSET) {
-			printf("0x%x", inst.immediate_offset);
+			printf("0x%llx", inst.immediate_offset);
 		}
 	}break;
 	}
