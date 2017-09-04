@@ -197,6 +197,9 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 #endif
 #if 0
 	{
+		{
+			*(u64*)datas_ptr = (u64)-(8 * 4); datas_ptr += sizeof(u64);
+		}
 		// IMMEDIATE_OFFSET | REGISTER_OFFSET | SIGNED | IMMEDIATE_VALUE
 
 		// mov r2, datas_ptr
@@ -223,7 +226,7 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 	// POP val
 	// sub rsp, 8
 	// mov val, [rsp]
-
+#if 1
 	{
 		// push datas_ptr
 		// mov r2, 0
@@ -259,9 +262,10 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 		push_instruction(make_instruction(BLE, SIGNED | IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, -80 - 16));
 		HALT;
 	}
+#endif
 }
 
-#define PRINT_INSTRUCTIONS 0
+#define PRINT_INSTRUCTIONS 1
 int run_interpreter()
 {
 	running = true;	
