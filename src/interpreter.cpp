@@ -7,8 +7,7 @@
 #define HALT push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0))
 
 // external functions
-extern "C" void call_external(void* proc_address, u8* call_stack_ptr, u64 size_stack);
-extern "C" void call_external_DEBUG(void* proc_address, u8* call_stack_ptr, u64 size_stack);
+extern "C" u64 call_external(void* proc_address, u64 call_stack_ptr, u64 size_stack);
 
 // Instruction type
 const u16 HLT  = 0;
@@ -24,8 +23,8 @@ const u16 BLE  = 9;
 const u16 BGT  = 10;
 const u16 BGE  = 11;
 const u16 JMP  = 12;
-const u16 PUSH = 13;	// @todo
-const u16 POP  = 14;	// @todo
+const u16 PUSH = 13;
+const u16 POP  = 14;
 const u16 CALL = 15;	// @todo
 const u16 RET  = 16;	// @todo
 const u16 CMP  = 17;
@@ -67,8 +66,8 @@ const s64 FLAGS_REG_ZERO		= FLAG(2);
 const s64 FLAGS_REG_SIGN		= FLAG(3);
 
 enum Registers {
-	R_IP = 0,
 
+	R_0 = 0,
 	R_1 = 1,
 	R_2 = 2,
 	R_3 = 3,
@@ -78,14 +77,15 @@ enum Registers {
 	R_7 = 7,
 	R_8 = 8,
 	
-	R_SP = 9,
-	R_SB = 10,
-	R_SS = 11,
+	R_IP = 9,
+	R_SP = 10,
+	R_SB = 11,
+	R_SS = 12,
 
-	R_FLAGS = 12,
+	R_FLAGS = 13,
 
-	NO_REG = 13,
-	NUM_REGS = 14,
+	NO_REG = 14,
+	NUM_REGS = 15,
 };
 
 struct Instruction {
@@ -143,9 +143,10 @@ Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8
 	return res;
 }
 
-void teste(char* str, int d)
+int teste(int a, int b, int c, int d, int e, int f)
 {
-	printf("%s %d\n", str, d);
+	//printf("%d %d %d %d %d %d\n", a, b, c, d, e, f);
+	return a + b + c + d + e + f;
 }
 
 void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024) 
@@ -154,6 +155,8 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 	heap  = (u8*)ho_bigalloc_rw(heap_size);
 	code  = (u8*)ho_bigalloc_rw(1024 * 1024);
 	datas = (u8*)ho_bigalloc_rw(1024 * 1024);
+
+	stack = stack + 4 * sizeof(u64);	// this is necessary for external call, in order to not access an address below the stack address
 
 	stack_ptr = stack;
 	heap_ptr = heap;
@@ -164,14 +167,9 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 	reg[R_SP] = (u64)stack;
 	reg[R_SB] = (u64)stack;
 
-	{
-		const char* str = "iterations :";
-		*(u64*)datas_ptr = (u64)str;
-		//*(u64*)datas_ptr = (u64)-(8 * 4); datas_ptr += sizeof(u64);
-	}
-
 	u64 label = (u64)code_ptr;
 	u64 start = (u64)code_ptr;
+
 #if 0
 	{
 		// mov r1, 0
@@ -197,72 +195,202 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 #endif
 #if 0
 	{
-		{
-			*(u64*)datas_ptr = (u64)-(8 * 4); datas_ptr += sizeof(u64);
-		}
-		// IMMEDIATE_OFFSET | REGISTER_OFFSET | SIGNED | IMMEDIATE_VALUE
-
-		// mov r2, datas_ptr
-		// mov r1, 5
-		// sub r1, 1
-		// extcall print
-		// cmp r1, 0
-		// bge [r2]
-		// hlt
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), (u64)datas_ptr - 8);
-		start = push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), 5);
-		push_instruction(make_instruction(SUB, SIGNED | IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, NO_REG, 0), 1);
-		label = push_instruction(make_instruction(CMP, SIGNED | IMMEDIATE_VALUE | INSTR_DWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
-		push_instruction(make_instruction(BGE, SIGNED, SINGLE_REG_PTR, R_2, NO_REG, 0, 0));
-		push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
-		
+		const char* str = "iterations : %d\n";
+		*(u64*)datas_ptr = (u64)str;
 	}
-#endif
-	// PUSH val
-	// mov r1, val
-	// mov [rsp], r1
-	// add rsp, 8
-
-	// POP val
-	// sub rsp, 8
-	// mov val, [rsp]
-#if 1
 	{
-		// push datas_ptr
+		// mov r3, rsp
 		// mov r2, 0
+		// push r2
+		// push [datas_ptr]
 		// mov ss, 8
 	// label:
-		// push r2
 		// extcall printf
-		// sub rsp, 8
+		// add rsp, 16
 		// add r2, 1
+		// mov [r3], r2
 		// cmp r2, 10
-		// jle label
+		// ble label
 		// hlt
+
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG, R_3, R_SP, 0, 0));
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 0);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_2, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
 
 		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE|INSTR_QWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), *(u64*)datas_ptr);
 		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
 		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
 
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 0);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 8);
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 16);
 
 		// label
-		push_instruction(make_instruction(MOV, 0, REG_TO_REG, R_1, R_2, 0, 0));
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+		push_instruction(make_instruction(EXTCALL, INSTR_QWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)printf);	// 16
 
-		push_instruction(make_instruction(EXTCALL, INSTR_QWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)teste);
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 16);		// 16
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 1);			// 16
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_3, R_2, 0, 0));				// 8
+		push_instruction(make_instruction(CMP, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 46);			// 16
 
-		push_instruction(make_instruction(SUB, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 1);
-		push_instruction(make_instruction(CMP, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 10);
+		push_instruction(make_instruction(BLE, IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, -(4*16 + 8)));
 
-		push_instruction(make_instruction(BLE, SIGNED | IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, -80 - 16));
 		HALT;
 	}
 #endif
+#if 0
+	{
+		const char* str = "Untitled - Notepad";
+		const char* str2 = "Eita!";
+		*(u64*)datas_ptr = (u64)str;
+		datas_ptr += sizeof(u64);
+		*(u64*)datas_ptr = (u64)str2;
+	}
+	{
+		// mov r1, 0
+		// push r1
+		// push [datas_ptr - 8]
+		// push [datas_ptr]
+		// push r1
+		// callext MessageBoxA
+		
+		// mov r1, 0
+		// push r1
+		// push [datas_ptr - 8]
+		// callext FindWindowA
+
+		// mov r2, rsp
+		// add rsp, 16
+		// hlt
+
+		
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_QWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), *(u64*)datas_ptr);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_QWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), *(u64*)(datas_ptr - 8));
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 4 * 8);
+
+		push_instruction(make_instruction(EXTCALL, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)MessageBoxA);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_QWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), *((u64*)(datas_ptr - 8)));
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+		
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 2 * 8);
+
+		push_instruction(make_instruction(EXTCALL, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)FindWindowA);
+
+
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG, R_2, R_SP, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 16);
+
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_2, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_0, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 2 * 8);
+
+		push_instruction(make_instruction(EXTCALL, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)GetWindowRect);
+
+		HALT;
+
+	}
+#endif
+#if 0
+	{
+		// mov r1, 1
+		// push r1
+		// mov r1, 2
+		// push r1
+		// mov r1, 3
+		// push r1
+		// mov r1, 4
+		// push r1
+		// mov r1, 5
+		// push r1
+		// mov r1, 6
+		// push r1
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 1);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 2);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 3);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 4);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 5);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 6);
+		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
+		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 6 * 8);
+
+		push_instruction(make_instruction(EXTCALL, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)teste);
+
+		HALT;
+
+	}
+#endif
+#if 0
+	{
+		push_instruction(make_instruction(PUSH, INSTR_DWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 1);
+		push_instruction(make_instruction(PUSH, INSTR_DWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 2);
+
+		push_instruction(make_instruction(POP, INSTR_DWORD, SINGLE_REG, R_1, NO_REG, 0, 0));
+
+		push_instruction(make_instruction(PUSH, IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 3);
+		push_instruction(make_instruction(PUSH, IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 4);
+		push_instruction(make_instruction(PUSH, IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 5);
+		push_instruction(make_instruction(PUSH, IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 6);
+
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 6 * 8);
+		push_instruction(make_instruction(EXTCALL, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)teste);
+
+		HALT;
+	}
+#endif
+#if 0
+	{
+		push_instruction(make_instruction(MOV, INSTR_BYTE | SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 120);
+		push_instruction(make_instruction(MOV, INSTR_BYTE | SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 75);
+		push_instruction(make_instruction(ADD, INSTR_BYTE | SIGNED, REG_TO_REG, R_1, R_2, 0, 0));
+		push_instruction(make_instruction(PUSH, INSTR_BYTE, SINGLE_REG, R_1, NO_REG, 0, 0));
+		push_instruction(make_instruction(POP, SIGNED|INSTR_BYTE, SINGLE_REG, R_2, NO_REG, 0, 0));
+	}
+#endif
+	{
+		push_instruction(make_instruction(EXTCALL, IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)GetModuleHandleA);
+	}
 }
 
 #define PRINT_INSTRUCTIONS 1
@@ -457,14 +585,24 @@ int execute_instruction(Instruction inst, u64 next_word)
 	case MOV: {
 		ui_left = ui_right;
 	}break;
+	case PUSH: {
+		assert(inst.addressing == SINGLE_MEM || inst.addressing == SINGLE_REG || inst.addressing == SINGLE_REG_PTR || inst.addressing == SINGLE_MEM);
+		address_to_write = reg[R_SP];
+		reg[R_SP] += sizeof(u64);
+		write_memory = true;
+	}break;
+	case POP: {
+		assert(inst.addressing == SINGLE_REG);
+		reg[R_SP] -= sizeof(u64);
+		ui_left = *(T*)reg[R_SP];
+		write_register = true;
+	}break;
 	case EXTCALL: {
 		assert(inst.flags & IMMEDIATE_VALUE);
 		// put arguments on the stack and call the function
-#if _DEBUG
-		call_external_DEBUG((void*)ui_left, stack, (u64)reg[R_SS]);
-#else
-		call_external((void*)ui_left, stack, (u64)reg[R_SS]);
-#endif
+		u64 ret = call_external((void*)ui_left, (u64)reg[R_SP], (u64)reg[R_SS]);
+		reg[R_0] = ret;
+		reg[R_SP] -= reg[R_SS];		
 	}break;
 	case HLT: {
 		return 1;
