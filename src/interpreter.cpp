@@ -34,6 +34,8 @@ const u16 AND  = 20;
 const u16 OR   = 21;
 const u16 XOR  = 22;
 const u16 NOT  = 23;
+const u16 SHL  = 24;
+const u16 SHR  = 25;
 
 // Instruction addressing
 const u8 NO_ADDRESSING		= 0;
@@ -141,12 +143,6 @@ Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8
 	res.offset_reg = offset_reg;
 	res.immediate_offset = immediate_offset;
 	return res;
-}
-
-int teste(int a, int b, int c, int d, int e, int f)
-{
-	//printf("%d %d %d %d %d %d\n", a, b, c, d, e, f);
-	return a + b + c + d + e + f;
 }
 
 void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024) 
@@ -423,6 +419,7 @@ int execute_instruction(Instruction inst, u64 next_word)
 	bool advance_ip = true;
 	u64 address_to_write = 0;
 
+	// addressing mode
 	switch (inst.addressing) {
 	case REG_TO_REG: {
 		ui_left = reg[inst.left_reg];
@@ -506,12 +503,16 @@ int execute_instruction(Instruction inst, u64 next_word)
 		write_memory = true;
 	}break;
 	}
+
+	// instruction decode
 	switch (inst.type) {
 	case ADD:	ui_left = ui_left + ui_right; break;
 	case SUB:	ui_left = ui_left - ui_right; break;
 	case MUL:	ui_left = ui_left * ui_right; break;
 	case DIV:	ui_left = ui_left / ui_right; break;
 	case MOD:	ui_left = ui_left % ui_right; break;
+	case SHL:   ui_left = ui_left << ui_right; break;
+	case SHR:   ui_left = ui_left >> ui_right; break;
 
 	case CMP: {
 		if (ui_left < ui_right)
@@ -674,6 +675,8 @@ void print_instruction(Instruction inst, u64 next_qword)
 		case OR   : printf("OR "); break;
 		case XOR  : printf("XOR "); break;
 		case NOT  : printf("NOT "); break;
+		case SHL  : printf("SHL "); break;
+		case SHR  : printf("SHR "); break;
 		case EXTCALL: printf("EXTERNAL CALL: "); break;
 		case HLT  : printf("HLT "); break;
 		default   : printf("UNKNOWN "); break;

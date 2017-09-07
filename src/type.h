@@ -36,6 +36,8 @@ const u32 TYPE_FLAG_IS_RESOLVED = FLAG(1);
 const u32 TYPE_FLAG_IS_SIZE_RESOLVED = FLAG(2);
 const u32 TYPE_FLAG_ARRAY_STATIC = FLAG(3);
 const u32 TYPE_FLAG_ARRAY_DYNAMIC = FLAG(4);
+const u32 TYPE_FLAG_QUEUED = FLAG(5);
+const u32 TYPE_FLAG_NOT_DELETE = FLAG(6);
 
 /*
 Types
@@ -67,7 +69,9 @@ struct Type_Instance {
 		struct Type_Struct {
 			char* name;
 			int name_length;
-			Type_Instance* struct_descriptor;
+			Type_Instance** fields_types;
+			string* fields_names;
+			Ast* struct_descriptor;
 		} type_struct;
 	};
 
@@ -78,7 +82,6 @@ struct Type_Instance {
 };
 
 s32 get_size_of_pointer();
-
 s32 get_size_of_primitive_type(Type_Primitive primitive);
 
 struct Type_Table_Entry {
@@ -103,6 +106,7 @@ struct Type_Table {
 	u32 type_hash(Type_Instance* instance);
 	bool entry_exist(Type_Instance* instance, s64* hash);
 	bool insert_type(Type_Instance* instance, s64* hash);
+	Type_Instance* get_entry(s64 hash);
 };
 
 Type_Instance* get_primitive_type(Type_Primitive primitive_type);

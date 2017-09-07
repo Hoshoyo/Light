@@ -66,24 +66,21 @@ u32 Type_Table::type_hash(Type_Instance* instance)
 		// --
 	case TYPE_ARRAY: {
 
-		if (instance->flags & TYPE_FLAG_ARRAY_STATIC) {
-#if 0
-			// @TODO make dimension sizes constant
-			u32 hash = type_hash(instance->type_array.array_of);
-			int num_dims = instance->type_array.num_dimensions;
-			for (int i = 0; i < num_dims; ++i) {
-				//hash = djb2_hash(hash, (u8*)instance->type_array.dimensions_sizes[i], sizeof())
-			}
-#endif
-		} else if (instance->flags & TYPE_FLAG_ARRAY_DYNAMIC) {
-
-		} else {
-			assert(0);	// should not get here
-		}
 	}break;
 		// --
 	case TYPE_STRUCT: {
-		assert(0);
+		u32 hash = djb2_hash((u8*)instance->type_struct.name, instance->type_struct.name_length);
+		return hash % max_entries;
+	}break;
+		// --
+	case TYPE_FUNCTION: {
+		u32 hash = type_hash(instance->type_function.return_type);
+		int num_args = instance->type_function.num_arguments;
+		for (int i = 0; i < num_args; ++i) {
+			Type_Instance* argtype = instance->type_function.arguments_type[i];
+			hash = djb2_hash(hash, type_hash(argtype));
+		}
+		return hash % max_entries;
 	}break;
 	}
 }
@@ -108,16 +105,26 @@ bool types_equal(Type_Instance* i1, Type_Instance* i2)
 		}break;
 			// --
 		case TYPE_STRUCT: {
-			assert(0);	// @todo
+			return str_equal(i1->type_struct.name, i1->type_struct.name_length, i2->type_struct.name, i2->type_struct.name_length);
+		}break;
+			// --
+		case TYPE_FUNCTION: {
+			if (!types_equal(i1->type_function.return_type, i2->type_function.return_type)) return false;
+			int num_args = i1->type_function.num_arguments;
+			if (num_args != i2->type_function.num_arguments) return false;
+			for (int i = 0; i < num_args; ++i) {
+				if (!types_equal(i1->type_function.arguments_type[i], i2->type_function.arguments_type[i])) return false;
+			}
+			return true;
 		}break;
 	}
 }
 
 bool Type_Table::entry_exist(Type_Instance* instance, s64* hash)
 {
-	assert(instance->flags & TYPE_FLAG_IS_REGISTER_SIZE);
+	//assert(instance->flags & TYPE_FLAG_IS_REGISTER_SIZE);
 	//assert(instance->flags & TYPE_FLAG_IS_RESOLVED);
-	assert(instance->flags & TYPE_FLAG_IS_SIZE_RESOLVED);
+	//assert(instance->flags & TYPE_FLAG_IS_SIZE_RESOLVED);
 
 	u32 h = type_table.type_hash(instance);
 
@@ -153,6 +160,7 @@ bool Type_Table::insert_type(Type_Instance* instance, s64* hash)
 		h += 1;
 		if (h == max_entries) h = 0;
 	}
+	instance->flags |= TYPE_FLAG_NOT_DELETE;
 	type_table.entries[h].entry = instance;
 	type_table.entries[h].used = true;
 
@@ -163,8 +171,15 @@ bool Type_Table::insert_type(Type_Instance* instance, s64* hash)
 	return true;
 }
 
+Type_Instance* Type_Table::get_entry(s64 hash)
+{
+	return entries[hash].entry;
+}
+
 void delete_type(Type_Instance* instance) 
 {
+	if (instance->flags & TYPE_FLAG_NOT_DELETE) return;
+
 	switch (instance->type) {
 		case TYPE_PRIMITIVE: {
 			delete instance;
@@ -180,7 +195,7 @@ void delete_type(Type_Instance* instance)
 		}break;
 			// --
 		case TYPE_STRUCT: {
-			assert(0);	// @todo
+			delete instance;
 		}break;
 
 		case TYPE_FUNCTION: {
@@ -209,11 +224,14 @@ s64 create_type(Type_Instance** instance, bool swap_and_delete)
 	}
 	return index;
 }
-
+#include "ast.h"
 void DEBUG_print_type_table()
 {
+	printf("The type table has %d entries.\n", DEBUG_type_index);
 	for (int i = 0; i < DEBUG_type_index; ++i) {
 		s64 hash = DEBUG_type_entries[i];
-		printf("entry[%d/%u]: %p\n", i, hash, type_table.entries[hash].entry);
+		printf("entry[%d/%u]: %p\n", i, hash, type_table.get_entry(hash));
+		DEBUG_print_type(stdout, type_table.get_entry(hash));
+		printf("\n");
 	}
 }

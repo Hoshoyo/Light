@@ -6,6 +6,8 @@ static int declaration_ratio = 8;
 
 #define TOKEN_STR(X) X->value.length, X->value.data
 
+Infer_Node* infer_queue = 0;
+
 static int report_semantic_error(Decl_Site* site, char* msg, ...)
 {
 	va_list args;
@@ -280,54 +282,251 @@ Type_Instance* infer_node_expression_type(Ast* node, Scope* scope, Type_Table* t
 	}
 }
 
+void push_infer_queue(Ast* node, Scope* scope)
+{
+	Infer_Node infer_node;
+	node->return_type->flags |= TYPE_FLAG_QUEUED;
+	infer_node.node = node;
+	infer_node.scope = scope;
+	push_array(infer_queue, &node);
+}
+
+// returns 0 if failed to resolve
+// returns non-zero if resolved
+// this function only changed type flags
+int resolve_type(Type_Instance* instance, Type_Table* type_table)
+{
+	assert(!(instance->flags & TYPE_FLAG_IS_RESOLVED));
+
+	switch (instance->type) {
+	case TYPE_PRIMITIVE: {
+		return 1;
+	}break;
+	case TYPE_POINTER: {
+		assert(instance->flags & TYPE_FLAG_IS_SIZE_RESOLVED);
+		assert(instance->flags & TYPE_FLAG_IS_REGISTER_SIZE);
+		if (!resolve_type(instance->pointer_to, type_table)) {
+			return 0;
+		}
+		instance->flags |= TYPE_FLAG_IS_RESOLVED;
+		return 1;
+	}break;
+
+	case TYPE_FUNCTION: {
+		// if could not resolve type of return, fail
+
+		if (!(instance->type_function.return_type->flags & TYPE_FLAG_IS_RESOLVED) &&
+			!resolve_type(instance->type_function.return_type, type_table)) {
+			return 0;
+		}
+		// try resolving the type for all the arguments
+		int num_args = instance->type_function.num_arguments;
+		for (int i = 0; i < num_args; ++i) {
+			Type_Instance* in = instance->type_function.arguments_type[i];
+			if (!(in->flags & TYPE_FLAG_IS_RESOLVED) && !resolve_type(in, type_table)) {
+				return 0;
+			}
+			in->flags |= TYPE_FLAG_IS_RESOLVED;
+		}
+		instance->flags |= TYPE_FLAG_IS_RESOLVED;
+		return 1;
+	}break;
+
+	case TYPE_STRUCT: {
+		s64 hash = -1;
+		// if the entry exist, that means the structure was declared and it is on the type table
+		if (type_table->entry_exist(instance, &hash)) {
+			Type_Instance* in = type_table->get_entry(hash);
+			assert(in->flags & TYPE_FLAG_IS_RESOLVED);
+			assert(in->flags & TYPE_FLAG_IS_SIZE_RESOLVED);
+			instance->flags |= TYPE_FLAG_IS_SIZE_RESOLVED;
+			instance->flags |= TYPE_FLAG_IS_RESOLVED;
+		} else {
+			return 0;
+		}
+	}break;
+
+	default: 
+		assert(0); break;	// @todo
+	}
+}
+
+Type_Instance* get_decl_type(Ast* node)
+{
+	assert(node->is_decl);
+	switch (node->node) {
+	case AST_NODE_VARIABLE_DECL:      return node->var_decl.type;
+	case AST_NODE_NAMED_ARGUMENT:     return node->named_arg.arg_type;
+	case AST_NODE_PROC_DECLARATION:   assert(0); break; //@todo
+	case AST_NODE_STRUCT_DECLARATION: return node->struct_decl.type_info;
+
+	default: assert(0); // @todo
+	}
+}
+
+Token* get_decl_name(Ast* node)
+{
+	assert(node->is_decl);
+	switch (node->node) {
+	case AST_NODE_VARIABLE_DECL:      return node->var_decl.name;
+	case AST_NODE_NAMED_ARGUMENT:     return node->named_arg.arg_name; 
+	case AST_NODE_PROC_DECLARATION:   return node->proc_decl.name;
+	case AST_NODE_STRUCT_DECLARATION: return node->struct_decl.name;
+
+	default: assert(0); // @todo
+	}
+}
+
+// return 0 if infered
+// return 1 if queued
+// return -1 if errored
+
 int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 {
+	if (node->return_type && node->return_type->flags & TYPE_FLAG_QUEUED) return 1;
 	if (node->is_decl) {
+		// if this is a declaration, the return type of this node is always void
+		node->return_type = get_primitive_type(TYPE_PRIMITIVE_VOID);
 		switch (node->node)
 		{
 			case AST_NODE_NAMED_ARGUMENT: {
+				if (node->named_arg.arg_type->flags & TYPE_FLAG_IS_RESOLVED) return 0;
+
 				assert(node->named_arg.arg_type);
-				create_type(&node->named_arg.arg_type, true);
+				if (node->named_arg.arg_type->flags & TYPE_FLAG_IS_RESOLVED) {
+					// create the type, since it is resolved
+					create_type(&node->named_arg.arg_type, true);
+				} else {
+					// put it on the queue to be resolved
+					push_infer_queue(node, scope);
+					return 1;
+				}
 			} break;
+
 			case AST_NODE_PROC_DECLARATION: {
-				// proc itself
+				// proc return type creation
 				assert(node->proc_decl.proc_ret_type);
-				Type_Instance* type_instance = new Type_Instance();
+
+				bool infered = true;
+
+				if (node->proc_decl.proc_ret_type->flags & TYPE_FLAG_IS_RESOLVED) {
+					create_type(&node->proc_decl.proc_ret_type, true);
+				} else {
+					infered = false;
+				}
+				
 				// arguments
 				int num_args = node->proc_decl.num_args;
-				type_instance->type_function.arguments_type = create_array(Type_Instance*, num_args);
 				for (int i = 0; i < num_args; ++i) {
-					if (infer_node_types(node->proc_decl.arguments[i], node->proc_decl.scope, table) == -1) {
-						report_semantic_error(&node->proc_decl.arguments[i]->named_arg.site, "Type of argument #%d/%.*s of procedure declaration %.*s could not be inferred.\n",
-							i + 1, TOKEN_STR(node->proc_decl.arguments[i]->named_arg.arg_name), TOKEN_STR(node->proc_decl.name));
-						return -1;
+					Ast* arg = node->proc_decl.arguments[i];
+					if (infer_node_types(arg, node->proc_decl.scope, table) != 0) {
+						infered = false;
 					}
-					push_array(type_instance->type_function.arguments_type, node->proc_decl.arguments[i]);
 				}
 
-				type_instance->type_function.num_arguments = num_args;
-				type_instance->type_function.return_type = node->proc_decl.proc_ret_type;
+				int err = infer_node_types(node->proc_decl.body, node->proc_decl.scope, table);
 
-				// body
-				if (infer_node_types(node->proc_decl.body, node->proc_decl.scope, table) == -1) {
-					return -1;
+				if (infered) {
+					Type_Instance* instance = new Type_Instance();
+					instance->type = TYPE_FUNCTION;
+					instance->flags = TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED | TYPE_FLAG_IS_REGISTER_SIZE;
+					instance->type_size = get_size_of_pointer();
+
+					instance->type_function.num_arguments = num_args;
+					instance->type_function.return_type = node->proc_decl.proc_ret_type;
+					instance->type_function.arguments_type = create_array(Type_Instance*, num_args);
+
+					for (int i = 0; i < num_args; ++i) {
+						Type_Instance* in = get_decl_type(node->proc_decl.arguments[i]);
+						push_array(instance->type_function.arguments_type, &in);
+					}
+
+					create_type(&instance, true);
+				} else {
+					push_infer_queue(node, scope);
+					return 1;
 				}
+
 			}break;
 
 			case AST_NODE_VARIABLE_DECL: {
+				if (node->var_decl.type->flags & TYPE_FLAG_IS_RESOLVED) return 0;
+
 				if (node->var_decl.type) {
-					create_type(&node->var_decl.type, true);
+					if (node->var_decl.type->flags & TYPE_FLAG_IS_RESOLVED) {
+						create_type(&node->var_decl.type, true);
+					} else {
+						if (resolve_type(node->var_decl.type, table)) {
+							create_type(&node->var_decl.type, true);
+						} else {
+							push_infer_queue(node, scope);
+							return 1;
+						}
+					}
 				} else if(node->var_decl.assignment) {
 					// infer type from rvalue
 					Type_Instance* inst = infer_node_expression_type(node->var_decl.assignment, node->var_decl.scope, table);
-
-					create_type(&inst, true);
-					node->var_decl.assignment->return_type = inst;
-					node->var_decl.type = inst;
+					if (inst == 0) {
+						// could not infer, put it on the queue
+						push_infer_queue(node, scope);
+					} else {
+						if (inst->flags & TYPE_FLAG_IS_RESOLVED || resolve_type(inst, table)) {
+							create_type(&inst, true);
+							node->var_decl.assignment->return_type = inst;
+							node->var_decl.type = inst;
+						} else {
+							push_infer_queue(node, scope);
+							return 1;
+						}
+					}
 				} else {
 					report_semantic_error(&node->var_decl.site, "type of variable %.*s could not be inferred, since there is no rvalue assignment.\n", TOKEN_STR(node->var_decl.name));
 					return -1;
 				}
+			}break;
+
+			case AST_NODE_STRUCT_DECLARATION: {
+				bool infered = true;
+				int num_fields = node->struct_decl.num_fields;
+				for (int i = 0; i < num_fields; ++i) {
+					Ast* field = node->struct_decl.fields[i];
+					if (infer_node_types(field, node->struct_decl.scope, table) != 0) {
+						infered = false;
+					}
+				}
+				if (infered) {
+					Type_Instance** ftypes = create_array(Type_Instance*, num_fields);
+					string* fnames = create_array(string, num_fields);
+					s64 size_bytes = 0;
+					for (int i = 0; i < num_fields; ++i) {
+						Type_Instance* ti = get_decl_type(node->struct_decl.fields[i]);
+						Token* name = get_decl_name(node->struct_decl.fields[i]);
+						string s;
+						make_immutable_string(s, name->value.data, name->value.length);
+						push_array(fnames, &s);
+						size_bytes += ti->type_size;
+						push_array(ftypes, &ti);
+					}
+					Type_Instance* struct_instance = new Type_Instance();
+					struct_instance->type = TYPE_STRUCT;
+					struct_instance->type_struct.name = node->struct_decl.name->value.data;
+					struct_instance->type_struct.name_length = node->struct_decl.name->value.length;
+					struct_instance->type_struct.struct_descriptor = node;
+					struct_instance->type_struct.fields_types = ftypes;
+					struct_instance->type_struct.fields_names = fnames;
+
+					struct_instance->flags = TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED;
+					struct_instance->type_size = size_bytes;
+
+					create_type(&struct_instance, false);
+
+					node->struct_decl.type_info = struct_instance;
+					node->struct_decl.size_bytes = size_bytes;
+				} else {
+					push_infer_queue(node, scope);
+					return 1;
+				}
+
 			}break;
 		}
 	} else {
@@ -353,13 +552,52 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 	return 0;
 }
 
+// return 0 if infered correctly
+// return 1 if queued
+// return -1 if errored
 int type_inference(Ast** ast, Scope* global_scope, Type_Table* table)
 {
+	int ret_val = 0;
 	size_t num_nodes = get_arr_length(ast);
-
 	for (size_t i = 0; i < num_nodes; ++i) {
 		Ast* node = ast[i];
-		infer_node_types(node, global_scope, table);
+		int err = infer_node_types(node, global_scope, table);
+		if (err == -1) {
+			return -1;
+		} else if (err == 1) {
+			ret_val = 1;
+		}
 	}
-	return DECL_CHECK_PASSED;
+	return ret_val;
+}
+
+int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
+{
+	infer_queue = create_array(Infer_Node, 16);
+	if (type_inference(ast, global_scope, type_table) == DECL_CHECK_PASSED) {
+		int qsize = get_arr_length(infer_queue);
+		while (qsize != 0) {
+			for(int i = 0; i < qsize; ++i) {
+				Infer_Node in = infer_queue[i];
+				if (infer_node_types(in.node, in.scope, type_table) == 0) {
+					int n = get_arr_length(infer_queue);
+					array_remove(infer_queue, i);
+				} else {
+					continue;
+				}
+			}
+			int newsize = get_arr_length(infer_queue);
+			if (qsize == newsize) {
+				report_semantic_error(0, "Detected circulary dependency on type inference, exiting.\n");
+				return -1;
+			} else if (newsize < qsize) {
+				qsize = newsize;
+				continue;
+			} else {
+				report_semantic_error(0, "Internal compiler error, the number of entries in the infer_queue grew, which is an unintender behaviour.\n");
+				return -1;
+			}
+		}
+	}
+	return 0;
 }

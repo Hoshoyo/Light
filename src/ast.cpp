@@ -370,6 +370,26 @@ void DEBUG_print_type(FILE* out, Type_Instance* type) {
 	} else if (type->type == TYPE_POINTER) {
 		fprintf(out, "^");
 		DEBUG_print_type(out, type->pointer_to);
+	} else if (type->type == TYPE_STRUCT) {
+		fprintf(out, "%.*s struct {\n", type->type_struct.name_length, type->type_struct.name);
+		int num_fields = get_arr_length(type->type_struct.fields_types);
+		for (int i = 0; i < num_fields; ++i) {
+			Type_Instance* field_type = type->type_struct.fields_types[i];
+			string name = type->type_struct.fields_names[i];
+			fprintf(out, "%.*s : ", name.length, name.data);
+			DEBUG_print_type(out, field_type);
+			fprintf(out, ";\n");
+		}
+		fprintf(out, "}\n");
+	} else if (type->type == TYPE_FUNCTION) {
+		fprintf(out, "(");
+		int num_args = type->type_function.num_arguments;
+		for (int i = 0; i < num_args; ++i) {
+			DEBUG_print_type(out, type->type_function.arguments_type[i]);
+			if(i + 1 < num_args) fprintf(out, ",");
+		}
+		fprintf(out, ") -> ");
+		DEBUG_print_type(out, type->type_function.return_type);
 	}
 
 }

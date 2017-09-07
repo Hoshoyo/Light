@@ -20,6 +20,7 @@ int Parser::report_syntax_error(char* msg, ...)
 	fprintf(stderr, "Syntax Error: ");
 	vfprintf(stderr, msg, args);
 	va_end(args);
+	parser_error = PARSER_ERROR_FATAL;
 	return 0;
 }
 
@@ -53,13 +54,13 @@ Ast** Parser::parse_top_level(Scope** g_scope)
 	Scope* global_scope = create_scope(0, 0, 0);
 	*g_scope = global_scope;
 
-	int error = PARSER_NO_ERROR;
-	while (error == PARSER_NO_ERROR && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
+	parser_error = PARSER_NO_ERROR;
+	while (parser_error == PARSER_NO_ERROR && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
 		Ast* decl = parse_declaration(global_scope);
 		if (!decl) break;
 		push_array(top_level, &decl);
 	}
-	if (error == PARSER_ERROR_FATAL) {
+	if (parser_error == PARSER_ERROR_FATAL) {
 		fprintf(stderr, "There were errors, exiting...\n");
 		return 0;
 	}
@@ -582,6 +583,7 @@ Ast* Parser::parse_struct(Token* name, Scope* scope)
 	Scope* struct_scope = create_scope(1, scope, SCOPE_FLAG_STRUCT_SCOPE);
 	while (true) {
 		Ast* field = parse_declaration(struct_scope);
+		if (field == 0) return 0;
 		push_array(fields, &field);
 		num_fields++;
 		if (lexer->peek_token_type() == TOKEN_SYMBOL_CLOSE_BRACE) break;
@@ -613,10 +615,14 @@ Ast* Parser::parse_declaration(Scope* scope)
 		if (lexer->peek_token_type(1) == TOKEN_STRUCT_WORD) {
 			// id :: struct {}
 			return parse_struct(name, scope);
-			//return 0;
 		} else if (lexer->peek_token_type(1) == (Token_Type)'(') {
 			// id :: () {}
 			return parse_proc_decl(name, scope);
+		} else {
+			Token* t = lexer->peek_token(1);
+			print_error_loc(stderr, filename, t->line, t->column);
+			report_syntax_error("invalid token '%.*s' on declaration site of %.*s.\n", TOKEN_STR(t), TOKEN_STR(name));
+			return 0;
 		}
 	} 
 	else if (decl->type == (Token_Type)':') {
@@ -682,13 +688,23 @@ Type_Instance* Parser::parse_type()
 		ti->type_array.array_of = parse_type();
 	} else if (tok->type == TOKEN_SYMBOL_OPEN_PAREN) {
 		// function type
+		ti->type = TYPE_FUNCTION;
+		ti->flags = TYPE_FLAG_IS_REGISTER_SIZE | TYPE_FLAG_IS_SIZE_RESOLVED;
+		ti->type_size = get_size_of_pointer();
+
 		int num_arguments = 0;
 		if (lexer->peek_token_type() != TOKEN_SYMBOL_CLOSE_PAREN) {
 			Type_Instance** arg_types = create_array(Type_Instance*, 8);
 			for (int i = 0;; ++i) {
 				Type_Instance* value = parse_type();
-				push_array(ti->type_function.arguments_type, &value);
+				push_array(arg_types, &value);
 				num_arguments++;
+				if (lexer->peek_token_type() == ',') {
+					lexer->eat_token();
+					continue;
+				} else {
+					break;
+				}
 			}
 			ti->type_function.arguments_type = arg_types;
 		} else {
@@ -710,7 +726,6 @@ Type_Instance* Parser::parse_type()
 
 			ti->type_function.return_type = void_type;
 		}
-		ti->type_function.return_type = parse_type();
 	} else if (tok->type == TOKEN_IDENTIFIER) {
 		// struct type
 		Type_Instance* struct_type = ti;
@@ -720,7 +735,7 @@ Type_Instance* Parser::parse_type()
 		struct_type->type_size = 0;
 		struct_type->type_struct.name = tok->value.data;
 		struct_type->type_struct.name_length = tok->value.length;
-		struct_type->type_struct.struct_descriptor = 0;
+		struct_type->type_struct.fields_types = 0;
 	}
 	return ti;
 }

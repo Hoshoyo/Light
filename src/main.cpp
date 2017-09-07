@@ -8,8 +8,8 @@
 #include "interpreter.h"
 
 int main(int argc, char** argv) {
-	init_interpreter();
-	run_interpreter();
+	//init_interpreter();
+	//run_interpreter();
 
 	if (argc <= 1) {
 		fprintf(stderr, "No files were given.\nusage: prism [option ...] filename\n");
@@ -25,13 +25,20 @@ int main(int argc, char** argv) {
 	Parser parser(&lexer);
 	Scope* global_scope = 0;
 	Ast** ast = parser.parse_top_level(&global_scope);
+	if (ast == 0) { return -1; }
 
 	if (check_declarations(ast, global_scope) == DECL_CHECK_PASSED) {
-		printf("\n*** Code preview ***\n\n");
+		//printf("\n*** Code preview ***\n\n");
 	}
 
-	type_inference(ast, global_scope, &type_table);
-	DEBUG_print_ast(stdout, ast);
+	if (do_type_inference(ast, global_scope, &type_table) != 0) {
+		return -1;
+	}
+	printf("Number of values in the infer queue = %d\n", get_arr_length(infer_queue));
 	DEBUG_print_type_table();
+
+#if 0
+	DEBUG_print_ast(stdout, ast);
+#endif
 	return 0;
 }

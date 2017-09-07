@@ -315,3 +315,8 @@ u32 djb2_hash(u32 starting_hash, u8 *str, int size)
 	}
 	return hash;
 }
+
+u32 djb2_hash(u32 hash1, u32 hash2) {
+	u32 hash = ((hash1 << 5) + hash1) + hash2;
+	return hash;
+}
