@@ -75,6 +75,7 @@ u32 Type_Table::type_hash(Type_Instance* instance)
 		// --
 	case TYPE_FUNCTION: {
 		u32 hash = type_hash(instance->type_function.return_type);
+		hash = djb2_hash(hash, (u8*)&instance->type, sizeof(u32));
 		int num_args = instance->type_function.num_arguments;
 		for (int i = 0; i < num_args; ++i) {
 			Type_Instance* argtype = instance->type_function.arguments_type[i];
@@ -105,10 +106,12 @@ bool types_equal(Type_Instance* i1, Type_Instance* i2)
 		}break;
 			// --
 		case TYPE_STRUCT: {
+			if (i2->type != TYPE_STRUCT) return false;
 			return str_equal(i1->type_struct.name, i1->type_struct.name_length, i2->type_struct.name, i2->type_struct.name_length);
 		}break;
 			// --
 		case TYPE_FUNCTION: {
+			if (i2->type != TYPE_FUNCTION) return false;
 			if (!types_equal(i1->type_function.return_type, i2->type_function.return_type)) return false;
 			int num_args = i1->type_function.num_arguments;
 			if (num_args != i2->type_function.num_arguments) return false;

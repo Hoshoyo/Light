@@ -66,6 +66,7 @@ Ast* create_proc(Memory_Arena* arena, Token* name, Type_Instance* return_type, A
 	proc->proc_decl.scope = scope;
 	proc->proc_decl.name = name;
 	proc->proc_decl.proc_ret_type = return_type;
+	proc->proc_decl.proc_type = 0;
 	proc->proc_decl.arguments = arguments;
 	proc->proc_decl.body = body;
 	proc->proc_decl.num_args = nargs;
@@ -413,7 +414,8 @@ void DEBUG_print_proc(FILE* out, Ast* proc_node) {
 		DEBUG_print_type(out, narg->named_arg.arg_type);
 		if (i + 1 != proc_node->proc_decl.num_args) fprintf(out, ",");
 	}
-	fprintf(out, ")");
+	fprintf(out, ") -> ");
+	DEBUG_print_type(out, proc_node->proc_decl.proc_ret_type);
 	if (proc_node->proc_decl.body == 0) {
 		fprintf(out, "{}");
 	} else {

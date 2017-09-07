@@ -16,7 +16,7 @@ struct Infer_Node {
 extern Symbol_Table* symbol_table;
 extern Infer_Node* infer_queue;
 
-int check_declarations(Ast** ast, Scope* global_scope);
+int check_and_submit_declarations(Ast** ast, Scope* global_scope);
 int type_inference(Ast** ast, Scope* global_scope, Type_Table* table);
 int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table);
 int do_type_check(Ast** ast, Scope* global_scope, Type_Table* type_table);

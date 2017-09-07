@@ -115,6 +115,7 @@ struct Ast_ProcDecl {
 	Ast* body;
 	int num_args;
 	Type_Instance* proc_ret_type;
+	Type_Instance* proc_type;
 	Scope* scope;
 	Decl_Site site;
 	u32 symbol_hash;

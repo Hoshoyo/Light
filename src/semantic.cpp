@@ -60,7 +60,7 @@ static void report_declaration_site(Ast* node) {
 	fprintf(stderr, "^   Previously defined here.\n");
 }
 
-int check_declarations(Ast* node, Scope* scope) {
+int check_and_submit_declarations(Ast* node, Scope* scope) {
 	if (node->is_decl) {
 		switch (node->node) {
 		case AST_NODE_VARIABLE_DECL: {
@@ -99,11 +99,11 @@ int check_declarations(Ast* node, Scope* scope) {
 				node->proc_decl.scope->symb_table = new Symbol_Table(num_args * declaration_ratio);
 				printf("Proc (%d - level[%d]) has %d arguments.\n", node->proc_decl.scope->id, node->proc_decl.scope->level, node->proc_decl.scope->num_declarations);
 				for (int i = 0; i < num_args; ++i) {
-					int ret = check_declarations(node->proc_decl.arguments[i], node->proc_decl.scope);
+					int ret = check_and_submit_declarations(node->proc_decl.arguments[i], node->proc_decl.scope);
 					if (ret != DECL_CHECK_PASSED) error = DECL_CHECK_FAILED;
 				}
 			}
-			int ret = check_declarations(node->proc_decl.body, node->proc_decl.scope);
+			int ret = check_and_submit_declarations(node->proc_decl.body, node->proc_decl.scope);
 			if (ret != DECL_CHECK_PASSED) error = DECL_CHECK_FAILED;
 			if (error == DECL_CHECK_FAILED) return DECL_CHECK_FAILED;
 		}break;
@@ -148,8 +148,9 @@ int check_declarations(Ast* node, Scope* scope) {
 
 			block_scope->symb_table = new Symbol_Table(declaration_ratio * block_scope->num_declarations);
 		}
-		return check_declarations(node->block.commands, block_scope);
+		return check_and_submit_declarations(node->block.commands, block_scope);
 	}
+
 	return 1;
 }
 
@@ -181,15 +182,16 @@ Type_Instance* get_variable_type(Ast* node, Scope* scope)
 	return scope->symb_table->entries[entry].node->var_decl.type;
 }
 
-int check_declarations(Ast** ast, Scope* global_scope)
+int check_and_submit_declarations(Ast** ast, Scope* global_scope)
 {
-	size_t num_nodes = get_arr_length(ast);
+	if (global_scope->num_declarations == 0) return DECL_CHECK_PASSED;
 
+	size_t num_nodes = get_arr_length(ast);
 	global_scope->symb_table = new Symbol_Table(global_scope->num_declarations * declaration_ratio);
 
 	for (size_t i = 0; i < num_nodes; ++i) {
 		Ast* node = ast[i];
-		if (check_declarations(node, global_scope) == 0) {
+		if (check_and_submit_declarations(node, global_scope) == 0) {
 			return DECL_CHECK_FAILED;
 		}
 	}
@@ -286,7 +288,9 @@ Type_Instance* infer_node_expression_type(Ast* node, Scope* scope, Type_Table* t
 void push_infer_queue(Ast* node, Scope* scope)
 {
 	Infer_Node infer_node;
-	node->return_type->flags |= TYPE_FLAG_QUEUED;
+	if (node->return_type) {
+		node->return_type->flags |= TYPE_FLAG_QUEUED;
+	}
 	infer_node.node = node;
 	infer_node.scope = scope;
 	push_array(infer_queue, &node);
@@ -358,7 +362,7 @@ Type_Instance* get_decl_type(Ast* node)
 	switch (node->node) {
 	case AST_NODE_VARIABLE_DECL:      return node->var_decl.type;
 	case AST_NODE_NAMED_ARGUMENT:     return node->named_arg.arg_type;
-	case AST_NODE_PROC_DECLARATION:   assert(0); break; //@todo
+	case AST_NODE_PROC_DECLARATION:   return node->proc_decl.proc_type;
 	case AST_NODE_STRUCT_DECLARATION: return node->struct_decl.type_info;
 
 	default: assert(0); // @todo
@@ -450,18 +454,18 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 						Type_Instance* in = get_decl_type(node->proc_decl.arguments[i]);
 						push_array(instance->type_function.arguments_type, &in);
 					}
-
 					create_type(&instance, true);
+					node->proc_decl.proc_type = instance;
 				} else {
 					if (!already_queued)
 						push_infer_queue(node, scope);
 					return 1;
 				}
-
+				if (err) return err;
 			}break;
 
 			case AST_NODE_VARIABLE_DECL: {
-				if (node->var_decl.type->flags & TYPE_FLAG_IS_RESOLVED) return 0;
+				if (node->var_decl.type && node->var_decl.type->flags & TYPE_FLAG_IS_RESOLVED) return 0;
 
 				if (node->var_decl.type) {
 					if (node->var_decl.type->flags & TYPE_FLAG_IS_RESOLVED) {
@@ -548,7 +552,47 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 		switch (node->node)
 		{
 			case AST_NODE_PROCEDURE_CALL: {
-
+				int ret_val = 0;
+				s64 index = -1;
+				Scope* aux_scope = node->expression.proc_call.scope;
+				Token* proc_name = node->expression.proc_call.name;
+				do {
+					// if there is no symbol table, and therefore no declarations, skip
+					if (aux_scope->symb_table > 0) {
+						index = aux_scope->symb_table->entry_exist(proc_name);
+						if (index != -1) {
+							// found
+							Type_Instance* type_instance = get_decl_type(aux_scope->symb_table->entries[index].node);
+							if (type_instance && type_instance->type != TYPE_FUNCTION) {
+								Decl_Site site;
+								site.column = proc_name->column;
+								site.line = proc_name->line;
+								site.filename = proc_name->filename;
+								report_semantic_error(&site, "Type of procedure '%.*s' call does not match with type of declaration.\n", TOKEN_STR(proc_name));
+								report_declaration_site(aux_scope->symb_table->entries[index].node);
+								ret_val = 1;
+							}
+							else {
+								if (type_instance && type_instance->flags & TYPE_FLAG_IS_RESOLVED) {
+									node->return_type = type_instance->type_function.return_type;
+									ret_val = 0;
+								}
+								else {
+									if (!already_queued) {
+										push_infer_queue(node, scope);
+									}
+									ret_val = 1;
+								}
+							}
+							int args_ret_val = type_inference(node->expression.proc_call.args, scope, table);
+							if (args_ret_val == 1) ret_val = 1;
+							return ret_val;
+						}
+					}
+					aux_scope = aux_scope->parent;
+				} while (aux_scope != 0);
+				report_semantic_error(0, "Internal compiler error: '%.*s' procedure call failed to be found in any symbol table in type inference compiler stage.\n");
+				return 1;
 			}break;
 
 			case AST_NODE_BINARY_EXPRESSION: {
@@ -560,7 +604,8 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 			}break;
 
 			case AST_NODE_BLOCK: {
-				type_inference(node->block.commands, scope, table);
+				node->return_type = get_primitive_type(TYPE_PRIMITIVE_VOID);
+				return type_inference(node->block.commands, scope, table);
 			}break;
 		}
 	}
@@ -589,7 +634,8 @@ int type_inference(Ast** ast, Scope* global_scope, Type_Table* table)
 int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 {
 	infer_queue = create_array(Infer_Node, 16);
-	if (type_inference(ast, global_scope, type_table) == DECL_CHECK_PASSED) {
+	int err = type_inference(ast, global_scope, type_table);
+	if (get_arr_length(infer_queue) > 0) {
 		int qsize = get_arr_length(infer_queue);
 		while (qsize != 0) {
 			for(int i = 0; i < qsize; ++i) {
@@ -617,69 +663,6 @@ int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 	return 0;
 }
 
-int require_expression_type(Ast* node, Type_Instance* type, bool coerce) 
-{
-	int sum = 0;
-	switch (node->node) {
-	case AST_NODE_BINARY_EXPRESSION: {
-		switch (node->expression.binary_exp.op) {
-		case BINARY_OP_PLUS:
-		case BINARY_OP_MINUS:
-		case BINARY_OP_MULT:
-		case BINARY_OP_DIV:
-		case BINARY_OP_AND:
-		case BINARY_OP_OR:
-		case BINARY_OP_XOR:
-		case BINARY_OP_MOD:
-			sum += require_expression_type(node->expression.binary_exp.left, type, true);
-			sum += require_expression_type(node->expression.binary_exp.right, type, true);
-			break;
-		//case BINARY_OP_LOGIC_AND:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
-		//case BINARY_OP_LOGIC_OR:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
-		//case BINARY_OP_BITSHIFT_LEFT:
-		//case BINARY_OP_BITSHIFT_RIGHT:
-		//case BINARY_OP_LESS_THAN:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
-		//case BINARY_OP_GREATER_THAN:	return get_primitive_type(TYPE_PRIMITIVE_BOOL);
-		//case BINARY_OP_LESS_EQUAL:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
-		//case BINARY_OP_GREATER_EQUAL:	return get_primitive_type(TYPE_PRIMITIVE_BOOL);
-		//case BINARY_OP_EQUAL_EQUAL:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
-		//case BINARY_OP_NOT_EQUAL:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
-		//
-		//case BINARY_OP_DOT:				return right;
-		//
-		//case ASSIGNMENT_OPERATION_EQUAL:		return left;
-		//case ASSIGNMENT_OPERATION_PLUS_EQUAL:	return left;
-		//case ASSIGNMENT_OPERATION_MINUS_EQUAL:	return left;
-		//case ASSIGNMENT_OPERATION_TIMES_EQUAL:	return left;
-		//case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:	return left;
-		//case ASSIGNMENT_OPERATION_AND_EQUAL:	return left;
-		//case ASSIGNMENT_OPERATION_OR_EQUAL:		return left;
-		//case ASSIGNMENT_OPERATION_XOR_EQUAL:	return left;
-		//case ASSIGNMENT_OPERATION_SHL_EQUAL:	return left;
-		//case ASSIGNMENT_OPERATION_SHR_EQUAL:	return left;
-		}
-	}break;
-	case AST_NODE_EXPRESSION_ASSIGNMENT: {
-
-	}break;
-	case AST_NODE_LITERAL_EXPRESSION: {
-
-	}break;
-	case AST_NODE_PROCEDURE_CALL: {
-
-	}break;
-	case AST_NODE_UNARY_EXPRESSION: {
-
-	}break;
-	case AST_NODE_VARIABLE_EXPRESSION: {
-
-	}break;
-
-	default: assert(0); break;
-	}
-	return 1;
-}
-
 // return 1 if passed
 // return 0 if failed
 int type_check_node(Ast* node, Scope* scope, Type_Table* table)
@@ -690,7 +673,10 @@ int type_check_node(Ast* node, Scope* scope, Type_Table* table)
 
 	if (node->is_decl) {
 		switch (node->node) {
-		case AST_NODE_PROC_DECLARATION:	
+		case AST_NODE_PROC_DECLARATION: {
+			assert(types_equal(node->return_type, get_primitive_type(TYPE_PRIMITIVE_VOID)));
+			return type_check_node(node->proc_decl.body, scope, table);
+		}break;
 		case AST_NODE_STRUCT_DECLARATION:
 			assert(types_equal(node->return_type, get_primitive_type(TYPE_PRIMITIVE_VOID)));
 			break;
@@ -707,7 +693,18 @@ int type_check_node(Ast* node, Scope* scope, Type_Table* table)
 		default: assert(0); break;
 		}
 	} else {
-		assert(0);	// @todo
+		if (node->node == AST_NODE_BLOCK) {
+			assert(node->return_type == get_primitive_type(TYPE_PRIMITIVE_VOID));
+			int num_decl = get_arr_length(node->block.commands);
+			int ret = 1;
+			for (int i = 0; i < num_decl; ++i) {
+				int err = type_check_node(node->block.commands[i], node->block.scope, table);
+				if (err == 0) {
+					ret = 0;
+				}
+			}
+			return ret;
+		}
 	}
 	return 1;
 }
