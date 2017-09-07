@@ -116,4 +116,5 @@ extern Type_Table type_table;
 // creates a type entry on the table and returns its index
 s64 create_type(Type_Instance** instance, bool swap_and_delete);
 Type_Instance* create_ptr_typeof(Type_Instance* inst);
+bool types_equal(Type_Instance* i1, Type_Instance* i2);
 void DEBUG_print_type_table();

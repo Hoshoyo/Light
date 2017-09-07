@@ -1,3 +1,16 @@
-proc :: (x : int, y : int) {
-	f : (int, int) -> void;
+vec3 :: struct {
+	x : float;
+	y : float;
+	z : float;
+}
+
+Entity :: struct {
+	position : vec3;
+	velocity : vec3;
+}
+
+main :: (argc : int, argv : ^^char) -> int {
+	e : Entity;
+	print("%", e.position);
+	return 0;
 }

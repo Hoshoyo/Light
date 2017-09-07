@@ -1,4 +1,5 @@
 #include "semantic.h"
+//#include "type.h"
 #include <stdarg.h>
 
 static int scope_error = 0;
@@ -296,7 +297,7 @@ void push_infer_queue(Ast* node, Scope* scope)
 // this function only changed type flags
 int resolve_type(Type_Instance* instance, Type_Table* type_table)
 {
-	assert(!(instance->flags & TYPE_FLAG_IS_RESOLVED));
+	//assert(!(instance->flags & TYPE_FLAG_IS_RESOLVED));
 
 	switch (instance->type) {
 	case TYPE_PRIMITIVE: {
@@ -375,6 +376,7 @@ Token* get_decl_name(Ast* node)
 
 	default: assert(0); // @todo
 	}
+	return 0;
 }
 
 // return 0 if infered
@@ -383,7 +385,7 @@ Token* get_decl_name(Ast* node)
 
 int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 {
-	if (node->return_type && node->return_type->flags & TYPE_FLAG_QUEUED) return 1;
+	bool already_queued = (node->return_type && node->return_type->flags & TYPE_FLAG_QUEUED);
 	if (node->is_decl) {
 		// if this is a declaration, the return type of this node is always void
 		node->return_type = get_primitive_type(TYPE_PRIMITIVE_VOID);
@@ -397,9 +399,15 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 					// create the type, since it is resolved
 					create_type(&node->named_arg.arg_type, true);
 				} else {
-					// put it on the queue to be resolved
-					push_infer_queue(node, scope);
-					return 1;
+					if (resolve_type(node->named_arg.arg_type, table)) {
+						create_type(&node->named_arg.arg_type, true);
+						return 0;
+					} else {
+						// put it on the queue to be resolved
+						if(!already_queued)
+							push_infer_queue(node, scope);
+						return 1;
+					}
 				}
 			} break;
 
@@ -409,10 +417,12 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 
 				bool infered = true;
 
-				if (node->proc_decl.proc_ret_type->flags & TYPE_FLAG_IS_RESOLVED) {
-					create_type(&node->proc_decl.proc_ret_type, true);
-				} else {
+				if (!(node->proc_decl.proc_ret_type->flags & TYPE_FLAG_IS_RESOLVED) &&
+					!resolve_type(node->proc_decl.proc_ret_type, table)) {
 					infered = false;
+				} 
+				if (infered) {
+					create_type(&node->proc_decl.proc_ret_type, true);
 				}
 				
 				// arguments
@@ -443,7 +453,8 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 
 					create_type(&instance, true);
 				} else {
-					push_infer_queue(node, scope);
+					if (!already_queued)
+						push_infer_queue(node, scope);
 					return 1;
 				}
 
@@ -459,7 +470,8 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 						if (resolve_type(node->var_decl.type, table)) {
 							create_type(&node->var_decl.type, true);
 						} else {
-							push_infer_queue(node, scope);
+							if (!already_queued)
+								push_infer_queue(node, scope);
 							return 1;
 						}
 					}
@@ -468,14 +480,16 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 					Type_Instance* inst = infer_node_expression_type(node->var_decl.assignment, node->var_decl.scope, table);
 					if (inst == 0) {
 						// could not infer, put it on the queue
-						push_infer_queue(node, scope);
+						if (!already_queued)
+							push_infer_queue(node, scope);
 					} else {
 						if (inst->flags & TYPE_FLAG_IS_RESOLVED || resolve_type(inst, table)) {
 							create_type(&inst, true);
 							node->var_decl.assignment->return_type = inst;
 							node->var_decl.type = inst;
 						} else {
-							push_infer_queue(node, scope);
+							if (!already_queued)
+								push_infer_queue(node, scope);
 							return 1;
 						}
 					}
@@ -501,7 +515,7 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 					for (int i = 0; i < num_fields; ++i) {
 						Type_Instance* ti = get_decl_type(node->struct_decl.fields[i]);
 						Token* name = get_decl_name(node->struct_decl.fields[i]);
-						string s;
+						string s = string();
 						make_immutable_string(s, name->value.data, name->value.length);
 						push_array(fnames, &s);
 						size_bytes += ti->type_size;
@@ -523,7 +537,8 @@ int infer_node_types(Ast* node, Scope* scope, Type_Table* table)
 					node->struct_decl.type_info = struct_instance;
 					node->struct_decl.size_bytes = size_bytes;
 				} else {
-					push_infer_queue(node, scope);
+					if (!already_queued)
+						push_infer_queue(node, scope);
 					return 1;
 				}
 
@@ -600,4 +615,115 @@ int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 		}
 	}
 	return 0;
+}
+
+int require_expression_type(Ast* node, Type_Instance* type, bool coerce) 
+{
+	int sum = 0;
+	switch (node->node) {
+	case AST_NODE_BINARY_EXPRESSION: {
+		switch (node->expression.binary_exp.op) {
+		case BINARY_OP_PLUS:
+		case BINARY_OP_MINUS:
+		case BINARY_OP_MULT:
+		case BINARY_OP_DIV:
+		case BINARY_OP_AND:
+		case BINARY_OP_OR:
+		case BINARY_OP_XOR:
+		case BINARY_OP_MOD:
+			sum += require_expression_type(node->expression.binary_exp.left, type, true);
+			sum += require_expression_type(node->expression.binary_exp.right, type, true);
+			break;
+		//case BINARY_OP_LOGIC_AND:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+		//case BINARY_OP_LOGIC_OR:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+		//case BINARY_OP_BITSHIFT_LEFT:
+		//case BINARY_OP_BITSHIFT_RIGHT:
+		//case BINARY_OP_LESS_THAN:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+		//case BINARY_OP_GREATER_THAN:	return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+		//case BINARY_OP_LESS_EQUAL:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+		//case BINARY_OP_GREATER_EQUAL:	return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+		//case BINARY_OP_EQUAL_EQUAL:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+		//case BINARY_OP_NOT_EQUAL:		return get_primitive_type(TYPE_PRIMITIVE_BOOL);
+		//
+		//case BINARY_OP_DOT:				return right;
+		//
+		//case ASSIGNMENT_OPERATION_EQUAL:		return left;
+		//case ASSIGNMENT_OPERATION_PLUS_EQUAL:	return left;
+		//case ASSIGNMENT_OPERATION_MINUS_EQUAL:	return left;
+		//case ASSIGNMENT_OPERATION_TIMES_EQUAL:	return left;
+		//case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:	return left;
+		//case ASSIGNMENT_OPERATION_AND_EQUAL:	return left;
+		//case ASSIGNMENT_OPERATION_OR_EQUAL:		return left;
+		//case ASSIGNMENT_OPERATION_XOR_EQUAL:	return left;
+		//case ASSIGNMENT_OPERATION_SHL_EQUAL:	return left;
+		//case ASSIGNMENT_OPERATION_SHR_EQUAL:	return left;
+		}
+	}break;
+	case AST_NODE_EXPRESSION_ASSIGNMENT: {
+
+	}break;
+	case AST_NODE_LITERAL_EXPRESSION: {
+
+	}break;
+	case AST_NODE_PROCEDURE_CALL: {
+
+	}break;
+	case AST_NODE_UNARY_EXPRESSION: {
+
+	}break;
+	case AST_NODE_VARIABLE_EXPRESSION: {
+
+	}break;
+
+	default: assert(0); break;
+	}
+	return 1;
+}
+
+// return 1 if passed
+// return 0 if failed
+int type_check_node(Ast* node, Scope* scope, Type_Table* table)
+{
+	assert(node->return_type);
+	assert(node->return_type->flags & TYPE_FLAG_IS_RESOLVED);
+	assert(node->return_type->flags & TYPE_FLAG_IS_SIZE_RESOLVED);
+
+	if (node->is_decl) {
+		switch (node->node) {
+		case AST_NODE_PROC_DECLARATION:	
+		case AST_NODE_STRUCT_DECLARATION:
+			assert(types_equal(node->return_type, get_primitive_type(TYPE_PRIMITIVE_VOID)));
+			break;
+		case AST_NODE_NAMED_ARGUMENT: {
+			if (node->named_arg.default_value) {
+				// check the rvalue to match
+			}
+		}break;
+
+		case AST_NODE_VARIABLE_DECL: {
+
+		}break;
+
+		default: assert(0); break;
+		}
+	} else {
+		assert(0);	// @todo
+	}
+	return 1;
+}
+
+// return 1 if passed
+// return 0 if failed
+int do_type_check(Ast** ast, Scope* global_scope, Type_Table* table)
+{
+	int err = 1;
+	size_t num_nodes = get_arr_length(ast);
+	for (size_t i = 0; i < num_nodes; ++i) {
+		Ast* node = ast[i];
+		int ret = type_check_node(node, global_scope, table);
+		if (ret == 0) {
+			err = 0;
+		}
+	}
+	return err;
 }
