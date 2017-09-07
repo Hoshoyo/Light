@@ -189,7 +189,7 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 
 	}
 #endif
-#if 0
+#if 1
 	{
 		const char* str = "iterations : %d\n";
 		*(u64*)datas_ptr = (u64)str;
@@ -375,7 +375,7 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 		HALT;
 	}
 #endif
-#if 0
+#if 0 
 	{
 		push_instruction(make_instruction(MOV, INSTR_BYTE | SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 120);
 		push_instruction(make_instruction(MOV, INSTR_BYTE | SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 75);
@@ -384,9 +384,11 @@ void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024)
 		push_instruction(make_instruction(POP, SIGNED|INSTR_BYTE, SINGLE_REG, R_2, NO_REG, 0, 0));
 	}
 #endif
+#if 0
 	{
 		push_instruction(make_instruction(EXTCALL, IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)GetModuleHandleA);
 	}
+#endif
 }
 
 #define PRINT_INSTRUCTIONS 1
