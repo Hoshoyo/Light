@@ -255,7 +255,7 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 			left_op = parse_proc_call(scope);
 		} else {
 			first = lexer->eat_token();
-			left_op = create_variable(&arena, first, 0);
+			left_op = create_variable(&arena, first, scope);
 		}
 	} else if (first->type == (Token_Type)'(') {
 		lexer->eat_token();

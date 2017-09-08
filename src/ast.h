@@ -306,3 +306,5 @@ void push_ast_list(Ast** list, Ast* arg);
 void DEBUG_print_node(FILE* out, Ast* node);
 void DEBUG_print_ast(FILE* out, Ast** ast);
 void DEBUG_print_type(FILE* out, Type_Instance* type);
+
+void DEBUG_print_indent_level();

@@ -16,6 +16,7 @@ UnaryOperation get_unary_op(Token* token)
 	case '&':			return UNARY_OP_ADDRESS_OF;
 	case '[':			return UNARY_OP_VECTOR_ACCESS;
 	case '~':			return UNARY_OP_NOT_BITWISE;
+	case '!':			return UNARY_OP_NOT_LOGICAL;
 	case TOKEN_CAST:	return UNARY_OP_CAST;
 	}
 }
@@ -351,8 +352,19 @@ Scope* create_scope(s32 level, Scope* parent, u32 flags)
 
 ****************************************/
 
+
+static int DEBUG_indent_level = 0;
+void DEBUG_print_indent_level() {
+	for (int i = 0; i < DEBUG_indent_level; ++i) {
+		fprintf(stdout, "   ");
+	}
+}
+
 void DEBUG_print_type(FILE* out, Type_Instance* type) {
-	assert(type);
+	if (!type) {
+		fprintf(out, "(TYPE_IS_NULL)");
+		return;
+	}
 	if (type->type == TYPE_PRIMITIVE) {
 		switch (type->primitive) {
 		case TYPE_PRIMITIVE_S64:	fprintf(out, "s64"); break;
@@ -399,11 +411,15 @@ void DEBUG_print_block(FILE* out, Ast* block)
 {
 	size_t num_commands = get_arr_length(block->block.commands);
 	fprintf(out, "{\n");
+	DEBUG_indent_level += 1;
 	for (size_t i = 0; i < num_commands; ++i) {
+		DEBUG_print_indent_level();
 		DEBUG_print_node(out, block->block.commands[i]);
 		fprintf(out, ";\n");
 	}
-	fprintf(out, "\n}");
+	DEBUG_indent_level -= 1;
+	DEBUG_print_indent_level();
+	fprintf(out, "}");
 }
 
 void DEBUG_print_proc(FILE* out, Ast* proc_node) {
@@ -412,7 +428,7 @@ void DEBUG_print_proc(FILE* out, Ast* proc_node) {
 		Ast* narg = proc_node->proc_decl.arguments[i];
 		fprintf(out, "%.*s : ", TOKEN_STR(narg->named_arg.arg_name));
 		DEBUG_print_type(out, narg->named_arg.arg_type);
-		if (i + 1 != proc_node->proc_decl.num_args) fprintf(out, ",");
+		if (i + 1 != proc_node->proc_decl.num_args) fprintf(out, ", ");
 	}
 	fprintf(out, ") -> ");
 	DEBUG_print_type(out, proc_node->proc_decl.proc_ret_type);
@@ -468,6 +484,7 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 	case EXPRESSION_TYPE_UNARY: {
 		if (node->expression.unary_exp.flags & UNARY_EXP_FLAG_PREFIXED) {
 			switch (node->expression.unary_exp.op) {
+			case UNARY_OP_ADDRESS_OF:	fprintf(out, "&"); break;
 			case UNARY_OP_MINUS:		fprintf(out, "-"); break;
 			case UNARY_OP_DEREFERENCE:	fprintf(out, "*"); break;
 			case UNARY_OP_NOT_BITWISE:	fprintf(out, "~"); break;
@@ -503,7 +520,6 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 	}
 }
 
-
 void DEBUG_print_var_decl(FILE* out, Ast* node) {
 	fprintf(out, "%.*s : ", TOKEN_STR(node->var_decl.name));
 	DEBUG_print_type(out, node->var_decl.type);
@@ -523,16 +539,18 @@ void DEBUG_print_if_statement(FILE* out, Ast* node)
 	} else {
 		fprintf(out, " ");
 		DEBUG_print_node(out, node->if_stmt.body);
-		fprintf(out, ";\n");
+		fprintf(out, ";");
 	}
 	if (node->if_stmt.else_exp) {
+		fprintf(out, "\n");
+		DEBUG_print_indent_level();
 		fprintf(out, "else");
 		if (node->if_stmt.body->node == AST_NODE_BLOCK) {
 			DEBUG_print_node(out, node->if_stmt.else_exp);
 		} else {
 			fprintf(out, " ");
 			DEBUG_print_node(out, node->if_stmt.else_exp);
-			fprintf(out, ";\n");
+			fprintf(out, ";");
 		}
 	}
 }
@@ -565,14 +583,15 @@ void DEBUG_print_continue_statement(FILE* out, Ast* node)
 
 void DEBUG_print_struct_declaration(FILE* out, Ast* node)
 {
+
 	Ast_StructDecl* sd = &node->struct_decl;
 	fprintf(out, "%.*s :: struct{\n", TOKEN_STR(sd->name));
-
+	DEBUG_indent_level += 1;
 	for (int i = 0; i < sd->num_fields; ++i) {
 		DEBUG_print_var_decl(out, sd->fields[i]);
 		fprintf(out, ";\n");
 	}
-
+	DEBUG_indent_level -= 1;
 	fprintf(out, "}\n");
 }
 
@@ -580,6 +599,7 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 	switch (node->node) {
 	case AST_NODE_PROC_DECLARATION:		DEBUG_print_proc(out, node); break;
 	case AST_NODE_VARIABLE_DECL:		DEBUG_print_var_decl(out, node); break;
+	case AST_NODE_UNARY_EXPRESSION:		
 	case AST_NODE_BINARY_EXPRESSION:	DEBUG_print_expression(out, node); break;
 	case AST_NODE_BLOCK:				DEBUG_print_block(out, node); break;
 	case AST_NODE_IF_STATEMENT:			DEBUG_print_if_statement(out, node); break;

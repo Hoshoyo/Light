@@ -33,12 +33,15 @@ int main(int argc, char** argv) {
 	if (do_type_inference(ast, global_scope, &type_table) != 0) {
 		return -1;
 	}
+	//DEBUG_print_node_type(stdout, ast, true);
 	//if (do_type_check(ast, global_scope, &type_table) == 0) {
 	//	return -1;
 	//}
 	printf("Number of values in the infer queue = %d\n", get_arr_length(infer_queue));
 #if 1
+	printf("\n\n");
 	DEBUG_print_type_table();
+	printf("\n\n");
 	DEBUG_print_ast(stdout, ast);
 #endif
 	return 0;
