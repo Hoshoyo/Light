@@ -19,14 +19,14 @@ call_external proc
 	mov rax, rcx			; copy the function pointer to rax to use rcx for arguments
 
 	mov r9, -40
-	mov r12, 32
+	mov r11, 32
 	sub r8, 32				; stack size is now 32 bytes less
 	jle label_call
 label_copy_stack:			; copy all the additional arguments on to the stack
-	mov rbx, [rdx + r9]
-	mov [rsp + r12], rbx
+	mov r10, [rdx + r9]
+	mov [rsp + r11], r10
 	sub r9, 8
-	add r12, 8
+	add r11, 8
 	sub r8, 8
 	jnz label_copy_stack
 

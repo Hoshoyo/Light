@@ -1,16 +1,2 @@
-hello : ^^int = 1;
-world : int = 8;
-my : float = 1.0;
-name : double = 3.0;
-is : float = 3.5;
-print :: (str : ^char, val : int) -> void {
-	printf(str, val);
-}
-
-main :: () -> int{
-	i : int = 0;
-	while(i < 10){
-		print("%d", i);
-	}
-	list : ^^char = 0;
-}
+var2 : float = 1.0;
+var := 1 + &var2;

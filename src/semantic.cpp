@@ -801,68 +801,9 @@ int decl_type_inference(Ast** ast, Type_Table* table)
 	return ret_val;
 }
 
-int expr_type_inference(Ast* node, Type_Table* table)
-{
-	switch (node->node) {
-	case AST_NODE_BINARY_EXPRESSION: {
-
-	}break;
-	case AST_NODE_BLOCK: {
-
-	}break;
-	case AST_NODE_BREAK_STATEMENT: {
-
-	}break;
-	case AST_NODE_CONTINUE_STATEMENT: {
-
-	}break;
-	case AST_NODE_EXPRESSION_ASSIGNMENT: {
-
-	}break;
-	case AST_NODE_IF_STATEMENT: {
-
-	}break;
-	case AST_NODE_LITERAL_EXPRESSION: {
-
-	}break;
-	case AST_NODE_NAMED_ARGUMENT: {
-
-	}break;
-	case AST_NODE_PROCEDURE_CALL: {
-
-	}break;
-	case AST_NODE_PROC_DECLARATION: {
-
-	}break;
-	case AST_NODE_RETURN_STATEMENT: {
-
-	}break;
-	case AST_NODE_STRUCT_DECLARATION: {
-
-	}break;
-	case AST_NODE_UNARY_EXPRESSION: {
-
-	}break;
-	case AST_NODE_VARIABLE_DECL: {
-
-	}break;
-	case AST_NODE_VARIABLE_EXPRESSION: {
-
-	}break;
-	}
-	return 0;
-}
-
-int expr_type_inference(Ast** ast, Type_Table* table)
-{
-	size_t num_nodes = get_arr_length(ast);
-	for (size_t i = 0; i < num_nodes; ++i) {
-		Ast* node = ast[i];
-		
-	}
-	return 0;
-}
-
+// return 0 if infered correctly
+// return 1 if queued
+// return -1 if errored
 int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 {
 	infer_queue = create_array(Infer_Node, 16);
@@ -892,26 +833,77 @@ int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 			}
 		}
 	}
-	err = expr_type_inference(ast, type_table);
 	return 0;
 }
 
 // return 1 if passed
 // return 0 if failed
-int type_check_node(Ast* node, Scope* scope, Type_Table* table)
+int type_check_node(Ast* node, Type_Table* table)
 {
+	if (node->is_decl) {
+		switch (node->node) {
+			case AST_NODE_PROC_DECLARATION: {
+
+			}break;
+			case AST_NODE_STRUCT_DECLARATION: {
+
+			}break;
+			case AST_NODE_VARIABLE_DECL: {
+
+			}break;
+		}
+	} else {
+		switch (node->node) {
+			case AST_NODE_BINARY_EXPRESSION: {
+
+			}break;
+			case AST_NODE_BLOCK: {
+
+			}break;
+			case AST_NODE_BREAK_STATEMENT: {
+
+			}break;
+			case AST_NODE_CONTINUE_STATEMENT: {
+
+			}break;
+			case AST_NODE_EXPRESSION_ASSIGNMENT: {
+
+			}break;
+			case AST_NODE_IF_STATEMENT: {
+
+			}break;
+			case AST_NODE_LITERAL_EXPRESSION: {
+
+			}break;
+			case AST_NODE_NAMED_ARGUMENT: {
+
+			}break;
+			case AST_NODE_PROCEDURE_CALL: {
+
+			}break;
+			case AST_NODE_RETURN_STATEMENT: {
+
+			}break;
+			case AST_NODE_UNARY_EXPRESSION: {
+
+			}break;
+			case AST_NODE_VARIABLE_EXPRESSION: {
+
+			}break;
+		}
+	}
 	return 0;
 }
 
 // return 1 if passed
 // return 0 if failed
-int do_type_check(Ast** ast, Scope* global_scope, Type_Table* table)
+int do_type_check(Ast** ast, Type_Table* table)
 {
 	int err = 1;
 	size_t num_nodes = get_arr_length(ast);
 	for (size_t i = 0; i < num_nodes; ++i) {
 		Ast* node = ast[i];
-		int ret = type_check_node(node, global_scope, table);
+		int ret = type_check_node(node, table);
 		if (ret == 0) {
 			err = 0;
 		}
