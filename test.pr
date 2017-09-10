@@ -1,2 +1,4 @@
-var2 : float = 1.0;
-var := 1 + &var2;
+
+v : ^u8;
+
+u : = v + v;

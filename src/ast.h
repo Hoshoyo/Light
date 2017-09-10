@@ -107,6 +107,11 @@ struct Decl_Site {
 	int column;
 };
 
+struct Expr_Site {
+	string filename;
+	int line;
+	int column;
+};
 
 // declarations
 struct Ast_ProcDecl {
@@ -145,6 +150,7 @@ struct Ast_StructDecl {
 struct Ast_Binary_Exp {
 	BinaryOperation op;
 	Precedence precedence;
+	Token* op_token;
 	Ast* left;
 	Ast* right;
 	Scope* scope;
@@ -242,6 +248,7 @@ struct Ast {
 	Node_Type node;
 	Type_Instance* return_type;
 	bool is_decl;
+	bool type_checked;
 	union {
 		Ast_ProcDecl proc_decl;
 		Ast_VarDecl var_decl;
@@ -269,6 +276,7 @@ struct Scope {
 	s32 num_declarations;
 	Symbol_Table* symb_table;
 	Scope* parent;
+	Ast* decl_node;
 };
 
 struct Scope_Manager {

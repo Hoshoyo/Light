@@ -118,7 +118,9 @@ extern Type_Table type_table;
 s64 create_type(Type_Instance** instance, bool swap_and_delete);
 Type_Instance* create_ptr_typeof(Type_Instance* inst);
 bool types_equal(Type_Instance* i1, Type_Instance* i2);
-bool is_integer_type(Type_Instance* inst);
+
+// return 1 if signed 2 if unsigned 0 if not integer type
+int is_integer_type(Type_Instance* inst);
 
 void DEBUG_print_type_table();
 void DEBUG_print_node_type(FILE* out, Ast** ast, bool decl_only);

@@ -63,6 +63,7 @@ Ast* create_proc(Memory_Arena* arena, Token* name, Type_Instance* return_type, A
 	proc->node = AST_NODE_PROC_DECLARATION;
 	proc->is_decl = true;
 	proc->return_type = 0;
+	proc->type_checked = false;
 
 	proc->proc_decl.scope = scope;
 	proc->proc_decl.name = name;
@@ -76,6 +77,8 @@ Ast* create_proc(Memory_Arena* arena, Token* name, Type_Instance* return_type, A
 	proc->proc_decl.site.line = site->line;
 	proc->proc_decl.site.column = site->column;
 
+	scope->decl_node = proc;
+
 	return proc;
 }
 
@@ -86,6 +89,7 @@ Ast* create_named_argument(Memory_Arena* arena, Token* name, Type_Instance* type
 	narg->node = AST_NODE_NAMED_ARGUMENT;
 	narg->is_decl = true;
 	narg->return_type = 0;
+	narg->type_checked = false;
 
 	narg->named_arg.arg_name = name;
 	narg->named_arg.arg_type = type;
@@ -107,6 +111,7 @@ Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type,
 	vdecl->node = AST_NODE_VARIABLE_DECL;
 	vdecl->is_decl = true;
 	vdecl->return_type = 0;
+	vdecl->type_checked = false;
 
 	vdecl->var_decl.scope = scope;
 	vdecl->var_decl.name = name;
@@ -118,8 +123,6 @@ Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type,
 	vdecl->var_decl.site.line = site->line;
 	vdecl->var_decl.site.column = site->column;
 
-	//vdecl->var_decl.size_bytes = get_type_size_bytes(type);
-
 	return vdecl;
 }
 
@@ -130,6 +133,7 @@ Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok)
 	lit->node = AST_NODE_LITERAL_EXPRESSION;
 	lit->is_decl = false;
 	lit->return_type = 0;
+	lit->type_checked = false;
 
 	lit->expression.expression_type = EXPRESSION_TYPE_LITERAL;
 	lit->expression.literal_exp.flags = flags;
@@ -145,11 +149,13 @@ Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, T
 	binop->node = AST_NODE_BINARY_EXPRESSION;
 	binop->is_decl = false;
 	binop->return_type = 0;
+	binop->type_checked = false;
 
 	binop->expression.expression_type = EXPRESSION_TYPE_BINARY;
 	binop->expression.binary_exp.left = left_op;
 	binop->expression.binary_exp.right = right_op;
 	binop->expression.binary_exp.op = get_binary_op(op);
+	binop->expression.binary_exp.op_token = op;
 	binop->expression.binary_exp.scope = scope;
 	binop->expression.binary_exp.precedence = precedence;
 
@@ -163,6 +169,7 @@ Ast* create_variable(Memory_Arena* arena, Token* var_token, Scope* scope)
 	var->node = AST_NODE_VARIABLE_EXPRESSION;
 	var->is_decl = false;
 	var->return_type = 0;
+	var->type_checked = false;
 
 	var->expression.expression_type = EXPRESSION_TYPE_VARIABLE;
 
@@ -176,12 +183,16 @@ Ast* create_variable(Memory_Arena* arena, Token* var_token, Scope* scope)
 Ast* create_block(Memory_Arena* arena, Scope* scope)
 {
 	Ast* block = ALLOC_AST(arena);
+
 	block->node = AST_NODE_BLOCK;
 	block->is_decl = false;
 	block->return_type = 0;
+	block->type_checked = false;
 
 	block->block.scope = create_scope(scope->level + 1, scope, SCOPE_FLAG_BLOCK_SCOPE);
 	block->block.commands = create_array(Ast*, 16);
+
+	scope->decl_node = block;
 
 	return block;
 }
@@ -189,9 +200,11 @@ Ast* create_block(Memory_Arena* arena, Scope* scope)
 Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope)
 {
 	Ast* proc_call = ALLOC_AST(arena);
+
 	proc_call->node = AST_NODE_PROCEDURE_CALL;
 	proc_call->is_decl = false;
 	proc_call->return_type = 0;
+	proc_call->type_checked = false;
 
 	proc_call->expression.expression_type = EXPRESSION_TYPE_PROC_CALL;
 
@@ -208,6 +221,7 @@ Ast* create_if(Memory_Arena* arena, Ast* bool_exp, Ast* body, Ast* else_stmt, Sc
 	if_stmt->node = AST_NODE_IF_STATEMENT;
 	if_stmt->is_decl = false;
 	if_stmt->return_type = 0;
+	if_stmt->type_checked = false;
 
 	if_stmt->if_stmt.bool_exp = bool_exp;
 	if_stmt->if_stmt.body = body;
@@ -223,6 +237,7 @@ Ast* create_while(Memory_Arena* arena, Ast* bool_exp, Ast* body, Scope* scope)
 	while_stmt->node = AST_NODE_WHILE_STATEMENT;
 	while_stmt->is_decl = false;
 	while_stmt->return_type = 0;
+	while_stmt->type_checked = false;
 
 	while_stmt->while_stmt.bool_exp = bool_exp;
 	while_stmt->while_stmt.body = body;
@@ -237,6 +252,7 @@ Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope)
 	ret_stmt->node = AST_NODE_RETURN_STATEMENT;
 	ret_stmt->is_decl = false;
 	ret_stmt->return_type = 0;
+	ret_stmt->type_checked = false;
 
 	ret_stmt->ret_stmt.expr = exp;
 	ret_stmt->ret_stmt.scope = scope;
@@ -251,6 +267,7 @@ Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation o
 	unop->node = AST_NODE_UNARY_EXPRESSION;
 	unop->is_decl = false;
 	unop->return_type = 0;
+	unop->type_checked = false;
 
 	unop->expression.expression_type = EXPRESSION_TYPE_UNARY;
 	unop->expression.unary_exp.op = op;
@@ -270,6 +287,7 @@ Ast* create_break(Memory_Arena* arena, Scope* scope)
 	break_stmt->is_decl = false;
 	break_stmt->node = AST_NODE_BREAK_STATEMENT;
 	break_stmt->return_type = 0;
+	break_stmt->type_checked = false;
 
 	break_stmt->break_stmt.scope = scope;
 
@@ -283,6 +301,7 @@ Ast* create_continue(Memory_Arena* arena, Scope* scope)
 	continue_stmt->is_decl = false;
 	continue_stmt->node = AST_NODE_CONTINUE_STATEMENT;
 	continue_stmt->return_type = 0;
+	continue_stmt->type_checked = false;
 
 	continue_stmt->continue_stmt.scope = scope;
 
@@ -296,6 +315,7 @@ Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_
 	struct_decl->is_decl = true;
 	struct_decl->node = AST_NODE_STRUCT_DECLARATION;
 	struct_decl->return_type = 0;
+	struct_decl->type_checked = false;
 
 	struct_decl->struct_decl.alignment = 4;
 	struct_decl->struct_decl.fields = fields;
@@ -308,6 +328,8 @@ Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_
 	struct_decl->struct_decl.site.filename = site->filename;
 	struct_decl->struct_decl.site.line = site->line;
 	struct_decl->struct_decl.site.column = site->column;
+
+	struct_scope->decl_node = struct_decl;
 
 	return struct_decl;
 }
@@ -337,6 +359,7 @@ Scope* create_scope(s32 level, Scope* parent, u32 flags)
 	res->level = level;
 	res->parent = parent;
 	res->flags = flags;
+	res->decl_node = 0;
 	return res;
 }
 

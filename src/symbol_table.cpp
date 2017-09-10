@@ -36,17 +36,17 @@ s64 Symbol_Table::insert(Scope* scope, Token* ident, Ast* node) {
 
 	u32 hash = hash_of_ident(ident);
 	bool collided = false;
-	if (!entries[hash].used) {
+	if (entries[hash].used) {
 		int entry_size = 0;
 		while (entries[hash].used) {
 			collided = true;
+			entries[hash].collided = true;
 			hash += 1;
 			num_collisions += 1;
 			if (hash >= max_entries) hash = 0;
 		}
 	}
 	entries[hash].used = true;
-	entries[hash].collided = collided;
 	entries[hash].identifier = ident;
 	entries[hash].node = node;
 	entries[hash].scope = scope;

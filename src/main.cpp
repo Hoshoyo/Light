@@ -37,10 +37,10 @@ int main(int argc, char** argv) {
 	//if (do_type_check(ast, &type_table) == 0) {
 	//	return -1;
 	//}
-	printf("Number of values in the infer queue = %d\n", get_arr_length(infer_queue));
+	//printf("\n\nNumber of values in the infer queue = %d\n", get_arr_length(infer_queue));
 #if 1
-	printf("\n\n");
-	DEBUG_print_type_table();
+	//printf("\n\n");
+	//DEBUG_print_type_table();
 	printf("\n\n");
 	DEBUG_print_ast(stdout, ast);
 #endif
