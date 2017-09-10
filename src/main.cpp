@@ -15,18 +15,21 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "No files were given.\nusage: prism [option ...] filename\n");
 		return -1;
 	}
-
+	
 	Lexer lexer;
+	
 	if (lexer.start(argv[1]) != LEXER_SUCCESS) {
 		fprintf(stderr, "There were errors, exiting.\n");
 		return -1;
 	}
 
 	Parser parser(&lexer);
-	Scope* global_scope = 0;
-	Ast** ast = parser.parse_top_level(&global_scope);
-	if (ast == 0) { return -1; }
-
+	Scope* global_scope = create_scope(0, 0, 0);
+	Ast** ast = parser.parse_top_level(global_scope);
+	if (ast == 0) {
+		// file is empty
+		return -1; 
+	}
 	if (check_and_submit_declarations(ast, global_scope) != DECL_CHECK_PASSED) {
 		return -1;
 	}

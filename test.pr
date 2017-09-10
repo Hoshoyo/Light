@@ -1,3 +1,1 @@
-get_value :: (a : int) -> s32 {
-	return get_value(2.0);
-}
+#include(user32.lib) MessageBoxA(hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> int;

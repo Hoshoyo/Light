@@ -2,6 +2,8 @@
 #include <ho_system.h>
 #include <stdio.h>
 
+#define MAX(X, Y) ((X > Y) ? (X) : (Y))
+
 s32 Lexer::start(const char* filename)
 {
 	make_immutable_string(this->filename, filename);
@@ -12,7 +14,6 @@ s32 Lexer::start(const char* filename)
 		return LEXER_FAILURE;
 	}
 	this->file_size = file_size;
-
 	void* file_memory = malloc(file_size + 1);
 	*((char*)file_memory + file_size) = 0;
 	filedata = (char*)ho_readentirefile(filehandle, file_size, file_memory);
@@ -28,8 +29,7 @@ static int remove_white_space(char** start, s64* col_ptr);
 
 void Lexer::lex_file()
 {
-	token_array = (Token*)malloc(sizeof(Token) * file_size);
-
+	token_array = (Token*)malloc(sizeof(Token) * (MAX(file_size, 64) + 4));
 	char* at = filedata;
 
 	current_col = 0;
@@ -39,8 +39,6 @@ void Lexer::lex_file()
 		lexing = read_token(&at);
 		current_token++;
 	} while (lexing);
-
-	int x = 0;
 }
 
 // return lines that advanced
@@ -87,7 +85,7 @@ static int remove_white_space(char** start, s64* col_ptr)
 	char* at = *start;
 	int line_count = 0;
 	int advance = 0;
-
+	if (!at || !*at) return 0;
 	line_count += remove_comments(&at, &column_ptr);
 	while (is_white_space(*at)) {
 		if (*at == '\n') {
@@ -198,7 +196,10 @@ bool Lexer::read_token(char** begin)
 	Token_Type type = TOKEN_UNKNOWN;
 	u32 flags = 0;
 
-	char ch_1 = at[0];
+	char ch_1 = 0;
+	if (at) {
+		ch_1 = at[0];
+	}
 	char ch_2 = 0;
 	if(ch_1){
 		ch_2 = at[1];

@@ -48,11 +48,12 @@ int Parser::require_token_type(Token* tok, Token_Type type)
 	return 0;
 }
 
-Ast** Parser::parse_top_level(Scope** g_scope) 
+Ast** Parser::parse_top_level(Scope* global_scope) 
 {
+	if (lexer->token_count == 1 && lexer->peek_token_type() == TOKEN_END_OF_STREAM) {
+		return 0;
+	}
 	top_level = create_array(Ast*, 2048);	// @todo estimate size here @important
-	Scope* global_scope = create_scope(0, 0, 0);
-	*g_scope = global_scope;
 
 	parser_error = PARSER_NO_ERROR;
 	while (parser_error == PARSER_NO_ERROR && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
@@ -630,6 +631,10 @@ Ast* Parser::parse_declaration(Scope* scope)
 		Ast* vardecl = parse_variable_decl(name, scope);
 		require_and_eat((Token_Type)';');
 		return vardecl;
+	}
+	else {
+		report_syntax_error("invalid declaration of '%.*s'\n", TOKEN_STR(name));
+		return 0;
 	}
 }
 

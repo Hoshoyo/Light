@@ -19,7 +19,7 @@ struct Parser {
 
 	Parser(Lexer* lexer);
 
-	Ast** parse_top_level(Scope** g_scope);
+	Ast** parse_top_level(Scope* global_scope);
 	Ast* parse_declaration(Scope* scope);
 	Ast* parse_expression(Scope* scope, Precedence caller_prec = PRECEDENCE_0, bool quit_on_precedence = false);
 	Ast* parse_block(Scope* scope);
