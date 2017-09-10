@@ -750,7 +750,7 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 				}
 				aux_scope = aux_scope->parent;
 			} while (aux_scope != 0);
-			assert(0);	// internal compiler error
+			report_semantic_error(get_site_from_token(node->expression.proc_call.name), "Undeclared procedure '%.*s'\n", TOKEN_STR(node->expression.proc_call.name));
 			return -1;
 		}break;
 
@@ -761,6 +761,14 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 				if (decl_scope->flags & SCOPE_FLAG_PROC_SCOPE) {
 					Ast* proc_decl = decl_scope->decl_node;
 					if (proc_decl->proc_decl.proc_ret_type->flags & TYPE_FLAG_IS_RESOLVED) {
+						if (!node->ret_stmt.expr) {
+							if (!types_equal(proc_decl->proc_decl.proc_ret_type, node->return_type)) {
+								report_semantic_error(&proc_decl->proc_decl.site, "Procedure '%.*s' must have return of type ", TOKEN_STR(proc_decl->proc_decl.name));
+								DEBUG_print_type(stderr, proc_decl->proc_decl.proc_ret_type);
+								return -1;
+							}
+							return 0;
+						}
 						int err = infer_node_expr_type(node->ret_stmt.expr, table, proc_decl->proc_decl.proc_ret_type);
 						return err;
 					} else {

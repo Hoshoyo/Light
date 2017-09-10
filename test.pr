@@ -1,4 +1,5 @@
+get_value :: () -> () -> void{
+	return main;
+}
 
-v : ^u8;
-
-u : = v + v;
+main :: () {}
