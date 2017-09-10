@@ -1,5 +1,3 @@
-get_value :: () -> () -> void{
-	return main;
+get_value :: (a : int) -> s32 {
+	return get_value(2.0);
 }
-
-main :: () {}

@@ -724,26 +724,28 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 						}
 						int args_ret_val = 0;
 						int proc_decl_num_args = type_instance->type_function.num_arguments;
-
+						int proc_call_num_args = 0;
+						
 						if (node->expression.proc_call.args) {
-							int proc_call_num_args = get_arr_length(node->expression.proc_call.args);
-							if (proc_call_num_args != proc_decl_num_args) {
-								if (proc_decl_num_args < proc_call_num_args)
-									report_semantic_error(get_site_from_token(node->expression.proc_call.name), "Type mismatch: too many arguments for '%.*s' procedure call, expected #%d arguments got #%d",
-										TOKEN_STR(node->expression.proc_call.name), proc_decl_num_args, proc_call_num_args);
-								else
-									report_semantic_error(get_site_from_token(node->expression.proc_call.name), "Type mismatch: too few arguments for '%.*s' procedure call, expected #%d arguments got #%d",
-										TOKEN_STR(node->expression.proc_call.name), proc_decl_num_args, proc_call_num_args);
-								return -1;
-							}
-							for (int i = 0; i < proc_decl_num_args; ++i) {
-								int error = infer_node_expr_type(node->expression.proc_call.args[i], table, type_instance->type_function.arguments_type[i], result, required);
-								if(error == -1){
-									report_semantic_error(0, " in argument #%d of '%.*s' procedure call.\n", i + 1, TOKEN_STR(node->expression.proc_call.name));
-								}
-								if (error) args_ret_val = error;
-							}
+							proc_call_num_args = get_arr_length(node->expression.proc_call.args);
 						}
+						if (proc_call_num_args != proc_decl_num_args) {
+							if (proc_decl_num_args < proc_call_num_args)
+								report_semantic_error(get_site_from_token(node->expression.proc_call.name), "Type mismatch: too many arguments for '%.*s' procedure call, expected #%d arguments got #%d\n",
+									TOKEN_STR(node->expression.proc_call.name), proc_decl_num_args, proc_call_num_args);
+							else
+								report_semantic_error(get_site_from_token(node->expression.proc_call.name), "Type mismatch: too few arguments for '%.*s' procedure call, expected #%d arguments got #%d\n",
+									TOKEN_STR(node->expression.proc_call.name), proc_decl_num_args, proc_call_num_args);
+							return -1;
+						}
+						for (int i = 0; i < proc_decl_num_args; ++i) {
+							int error = infer_node_expr_type(node->expression.proc_call.args[i], table, type_instance->type_function.arguments_type[i], result, required);
+							if(error == -1){
+								report_semantic_error(0, " in argument #%d of '%.*s' procedure call.\n", i + 1, TOKEN_STR(node->expression.proc_call.name));
+							}
+							if (error) args_ret_val = error;
+						}
+					
 						if (args_ret_val == 1 || args_ret_val == -1) ret_val = args_ret_val;
 						return ret_val;
 					}
@@ -1141,11 +1143,13 @@ int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 		while (qsize != 0) {
 			for(int i = 0; i < qsize; ++i) {
 				Infer_Node in = infer_queue[i];
-				if (infer_node_decl_types(in.node, type_table) == 0) {
-					int n = get_arr_length(infer_queue);
+				int err = infer_node_decl_types(in.node, type_table);
+				if (err == 0) {
 					array_remove(infer_queue, i);
-				} else {
+				} else if (err == 1) {
 					continue;
+				} else {
+					return -1;
 				}
 			}
 			int newsize = get_arr_length(infer_queue);
