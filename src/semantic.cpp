@@ -73,7 +73,7 @@ static Expr_Site get_site_from_token(Token* t)
 	return site;
 }
 
-static void report_declaration_site(Ast* node) {
+static void report_declaration_site(Ast* node, char* message = 0) {
 	assert(node->is_decl);
 	Decl_Site* site = 0;
 	Token* name = 0;
@@ -98,7 +98,10 @@ static void report_declaration_site(Ast* node) {
 		fprintf(stderr, "-");
 		num -= 1;
 	}
-	fprintf(stderr, "^   Previously defined here.\n");
+	if(!message)
+		fprintf(stderr, "^   Previously defined here.\n");
+	else
+		fprintf(stderr, "^   %s", message);
 }
 
 int check_and_submit_declarations(Ast* node, Scope* scope) {
@@ -117,6 +120,21 @@ int check_and_submit_declarations(Ast* node, Scope* scope) {
 				report_declaration_site(scope->symb_table->entries[hash].node);
 				return 0;
 			}
+		}break;
+		case AST_NODE_PROC_FORWARD_DECL: {
+			int num_args = node->proc_decl.num_args;
+			int error = DECL_CHECK_PASSED;
+			if (num_args > 0) {
+				node->proc_decl.scope->symb_table = new Symbol_Table(num_args * declaration_ratio);
+#if PRINT_SCOPE_INFO
+				printf("Proc Forward declaration (%d - level[%d]) has %d arguments.\n", node->proc_decl.scope->id, node->proc_decl.scope->level, node->proc_decl.scope->num_declarations);
+#endif
+				for (int i = 0; i < num_args; ++i) {
+					int ret = check_and_submit_declarations(node->proc_decl.arguments[i], node->proc_decl.scope);
+					if (ret != DECL_CHECK_PASSED) error = DECL_CHECK_FAILED;
+				}
+			}
+			return error;
 		}break;
 		case AST_NODE_PROC_DECLARATION: {
 			assert(scope->symb_table);
@@ -150,6 +168,7 @@ int check_and_submit_declarations(Ast* node, Scope* scope) {
 			if (ret != DECL_CHECK_PASSED) error = DECL_CHECK_FAILED;
 			if (error == DECL_CHECK_FAILED) return DECL_CHECK_FAILED;
 		}break;
+
 		case AST_NODE_STRUCT_DECLARATION: {
 			Scope* struct_scope = node->struct_decl.scope;
 #if PRINT_SCOPE_INFO
@@ -166,7 +185,7 @@ int check_and_submit_declarations(Ast* node, Scope* scope) {
 			if (hash == -1) {
 				hash = scope->symb_table->insert(scope, node->named_arg.arg_name, node);
 			} else {
-				report_semantic_error(&node->named_arg.site, "Procedure argument %.*s redefinition.\n", node->named_arg.arg_name->value.length, node->named_arg.arg_name->value.data);
+				report_semantic_error(&node->named_arg.site, "Procedure argument #%d '%.*s' redefinition.\n", node->named_arg.index + 1, TOKEN_STR(node->named_arg.arg_name));
 				fprintf(stderr, "Previously defined as argument #%d in the procedure.\n", scope->symb_table->entries[hash].node->named_arg.index + 1);
 				return 0;
 			}
@@ -497,6 +516,7 @@ Type_Instance* get_decl_type(Ast* node)
 	switch (node->node) {
 	case AST_NODE_VARIABLE_DECL:      return node->var_decl.type;
 	case AST_NODE_NAMED_ARGUMENT:     return node->named_arg.arg_type;
+	case AST_NODE_PROC_FORWARD_DECL:
 	case AST_NODE_PROC_DECLARATION:   return node->proc_decl.proc_type;
 	case AST_NODE_STRUCT_DECLARATION: return node->struct_decl.type_info;
 
@@ -527,83 +547,97 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 // return -1 if error
 int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_against, Type_Instance** result = 0, Type_Instance** required = 0)
 {
-	/*
-	if (check_against) {
-		switch (node->expression.binary_exp.op) {
-		case BINARY_OP_PLUS:
-		case BINARY_OP_MINUS: {
-			if (check_against->type == TYPE_POINTER) {
-				// pointer arithmetic
-				break;
-			}
-		}
-		case BINARY_OP_MULT:
-		case BINARY_OP_DIV:
-		case BINARY_OP_MOD: {
-			assert(0);
-		} break;
-
-		case BINARY_OP_BITSHIFT_LEFT:
-		case BINARY_OP_BITSHIFT_RIGHT:
-		case BINARY_OP_AND:
-		case BINARY_OP_OR:
-		case BINARY_OP_XOR:
-
-		case BINARY_OP_LOGIC_AND:
-		case BINARY_OP_LOGIC_OR:
-
-		case BINARY_OP_LESS_THAN:
-		case BINARY_OP_GREATER_THAN:
-		case BINARY_OP_LESS_EQUAL:
-		case BINARY_OP_GREATER_EQUAL:
-		case BINARY_OP_EQUAL_EQUAL:
-		case BINARY_OP_NOT_EQUAL: {
-
-		} break;
-
-		case BINARY_OP_DOT:
-
-		case ASSIGNMENT_OPERATION_EQUAL:
-		case ASSIGNMENT_OPERATION_PLUS_EQUAL:
-		case ASSIGNMENT_OPERATION_MINUS_EQUAL:
-		case ASSIGNMENT_OPERATION_TIMES_EQUAL:
-		case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:
-		case ASSIGNMENT_OPERATION_AND_EQUAL:
-		case ASSIGNMENT_OPERATION_OR_EQUAL:
-		case ASSIGNMENT_OPERATION_XOR_EQUAL:
-		case ASSIGNMENT_OPERATION_SHL_EQUAL:
-		case ASSIGNMENT_OPERATION_SHR_EQUAL:
-			assert(0);
+	// this is supposed to be infered
+	switch (node->expression.binary_exp.op) {
+	case BINARY_OP_PLUS:
+	case BINARY_OP_MINUS: {
+		if (check_against && check_against->type == TYPE_POINTER) {
+			// pointer arithmetic
 			break;
 		}
 	}
-	*/
-
-	{
-		// this is supposed to be infered
-		switch (node->expression.binary_exp.op) {
-		case BINARY_OP_PLUS:
-		case BINARY_OP_MINUS: {
-			if (check_against && check_against->type == TYPE_POINTER) {
-				// pointer arithmetic
-				break;
+	case BINARY_OP_MULT:
+	case BINARY_OP_DIV:
+	case BINARY_OP_MOD: {
+		// both sides need to be the same type
+		Type_Instance* left = 0;
+		Type_Instance* right = 0;
+		Type_Instance* required_left = 0;
+		Type_Instance* required_right = 0;
+		int l = infer_node_expr_type(node->expression.binary_exp.left, table, check_against, &left, &required_left);
+		int r = infer_node_expr_type(node->expression.binary_exp.right, table, check_against, &right, &required_right);
+		if (l == 0 && r == 0) {
+			if (types_equal(left, right)) {
+				if (left->flags & TYPE_FLAG_IS_RESOLVED) {
+					node->return_type = left;
+					if(result)
+						*result = left;
+					if ((required_left || required_right) && required)
+						*required = left;
+					return 0;
+				} else {
+					return 1;
+				}
+			} else {
+				if (required_left && required_right) {
+					report_semantic_type_mismatch(get_site_from_token(node->expression.binary_exp.op_token), required_left, required_right);
+					fprintf(stderr, " on binary expression '%.*s'\n", TOKEN_STR(node->expression.binary_exp.op_token));
+					return -1;
+				}
+				Type_Instance* coerced = 0;
+				if (required_left) {
+					coerced = do_type_coercion(right, left, true);
+					if (!coerced) {
+						infer_node_expr_type(node->expression.binary_exp.right, table, required_left, &right);
+						coerced = do_type_coercion(left, right, true);
+					}
+					if(required) *required = coerced;
+				} else if (required_right) {
+					coerced = do_type_coercion(left, right, true);
+					if (!coerced) {
+						infer_node_expr_type(node->expression.binary_exp.left, table, required_right, &left);
+						coerced = do_type_coercion(right, left, true);
+					}
+					if(required) *required = coerced;
+				} else {
+					coerced = do_type_coercion(left, right, false);
+				}
+				if (coerced) {
+					if(result) *result = coerced;
+					node->return_type = coerced;
+					return 0;
+				} else {
+					report_semantic_type_mismatch(get_site_from_token(node->expression.binary_exp.op_token), left, right);
+					fprintf(stderr, " on binary expression '%.*s'\n", TOKEN_STR(node->expression.binary_exp.op_token));
+					return -1;
+				}
 			}
+		} else if (l == -1 || r == -1) {
+			return -1;
+		} else if (l == 1 || r == 1) {
+			return 1;
 		}
-		case BINARY_OP_MULT:
-		case BINARY_OP_DIV:
-		case BINARY_OP_MOD: {
-			// both sides need to be the same type
-			Type_Instance* left = 0;
-			Type_Instance* right = 0;
-			Type_Instance* required_left = 0;
-			Type_Instance* required_right = 0;
-			int l = infer_node_expr_type(node->expression.binary_exp.left, table, check_against, &left, &required_left);
-			int r = infer_node_expr_type(node->expression.binary_exp.right, table, check_against, &right, &required_right);
-			if (l == 0 && r == 0) {
+	} break;
+
+	case BINARY_OP_BITSHIFT_LEFT:
+	case BINARY_OP_BITSHIFT_RIGHT:
+	case BINARY_OP_AND:
+	case BINARY_OP_OR:
+	case BINARY_OP_XOR: {
+		Type_Instance* left = 0;
+		Type_Instance* right = 0;
+		Type_Instance* required_left = 0;
+		Type_Instance* required_right = 0;
+
+		int l = infer_node_expr_type(node->expression.binary_exp.left, table, check_against, &left, &required_left);
+		int r = infer_node_expr_type(node->expression.binary_exp.right, table, check_against, &right, &required_right);
+			
+		if (l == 0 && r == 0) {
+			if (is_integer_type(left) && is_integer_type(right)) {
 				if (types_equal(left, right)) {
 					if (left->flags & TYPE_FLAG_IS_RESOLVED) {
 						node->return_type = left;
-						if(result)
+						if (result)
 							*result = left;
 						if ((required_left || required_right) && required)
 							*required = left;
@@ -611,76 +645,76 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 					} else {
 						return 1;
 					}
-				} else {
-					if (required_left && required_right) {
+				}
+				Type_Instance* coerced = 0;
+				if (required_right && required_left) {
+					if (!types_equal(required_left, required_right)) {
 						report_semantic_type_mismatch(get_site_from_token(node->expression.binary_exp.op_token), required_left, required_right);
 						fprintf(stderr, " on binary expression '%.*s'\n", TOKEN_STR(node->expression.binary_exp.op_token));
 						return -1;
 					}
-					Type_Instance* coerced = 0;
-					if (required_left) {
+					if(required) *required = required_right;
+				} else if (required_left) {
+					coerced = do_type_coercion(right, left, false);
+					if (!coerced) {
+						infer_node_expr_type(node->expression.binary_exp.right, table, required_left, &right);
 						coerced = do_type_coercion(right, left, true);
-						if (coerced) {
-							if(required)
-								*required = coerced;
-						}
-					} else if (required_right) {
+					}
+					if (required) *required = coerced;
+				} else if (required_right) {
+					coerced = do_type_coercion(left, right, false);
+					if (!coerced) {
+						infer_node_expr_type(node->expression.binary_exp.left, table, required_right, &left);
 						coerced = do_type_coercion(left, right, true);
-						if (coerced) {
-							if(required)
-								*required = coerced;
-						}
-					} else {
-						coerced = do_type_coercion(left, right, false);
 					}
-					if (coerced) {
-						if(result)
-							*result = coerced;
-						node->return_type = coerced;
-						return 0;
-					} else {
-						report_semantic_type_mismatch(get_site_from_token(node->expression.binary_exp.op_token), left, right);
-						fprintf(stderr, " on binary expression '%.*s'\n", TOKEN_STR(node->expression.binary_exp.op_token));
-						return -1;
-					}
+					if (required) *required = coerced;
+				} else {
+					assert(!required);
+					coerced = do_type_coercion(left, right, false);
 				}
-			} else if (l == -1 || r == -1) {
+				if (!coerced) {
+					report_semantic_type_mismatch(get_site_from_token(node->expression.binary_exp.op_token), left, right);
+					fprintf(stderr, " on binary expression '%.*s'\n", TOKEN_STR(node->expression.binary_exp.op_token));
+					return -1;
+				}
+				node->return_type = coerced;
+				if (result) *result = coerced;
+				return 0;
+			} else {
+				report_semantic_error(get_site_from_token(node->expression.binary_exp.op_token), "binary operator '%.*s' requires integer type.\n", TOKEN_STR(node->expression.binary_exp.op_token));
 				return -1;
-			} else if (l == 1 || r == 1) {
-				return 1;
 			}
-		} break;
-
-		case BINARY_OP_BITSHIFT_LEFT:
-		case BINARY_OP_BITSHIFT_RIGHT:
-		case BINARY_OP_AND:
-		case BINARY_OP_OR:
-		case BINARY_OP_XOR:
-
-		case BINARY_OP_LOGIC_AND:
-		case BINARY_OP_LOGIC_OR:
-		case BINARY_OP_LESS_THAN:
-		case BINARY_OP_GREATER_THAN:
-		case BINARY_OP_LESS_EQUAL:
-		case BINARY_OP_GREATER_EQUAL:
-		case BINARY_OP_EQUAL_EQUAL:
-		case BINARY_OP_NOT_EQUAL:
-
-		case BINARY_OP_DOT:
-
-		case ASSIGNMENT_OPERATION_EQUAL:
-		case ASSIGNMENT_OPERATION_PLUS_EQUAL:
-		case ASSIGNMENT_OPERATION_MINUS_EQUAL:
-		case ASSIGNMENT_OPERATION_TIMES_EQUAL:
-		case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:
-		case ASSIGNMENT_OPERATION_AND_EQUAL:
-		case ASSIGNMENT_OPERATION_OR_EQUAL:
-		case ASSIGNMENT_OPERATION_XOR_EQUAL:
-		case ASSIGNMENT_OPERATION_SHL_EQUAL:
-		case ASSIGNMENT_OPERATION_SHR_EQUAL:
-			assert(0);
-			break;
+		} else if(l == -1 || r == -1) {
+			return -1;
+		} else if (l == 1 || r == 1) {
+			return 1;
 		}
+			
+	}break;
+
+	case BINARY_OP_LOGIC_AND:
+	case BINARY_OP_LOGIC_OR:
+	case BINARY_OP_LESS_THAN:
+	case BINARY_OP_GREATER_THAN:
+	case BINARY_OP_LESS_EQUAL:
+	case BINARY_OP_GREATER_EQUAL:
+	case BINARY_OP_EQUAL_EQUAL:
+	case BINARY_OP_NOT_EQUAL:
+
+	case BINARY_OP_DOT:
+
+	case ASSIGNMENT_OPERATION_EQUAL:
+	case ASSIGNMENT_OPERATION_PLUS_EQUAL:
+	case ASSIGNMENT_OPERATION_MINUS_EQUAL:
+	case ASSIGNMENT_OPERATION_TIMES_EQUAL:
+	case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:
+	case ASSIGNMENT_OPERATION_AND_EQUAL:
+	case ASSIGNMENT_OPERATION_OR_EQUAL:
+	case ASSIGNMENT_OPERATION_XOR_EQUAL:
+	case ASSIGNMENT_OPERATION_SHL_EQUAL:
+	case ASSIGNMENT_OPERATION_SHR_EQUAL:
+		assert(0);
+		break;
 	}
 }
 
@@ -781,7 +815,9 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 				decl_scope = decl_scope->parent;
 			} while (decl_scope != 0);
 
-			// if got here return is not inside a procedure @todo report error
+			// if got here return is not inside a procedure
+			// @CHECK is this an internal compiler error?
+			report_semantic_error(node->ret_stmt.site, "return statement is not inside a procedure\n");
 			return -1;
 		}break;
 
@@ -817,10 +853,11 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 			int inttype = is_integer_type(check_against);
 
 			if (tok_type == TOKEN_INT_LITERAL) {
-				if(inttype == 2)
-					prim = get_primitive_type(TYPE_PRIMITIVE_U32);
-				else
-					prim = get_primitive_type(TYPE_PRIMITIVE_S32);
+				if (check_against && (inttype == 2 || inttype == 1)) {
+					prim = get_primitive_type(check_against->primitive);
+				} else {
+					prim = get_primitive_type(TYPE_PRIMITIVE_S64);
+				}
 			}
 			else if (tok_type == TOKEN_FLOAT_LITERAL) {
 				prim = get_primitive_type(TYPE_PRIMITIVE_R32);
@@ -859,6 +896,9 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 			if (!prim) {
 				return 1;
 			} else {
+				if (!(prim->flags & TYPE_FLAG_IS_RESOLVED)) {
+					return 1;
+				}
 				if (check_against) {
 					Type_Instance* coerced = do_type_coercion(check_against, prim, true);
 					if (coerced) {
@@ -885,6 +925,18 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 	return -1;
 }
 
+// return 0 if success
+// return 1 if could not infer type of node
+// return -1 if an error happened
+// @IMPORTANT this function queues the node to be later infered again, do not queue the node
+// passed to this function, this function will queue all the nodes of types:
+// - AST_NODE_NAMED_ARGUMENT
+// - AST_NODE_PROC_DECLARATION
+// - AST_NODE_VARIABLE_DECL
+// - AST_NODE_STRUCT_DECLARATION
+// - AST_NODE_BLOCK
+// As the second infer pass process these nodes again, all the not infered nodes will be infered
+// @TODO check if multiple blocks returning 1 will be queued more than once
 int infer_node_decl_types(Ast* node, Type_Table* table)
 {
 	bool already_queued = (node->return_type && node->return_type->flags & TYPE_FLAG_QUEUED);
@@ -913,6 +965,83 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 				}
 			} break;
 
+			case AST_NODE_PROC_FORWARD_DECL: {
+				assert(node->proc_decl.proc_ret_type);
+				Scope* scope = node->proc_decl.scope->parent;
+				s64 hash = scope->symb_table->entry_exist(node->proc_decl.name);
+				if (hash == -1) {
+					if (already_queued) {
+						// proc was not declared, since it came back here already queued and 
+						// the symbol table for the scope still does not contain the symbol
+						report_semantic_error(&node->proc_decl.site,  "'%.*s' procedure declaration does not have an equivalent with a body definition.\n", TOKEN_STR(node->proc_decl.name));
+						return -1;
+					} else {
+						push_infer_queue(node);
+						return 1;
+					}
+				}
+				Ast* proc_def = scope->symb_table->entries[hash].node;
+				if (proc_def->proc_decl.proc_type && proc_def->proc_decl.proc_type->flags & TYPE_FLAG_IS_RESOLVED) {
+					// @COPY AND PASTE @FIX
+					bool infered = true;
+
+					if (!(node->proc_decl.proc_ret_type->flags & TYPE_FLAG_IS_RESOLVED) &&
+						!resolve_type(node->proc_decl.proc_ret_type, table)) {
+						infered = false;
+					}
+					if (infered) {
+						create_type(&node->proc_decl.proc_ret_type, true);
+					}
+
+					// arguments
+					int num_args = node->proc_decl.num_args;
+					for (int i = 0; i < num_args; ++i) {
+						Ast* arg = node->proc_decl.arguments[i];
+						if (infer_node_decl_types(arg, table) != 0) {
+							infered = false;
+						}
+					}
+
+					if (infered) {
+						Type_Instance* instance = new Type_Instance();
+						instance->type = TYPE_FUNCTION;
+						instance->flags = TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED | TYPE_FLAG_IS_REGISTER_SIZE;
+						instance->type_size = get_size_of_pointer();
+
+						instance->type_function.num_arguments = num_args;
+						instance->type_function.return_type = node->proc_decl.proc_ret_type;
+						instance->type_function.arguments_type = create_array(Type_Instance*, num_args);
+
+						for (int i = 0; i < num_args; ++i) {
+							Type_Instance* in = get_decl_type(node->proc_decl.arguments[i]);
+							push_array(instance->type_function.arguments_type, &in);
+						}
+						create_type(&instance, true);
+						node->proc_decl.proc_type = instance;
+						if (node->proc_decl.proc_type == proc_def->proc_decl.proc_type) {
+							return 0;
+						} else {
+							report_semantic_error(&node->proc_decl.site, "'%.*s' procedure declaration does not match definition.\n", TOKEN_STR(node->proc_decl.name));
+							report_semantic_error(0, "\ndeclaration type: ");
+							DEBUG_print_type(stderr, node->proc_decl.proc_type);
+							report_semantic_error(0, "\ndefinition type:  ");
+							DEBUG_print_type(stderr, proc_def->proc_decl.proc_type);
+							fprintf(stderr, "\n\n");
+							report_declaration_site(proc_def, "Declaration of body here.");
+							return -1;
+						}
+					}
+					else {
+						if (!already_queued)
+							push_infer_queue(node);
+						return 1;
+					}
+				} else {
+					if (!already_queued)
+						push_infer_queue(node);
+					return 1;
+				}
+			}break;
 			case AST_NODE_PROC_DECLARATION: {
 				// proc return type creation
 				assert(node->proc_decl.proc_ret_type);
@@ -936,7 +1065,9 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 					}
 				}
 
-				int err = infer_node_decl_types(node->proc_decl.body, table);
+				int err = 0;
+				if(node->proc_decl.body)
+					infer_node_decl_types(node->proc_decl.body, table);
 
 				if (infered) {
 					Type_Instance* instance = new Type_Instance();

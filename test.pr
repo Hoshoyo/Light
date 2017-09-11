@@ -1,1 +1,10 @@
-#include(user32.lib) MessageBoxA(hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> int;
+//#include(user32.lib) MessageBoxA(hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> int;
+
+hello :: () -> u32{
+	return 1;
+}
+proc :: () -> void
+{
+	a := 1 << b;
+	b := hello();
+}

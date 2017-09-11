@@ -18,6 +18,7 @@ struct Scope;
 
 enum Node_Type {
 	AST_NODE_PROC_DECLARATION,
+	AST_NODE_PROC_FORWARD_DECL,
 	AST_NODE_NAMED_ARGUMENT,
 	AST_NODE_VARIABLE_DECL,
 	AST_NODE_BINARY_EXPRESSION,
@@ -234,14 +235,17 @@ struct Ast_While {
 struct Ast_Return {
 	Ast* expr;
 	Scope* scope;
+	Expr_Site site;
 };
 
 struct Ast_Break {
 	Scope* scope;
+	Expr_Site site;
 };
 
 struct Ast_Continue {
 	Scope* scope;
+	Expr_Site site;
 };
 
 struct Ast {
@@ -297,11 +301,11 @@ Ast* create_block(Memory_Arena* arena, Scope* scope);
 Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope);
 Ast* create_if(Memory_Arena* arena, Ast* bool_exp, Ast* body, Ast* else_stmt, Scope* scope);
 Ast* create_while(Memory_Arena* arena, Ast* bool_exp, Ast* body, Scope* scope);
-Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope);
+Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope, Token* token);
 Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, u32 flags, Type_Instance* cast_type, Precedence precedence, Scope* scope);
 Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, Token* op, Precedence precedence, Scope* scope);
-Ast* create_break(Memory_Arena* arena, Scope* scope);
-Ast* create_continue(Memory_Arena* arena, Scope* scope);
+Ast* create_break(Memory_Arena* arena, Scope* scope, Token* token);
+Ast* create_continue(Memory_Arena* arena, Scope* scope, Token* token);
 Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_fields, Scope* struct_scope, Decl_Site* site);
 
 UnaryOperation get_unary_op(Token* token);

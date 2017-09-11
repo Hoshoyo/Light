@@ -418,26 +418,26 @@ Ast* Parser::parse_command(Scope* scope)
 		command = parse_block(scope);
 	}
 	else if (first->type == TOKEN_BREAK_STATEMENT) {
-		lexer->eat_token();
-		command = create_break(&arena, scope);
+		Token* tok = lexer->eat_token();
+		command = create_break(&arena, scope, tok);
 		require_and_eat((Token_Type)';');
 	}
 	else if (first->type == TOKEN_CONTINUE_STATEMENT) {
-		lexer->eat_token();
-		command = create_continue(&arena, scope);
+		Token* tok = lexer->eat_token();
+		command = create_continue(&arena, scope, tok);
 		require_and_eat((Token_Type)';');
 	}
 	else if (first->type == TOKEN_RETURN_STATEMENT) {
-		lexer->eat_token();
+		Token* tok = lexer->eat_token();
 		Ast* exp = 0;
 		if (lexer->peek_token_type() != ';') {
 			exp = parse_expression(scope);
 		}
-		command = create_return(&arena, exp, scope);
+		command = create_return(&arena, exp, scope, tok);
 		require_and_eat((Token_Type)';');
 	}
 	else if (first->type == (Token_Type)'}') {
-		command = create_return(&arena, 0, scope);
+		command = create_return(&arena, 0, scope, first);
 	}
 	else {
 		command = parse_expression(scope);
@@ -524,6 +524,9 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 	Ast* body = 0;
 	if (lexer->peek_token_type() == TOKEN_SYMBOL_OPEN_BRACE) {
 		body = parse_block(proc_scope);
+	} else if(lexer->peek_token_type() == ';'){
+		lexer->eat_token();
+		body = 0;
 	}
 
 	Decl_Site site;

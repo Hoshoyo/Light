@@ -60,7 +60,10 @@ BinaryOperation get_binary_op(Token* token)
 Ast* create_proc(Memory_Arena* arena, Token* name, Type_Instance* return_type, Ast** arguments, int nargs, Ast* body, Scope* scope, Decl_Site* site) {
 	Ast* proc = ALLOC_AST(arena);
 
-	proc->node = AST_NODE_PROC_DECLARATION;
+	if (body)
+		proc->node = AST_NODE_PROC_DECLARATION;
+	else
+		proc->node = AST_NODE_PROC_FORWARD_DECL;
 	proc->is_decl = true;
 	proc->return_type = 0;
 	proc->type_checked = false;
@@ -246,7 +249,7 @@ Ast* create_while(Memory_Arena* arena, Ast* bool_exp, Ast* body, Scope* scope)
 	return while_stmt;
 }
 
-Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope)
+Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope, Token* token)
 {
 	Ast* ret_stmt = ALLOC_AST(arena);
 	ret_stmt->node = AST_NODE_RETURN_STATEMENT;
@@ -256,6 +259,10 @@ Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope)
 
 	ret_stmt->ret_stmt.expr = exp;
 	ret_stmt->ret_stmt.scope = scope;
+
+	ret_stmt->ret_stmt.site.filename = token->filename;
+	ret_stmt->ret_stmt.site.line = token->line;
+	ret_stmt->ret_stmt.site.column = token->column;
 	
 	return ret_stmt;
 }
@@ -280,7 +287,7 @@ Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation o
 	return unop;
 }
 
-Ast* create_break(Memory_Arena* arena, Scope* scope)
+Ast* create_break(Memory_Arena* arena, Scope* scope, Token* token)
 {
 	Ast* break_stmt = ALLOC_AST(arena);
 
@@ -291,10 +298,14 @@ Ast* create_break(Memory_Arena* arena, Scope* scope)
 
 	break_stmt->break_stmt.scope = scope;
 
+	break_stmt->break_stmt.site.filename = token->filename;
+	break_stmt->break_stmt.site.line = token->line;
+	break_stmt->break_stmt.site.column = token->column;
+
 	return break_stmt;
 }
 
-Ast* create_continue(Memory_Arena* arena, Scope* scope)
+Ast* create_continue(Memory_Arena* arena, Scope* scope, Token* token)
 {
 	Ast* continue_stmt = ALLOC_AST(arena);
 
@@ -304,6 +315,10 @@ Ast* create_continue(Memory_Arena* arena, Scope* scope)
 	continue_stmt->type_checked = false;
 
 	continue_stmt->continue_stmt.scope = scope;
+
+	continue_stmt->continue_stmt.site.filename = token->filename;
+	continue_stmt->continue_stmt.site.line = token->line;
+	continue_stmt->continue_stmt.site.column = token->column;
 
 	return continue_stmt;
 }
@@ -456,7 +471,7 @@ void DEBUG_print_proc(FILE* out, Ast* proc_node) {
 	fprintf(out, ") -> ");
 	DEBUG_print_type(out, proc_node->proc_decl.proc_ret_type);
 	if (proc_node->proc_decl.body == 0) {
-		fprintf(out, "{}");
+		fprintf(out, ";");
 	} else {
 		DEBUG_print_block(out, proc_node->proc_decl.body);
 	}
@@ -620,6 +635,7 @@ void DEBUG_print_struct_declaration(FILE* out, Ast* node)
 
 void DEBUG_print_node(FILE* out, Ast* node) {
 	switch (node->node) {
+	case AST_NODE_PROC_FORWARD_DECL:
 	case AST_NODE_PROC_DECLARATION:		DEBUG_print_proc(out, node); break;
 	case AST_NODE_VARIABLE_DECL:		DEBUG_print_var_decl(out, node); break;
 	case AST_NODE_UNARY_EXPRESSION:		
