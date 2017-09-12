@@ -1,3 +1,8 @@
-- remove -fpermissive from gcc compilation
-- check memory arena allocation function possible write bug
-
+- do better errors in parser stage and check for end of stream
+- do better errors in semantic stage
+- check this code, detecting circular dependency
+proc :: () -> vec3
+{
+}
+- check things like
+a : bool = !a;

@@ -175,6 +175,7 @@ Ast* create_variable(Memory_Arena* arena, Token* var_token, Scope* scope)
 	var->type_checked = false;
 
 	var->expression.expression_type = EXPRESSION_TYPE_VARIABLE;
+	var->expression.is_lvalue = true;
 
 	var->expression.variable_exp.name = var_token;
 	var->expression.variable_exp.type = 0;
@@ -210,6 +211,7 @@ Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope
 	proc_call->type_checked = false;
 
 	proc_call->expression.expression_type = EXPRESSION_TYPE_PROC_CALL;
+	proc_call->expression.is_lvalue = false;
 
 	proc_call->expression.proc_call.name = name;
 	proc_call->expression.proc_call.args = args;
@@ -267,7 +269,7 @@ Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope, Token* token)
 	return ret_stmt;
 }
 
-Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, u32 flags, Type_Instance* cast_type, Precedence precedence, Scope* scope)
+Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, Token* token, u32 flags, Type_Instance* cast_type, Precedence precedence, Scope* scope)
 {
 	Ast* unop = ALLOC_AST(arena);
 
@@ -278,6 +280,7 @@ Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation o
 
 	unop->expression.expression_type = EXPRESSION_TYPE_UNARY;
 	unop->expression.unary_exp.op = op;
+	unop->expression.unary_exp.op_token = token;
 	unop->expression.unary_exp.operand = operand;
 	unop->expression.unary_exp.cast_type = cast_type;
 	unop->expression.unary_exp.precedence = precedence;
@@ -398,7 +401,7 @@ void DEBUG_print_indent_level() {
 	}
 }
 
-void DEBUG_print_type(FILE* out, Type_Instance* type) {
+void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
 	if (!type) {
 		fprintf(out, "(TYPE_IS_NULL)");
 		return;
@@ -422,16 +425,20 @@ void DEBUG_print_type(FILE* out, Type_Instance* type) {
 		fprintf(out, "^");
 		DEBUG_print_type(out, type->pointer_to);
 	} else if (type->type == TYPE_STRUCT) {
-		fprintf(out, "%.*s struct {\n", type->type_struct.name_length, type->type_struct.name);
-		int num_fields = get_arr_length(type->type_struct.fields_types);
-		for (int i = 0; i < num_fields; ++i) {
-			Type_Instance* field_type = type->type_struct.fields_types[i];
-			string name = type->type_struct.fields_names[i];
-			fprintf(out, "%.*s : ", name.length, name.data);
-			DEBUG_print_type(out, field_type);
-			fprintf(out, ";\n");
+		if (short_) {
+			fprintf(out, "%.*s", type->type_struct.name_length, type->type_struct.name);
+		} else {
+			fprintf(out, "%.*s struct {\n", type->type_struct.name_length, type->type_struct.name);
+			int num_fields = get_arr_length(type->type_struct.fields_types);
+			for (int i = 0; i < num_fields; ++i) {
+				Type_Instance* field_type = type->type_struct.fields_types[i];
+				string name = type->type_struct.fields_names[i];
+				fprintf(out, "%.*s : ", name.length, name.data);
+				DEBUG_print_type(out, field_type);
+				fprintf(out, ";\n");
+			}
+			fprintf(out, "}\n");
 		}
-		fprintf(out, "}\n");
 	} else if (type->type == TYPE_FUNCTION) {
 		fprintf(out, "(");
 		int num_args = type->type_function.num_arguments;

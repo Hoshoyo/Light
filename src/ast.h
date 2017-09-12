@@ -166,6 +166,7 @@ struct Ast_Unary_Exp {
 	Ast* operand;
 	Type_Instance* cast_type;
 	Scope* scope;
+	Token* op_token;
 };
 
 const u32 LITERAL_FLAG_IS_REGSIZE = FLAG(0);
@@ -195,6 +196,7 @@ const u32 EXPRESSION_TYPE_PROC_CALL = 5;
 
 struct Ast_Expression {
 	u32 expression_type;
+	bool is_lvalue;
 	union {
 		Ast_Binary_Exp binary_exp;
 		Ast_Unary_Exp unary_exp;
@@ -302,7 +304,7 @@ Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope
 Ast* create_if(Memory_Arena* arena, Ast* bool_exp, Ast* body, Ast* else_stmt, Scope* scope);
 Ast* create_while(Memory_Arena* arena, Ast* bool_exp, Ast* body, Scope* scope);
 Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope, Token* token);
-Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, u32 flags, Type_Instance* cast_type, Precedence precedence, Scope* scope);
+Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, Token* op_tok, u32 flags, Type_Instance* cast_type, Precedence precedence, Scope* scope);
 Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, Token* op, Precedence precedence, Scope* scope);
 Ast* create_break(Memory_Arena* arena, Scope* scope, Token* token);
 Ast* create_continue(Memory_Arena* arena, Scope* scope, Token* token);
@@ -317,6 +319,6 @@ void push_ast_list(Ast** list, Ast* arg);
 
 void DEBUG_print_node(FILE* out, Ast* node);
 void DEBUG_print_ast(FILE* out, Ast** ast);
-void DEBUG_print_type(FILE* out, Type_Instance* type);
+void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_ = true);
 
 void DEBUG_print_indent_level();

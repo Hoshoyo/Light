@@ -121,6 +121,7 @@ bool types_equal(Type_Instance* i1, Type_Instance* i2);
 
 // return 1 if signed 2 if unsigned 0 if not integer type
 int is_integer_type(Type_Instance* inst);
+int is_floating_point_type(Type_Instance* inst);
 
 void DEBUG_print_type_table();
 void DEBUG_print_node_type(FILE* out, Ast** ast, bool decl_only);

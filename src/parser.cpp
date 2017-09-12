@@ -21,7 +21,7 @@ int Parser::report_syntax_error(char* msg, ...)
 	vfprintf(stderr, msg, args);
 	va_end(args);
 	parser_error = PARSER_ERROR_FATAL;
-	return 0;
+	exit(-1);
 }
 
 Token* Parser::require_and_eat(Token_Type t)
@@ -263,7 +263,8 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 		left_op = parse_expression(scope, PRECEDENCE_0);
 		require_and_eat((Token_Type)')');
 	} else if (first->flags & TOKEN_FLAG_UNARY_OPERATOR) {
-		UnaryOperation uop = get_unary_op(lexer->eat_token());
+		Token* tok = lexer->eat_token();
+		UnaryOperation uop = get_unary_op(tok);
 		Precedence unop_precedence = get_precedence_level(uop, true);
 		Type_Instance* cast_type = 0;
 		if (uop == UNARY_OP_CAST) {
@@ -272,7 +273,13 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 			require_and_eat((Token_Type)')');
 		}
 		Ast* operand = parse_expression(scope, unop_precedence, true);
-		left_op = create_unary_expression(&arena, operand, uop, UNARY_EXP_FLAG_PREFIXED, cast_type, unop_precedence, scope);
+		left_op = create_unary_expression(&arena, operand, uop, tok, UNARY_EXP_FLAG_PREFIXED, cast_type, unop_precedence, scope);
+	} else {
+		print_error_loc(stderr, first->filename, first->line, first->column);
+		if (first->type == TOKEN_END_OF_STREAM) {
+			report_syntax_error("unexpected end of stream at expression.\n", TOKEN_STR(first));
+		}
+		report_syntax_error("expected expression but got '%.*s'.\n", TOKEN_STR(first));
 	}
 
 	Token* optor = lexer->eat_token();
@@ -555,6 +562,10 @@ Ast* Parser::parse_variable_decl(Token* name, Scope* scope)
 		assign_exp = parse_expression(scope);
 	} else {
 		type = parse_type();
+		if (!type) {
+			print_error_loc(stderr, lexer->filename, name->line, name->column);
+			report_syntax_error("expected type definition or assignment after '%.*s' variable declaration.\n", TOKEN_STR(name));
+		}
 		if (lexer->peek_token_type() == (Token_Type)'=') {
 			lexer->eat_token();
 			assign_exp = parse_expression(scope);
@@ -744,6 +755,8 @@ Type_Instance* Parser::parse_type()
 		struct_type->type_struct.name = tok->value.data;
 		struct_type->type_struct.name_length = tok->value.length;
 		struct_type->type_struct.fields_types = 0;
+	} else {
+		return 0;
 	}
 	return ti;
 }
