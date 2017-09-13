@@ -352,6 +352,22 @@ Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_
 	return struct_decl;
 }
 
+Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* declaration)
+{
+	Ast* directive = ALLOC_AST(arena);
+
+	directive->node = AST_NODE_DIRECTIVE;
+
+	directive->return_type = 0;
+	directive->is_decl = true;
+	directive->type_checked = false;
+
+	directive->directive.declaration = declaration;
+	directive->directive.token = directive_token;
+
+	return directive;
+}
+
 void block_push_command(Ast* block, Ast* command)
 {
 	push_array(block->block.commands, &command);

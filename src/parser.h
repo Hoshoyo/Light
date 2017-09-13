@@ -29,6 +29,7 @@ struct Parser {
 	Ast* parse_command(Scope* scope);
 	Ast* parse_proc_call(Scope* scope);
 	Ast* parse_struct(Token* name, Scope* scope);
+	Ast* parse_directive(Scope* scope);
 
 	Precedence get_precedence_level(Token_Type type, bool postfixed, bool unary);
 	Precedence get_precedence_level(UnaryOperation uo, bool prefixed);

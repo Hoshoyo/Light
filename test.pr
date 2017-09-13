@@ -1,8 +1,15 @@
-//#include(user32.lib) MessageBoxA(hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> int;
+//#include("user32.lib") MessageBoxA(hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> int;
 
-proc :: () -> void
+proc :: () -> ^int
 {
-	a : ^int;
-	b : ^s64;
-	c : int = *a + *b;
+	{
+		a : ^int;
+		b : ^s64;
+		c : s64 = *a + *b;
+	}
+	{
+		a : ^int = &x;
+		b : ^int = &*a;
+		x : int = 0;
+	}
 }

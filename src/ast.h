@@ -34,6 +34,7 @@ enum Node_Type {
 	AST_NODE_CONTINUE_STATEMENT,
 	AST_NODE_STRUCT_DECLARATION,
 	AST_NODE_EXPRESSION_ASSIGNMENT,
+	AST_NODE_DIRECTIVE,
 };
 
 enum Precedence
@@ -250,6 +251,11 @@ struct Ast_Continue {
 	Expr_Site site;
 };
 
+struct Ast_Directive {
+	Ast* declaration;
+	Token* token;
+};
+
 struct Ast {
 	Node_Type node;
 	Type_Instance* return_type;
@@ -266,6 +272,7 @@ struct Ast {
 		Ast_Return ret_stmt;
 		Ast_Break break_stmt;
 		Ast_Continue continue_stmt;
+		Ast_Directive directive;
 
 		Ast_Expression expression;
 	};
@@ -309,6 +316,7 @@ Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, T
 Ast* create_break(Memory_Arena* arena, Scope* scope, Token* token);
 Ast* create_continue(Memory_Arena* arena, Scope* scope, Token* token);
 Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_fields, Scope* struct_scope, Decl_Site* site);
+Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* declaration);
 
 UnaryOperation get_unary_op(Token* token);
 BinaryOperation get_binary_op(Token* token);

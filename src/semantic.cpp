@@ -1010,14 +1010,17 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 				assert(res);
 				if (node->expression.unary_exp.operand->expression.is_lvalue) {
 					if (res->type == TYPE_POINTER) {
+						Type_Instance* coerced = req->pointer_to;
 						if (check_against && !types_equal(res->pointer_to, check_against)) {
-							report_semantic_type_mismatch(get_site_from_token(node->expression.unary_exp.op_token), check_against, res->pointer_to);
-							report_semantic_error(0, " on expression dereference.\n");
-							return -1;
+							coerced = do_type_coercion(res->pointer_to, check_against, true);
+							if (!coerced) {
+								report_semantic_type_mismatch(get_site_from_token(node->expression.unary_exp.op_token), check_against, res->pointer_to);
+								report_semantic_error(0, " on expression dereference.\n");
+								return -1;
+							}
 						}
-						if (required) *required = req;
-						if (result) *result = res;
-						node->return_type = res;
+						if (result) *result = coerced;
+						node->return_type = coerced;
 						if (res->pointer_to->type == TYPE_POINTER) {
 							node->expression.is_lvalue = true;
 						}
@@ -1032,11 +1035,31 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 				}
 			}break;
 			case UNARY_OP_ADDRESS_OF: {
-				assert(0);
+				Type_Instance* res = 0;
+				Type_Instance* req = 0;
+				int err = infer_node_expr_type(node->expression.unary_exp.operand, table, 0, &res, &req);
+				if (err) return err;
+				assert(res);
+				if (node->expression.unary_exp.operand->expression.is_lvalue) {
+					if (res->type == TYPE_POINTER && res->pointer_to->type == TYPE_POINTER) {
+						node->expression.is_lvalue = true;
+					}
+					if (check_against) {
+						assert(check_against->type == TYPE_POINTER);
+						if (types_equal(check_against->pointer_to, res)) {
+							if (required) *required = check_against;
+							if (result) *result = check_against;
+							node->return_type = check_against;
+							return 0;
+						}
+					}
+				} else {
+					report_semantic_error(get_site_from_token(node->expression.unary_exp.op_token), "Unary operator '%.*s' requires an lvalue operand.\n", TOKEN_STR(node->expression.unary_exp.op_token));
+					return -1;
+				}
 			}break;
 				/*
 			case UNARY_OP_VECTOR_ACCESS: assert(0); break;
-			
 			case UNARY_OP_CAST:				return node->expression.unary_exp.cast_type;
 				*/
 			}

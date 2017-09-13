@@ -615,9 +615,38 @@ Ast* Parser::parse_struct(Token* name, Scope* scope)
 	return struct_decl;
 }
 
+Ast* Parser::parse_directive(Scope* scope)
+{
+	Token* directive = lexer->eat_token();
+	if (directive->type == TOKEN_IDENTIFIER) {
+		if (str_equal(directive->value.data, directive->value.length, "include", sizeof("include") - 1)) {
+			// parse include directive
+			require_and_eat((Token_Type)'(');
+			Ast* lit = parse_literal();
+			if (lit->node != TOKEN_STRING_LITERAL) {
+				print_error_loc(stderr, filename, directive->line, directive->column);
+				report_syntax_error("directive '%.*s' requires library name as string literal as argument.\n", TOKEN_STR(directive));
+				return 0;
+			}
+
+			Ast* decl = parse_declaration(scope);
+			require_and_eat((Token_Type)')');
+			return decl;
+		}
+	} else {
+		print_error_loc(stderr, filename, directive->line, directive->column);
+		report_syntax_error("directive '%.*s' doest not exist.\n", TOKEN_STR(directive));
+		return 0;
+	}
+}
+
 Ast* Parser::parse_declaration(Scope* scope)
 {
 	Token* name = lexer->eat_token();
+	if (name->type == '#') {
+		return parse_directive(scope);
+	}
+
 	if (name->type != TOKEN_IDENTIFIER) {
 		print_error_loc(stderr, filename, name->line, name->column);
 		report_syntax_error("invalid identifier %.*s on declaration.\n", TOKEN_STR(name));

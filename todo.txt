@@ -6,3 +6,13 @@ proc :: () -> vec3
 }
 - check things like
 a : bool = !a;
+- allow 0 literal to be pointer type
+- check return in all paths, proc with no return clause and other commands is ignored when returning any non-void
+
+
+
+#IDEAS FOR CAST SYNTAX
+cast(type, value)
+cast(type) value
+value as type
+type from value
