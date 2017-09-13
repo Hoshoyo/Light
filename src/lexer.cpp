@@ -52,7 +52,6 @@ static int remove_comments(char** start, s64* col_ptr)
 		while (*at && !(*at == '\n' || *at == '\r')) {
 			at++;
 		}
-		at++;
 		column_ptr = 0;
 	}
 	else if (at[0] && at[0] == '/' && at[1] == '*') {
