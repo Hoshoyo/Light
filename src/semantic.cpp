@@ -1047,12 +1047,27 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 					}
 					if (check_against) {
 						//assert(check_against->type == TYPE_POINTER);
-						if (types_equal(check_against->pointer_to, res)) {
-							if (required) *required = check_against;
-							if (result) *result = check_against;
-							node->return_type = check_against;
-							return 0;
+						if (!types_equal(check_against->pointer_to, res)) {
+							report_semantic_type_mismatch(get_site_from_token(node->expression.unary_exp.op_token), check_against->pointer_to, res);
+							report_semantic_error(0, " on unary operator '%.*s'.\n", TOKEN_STR(node->expression.unary_exp.op_token));
+							return -1;
 						}
+						if (required) *required = check_against;
+						if (result) *result = check_against;
+						node->return_type = check_against;
+					} else {
+						Type_Instance* instance = new Type_Instance();
+						instance->type = TYPE_POINTER;
+						instance->flags = TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED | TYPE_FLAG_IS_REGISTER_SIZE;
+						instance->type_size = get_size_of_pointer();
+
+						instance->pointer_to = res;
+						res->flags |= TYPE_FLAG_NOT_DELETE;
+						create_type(&instance, true);
+
+						if (required) *required = instance;
+						if (result) *result = instance;
+						node->return_type = instance;
 					}
 					return 0;
 				} else {

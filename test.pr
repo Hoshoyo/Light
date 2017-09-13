@@ -4,6 +4,7 @@
 
 proc :: () -> ^int
 {
+
 	{
 		a : ^int;
 		b : ^s64;
@@ -11,10 +12,7 @@ proc :: () -> ^int
 	}
 	{
 		a : ^int = &x;
-
-
-
-		b : ^int = &(&*a);
+		b : ^int = *a;
 		x : int = 0;
 	}
 }
