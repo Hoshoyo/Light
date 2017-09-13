@@ -1,4 +1,6 @@
 //#include("user32.lib") MessageBoxA(hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> int;
+// haa
+// aygya
 
 proc :: () -> ^int
 {
@@ -9,7 +11,10 @@ proc :: () -> ^int
 	}
 	{
 		a : ^int = &x;
-		b : ^int = &*a;
+
+
+
+		b : ^int = &(&*a);
 		x : int = 0;
 	}
 }

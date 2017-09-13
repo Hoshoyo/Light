@@ -1040,12 +1040,13 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 				int err = infer_node_expr_type(node->expression.unary_exp.operand, table, 0, &res, &req);
 				if (err) return err;
 				assert(res);
-				if (node->expression.unary_exp.operand->expression.is_lvalue) {
+				Ast* operand = node->expression.unary_exp.operand;
+				if (operand->expression.is_lvalue || (operand->node == AST_NODE_UNARY_EXPRESSION && operand->expression.unary_exp.op == UNARY_OP_DEREFERENCE)) {
 					if (res->type == TYPE_POINTER && res->pointer_to->type == TYPE_POINTER) {
 						node->expression.is_lvalue = true;
 					}
 					if (check_against) {
-						assert(check_against->type == TYPE_POINTER);
+						//assert(check_against->type == TYPE_POINTER);
 						if (types_equal(check_against->pointer_to, res)) {
 							if (required) *required = check_against;
 							if (result) *result = check_against;
@@ -1053,6 +1054,7 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 							return 0;
 						}
 					}
+					return 0;
 				} else {
 					report_semantic_error(get_site_from_token(node->expression.unary_exp.op_token), "Unary operator '%.*s' requires an lvalue operand.\n", TOKEN_STR(node->expression.unary_exp.op_token));
 					return -1;
