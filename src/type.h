@@ -123,5 +123,7 @@ bool types_equal(Type_Instance* i1, Type_Instance* i2);
 int is_integer_type(Type_Instance* inst);
 int is_floating_point_type(Type_Instance* inst);
 
+//s64 get_type_size(Type_Instance* inst);
+
 void DEBUG_print_type_table();
 void DEBUG_print_node_type(FILE* out, Ast** ast, bool decl_only);

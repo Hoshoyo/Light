@@ -1,4 +1,3 @@
-- check single line comment giving error if # inside
 - do better errors in parser stage and check for end of stream
 - do better errors in semantic stage
 - check this code, detecting circular dependency
@@ -7,13 +6,14 @@ proc :: () -> vec3
 }
 - check things like
 a : bool = !a;
-- allow 0 literal to be pointer type
-- check return in all paths, proc with no return clause and other commands is ignored when returning any non-void
 
+- check return in all paths, proc with no return clause and other commands is ignored when returning any non-void
+- check for end of stream within comment
 
 
 #IDEAS FOR CAST SYNTAX
 cast(type, value)
 cast(type) value
 value as type
-type from value
+value -> type
+

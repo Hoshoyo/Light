@@ -115,6 +115,7 @@ struct Expr_Site {
 	int column;
 };
 
+const u32 PROC_DECL_FLAG_IS_EXTERNAL = FLAG(0);
 // declarations
 struct Ast_ProcDecl {
 	Token* name;
@@ -124,8 +125,9 @@ struct Ast_ProcDecl {
 	Type_Instance* proc_ret_type;
 	Type_Instance* proc_type;
 	Scope* scope;
+	void* external_runtime_address;
 	Decl_Site site;
-	u32 symbol_hash;
+	u32 flags;
 };
 struct Ast_VarDecl {
 	Token* name;
@@ -253,6 +255,7 @@ struct Ast_Continue {
 
 struct Ast_Directive {
 	Ast* declaration;
+	Ast* literal_argument;
 	Token* token;
 };
 
@@ -316,7 +319,7 @@ Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, T
 Ast* create_break(Memory_Arena* arena, Scope* scope, Token* token);
 Ast* create_continue(Memory_Arena* arena, Scope* scope, Token* token);
 Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_fields, Scope* struct_scope, Decl_Site* site);
-Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* declaration);
+Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* literal_argument, Ast* declaration);
 
 UnaryOperation get_unary_op(Token* token);
 BinaryOperation get_binary_op(Token* token);

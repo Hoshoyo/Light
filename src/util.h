@@ -23,11 +23,13 @@ struct string
 	bool is_mutable();
 };
 
+char* make_c_string(string& s);
 string make_new_string(const char*);
 string make_new_string(s64 capacity);
 void make_immutable_string(string& s, const char* val, s64 length);
 void make_immutable_string(string& s, const char* val);
 void make_immutable_string(string& dest, string& src);
+void make_immutable_string(string* s, const char* val);
 
 bool c_str_equal(const char* s1, const char* s2);
 bool str_equal(const char* s1, int s1_len, const char* s2, int s2_len);

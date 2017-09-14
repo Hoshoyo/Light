@@ -6,10 +6,10 @@
 #include "symbol_table.h"
 #include "semantic.h"
 #include "interpreter.h"
+#include "code_generator.h"
 
 int main(int argc, char** argv) {
-	//init_interpreter();
-	//run_interpreter();
+	
 
 	if (argc <= 1) {
 		fprintf(stderr, "No files were given.\nusage: prism [option ...] filename\n");
@@ -36,14 +36,18 @@ int main(int argc, char** argv) {
 	if (do_type_inference(ast, global_scope, &type_table) != 0) {
 		return -1;
 	}
-	//DEBUG_print_node_type(stdout, ast, true);
-	//if (do_type_check(ast, &type_table) == 0) {
-	//	return -1;
-	//}
-	printf("\n\nNumber of values in the infer queue = %d\n", get_arr_length(infer_queue));
+
 #if 1
-	//printf("\n\n");
-	//DEBUG_print_type_table();
+	init_interpreter();
+	generate_interpreter_code(ast);
+	run_interpreter();
+#endif
+
+#if 0
+	DEBUG_print_type_table();
+	//DEBUG_print_node_type(stdout, ast, true);
+	printf("\n\nNumber of values in the infer queue = %d\n", get_arr_length(infer_queue));
+	printf("\n\n");
 	printf("\n\n");
 	DEBUG_print_ast(stdout, ast);
 #endif

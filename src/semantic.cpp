@@ -5,7 +5,7 @@ static bool semantic_error = 0;
 static int scope_error = 0;
 static int declaration_ratio = 8;
 
-#define PRINT_SCOPE_INFO 1
+#define PRINT_SCOPE_INFO 0
 
 #define TOKEN_STR(X) X->value.length, X->value.data
 
@@ -107,6 +107,9 @@ static void report_declaration_site(Ast* node, char* message = 0) {
 int check_and_submit_declarations(Ast* node, Scope* scope) {
 	if (node->is_decl) {
 		switch (node->node) {
+		case AST_NODE_DIRECTIVE: {
+			return check_and_submit_declarations(node->directive.declaration, scope);
+		}break;
 		case AST_NODE_VARIABLE_DECL: {
 			assert(scope->symb_table);
 			//
@@ -122,6 +125,19 @@ int check_and_submit_declarations(Ast* node, Scope* scope) {
 			}
 		}break;
 		case AST_NODE_PROC_FORWARD_DECL: {
+			if (node->proc_decl.flags & PROC_DECL_FLAG_IS_EXTERNAL) {
+				//
+				// check if the proc decl is not redefined in the same scope
+				//
+				s64 hash = scope->symb_table->entry_exist(node->proc_decl.name);
+				if (hash == -1) {
+					hash = scope->symb_table->insert(scope, node->proc_decl.name, node);
+				} else {
+					report_semantic_error(&node->proc_decl.site, "External procedure %.*s redefinition.\n", node->proc_decl.name->value.length, node->proc_decl.name->value.data);
+					report_declaration_site(scope->symb_table->entries[hash].node);
+					return 0;
+				}
+			}
 			int num_args = node->proc_decl.num_args;
 			int error = DECL_CHECK_PASSED;
 			if (num_args > 0) {
@@ -145,7 +161,7 @@ int check_and_submit_declarations(Ast* node, Scope* scope) {
 			if (hash == -1) {
 				hash = scope->symb_table->insert(scope, node->proc_decl.name, node);
 			} else {
-				report_semantic_error(&node->proc_decl.site, "Variable %.*s redefinition.\n", node->proc_decl.name->value.length, node->proc_decl.name->value.data);
+				report_semantic_error(&node->proc_decl.site, "Procedure %.*s redefinition.\n", node->proc_decl.name->value.length, node->proc_decl.name->value.data);
 				report_declaration_site(scope->symb_table->entries[hash].node);
 				return 0;
 			}
@@ -1112,6 +1128,14 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 					node->expression.literal_exp.type = coerced;
 					node->return_type = coerced;
 				} else {
+					if (check_against->type == TYPE_POINTER && tok_type == TOKEN_INT_LITERAL) {
+						Token* lit = node->expression.literal_exp.lit_tok;
+						s64 value = str_to_s64(lit->value.data, lit->value.length);
+						if (value == 0) {
+							return 0;
+						}
+					}
+
 					char* lit_type = 0;
 					char lit_float[] = "floating point";
 					char lit_int[] = "integer";
@@ -1198,6 +1222,10 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 		node->return_type = get_primitive_type(TYPE_PRIMITIVE_VOID);
 		switch (node->node)
 		{
+			case AST_NODE_DIRECTIVE: {
+				return infer_node_decl_types(node->directive.declaration, table);
+			} break;
+
 			case AST_NODE_NAMED_ARGUMENT: {
 				if (node->named_arg.arg_type->flags & TYPE_FLAG_IS_RESOLVED) return 0;
 
@@ -1224,17 +1252,24 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 				s64 hash = scope->symb_table->entry_exist(node->proc_decl.name);
 				if (hash == -1) {
 					if (already_queued) {
-						// proc was not declared, since it came back here already queued and 
-						// the symbol table for the scope still does not contain the symbol
-						report_semantic_error(&node->proc_decl.site,  "'%.*s' procedure declaration does not have an equivalent with a body definition.\n", TOKEN_STR(node->proc_decl.name));
-						return -1;
+						if (!(node->proc_decl.flags & PROC_DECL_FLAG_IS_EXTERNAL)) {
+							// proc was not declared, since it came back here already queued and 
+							// the symbol table for the scope still does not contain the symbol
+							report_semantic_error(&node->proc_decl.site, "'%.*s' procedure declaration does not have an equivalent with a body definition.\n", TOKEN_STR(node->proc_decl.name));
+							return -1;
+						}
 					} else {
 						push_infer_queue(node);
 						return 1;
 					}
 				}
-				Ast* proc_def = scope->symb_table->entries[hash].node;
-				if (proc_def->proc_decl.proc_type && proc_def->proc_decl.proc_type->flags & TYPE_FLAG_IS_RESOLVED) {
+				Ast* proc_def = 0;
+				if (hash != -1)
+					proc_def = scope->symb_table->entries[hash].node;
+				else
+					proc_def = node;
+
+				if ((proc_def->proc_decl.proc_type && proc_def->proc_decl.proc_type->flags & TYPE_FLAG_IS_RESOLVED) || node->proc_decl.flags & PROC_DECL_FLAG_IS_EXTERNAL) {
 					// @COPY AND PASTE @FIX
 					bool infered = true;
 
@@ -1560,22 +1595,6 @@ int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 }
 
 /*
-// return 1 if passed
-// return 0 if failed
-int do_type_check(Ast** ast, Type_Table* table)
-{
-	int err = 1;
-	size_t num_nodes = get_arr_length(ast);
-	for (size_t i = 0; i < num_nodes; ++i) {
-		Ast* node = ast[i];
-		int ret = type_check_node(node, table);
-		if (ret == 0) {
-			err = 0;
-		}
-	}
-	return err;
-}
-
 
 // return 1 if passed
 // return 0 if failed

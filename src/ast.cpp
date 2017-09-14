@@ -75,10 +75,13 @@ Ast* create_proc(Memory_Arena* arena, Token* name, Type_Instance* return_type, A
 	proc->proc_decl.arguments = arguments;
 	proc->proc_decl.body = body;
 	proc->proc_decl.num_args = nargs;
+	proc->proc_decl.flags = 0;
 
 	proc->proc_decl.site.filename = site->filename;
 	proc->proc_decl.site.line = site->line;
 	proc->proc_decl.site.column = site->column;
+
+	proc->proc_decl.external_runtime_address = 0;
 
 	scope->decl_node = proc;
 
@@ -121,6 +124,7 @@ Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type,
 	vdecl->var_decl.alignment = 4;
 	vdecl->var_decl.assignment = assign_val;
 	vdecl->var_decl.type = type;
+	vdecl->var_decl.size_bytes = 0;
 	
 	vdecl->var_decl.site.filename = site->filename;
 	vdecl->var_decl.site.line = site->line;
@@ -352,7 +356,7 @@ Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_
 	return struct_decl;
 }
 
-Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* declaration)
+Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* literal_argument, Ast* declaration)
 {
 	Ast* directive = ALLOC_AST(arena);
 
@@ -364,6 +368,7 @@ Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* declarat
 
 	directive->directive.declaration = declaration;
 	directive->directive.token = directive_token;
+	directive->directive.literal_argument = literal_argument;
 
 	return directive;
 }

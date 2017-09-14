@@ -623,15 +623,17 @@ Ast* Parser::parse_directive(Scope* scope)
 			// parse include directive
 			require_and_eat((Token_Type)'(');
 			Ast* lit = parse_literal();
-			if (lit->node != TOKEN_STRING_LITERAL) {
+			if (lit->node != AST_NODE_LITERAL_EXPRESSION || lit->expression.literal_exp.lit_tok->type != TOKEN_STRING_LITERAL) {
 				print_error_loc(stderr, filename, directive->line, directive->column);
 				report_syntax_error("directive '%.*s' requires library name as string literal as argument.\n", TOKEN_STR(directive));
 				return 0;
 			}
-
-			Ast* decl = parse_declaration(scope);
 			require_and_eat((Token_Type)')');
-			return decl;
+			Ast* decl = parse_declaration(scope);
+			if (decl->node == AST_NODE_PROC_FORWARD_DECL) {
+				decl->proc_decl.flags |= PROC_DECL_FLAG_IS_EXTERNAL;
+			}
+			return create_directive(&arena, directive, lit, decl);
 		}
 	} else {
 		print_error_loc(stderr, filename, directive->line, directive->column);
@@ -676,7 +678,7 @@ Ast* Parser::parse_declaration(Scope* scope)
 		return vardecl;
 	}
 	else {
-		report_syntax_error("invalid declaration of '%.*s'\n", TOKEN_STR(name));
+		report_syntax_error("invalid declaration of '%.*s', declaration requires '::' or ':'\n", TOKEN_STR(name));
 		return 0;
 	}
 }

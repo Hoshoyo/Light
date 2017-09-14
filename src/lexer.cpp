@@ -224,6 +224,7 @@ bool Lexer::read_token(char** begin)
 	case '^': type = TOKEN_SYMBOL_CARAT;			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED; break;
 	case '~': type = TOKEN_SYMBOL_TILDE;			flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED;  break;
 	case '?': type = TOKEN_SYMBOL_INTERROGATION;	break;
+	case '#': type = TOKEN_SYMBOL_POUND;			break;
 
 	case '.': {
 		if (ch_2 == '.') {

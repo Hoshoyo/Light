@@ -283,6 +283,14 @@ void make_immutable_string(string& s, const char* val)
 	s.length = strlen(val);
 }
 
+void make_immutable_string(string* s, const char* val)
+{
+	s->capacity = -1;
+	// yes i dont give a damn I say when it is or it is'nt const
+	s->data = (char*)val;
+	s->length = strlen(val);
+}
+
 void make_immutable_string(string& dest, string& src)
 {
 	dest.capacity = -1;
@@ -319,4 +327,13 @@ u32 djb2_hash(u32 starting_hash, u8 *str, int size)
 u32 djb2_hash(u32 hash1, u32 hash2) {
 	u32 hash = ((hash1 << 5) + hash1) + hash2;
 	return hash;
+}
+
+char* make_c_string(string& s)
+{
+	if (s.length == 0) return 0;
+	char* mem = (char*)malloc(s.length + 1);
+	mem[s.length] = 0;
+	memcpy(mem, s.data, s.length);
+	return mem;
 }
