@@ -112,7 +112,12 @@ Ast* create_named_argument(Memory_Arena* arena, Token* name, Type_Instance* type
 
 Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* assign_val, Scope* scope, Decl_Site* site)
 {
-	Ast* vdecl = ALLOC_AST(arena);
+	Ast* vdecl = 0;
+	if (arena) {
+		vdecl = ALLOC_AST(arena);
+	} else {
+		vdecl = (Ast*)malloc(sizeof(Ast));
+	}
 
 	vdecl->node = AST_NODE_VARIABLE_DECL;
 	vdecl->is_decl = true;
@@ -332,7 +337,12 @@ Ast* create_continue(Memory_Arena* arena, Scope* scope, Token* token)
 
 Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_fields, Scope* struct_scope, Decl_Site* site)
 {
-	Ast* struct_decl = ALLOC_AST(arena);
+	Ast* struct_decl = 0;
+	if (arena) {
+		struct_decl = ALLOC_AST(arena);
+	} else {
+		struct_decl = (Ast*)malloc(sizeof(Ast));
+	}
 
 	struct_decl->is_decl = true;
 	struct_decl->node = AST_NODE_STRUCT_DECLARATION;

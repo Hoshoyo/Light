@@ -1,0 +1,15 @@
+print :: (data : string) -> void
+{
+}
+
+main :: () -> int {
+	print("Hello World");	
+	return 0;
+}
+/*
+main : () -> void {
+	
+}
+*/
+
+//var :: 2;

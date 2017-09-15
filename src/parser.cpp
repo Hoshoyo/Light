@@ -48,13 +48,11 @@ int Parser::require_token_type(Token* tok, Token_Type type)
 	return 0;
 }
 
-Ast** Parser::parse_top_level(Scope* global_scope) 
+Ast** Parser::parse_top_level(Scope* global_scope, Ast** top_level) 
 {
 	if (lexer->token_count == 1 && lexer->peek_token_type() == TOKEN_END_OF_STREAM) {
 		return 0;
 	}
-	top_level = create_array(Ast*, 2048);	// @todo estimate size here @important
-
 	parser_error = PARSER_NO_ERROR;
 	while (parser_error == PARSER_NO_ERROR && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
 		Ast* decl = parse_declaration(global_scope);

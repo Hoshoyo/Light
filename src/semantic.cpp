@@ -1120,7 +1120,7 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 				prim = get_primitive_type(TYPE_PRIMITIVE_BOOL);
 			}
 			else if (tok_type == TOKEN_STRING_LITERAL) {
-				assert(0);	// @todo
+				prim = get_string_type();
 			}
 			if (check_against) {
 				Type_Instance* coerced = do_type_coercion(prim, check_against, false);

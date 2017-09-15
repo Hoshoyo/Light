@@ -1,16 +1,104 @@
 #include "type.h"
 #include "lexer.h"
 #include "util.h"
+#include "ast.h"
 
-s32 get_size_of_primitive_type(Type_Primitive primitive);
+Type_Table type_table;
+static s64 DEBUG_type_entries[1024] = { 0 };
+static s64 DEBUG_type_index = 0;
+
+static Type_Instance* string_type;
+
+Type_Instance* create_ptr_typeof(Type_Instance* inst);
+
+void initialize_types(Scope* global_scope, Ast** ast)
+{
+	{
+		// string type
+		Type_Instance* str_ti = new Type_Instance();
+		str_ti->type = TYPE_STRUCT;
+		str_ti->flags = TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED | TYPE_FLAG_NOT_DELETE;
+		str_ti->type_size = 16;
+
+		str_ti->type_struct.name = "string";
+		str_ti->type_struct.name_length = sizeof("string") - 1;
+		str_ti->type_struct.fields_names = create_array(string, 2);
+		str_ti->type_struct.fields_types = create_array(Type_Instance*, 2);
+
+		Token* t = new Token();
+		t->column = 0;
+		t->line = 0;
+		string filename;
+		make_immutable_string(&filename, "internal_compiler");
+		t->filename = filename;
+		t->flags = 0;
+		t->type = TOKEN_IDENTIFIER;
+		string name;
+		make_immutable_string(&name, "string");
+		t->value = name;
+
+		Token* tlen = new Token();
+		tlen->column = 0;
+		tlen->line = 0;
+		tlen->filename = filename;
+		tlen->flags = 0;
+		tlen->type = TOKEN_IDENTIFIER;
+		string name_tlen;
+		make_immutable_string(&name_tlen, "length");
+		tlen->value = name_tlen;
+
+		Token* tdata = new Token();
+		tdata->column = 0;
+		tdata->line = 0;
+		tdata->filename = filename;
+		tdata->flags = 0;
+		tdata->type = TOKEN_IDENTIFIER;
+		string name_tdata;
+		make_immutable_string(&name_tdata, "data");
+		tdata->value = name_tdata;
+
+		Decl_Site decl_site;
+		decl_site.column = 0;
+		decl_site.line = 0;
+		decl_site.filename = filename;
+
+		Scope* struct_scope = create_scope(1, global_scope, SCOPE_FLAG_STRUCT_SCOPE);
+
+		Type_Instance* tlen_type = get_primitive_type(TYPE_PRIMITIVE_S64);
+		Type_Instance* tdata_type = create_ptr_typeof(get_primitive_type(TYPE_PRIMITIVE_S8));
+		push_array(str_ti->type_struct.fields_types, &tlen_type);
+		push_array(str_ti->type_struct.fields_types, &tdata_type);
+		push_array(str_ti->type_struct.fields_names, &name_tlen);
+		push_array(str_ti->type_struct.fields_names, &name_tdata);
+
+		Ast* str_field_length = create_variable_decl(0, tlen, tlen_type, 0, struct_scope, &decl_site);
+		Ast* str_field_data   = create_variable_decl(0, tdata, tdata_type, 0, struct_scope, &decl_site);
+		Ast** fields = create_array(Ast*, 2);
+		push_array(fields, &str_field_length);
+		push_array(fields, &str_field_data);
+
+		str_ti->type_struct.struct_descriptor = create_struct_decl(0, t, fields, 2, global_scope, &decl_site);
+
+		push_array(ast, &str_ti->type_struct.struct_descriptor);	// put string struct declaration in the AST
+		create_type(&str_ti, false);
+		string_type = str_ti;
+	}
+	{
+		// array type @TODO
+		Type_Instance* str_ti = new Type_Instance();
+		str_ti->type = TYPE_STRUCT;
+		str_ti->flags = TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED | TYPE_FLAG_NOT_DELETE;
+		str_ti->type_size = 16;
+	}
+}
 
 Type_Instance* get_primitive_type(Type_Primitive primitive_type)
 {
 	Type_Instance ti;
-	ti.flags = 0 | TYPE_FLAG_IS_REGISTER_SIZE | TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED;
 	ti.type = TYPE_PRIMITIVE;
-	ti.primitive = primitive_type;
-	ti.type_size = get_size_of_primitive_type(primitive_type);
+	//ti.flags = 0 | TYPE_FLAG_IS_REGISTER_SIZE | TYPE_FLAG_IS_RESOLVED | TYPE_FLAG_IS_SIZE_RESOLVED;
+	//ti.primitive = primitive_type;
+	//ti.type_size = get_size_of_primitive_type(primitive_type);
 	s64 hash = -1;
 	if (type_table.entry_exist(&ti, &hash)) {
 		return type_table.entries[hash].entry;
@@ -23,6 +111,10 @@ Type_Instance* get_primitive_type(Type_Primitive primitive_type)
 		create_type(&ti, true);
 		return ti;
 	}
+}
+
+Type_Instance* get_string_type() {
+	return string_type;
 }
 
 Type_Instance* create_ptr_typeof(Type_Instance* inst)
@@ -56,9 +148,6 @@ s32 get_size_of_primitive_type(Type_Primitive primitive) {
 	case TYPE_PRIMITIVE_VOID:	return 0;
 	}
 }
-Type_Table type_table;
-static s64 DEBUG_type_entries[1024] = { 0 };
-static s64 DEBUG_type_index = 0;
 
 u32 Type_Table::type_hash(Type_Instance* instance)
 {

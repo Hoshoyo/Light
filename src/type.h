@@ -3,6 +3,7 @@
 #include "lexer.h"
 
 struct Ast;
+struct Scope;
 
 enum Type_Primitive
 {
@@ -82,9 +83,6 @@ struct Type_Instance {
 	}
 };
 
-s32 get_size_of_pointer();
-s32 get_size_of_primitive_type(Type_Primitive primitive);
-
 struct Type_Table_Entry {
 	Type_Instance* entry;
 	bool used;
@@ -110,9 +108,14 @@ struct Type_Table {
 	Type_Instance* get_entry(s64 hash);
 };
 
-Type_Instance* get_primitive_type(Type_Primitive primitive_type);
-
 extern Type_Table type_table;
+
+s32 get_size_of_pointer();
+s32 get_size_of_primitive_type(Type_Primitive primitive);
+Type_Instance* get_primitive_type(Type_Primitive primitive_type);
+Type_Instance* get_string_type();
+
+void initialize_types(Scope* global_scope, Ast** ast);
 
 // creates a type entry on the table and returns its index
 s64 create_type(Type_Instance** instance, bool swap_and_delete);
@@ -123,7 +126,7 @@ bool types_equal(Type_Instance* i1, Type_Instance* i2);
 int is_integer_type(Type_Instance* inst);
 int is_floating_point_type(Type_Instance* inst);
 
-//s64 get_type_size(Type_Instance* inst);
+s32 get_size_of_primitive_type(Type_Primitive primitive);
 
 void DEBUG_print_type_table();
 void DEBUG_print_node_type(FILE* out, Ast** ast, bool decl_only);

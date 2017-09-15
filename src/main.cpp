@@ -23,9 +23,12 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	Parser parser(&lexer);
 	Scope* global_scope = create_scope(0, 0, 0);
-	Ast** ast = parser.parse_top_level(global_scope);
+	Ast** ast = create_array(Ast*, 2048);	// @todo estimate size here @important
+	initialize_types(global_scope, ast);
+
+	Parser parser(&lexer);
+	ast = parser.parse_top_level(global_scope, ast);
 	if (ast == 0) {
 		// file is empty
 		return -1; 
@@ -37,17 +40,17 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-#if 1
+#if 0
 	init_interpreter();
 	generate_interpreter_code(ast);
 	run_interpreter();
 #endif
 
-#if 0
+#if 1
+	printf("\n\n");
 	DEBUG_print_type_table();
 	//DEBUG_print_node_type(stdout, ast, true);
 	printf("\n\nNumber of values in the infer queue = %d\n", get_arr_length(infer_queue));
-	printf("\n\n");
 	printf("\n\n");
 	DEBUG_print_ast(stdout, ast);
 #endif
