@@ -125,6 +125,8 @@ bool types_equal(Type_Instance* i1, Type_Instance* i2);
 // return 1 if signed 2 if unsigned 0 if not integer type
 int is_integer_type(Type_Instance* inst);
 int is_floating_point_type(Type_Instance* inst);
+int is_boolean_type(Type_Instance* inst);
+int is_pointer_type(Type_Instance* inst);
 
 s32 get_size_of_primitive_type(Type_Primitive primitive);
 

@@ -376,6 +376,24 @@ int is_floating_point_type(Type_Instance* inst) {
 	return 0;
 }
 
+int is_boolean_type(Type_Instance* inst) {
+	if (!inst) return 0;
+	if (inst->type == TYPE_PRIMITIVE) {
+		if (inst->primitive == TYPE_PRIMITIVE_BOOL) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int is_pointer_type(Type_Instance* inst) {
+	if (!inst) return 0;
+	if (inst->type == TYPE_POINTER) {
+		return 1;
+	}
+	return 0;
+}
+
 #include "ast.h"
 void DEBUG_print_type_table()
 {

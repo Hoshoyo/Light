@@ -10,6 +10,9 @@ a : bool = !a;
 - check return in all paths, proc with no return clause and other commands is ignored when returning any non-void
 - check for end of stream within comment
 - dereference pointer on . operator
+- pointer arithmetic
+- assignment operators
+- do pointer arithmetic
 
 #IDEAS FOR CAST SYNTAX
 cast(type, value)

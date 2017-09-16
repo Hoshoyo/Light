@@ -210,6 +210,7 @@ Precedence Parser::get_precedence_level(BinaryOperation bo)
 	case ASSIGNMENT_OPERATION_MINUS_EQUAL:	p = PRECEDENCE_0; break;
 	case ASSIGNMENT_OPERATION_TIMES_EQUAL:	p = PRECEDENCE_0; break;
 	case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:	p = PRECEDENCE_0; break;
+	case ASSIGNMENT_OPERATION_MOD_EQUAL:	p = PRECEDENCE_0; break;
 	case ASSIGNMENT_OPERATION_AND_EQUAL:	p = PRECEDENCE_0; break;
 	case ASSIGNMENT_OPERATION_OR_EQUAL:		p = PRECEDENCE_0; break;
 	case ASSIGNMENT_OPERATION_XOR_EQUAL:	p = PRECEDENCE_0; break;
@@ -457,7 +458,7 @@ Ast* Parser::parse_command(Scope* scope)
 		require_and_eat((Token_Type)';');
 	}
 	else if (first->type == (Token_Type)'}') {
-		command = create_return(&arena, 0, scope, first);
+		return 0;
 	}
 	else {
 		command = parse_expression(scope);
@@ -478,7 +479,7 @@ Ast* Parser::parse_block(Scope* scope)
 	Token* next = 0;
 	do {
 		Ast* command = parse_command(block->block.scope);
-		if (!command) return 0;
+		if (!command) break;
 		block_push_command(block, command);
 		next = lexer->peek_token();
 	} while (next->type != '}');
@@ -603,7 +604,7 @@ Ast* Parser::parse_struct(Token* name, Scope* scope)
 		report_syntax_error("invalid identifier %.*s on struct declaration.\n", TOKEN_STR(name));
 		return 0;
 	}
-	require_and_eat(TOKEN_COLON_COLON);
+	require_and_eat((Token_Type)':');
 	require_and_eat(TOKEN_STRUCT_WORD);
 	require_and_eat(TOKEN_SYMBOL_OPEN_BRACE);
 
@@ -671,30 +672,19 @@ Ast* Parser::parse_declaration(Scope* scope)
 
 	Token* decl = lexer->peek_token();
 	
-	if (decl->type == TOKEN_COLON_COLON) {
-		if (lexer->peek_token_type(1) == TOKEN_STRUCT_WORD) {
-			// id :: struct {}
-			return parse_struct(name, scope);
-		} else {
-			Token* t = lexer->peek_token(1);
-			print_error_loc(stderr, filename, t->line, t->column);
-			report_syntax_error("invalid token '%.*s' on declaration site of %.*s.\n", TOKEN_STR(t), TOKEN_STR(name));
-			return 0;
-		}
-	} 
-	else if (decl->type == (Token_Type)':') {
-		// id :: type;
-		if (lexer->peek_token_type(1) == (Token_Type)'(') {
-			// id : () {}
+	if (decl->type == (Token_Type)':') {
+		Token* next = lexer->peek_token(1);
+		if (next->type == (Token_Type)'(') {
 			return parse_proc_decl(name, scope);
+		} else if (next->type == TOKEN_STRUCT_WORD) {
+			return parse_struct(name, scope);
 		} else {
 			Ast* vardecl = parse_variable_decl(name, scope);
 			require_and_eat((Token_Type)';');
 			return vardecl;
 		}
-	}
-	else {
-		report_syntax_error("invalid declaration of '%.*s', declaration requires '::' or ':'\n", TOKEN_STR(name));
+	} else {
+		report_syntax_error("invalid declaration of '%.*s', declaration requires ':'\n", TOKEN_STR(name));
 		return 0;
 	}
 }

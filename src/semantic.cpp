@@ -576,11 +576,53 @@ Ast* get_struct_field(Ast* struct_decl, Token* name) {
 	return 0;
 }
 
+int check_assignment_types(Type_Instance* left, Type_Instance* right, Ast* binop)
+{
+	Type_Instance* coerced = left;
+	if (!types_equal(left, right)) {
+		coerced = do_type_coercion(right, left, true);
+		if (!coerced) {
+			report_semantic_type_mismatch(get_site_from_token(binop->expression.binary_exp.op_token), left, right);
+			report_semantic_error(0, " on ninary operator '%.*s'\n", TOKEN_STR(binop->expression.binary_exp.op_token));
+			return -1;
+		}
+	}
+	switch (binop->expression.binary_exp.op) {
+		case ASSIGNMENT_OPERATION_EQUAL:		return 0;
+		case ASSIGNMENT_OPERATION_PLUS_EQUAL:
+		case ASSIGNMENT_OPERATION_MINUS_EQUAL:
+		case ASSIGNMENT_OPERATION_TIMES_EQUAL:
+		case ASSIGNMENT_OPERATION_MOD_EQUAL:
+		case ASSIGNMENT_OPERATION_DIVIDE_EQUAL: {
+			// @TODO POINTER TYPE HERE when pointer arithmetic is done
+			if (is_integer_type(coerced) || is_floating_point_type(coerced)) {
+				return 0;
+			} else {
+				report_semantic_error(get_site_from_token(binop->expression.binary_exp.op_token), "Binary operator '%.*s' requires numeric type.\n", TOKEN_STR(binop->expression.binary_exp.op_token));
+				return -1;
+			}
+		}break;
+		case ASSIGNMENT_OPERATION_AND_EQUAL:
+		case ASSIGNMENT_OPERATION_OR_EQUAL:
+		case ASSIGNMENT_OPERATION_XOR_EQUAL:
+		case ASSIGNMENT_OPERATION_SHL_EQUAL:
+		case ASSIGNMENT_OPERATION_SHR_EQUAL: {
+			if (is_integer_type(coerced)) {
+				return 0;
+			} else {
+				report_semantic_error(get_site_from_token(binop->expression.binary_exp.op_token), "Binary operator '%.*s' requires integer type.\n", TOKEN_STR(binop->expression.binary_exp.op_token));
+				return -1;
+			}
+		}break;
+	}
+	assert(0);
+}
+
 int infer_node_decl_types(Ast* node, Type_Table* table);
 
 int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_against, Type_Instance** result = 0, Type_Instance** required = 0);
 
-int infer_dot_op(Ast* struct_decl, Ast* var_decl, Ast *node_right, int level, Type_Instance** result);
+int infer_dot_op(Ast* struct_decl, Ast *node_right, int level, Type_Instance** result);
 
 // return 0 if success
 // return 1 if could not infer
@@ -787,7 +829,9 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 
 		Type_Instance* bool_type = get_primitive_type(TYPE_PRIMITIVE_BOOL);
 		if (l == 0 && r == 0) {
-			if ((is_integer_type(left) && is_integer_type(right)) || (is_floating_point_type(left) && is_floating_point_type(right))) {
+			bool equal_or_not_equal = (node->expression.binary_exp.op == BINARY_OP_NOT_EQUAL || node->expression.binary_exp.op == BINARY_OP_EQUAL_EQUAL);
+			if ((is_integer_type(left) && is_integer_type(right)) || (is_floating_point_type(left) && is_floating_point_type(right)) 
+				|| (equal_or_not_equal && is_boolean_type(left) && is_boolean_type(right)) || (is_pointer_type(left) && is_pointer_type(right))) {
 				if (types_equal(left, right)) {
 					if (left->flags & TYPE_FLAG_IS_RESOLVED) {
 						node->return_type = bool_type;
@@ -840,8 +884,7 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 				node->return_type = bool_type;
 				if (result) *result = bool_type;
 				return 0;
-			}
-			else {
+			} else {
 				report_semantic_error(get_site_from_token(node->expression.binary_exp.op_token), "binary operator '%.*s' requires numeric type.\n", TOKEN_STR(node->expression.binary_exp.op_token));
 				return -1;
 			}
@@ -860,8 +903,9 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 				report_semantic_error(get_site_from_token(node->expression.binary_exp.op_token), "left side of binary operation '.' does not evaluate to a struct.\n");
 				return -1;
 			}
-			err = infer_dot_op(res->type_struct.struct_descriptor, 0, node->expression.binary_exp.right, 0, &res);
+			err = infer_dot_op(res->type_struct.struct_descriptor, node->expression.binary_exp.right, 0, &res);
 			node->return_type = res;
+			node->expression.is_lvalue = true;
 			return err;
 		}
 
@@ -888,7 +932,7 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 		Ast* struct_decl = var_decl->var_decl.type->type_struct.struct_descriptor;
 
 		Type_Instance* res;
-		int err = infer_dot_op(struct_decl, var_decl, node->expression.binary_exp.right, 0, &res);
+		int err = infer_dot_op(struct_decl, node->expression.binary_exp.right, 0, &res);
 		if (err) return err;
 
 		if (check_against) {
@@ -904,6 +948,7 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 		if (result) *result = res;
 		if (required) *required = res;
 		node->return_type = res;
+		node->expression.is_lvalue = true;
 		return 0;
 	}break;
 
@@ -912,17 +957,33 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 	case ASSIGNMENT_OPERATION_MINUS_EQUAL:
 	case ASSIGNMENT_OPERATION_TIMES_EQUAL:
 	case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:
+	case ASSIGNMENT_OPERATION_MOD_EQUAL:
 	case ASSIGNMENT_OPERATION_AND_EQUAL:
 	case ASSIGNMENT_OPERATION_OR_EQUAL:
 	case ASSIGNMENT_OPERATION_XOR_EQUAL:
 	case ASSIGNMENT_OPERATION_SHL_EQUAL:
 	case ASSIGNMENT_OPERATION_SHR_EQUAL: {
-		assert(0);
-	} break;
+		Type_Instance* result_left = 0;
+		Type_Instance* result_right = 0;
+		Ast *left = node->expression.binary_exp.left;
+		Ast* right = node->expression.binary_exp.right;
+		int err = infer_node_expr_type(left, table, 0, &result_left, 0);
+		if (err) return err;
+		if (left->expression.is_lvalue) {
+			err = infer_node_expr_type(right, table, result_left, &result_right, 0);
+			if (err) return err;
+		} else {
+			report_semantic_error(get_site_from_token(node->expression.binary_exp.op_token), "Assignment operator '%.*s' requires an lvalue as left operand.\n", TOKEN_STR(node->expression.binary_exp.op_token));
+			return -1;
+		}
+		err = check_assignment_types(result_left, result_right, node);
+		return err;
+	}break;
+	
 	}
 }
 
-int infer_dot_op(Ast* struct_decl, Ast* var_declaaa, Ast *node_right, int level, Type_Instance** result)
+int infer_dot_op(Ast* struct_decl, Ast *node_right, int level, Type_Instance** result)
 {
 	// @TODO go through pointers and dereference them
 	if (node_right->node == AST_NODE_BINARY_EXPRESSION) {
@@ -948,7 +1009,7 @@ int infer_dot_op(Ast* struct_decl, Ast* var_declaaa, Ast *node_right, int level,
 		node_right->return_type = field->var_decl.type;
 
 		struct_decl = field->var_decl.type->type_struct.struct_descriptor;
-		return infer_dot_op(struct_decl, field, right, level + 1, result);
+		return infer_dot_op(struct_decl, right, level + 1, result);
 	}
 
 	// @CHECK maybe loop through field names
@@ -965,6 +1026,7 @@ int infer_dot_op(Ast* struct_decl, Ast* var_declaaa, Ast *node_right, int level,
 		return 1;
 	}
 	node_right->return_type = field->var_decl.type;
+	node_right->expression.is_lvalue = true;
 	if(result) *result = field->var_decl.type;
 	return 0;
 }
@@ -1159,9 +1221,9 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 						}
 						if (result) *result = coerced;
 						node->return_type = coerced;
-						if (res->pointer_to->type == TYPE_POINTER) {
+						//if (res->pointer_to->type == TYPE_POINTER) {
 							node->expression.is_lvalue = true;
-						}
+						//}
 						return 0;
 					} else {
 						report_semantic_error(get_site_from_token(node->expression.unary_exp.op_token), "Unary operator '%.*s' requires a pointer type.\n", TOKEN_STR(node->expression.unary_exp.op_token));
@@ -1180,9 +1242,9 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 				assert(res);
 				Ast* operand = node->expression.unary_exp.operand;
 				if (operand->expression.is_lvalue || (operand->node == AST_NODE_UNARY_EXPRESSION && operand->expression.unary_exp.op == UNARY_OP_DEREFERENCE)) {
-					if (res->type == TYPE_POINTER && res->pointer_to->type == TYPE_POINTER) {
+					//if (res->type == TYPE_POINTER && res->pointer_to->type == TYPE_POINTER) {
 						node->expression.is_lvalue = true;
-					}
+					//}
 					if (check_against) {
 						//assert(check_against->type == TYPE_POINTER);
 						if (!types_equal(check_against->pointer_to, res)) {
@@ -1273,7 +1335,7 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 					}
 
 					report_semantic_type_mismatch(get_site_from_token(node->expression.literal_exp.lit_tok), check_against, prim);
-					report_semantic_error(0, " literal '%.*s' of %s type ", TOKEN_STR(node->expression.literal_exp.lit_tok), lit_type);
+					report_semantic_error(0, ", literal '%.*s' of %s type ", TOKEN_STR(node->expression.literal_exp.lit_tok), lit_type);
 					report_semantic_error(0, "does not coerce to type ");
 					DEBUG_print_type(stderr, check_against, true);
 

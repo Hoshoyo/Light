@@ -54,6 +54,7 @@ BinaryOperation get_binary_op(Token* token)
 	case TOKEN_XOR_EQUAL:			return ASSIGNMENT_OPERATION_XOR_EQUAL;
 	case TOKEN_SHL_EQUAL:			return ASSIGNMENT_OPERATION_SHL_EQUAL;
 	case TOKEN_SHR_EQUAL:			return ASSIGNMENT_OPERATION_SHR_EQUAL;
+	case TOKEN_MOD_EQUAL:			return ASSIGNMENT_OPERATION_MOD_EQUAL;
 	}
 }
 
@@ -148,6 +149,7 @@ Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok)
 	lit->type_checked = false;
 
 	lit->expression.expression_type = EXPRESSION_TYPE_LITERAL;
+	lit->expression.is_lvalue = false;
 	lit->expression.literal_exp.flags = flags;
 	lit->expression.literal_exp.lit_tok = lit_tok;
 	lit->expression.literal_exp.type = 0;
@@ -164,6 +166,7 @@ Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, T
 	binop->type_checked = false;
 
 	binop->expression.expression_type = EXPRESSION_TYPE_BINARY;
+	binop->expression.is_lvalue = false;
 	binop->expression.binary_exp.left = left_op;
 	binop->expression.binary_exp.right = right_op;
 	binop->expression.binary_exp.op = get_binary_op(op);
@@ -288,6 +291,7 @@ Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation o
 	unop->type_checked = false;
 
 	unop->expression.expression_type = EXPRESSION_TYPE_UNARY;
+	unop->expression.is_lvalue = 0;
 	unop->expression.unary_exp.op = op;
 	unop->expression.unary_exp.op_token = token;
 	unop->expression.unary_exp.operand = operand;
@@ -524,35 +528,36 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 		fprintf(out, "(");
 		DEBUG_print_expression(out, node->expression.binary_exp.left);
 		switch (node->expression.binary_exp.op) {
-		case BINARY_OP_PLUS:			 fprintf(out, "+"); break;
-		case BINARY_OP_MINUS:			 fprintf(out, "-"); break;
-		case BINARY_OP_MULT:			 fprintf(out, "*"); break;
-		case BINARY_OP_DIV:				 fprintf(out, "/"); break;
-		case BINARY_OP_AND:				 fprintf(out, "&"); break;
-		case BINARY_OP_OR:				 fprintf(out, "|"); break;
-		case BINARY_OP_XOR:				 fprintf(out, "^"); break;
-		case BINARY_OP_MOD:				 fprintf(out, "%"); break;
-		case BINARY_OP_LOGIC_AND:		 fprintf(out, "&&"); break;
-		case BINARY_OP_LOGIC_OR:		 fprintf(out, "||"); break;
-		case BINARY_OP_BITSHIFT_LEFT:	 fprintf(out, "<<"); break;
-		case BINARY_OP_BITSHIFT_RIGHT:	 fprintf(out, ">>"); break;
-		case BINARY_OP_LESS_THAN:		 fprintf(out, "<"); break;
-		case BINARY_OP_GREATER_THAN:	 fprintf(out, ">"); break;
-		case BINARY_OP_LESS_EQUAL:		 fprintf(out, "<="); break;
-		case BINARY_OP_GREATER_EQUAL:	 fprintf(out, ">="); break;
-		case BINARY_OP_EQUAL_EQUAL:		 fprintf(out, "=="); break;
-		case BINARY_OP_NOT_EQUAL:		 fprintf(out, "!="); break;
+		case BINARY_OP_PLUS:			 fprintf(out, " + "); break;
+		case BINARY_OP_MINUS:			 fprintf(out, " - "); break;
+		case BINARY_OP_MULT:			 fprintf(out, " * "); break;
+		case BINARY_OP_DIV:				 fprintf(out, " / "); break;
+		case BINARY_OP_AND:				 fprintf(out, " & "); break;
+		case BINARY_OP_OR:				 fprintf(out, " | "); break;
+		case BINARY_OP_XOR:				 fprintf(out, " ^ "); break;
+		case BINARY_OP_MOD:				 fprintf(out, " %% "); break;
+		case BINARY_OP_LOGIC_AND:		 fprintf(out, " && "); break;
+		case BINARY_OP_LOGIC_OR:		 fprintf(out, " || "); break;
+		case BINARY_OP_BITSHIFT_LEFT:	 fprintf(out, " << "); break;
+		case BINARY_OP_BITSHIFT_RIGHT:	 fprintf(out, " >> "); break;
+		case BINARY_OP_LESS_THAN:		 fprintf(out, " < "); break;
+		case BINARY_OP_GREATER_THAN:	 fprintf(out, " > "); break;
+		case BINARY_OP_LESS_EQUAL:		 fprintf(out, " <= "); break;
+		case BINARY_OP_GREATER_EQUAL:	 fprintf(out, " >= "); break;
+		case BINARY_OP_EQUAL_EQUAL:		 fprintf(out, " == "); break;
+		case BINARY_OP_NOT_EQUAL:		 fprintf(out, " != "); break;
 		case BINARY_OP_DOT:				 fprintf(out, "."); break;
-		case ASSIGNMENT_OPERATION_EQUAL:		fprintf(out, "="); break;
-		case ASSIGNMENT_OPERATION_PLUS_EQUAL:	fprintf(out, "+="); break;
-		case ASSIGNMENT_OPERATION_MINUS_EQUAL:	fprintf(out, "-="); break;
-		case ASSIGNMENT_OPERATION_TIMES_EQUAL:	fprintf(out, "*="); break;
-		case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:	fprintf(out, "/="); break;
-		case ASSIGNMENT_OPERATION_AND_EQUAL:	fprintf(out, "&="); break;
-		case ASSIGNMENT_OPERATION_OR_EQUAL:		fprintf(out, "|="); break;
-		case ASSIGNMENT_OPERATION_XOR_EQUAL:	fprintf(out, "^="); break;
-		case ASSIGNMENT_OPERATION_SHL_EQUAL:	fprintf(out, "<<="); break;
-		case ASSIGNMENT_OPERATION_SHR_EQUAL:	fprintf(out, ">>="); break;
+		case ASSIGNMENT_OPERATION_EQUAL:		fprintf(out, " = "); break;
+		case ASSIGNMENT_OPERATION_PLUS_EQUAL:	fprintf(out, " += "); break;
+		case ASSIGNMENT_OPERATION_MINUS_EQUAL:	fprintf(out, " -= "); break;
+		case ASSIGNMENT_OPERATION_TIMES_EQUAL:	fprintf(out, " *= "); break;
+		case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:	fprintf(out, " /= "); break;
+		case ASSIGNMENT_OPERATION_MOD_EQUAL:	fprintf(out, " %%= "); break;
+		case ASSIGNMENT_OPERATION_AND_EQUAL:	fprintf(out, " &= "); break;
+		case ASSIGNMENT_OPERATION_OR_EQUAL:		fprintf(out, " |= "); break;
+		case ASSIGNMENT_OPERATION_XOR_EQUAL:	fprintf(out, " ^= "); break;
+		case ASSIGNMENT_OPERATION_SHL_EQUAL:	fprintf(out, " <<= "); break;
+		case ASSIGNMENT_OPERATION_SHR_EQUAL:	fprintf(out, " >>= "); break;
 		}
 		DEBUG_print_expression(out, node->expression.binary_exp.right);
 		fprintf(out, ")");

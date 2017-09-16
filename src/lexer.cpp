@@ -217,15 +217,42 @@ bool Lexer::read_token(char** begin)
 	case ')': type = TOKEN_SYMBOL_CLOSE_PAREN;		break;
 	case ',': type = TOKEN_SYMBOL_COMMA;			break;
 	case ';': type = TOKEN_SYMBOL_SEMICOLON;		break;
-	case '*': type = TOKEN_SYMBOL_TIMES;			flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED; break;
-	case '%': type = TOKEN_SYMBOL_MOD;				flags |= TOKEN_FLAG_BINARY_OPERATOR; break;
 	case '@': type = TOKEN_SYMBOL_AT;				break;
 	case '$': type = TOKEN_SYMBOL_DOLLAR;			break;
-	case '^': type = TOKEN_SYMBOL_CARAT;			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED; break;
 	case '~': type = TOKEN_SYMBOL_TILDE;			flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED;  break;
 	case '?': type = TOKEN_SYMBOL_INTERROGATION;	break;
 	case '#': type = TOKEN_SYMBOL_POUND;			break;
 
+	case '%': {
+		if (ch_2 == '=') {
+			type = TOKEN_MOD_EQUAL;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			length = 2;
+		} else {
+			type = TOKEN_SYMBOL_MOD;
+		}
+		flags |= TOKEN_FLAG_BINARY_OPERATOR;
+	}break;
+	case '*': {
+		if (ch_2 == '=') {
+			type = TOKEN_TIMES_EQUAL;
+			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			length = 2;
+		} else {
+			type = TOKEN_SYMBOL_TIMES;
+			flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED;
+		}
+	}break;
+	case '^': {
+		if (ch_2 == '=') {
+			type = TOKEN_XOR_EQUAL;
+			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			length = 2;
+		} else {
+			type = TOKEN_SYMBOL_CARAT;
+			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED;
+		}
+	}break;
 	case '.': {
 		if (ch_2 == '.') {
 			type = TOKEN_DOUBLE_DOT;
@@ -241,9 +268,8 @@ bool Lexer::read_token(char** begin)
 		if (ch_2 == '=') {
 			type = TOKEN_DIV_EQUAL;
 			length = 2;
-			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
-		}
-		else {
+			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+		} else {
 			flags |= TOKEN_FLAG_BINARY_OPERATOR;
 			type = TOKEN_SYMBOL_DIV;
 		}
@@ -252,12 +278,7 @@ bool Lexer::read_token(char** begin)
 	case '+': {
 		if (ch_2 == '=') {
 			type = TOKEN_PLUS_EQUAL;
-			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
-			length = 2;
-		}
-		else if (ch_2 == '+') {
-			type = TOKEN_PLUS_PLUS;
-			flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED | TOKEN_FLAG_UNARY_POSTFIXED;
+			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 			length = 2;
 		}
 		else {
@@ -273,12 +294,7 @@ bool Lexer::read_token(char** begin)
 		}
 		else if (ch_2 == '=') {
 			type = TOKEN_MINUS_EQUAL;
-			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
-			length = 2;
-		}
-		else if (ch_2 == '-') {
-			type = TOKEN_MINUS_MINUS;
-			flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED | TOKEN_FLAG_UNARY_POSTFIXED;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR | TOKEN_FLAG_BINARY_OPERATOR;
 			length = 2;
 		}
 		else {
@@ -302,10 +318,16 @@ bool Lexer::read_token(char** begin)
 		if (ch_2 == '=') {
 			type = TOKEN_LESS_EQUAL;
 			length = 2;
-		}
+		} 
 		else if (ch_2 == '<') {
-			type = TOKEN_BITSHIFT_LEFT;
-			length = 2;
+			if (at[2] && at[2] == '=') {
+				type = TOKEN_SHL_EQUAL;
+				length = 3;
+				flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			} else {
+				type = TOKEN_BITSHIFT_LEFT;
+				length = 2;
+			}
 		}
 		else type = TOKEN_SYMBOL_LESS;
 		flags |= TOKEN_FLAG_BINARY_OPERATOR;
@@ -316,8 +338,14 @@ bool Lexer::read_token(char** begin)
 			length = 2;
 		}
 		else if (ch_2 == '>') {
-			type = TOKEN_BITSHIFT_RIGHT;
-			length = 2;
+			if (at[2] && at[2] == '=') {
+				type = TOKEN_SHR_EQUAL;
+				length = 3;
+				flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			} else {
+				type = TOKEN_BITSHIFT_RIGHT;
+				length = 2;
+			}
 		}
 		else type = TOKEN_SYMBOL_GREATER;
 		flags |= TOKEN_FLAG_BINARY_OPERATOR;
@@ -344,7 +372,7 @@ bool Lexer::read_token(char** begin)
 		else if (ch_2 == '=') {
 			type = TOKEN_OR_EQUAL;
 			length = 2;
-			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR | TOKEN_FLAG_BINARY_OPERATOR;
 		}
 		else {
 			type = TOKEN_SYMBOL_PIPE;
@@ -361,7 +389,7 @@ bool Lexer::read_token(char** begin)
 		else if (ch_2 == '=') {
 			type = TOKEN_AND_EQUAL;
 			length = 2;
-			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR | TOKEN_FLAG_BINARY_OPERATOR;
 		}
 		else {
 			type = TOKEN_SYMBOL_AND;
