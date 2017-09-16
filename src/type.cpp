@@ -77,7 +77,10 @@ void initialize_types(Scope* global_scope, Ast** ast)
 		push_array(fields, &str_field_length);
 		push_array(fields, &str_field_data);
 
-		str_ti->type_struct.struct_descriptor = create_struct_decl(0, t, fields, 2, global_scope, &decl_site);
+		str_ti->type_struct.struct_descriptor = create_struct_decl(0, t, fields, 2, struct_scope, &decl_site);
+		global_scope->num_declarations += 1;
+		struct_scope->decl_node = str_ti->type_struct.struct_descriptor;
+		struct_scope->num_declarations = 2;
 
 		push_array(ast, &str_ti->type_struct.struct_descriptor);	// put string struct declaration in the AST
 		create_type(&str_ti, false);
@@ -313,12 +316,35 @@ void delete_type(Type_Instance* instance)
 	}
 }
 
+void mark_non_delete(Type_Instance* instance) {
+	instance->flags |= TYPE_FLAG_NOT_DELETE;
+	switch (instance->type) {
+	case TYPE_PRIMITIVE: break;
+	case TYPE_POINTER:   mark_non_delete(instance->pointer_to); break;
+	case TYPE_ARRAY: {
+		assert(0);	// @todo
+	}break;
+	case TYPE_STRUCT: {
+		int num_field = get_arr_length(instance->type_struct.fields_types);
+		for (int i = 0; i < num_field; ++i)
+			mark_non_delete(instance->type_struct.fields_types[i]);
+	}break;
+	case TYPE_FUNCTION: {
+		int num_args = instance->type_function.num_arguments;
+		for (int i = 0; i < num_args; ++i)
+			mark_non_delete(instance->type_function.arguments_type[i]);
+		mark_non_delete(instance->type_function.return_type);
+	}break;
+	}
+}
+
 s64 create_type(Type_Instance** instance, bool swap_and_delete)
 {
 	s64 index = 0;
 	if (!type_table.entry_exist(*instance, &index)) {
 		// if there is no entry for this type, then fill it
 		type_table.insert_type(*instance, &index);
+		mark_non_delete(*instance);
 	} else {
 		// if there is then swap it
 		if (swap_and_delete && type_table.entries[index].entry != *instance) {

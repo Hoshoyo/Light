@@ -9,8 +9,6 @@
 #include "code_generator.h"
 
 int main(int argc, char** argv) {
-	
-
 	if (argc <= 1) {
 		fprintf(stderr, "No files were given.\nusage: prism [option ...] filename\n");
 		return -1;

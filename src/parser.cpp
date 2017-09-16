@@ -231,7 +231,7 @@ Type_Primitive get_primitive_type(Token* tok)
 	case TOKEN_UINT16:	return Type_Primitive::TYPE_PRIMITIVE_U16; break;
 	case TOKEN_UINT32:	return Type_Primitive::TYPE_PRIMITIVE_U32; break;
 	case TOKEN_UINT64:	return Type_Primitive::TYPE_PRIMITIVE_U64; break;
-	case TOKEN_INT:		return Type_Primitive::TYPE_PRIMITIVE_S32; break;
+	case TOKEN_INT:		return Type_Primitive::TYPE_PRIMITIVE_S64; break;
 	case TOKEN_CHAR:	return Type_Primitive::TYPE_PRIMITIVE_S8; break;
 	case TOKEN_FLOAT:	return Type_Primitive::TYPE_PRIMITIVE_R32; break;
 	case TOKEN_REAL32:	return Type_Primitive::TYPE_PRIMITIVE_R32; break;
@@ -282,6 +282,10 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 
 	Token* optor = lexer->eat_token();
 	if (optor->flags & TOKEN_FLAG_BINARY_OPERATOR || optor->flags & TOKEN_FLAG_ASSIGNMENT_OPERATOR) {
+		if (optor->type == '.' && lexer->peek_token_type() != TOKEN_IDENTIFIER) {
+			Token* t = lexer->peek_token();
+			report_syntax_error("expected member variable, got '%.*s'.\n", TOKEN_STR(t));
+		}
 		Precedence bop_precedence = get_precedence_level(get_binary_op(optor));
 		if (bop_precedence < caller_prec && quit_on_precedence) {
 			lexer->rewind();
@@ -293,11 +297,21 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 			//
 			//	if it is an assignment operator, be right associative
 			//
-			if (get_precedence_level(optor->type, false, false) >= get_precedence_level(right_op->expression.binary_exp.op) &&
-				!(optor->flags & TOKEN_FLAG_ASSIGNMENT_OPERATOR)) {
-				binop->expression.binary_exp.right = right_op->expression.binary_exp.left;
-				right_op->expression.binary_exp.left = binop;
-				return right_op;
+			// @FIX
+			if (optor->type == '.') {
+				if (get_precedence_level(optor->type, false, false) > get_precedence_level(right_op->expression.binary_exp.op) &&
+					!(optor->flags & TOKEN_FLAG_ASSIGNMENT_OPERATOR)) {
+					binop->expression.binary_exp.right = right_op->expression.binary_exp.left;
+					right_op->expression.binary_exp.left = binop;
+					return right_op;
+				}
+			} else {
+				if (get_precedence_level(optor->type, false, false) >= get_precedence_level(right_op->expression.binary_exp.op) &&
+					!(optor->flags & TOKEN_FLAG_ASSIGNMENT_OPERATOR)) {
+					binop->expression.binary_exp.right = right_op->expression.binary_exp.left;
+					right_op->expression.binary_exp.left = binop;
+					return right_op;
+				}
 			}
 		}
 		return binop;
@@ -373,9 +387,16 @@ Ast* Parser::parse_command(Scope* scope)
 	if (first->type == TOKEN_IDENTIFIER) {
 		// variable decl
 		if (lexer->peek_token_type(1) == ':') {
-			Ast* vdecl = parse_variable_decl(lexer->eat_token(), scope);
-			require_and_eat((Token_Type)';');
-			command = vdecl;
+			if (lexer->peek_token_type(2) == '(') {
+				// proc declaration
+				Token* name = lexer->eat_token();
+				command = parse_proc_decl(name, scope);
+			} else {
+				// variable declaration
+				Ast* vdecl = parse_variable_decl(lexer->eat_token(), scope);
+				require_and_eat((Token_Type)';');
+				command = vdecl;
+			}
 			return command;
 		}
 		// proc call
@@ -383,12 +404,6 @@ Ast* Parser::parse_command(Scope* scope)
 			Ast* call = parse_expression(scope);
 			require_and_eat((Token_Type)';');
 			command = call;
-			return command;
-		}
-		else if (lexer->peek_token_type(1) == TOKEN_COLON_COLON) {
-			// proc declaration
-			Token* name = lexer->eat_token();
-			command = parse_proc_decl(name, scope);
 			return command;
 		}
 	}
@@ -480,7 +495,8 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 	}
 
 	// (name1 : type1, name2 : type2)
-	Token* curr = require_and_eat(TOKEN_COLON_COLON);
+	Token* curr = require_and_eat((Token_Type)':');
+	//Token* curr = require_and_eat(TOKEN_COLON_COLON);
 	curr = require_and_eat((Token_Type)'(');
 
 	Scope* proc_scope = create_scope(scope->level + 1, scope, SCOPE_FLAG_PROC_SCOPE);
@@ -659,9 +675,6 @@ Ast* Parser::parse_declaration(Scope* scope)
 		if (lexer->peek_token_type(1) == TOKEN_STRUCT_WORD) {
 			// id :: struct {}
 			return parse_struct(name, scope);
-		} else if (lexer->peek_token_type(1) == (Token_Type)'(') {
-			// id :: () {}
-			return parse_proc_decl(name, scope);
 		} else {
 			Token* t = lexer->peek_token(1);
 			print_error_loc(stderr, filename, t->line, t->column);
@@ -671,9 +684,14 @@ Ast* Parser::parse_declaration(Scope* scope)
 	} 
 	else if (decl->type == (Token_Type)':') {
 		// id :: type;
-		Ast* vardecl = parse_variable_decl(name, scope);
-		require_and_eat((Token_Type)';');
-		return vardecl;
+		if (lexer->peek_token_type(1) == (Token_Type)'(') {
+			// id : () {}
+			return parse_proc_decl(name, scope);
+		} else {
+			Ast* vardecl = parse_variable_decl(name, scope);
+			require_and_eat((Token_Type)';');
+			return vardecl;
+		}
 	}
 	else {
 		report_syntax_error("invalid declaration of '%.*s', declaration requires '::' or ':'\n", TOKEN_STR(name));

@@ -1,4 +1,4 @@
-u32_to_str_base16 :: (val : u32, leading_zeros : bool, buffer : ^char) -> int
+u32_to_str_base16 : (val : u32, leading_zeros : bool, buffer : ^char) -> int
 {
 	numbuffer : ^char = malloc(64);
 	at : ^char= &(numbuffer + 63);

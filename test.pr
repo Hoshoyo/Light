@@ -1,5 +1,5 @@
-#include("user32.dll") MessageBoxA :: (hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> int;
-#include("msvcrt.dll") malloc :: (size : s64) -> ^s64;
+#include("user32.dll") MessageBoxA : (hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> int;
+#include("msvcrt.dll") malloc : (size : s64) -> ^s64;
 
 vec3 :: struct{
 	x : float;
@@ -7,12 +7,7 @@ vec3 :: struct{
 	z : float;
 }
 
-string :: struct {
-	length : s64;
-	data   : ^s8;
-}
-
-proc :: ()
+proc : ()
 {
 	{
 		// call of external function

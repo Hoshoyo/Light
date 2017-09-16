@@ -1,7 +1,7 @@
 - do better errors in parser stage and check for end of stream
 - do better errors in semantic stage
 - check this code, detecting circular dependency
-proc :: () -> vec3
+proc : () -> vec3
 {
 }
 - check things like
@@ -9,7 +9,7 @@ a : bool = !a;
 
 - check return in all paths, proc with no return clause and other commands is ignored when returning any non-void
 - check for end of stream within comment
-
+- dereference pointer on . operator
 
 #IDEAS FOR CAST SYNTAX
 cast(type, value)

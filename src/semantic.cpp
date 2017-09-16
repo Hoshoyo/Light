@@ -186,6 +186,18 @@ int check_and_submit_declarations(Ast* node, Scope* scope) {
 		}break;
 
 		case AST_NODE_STRUCT_DECLARATION: {
+			//
+			// check if the struct decl is not redefined in the same scope
+			//
+			s64 hash = scope->symb_table->entry_exist(node->struct_decl.name);
+			if (hash == -1) {
+				hash = scope->symb_table->insert(scope, node->struct_decl.name, node);
+			} else {
+				report_semantic_error(&node->struct_decl.site, "Struct '%.*s' redefinition.\n", TOKEN_STR(node->struct_decl.name));
+				report_declaration_site(scope->symb_table->entries[hash].node);
+				return 0;
+			}
+
 			Scope* struct_scope = node->struct_decl.scope;
 #if PRINT_SCOPE_INFO
 			printf("Struct (%d - level[%d]) has %d declarations.\n", struct_scope->id, struct_scope->level, struct_scope->num_declarations);
@@ -470,53 +482,50 @@ void push_infer_queue(Ast* node)
 // returns 0 if failed to resolve
 // returns non-zero if resolved
 // this function only changed type flags
-int resolve_type(Type_Instance* instance, Type_Table* type_table)
+int resolve_type(Type_Instance** inst, Type_Table* type_table)
 {
-	//assert(!(instance->flags & TYPE_FLAG_IS_RESOLVED));
+	Type_Instance* instance = *inst;
 
-	switch (instance->type) {
+	switch ((*inst)->type) {
 	case TYPE_PRIMITIVE: {
+		create_type(inst, true);
 		return 1;
 	}break;
 	case TYPE_POINTER: {
 		assert(instance->flags & TYPE_FLAG_IS_SIZE_RESOLVED);
 		assert(instance->flags & TYPE_FLAG_IS_REGISTER_SIZE);
-		if (!resolve_type(instance->pointer_to, type_table)) {
+		if (!resolve_type(&(*inst)->pointer_to, type_table))
 			return 0;
-		}
 		instance->flags |= TYPE_FLAG_IS_RESOLVED;
+		create_type(inst, true);
 		return 1;
 	}break;
 
 	case TYPE_FUNCTION: {
 		// if could not resolve type of return, fail
-
 		if (!(instance->type_function.return_type->flags & TYPE_FLAG_IS_RESOLVED) &&
-			!resolve_type(instance->type_function.return_type, type_table)) {
+			!resolve_type(&(*inst)->type_function.return_type, type_table)) {
 			return 0;
 		}
 		// try resolving the type for all the arguments
 		int num_args = instance->type_function.num_arguments;
 		for (int i = 0; i < num_args; ++i) {
-			Type_Instance* in = instance->type_function.arguments_type[i];
-			if (!(in->flags & TYPE_FLAG_IS_RESOLVED) && !resolve_type(in, type_table)) {
+			Type_Instance** in = &(*inst)->type_function.arguments_type[i];
+			if (!((*in)->flags & TYPE_FLAG_IS_RESOLVED) && !resolve_type(in, type_table))
 				return 0;
-			}
-			in->flags |= TYPE_FLAG_IS_RESOLVED;
+			(*in)->flags |= TYPE_FLAG_IS_RESOLVED;
 		}
 		instance->flags |= TYPE_FLAG_IS_RESOLVED;
+		create_type(inst, true);
 		return 1;
 	}break;
 
 	case TYPE_STRUCT: {
 		s64 hash = -1;
 		// if the entry exist, that means the structure was declared and it is on the type table
-		if (type_table->entry_exist(instance, &hash)) {
-			Type_Instance* in = type_table->get_entry(hash);
-			assert(in->flags & TYPE_FLAG_IS_RESOLVED);
-			assert(in->flags & TYPE_FLAG_IS_SIZE_RESOLVED);
-			instance->flags |= TYPE_FLAG_IS_SIZE_RESOLVED;
-			instance->flags |= TYPE_FLAG_IS_RESOLVED;
+		if (type_table->entry_exist(*inst, &hash)) {
+			create_type(inst, true);	
+			return 1;
 		} else {
 			return 0;
 		}
@@ -555,9 +564,23 @@ Token* get_decl_name(Ast* node)
 	return 0;
 }
 
+Ast* get_struct_field(Ast* struct_decl, Token* name) {
+	assert(struct_decl->node == AST_NODE_STRUCT_DECLARATION);
+	int num_fields = struct_decl->struct_decl.num_fields;
+	string* fields = struct_decl->struct_decl.type_info->type_struct.fields_names;
+	for (int i = 0; i < num_fields; ++i) {
+		if (str_equal(name->value.data, name->value.length, fields[i].data, fields[i].length)) {
+			return struct_decl->struct_decl.fields[i];
+		}
+	}
+	return 0;
+}
+
 int infer_node_decl_types(Ast* node, Type_Table* table);
 
 int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_against, Type_Instance** result = 0, Type_Instance** required = 0);
+
+int infer_dot_op(Ast* struct_decl, Ast* var_decl, Ast *node_right, int level, Type_Instance** result);
 
 // return 0 if success
 // return 1 if could not infer
@@ -829,7 +852,59 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 	}break;
 
 	case BINARY_OP_DOT: {
+		if (node->expression.binary_exp.left->node == AST_NODE_BINARY_EXPRESSION) {
+			Type_Instance* res = 0;
+			int err = infer_binary_expr_type(node->expression.binary_exp.left, table, 0, &res, 0);
+			if (err) return err;
+			if (res->type != TYPE_STRUCT) {
+				report_semantic_error(get_site_from_token(node->expression.binary_exp.op_token), "left side of binary operation '.' does not evaluate to a struct.\n");
+				return -1;
+			}
+			err = infer_dot_op(res->type_struct.struct_descriptor, 0, node->expression.binary_exp.right, 0, &res);
+			node->return_type = res;
+			return err;
+		}
 
+		Ast* var_node = node->expression.binary_exp.left;
+		Ast* var_decl = is_declared(var_node);
+		if (var_decl->node != AST_NODE_VARIABLE_DECL) {
+			report_semantic_error(get_site_from_token(node->expression.binary_exp.op_token), "left side of '%.*s' operator is not a variable.\n", TOKEN_STR(node->expression.binary_exp.op_token));
+			report_declaration_site(var_decl, " Defined here.\n");
+			return -1;
+		}
+		if (!var_decl) {
+			report_semantic_error(get_site_from_token(node->expression.variable_exp.name), "Undeclared variable '%.*s'\n", TOKEN_STR(node->expression.variable_exp.name));
+			return -1;
+		}
+		// if not resolved, yield
+		if (!(var_decl->var_decl.type->flags & TYPE_FLAG_IS_RESOLVED)) {
+			return 1;
+		}
+		// check if type of variable is struct
+		if (var_decl->var_decl.type->type != TYPE_STRUCT) {
+			report_semantic_error(get_site_from_token(node->expression.variable_exp.name), "Attempt to access field of non struct '%.*s'\n", TOKEN_STR(node->expression.variable_exp.name));
+			return -1;
+		}
+		Ast* struct_decl = var_decl->var_decl.type->type_struct.struct_descriptor;
+
+		Type_Instance* res;
+		int err = infer_dot_op(struct_decl, var_decl, node->expression.binary_exp.right, 0, &res);
+		if (err) return err;
+
+		if (check_against) {
+			if (!types_equal(check_against, res)) {
+				Type_Instance* coerced = do_type_coercion(res, check_against, true);
+				if (!coerced) {
+					report_semantic_type_mismatch(get_site_from_token(node->expression.binary_exp.op_token), check_against, res);
+					report_semantic_error(0, " on binary expression '%.*s'\n", TOKEN_STR(node->expression.binary_exp.op_token));
+					return -1;
+				}
+			}
+		}
+		if (result) *result = res;
+		if (required) *required = res;
+		node->return_type = res;
+		return 0;
 	}break;
 
 	case ASSIGNMENT_OPERATION_EQUAL:
@@ -845,6 +920,53 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 		assert(0);
 	} break;
 	}
+}
+
+int infer_dot_op(Ast* struct_decl, Ast* var_declaaa, Ast *node_right, int level, Type_Instance** result)
+{
+	// @TODO go through pointers and dereference them
+	if (node_right->node == AST_NODE_BINARY_EXPRESSION) {
+		Token* field_name = node_right->expression.binary_exp.left->expression.variable_exp.name;
+		Ast* field = get_struct_field(struct_decl, field_name);
+		assert(field->node == AST_NODE_VARIABLE_DECL);
+		if (!field) {
+			report_semantic_error(get_site_from_token(field_name), "'%.*s' is not a field of struct '%.*s'.\n", TOKEN_STR(field_name), TOKEN_STR(struct_decl->struct_decl.name));
+			return -1;
+		}
+		if (!(field->var_decl.type->flags & TYPE_FLAG_IS_RESOLVED)) {
+			return 1;
+		}
+		Ast* right = node_right->expression.binary_exp.right;
+		if (field->var_decl.type->type != TYPE_STRUCT) {
+			if (right->node == AST_NODE_BINARY_EXPRESSION) {
+				right = right->expression.binary_exp.left;
+			}
+			Token* fname = right->expression.variable_exp.name;
+			report_semantic_error(get_site_from_token(fname), "field '%.*s' is not a struct and therefore does not have a field '%.*s'\n", TOKEN_STR(field_name), TOKEN_STR(fname));
+			return -1;
+		}
+		node_right->return_type = field->var_decl.type;
+
+		struct_decl = field->var_decl.type->type_struct.struct_descriptor;
+		return infer_dot_op(struct_decl, field, right, level + 1, result);
+	}
+
+	// @CHECK maybe loop through field names
+	s64 hash = struct_decl->struct_decl.scope->symb_table->entry_exist(node_right->expression.variable_exp.name);
+	if (hash == -1) {
+		report_semantic_error(get_site_from_token(node_right->expression.variable_exp.name), "'%.*s' is not a field of struct '%.*s'\n", TOKEN_STR(node_right->expression.variable_exp.name), TOKEN_STR(struct_decl->struct_decl.name));
+		return -1;
+	}
+
+	// if type of the field is not resolved yield
+	Ast* field = struct_decl->struct_decl.scope->symb_table->entries[hash].node;
+	assert(field->node == AST_NODE_VARIABLE_DECL);
+	if (!(field->var_decl.type->flags & TYPE_FLAG_IS_RESOLVED)) {
+		return 1;
+	}
+	node_right->return_type = field->var_decl.type;
+	if(result) *result = field->var_decl.type;
+	return 0;
 }
 
 // return 0 if infered and checked correctly
@@ -1234,8 +1356,8 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 					// create the type, since it is resolved
 					create_type(&node->named_arg.arg_type, true);
 				} else {
-					if (resolve_type(node->named_arg.arg_type, table)) {
-						create_type(&node->named_arg.arg_type, true);
+					if (resolve_type(&node->named_arg.arg_type, table)) {
+						//create_type(&node->named_arg.arg_type, true);
 						return 0;
 					} else {
 						// put it on the queue to be resolved
@@ -1274,7 +1396,7 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 					bool infered = true;
 
 					if (!(node->proc_decl.proc_ret_type->flags & TYPE_FLAG_IS_RESOLVED) &&
-						!resolve_type(node->proc_decl.proc_ret_type, table)) {
+						!resolve_type(&node->proc_decl.proc_ret_type, table)) {
 						infered = false;
 					}
 					if (infered) {
@@ -1337,7 +1459,7 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 				bool infered = true;
 
 				if (!(node->proc_decl.proc_ret_type->flags & TYPE_FLAG_IS_RESOLVED) &&
-					!resolve_type(node->proc_decl.proc_ret_type, table)) {
+					!resolve_type(&node->proc_decl.proc_ret_type, table)) {
 					infered = false;
 				} 
 				if (infered) {
@@ -1398,8 +1520,8 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 					if (node->var_decl.type->flags & TYPE_FLAG_IS_RESOLVED) {
 						create_type(&node->var_decl.type, true);
 					} else {
-						if (resolve_type(node->var_decl.type, table)) {
-							create_type(&node->var_decl.type, true);
+						if (resolve_type(&node->var_decl.type, table)) {
+							//create_type(&node->var_decl.type, true);
 						} else {
 							if (!already_queued)
 								push_infer_queue(node);
@@ -1422,8 +1544,8 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 							push_infer_queue(node);
 						return 1;
 					} else {
-						if (inst->flags & TYPE_FLAG_IS_RESOLVED || resolve_type(inst, table)) {
-							create_type(&inst, true);
+						if (inst->flags & TYPE_FLAG_IS_RESOLVED || resolve_type(&inst, table)) {
+							//create_type(&inst, true);
 							node->var_decl.assignment->return_type = inst;
 							node->var_decl.type = inst;
 						} else {
