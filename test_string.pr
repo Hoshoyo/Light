@@ -32,17 +32,41 @@ proc : () -> void
 		a != a;
 	}
 	{
+		c : ^int;
+		a : int = 0;
+		c += 1;
+		c -= 1;
+		c == c;
+		c != c;
+		c = c + a;
+		c = c - c;
+		c = c;
+	}
+	{
 		b : bool;
 		b && b;
 		b || b;
 		b == b;
 		b != b;
 	}
-	
 	{
-		c : ^int;
-		c == c;
-		c != c;
+		d : float;
+		d = 0.0;
+		d *= d;
+		d /= d;
+		d += d;
+		d -= d;
+		d + d;
+		d - d;
+		d / d;
+		d * d;
+		d < d;
+		d > d;
+		d <= d;
+		d >= d;
+		d == d;
+		d != d;
 	}
+
 	return;
 }

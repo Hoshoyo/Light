@@ -581,20 +581,29 @@ int check_assignment_types(Type_Instance* left, Type_Instance* right, Ast* binop
 	Type_Instance* coerced = left;
 	if (!types_equal(left, right)) {
 		coerced = do_type_coercion(right, left, true);
-		if (!coerced) {
-			report_semantic_type_mismatch(get_site_from_token(binop->expression.binary_exp.op_token), left, right);
-			report_semantic_error(0, " on ninary operator '%.*s'\n", TOKEN_STR(binop->expression.binary_exp.op_token));
-			return -1;
-		}
 	}
+	bool is_plus_or_minus = false;
 	switch (binop->expression.binary_exp.op) {
 		case ASSIGNMENT_OPERATION_EQUAL:		return 0;
 		case ASSIGNMENT_OPERATION_PLUS_EQUAL:
-		case ASSIGNMENT_OPERATION_MINUS_EQUAL:
+		case ASSIGNMENT_OPERATION_MINUS_EQUAL: {
+			is_plus_or_minus = true;
+		}
 		case ASSIGNMENT_OPERATION_TIMES_EQUAL:
-		case ASSIGNMENT_OPERATION_MOD_EQUAL:
 		case ASSIGNMENT_OPERATION_DIVIDE_EQUAL: {
-			// @TODO POINTER TYPE HERE when pointer arithmetic is done
+			if (!coerced) {
+				if (is_plus_or_minus) {
+					if ((left->type == TYPE_POINTER && is_integer_type(right))) {
+						return 0;
+					} else {
+						report_semantic_error(get_site_from_token(binop->expression.binary_exp.op_token), "Pointer arithmetic assignment operation '%.*s' requires integer type\n", TOKEN_STR(binop->expression.binary_exp.op_token));
+						return -1;
+					}
+				}
+				report_semantic_type_mismatch(get_site_from_token(binop->expression.binary_exp.op_token), left, right);
+				report_semantic_error(0, " on binary operator '%.*s'\n", TOKEN_STR(binop->expression.binary_exp.op_token));
+				return -1;
+			}
 			if (is_integer_type(coerced) || is_floating_point_type(coerced)) {
 				return 0;
 			} else {
@@ -602,6 +611,7 @@ int check_assignment_types(Type_Instance* left, Type_Instance* right, Ast* binop
 				return -1;
 			}
 		}break;
+		case ASSIGNMENT_OPERATION_MOD_EQUAL:
 		case ASSIGNMENT_OPERATION_AND_EQUAL:
 		case ASSIGNMENT_OPERATION_OR_EQUAL:
 		case ASSIGNMENT_OPERATION_XOR_EQUAL:
@@ -629,26 +639,52 @@ int infer_dot_op(Ast* struct_decl, Ast *node_right, int level, Type_Instance** r
 // return -1 if error
 int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_against, Type_Instance** result = 0, Type_Instance** required = 0)
 {
+	Type_Instance* left = 0;
+	Type_Instance* right = 0;
+	Type_Instance* required_left = 0;
+	Type_Instance* required_right = 0;
+	int l = 0, r = 0;
+	bool plus_or_minus = false;
+
 	// this is supposed to be infered
 	switch (node->expression.binary_exp.op) {
 	case BINARY_OP_PLUS:
 	case BINARY_OP_MINUS: {
-		if (check_against && check_against->type == TYPE_POINTER) {
-			// pointer arithmetic
-			break;
+		l = infer_node_expr_type(node->expression.binary_exp.left, table, 0, &left, &required_left);
+		if (l == -1) return -1;
+		r = infer_node_expr_type(node->expression.binary_exp.right, table, 0, &right, &required_right);
+		if (r == -1) return -1;
+		if (l == 0 && r == 0) {
+			if (right->type == TYPE_POINTER) {
+				Type_Instance* temp = right;
+				right = left;
+				left = temp;
+			}
+			if (left->type == TYPE_POINTER) {
+				if (is_integer_type(right)) {
+					if (check_against && !types_equal(check_against, left)) {
+						report_semantic_type_mismatch(get_site_from_token(node->expression.binary_exp.op_token), check_against, left);
+						report_semantic_error(0, " on binary expression '%.*s'\n", TOKEN_STR(node->expression.binary_exp.op_token));
+						return -1;
+					}
+				} else if (!(node->expression.binary_exp.op == BINARY_OP_MINUS && types_equal(left, right))) {
+					report_semantic_error(get_site_from_token(node->expression.binary_exp.op_token), "On binary expression '%.*s', two pointers can only be subtracted\n", TOKEN_STR(node->expression.binary_exp.op_token));
+					return -1;
+				}
+				
+				if (result) *result = check_against;
+				if (required) *required = check_against;
+				node->return_type = check_against;
+				return 0;
+			}
 		}
+		// fall through if not pointer arithmetic
 	}
 	case BINARY_OP_MULT:
-	case BINARY_OP_DIV:
-	case BINARY_OP_MOD: {
-		// both sides need to be the same type
-		Type_Instance* left = 0;
-		Type_Instance* right = 0;
-		Type_Instance* required_left = 0;
-		Type_Instance* required_right = 0;
-		int l = infer_node_expr_type(node->expression.binary_exp.left, table, check_against, &left, &required_left);
+	case BINARY_OP_DIV: {
+		l = infer_node_expr_type(node->expression.binary_exp.left, table, check_against, &left, &required_left);
 		if (l == -1) return -1;
-		int r = infer_node_expr_type(node->expression.binary_exp.right, table, check_against, &right, &required_right);
+		r = infer_node_expr_type(node->expression.binary_exp.right, table, check_against, &right, &required_right);
 		if (r == -1) return -1;
 
 		if (l == 0 && r == 0) {
@@ -702,16 +738,12 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 		}
 	} break;
 
+	case BINARY_OP_MOD:
 	case BINARY_OP_BITSHIFT_LEFT:
 	case BINARY_OP_BITSHIFT_RIGHT:
 	case BINARY_OP_AND:
 	case BINARY_OP_OR:
 	case BINARY_OP_XOR: {
-		Type_Instance* left = 0;
-		Type_Instance* right = 0;
-		Type_Instance* required_left = 0;
-		Type_Instance* required_right = 0;
-
 		int l = infer_node_expr_type(node->expression.binary_exp.left, table, check_against, &left, &required_left);
 		if (l == -1) return -1;
 		int r = infer_node_expr_type(node->expression.binary_exp.right, table, check_against, &right, &required_right);
@@ -778,12 +810,7 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 	}break;
 
 	case BINARY_OP_LOGIC_AND:
-	case BINARY_OP_LOGIC_OR: {
-		Type_Instance* left = 0;
-		Type_Instance* right = 0;
-		Type_Instance* required_left = 0;
-		Type_Instance* required_right = 0;
-		
+	case BINARY_OP_LOGIC_OR: {		
 		if (!check_against) {
 			check_against = get_primitive_type(TYPE_PRIMITIVE_BOOL);
 		} else {
@@ -817,10 +844,6 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 	case BINARY_OP_GREATER_EQUAL:
 	case BINARY_OP_EQUAL_EQUAL:
 	case BINARY_OP_NOT_EQUAL: {
-		Type_Instance* left = 0;
-		Type_Instance* right = 0;
-		Type_Instance* required_left = 0;
-		Type_Instance* required_right = 0;
 
 		int l = infer_node_expr_type(node->expression.binary_exp.left, table, 0, &left, &required_left);
 		if (l == -1) return -1;
@@ -952,9 +975,11 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 		return 0;
 	}break;
 
-	case ASSIGNMENT_OPERATION_EQUAL:
 	case ASSIGNMENT_OPERATION_PLUS_EQUAL:
-	case ASSIGNMENT_OPERATION_MINUS_EQUAL:
+	case ASSIGNMENT_OPERATION_MINUS_EQUAL: {
+		plus_or_minus = true;
+	}
+	case ASSIGNMENT_OPERATION_EQUAL:
 	case ASSIGNMENT_OPERATION_TIMES_EQUAL:
 	case ASSIGNMENT_OPERATION_DIVIDE_EQUAL:
 	case ASSIGNMENT_OPERATION_MOD_EQUAL:
@@ -965,12 +990,16 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 	case ASSIGNMENT_OPERATION_SHR_EQUAL: {
 		Type_Instance* result_left = 0;
 		Type_Instance* result_right = 0;
-		Ast *left = node->expression.binary_exp.left;
+		Ast* left = node->expression.binary_exp.left;
 		Ast* right = node->expression.binary_exp.right;
 		int err = infer_node_expr_type(left, table, 0, &result_left, 0);
 		if (err) return err;
 		if (left->expression.is_lvalue) {
-			err = infer_node_expr_type(right, table, result_left, &result_right, 0);
+			if (plus_or_minus) {
+				err = infer_node_expr_type(right, table, 0, &result_right, 0);
+			} else {
+				err = infer_node_expr_type(right, table, result_left, &result_right, 0);
+			}
 			if (err) return err;
 		} else {
 			report_semantic_error(get_site_from_token(node->expression.binary_exp.op_token), "Assignment operator '%.*s' requires an lvalue as left operand.\n", TOKEN_STR(node->expression.binary_exp.op_token));

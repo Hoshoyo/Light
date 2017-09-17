@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
 #endif
 
 #if 1
-	printf("\n\n");
+	//printf("\n\n");
 	//DEBUG_print_type_table();
 	//DEBUG_print_node_type(stdout, ast, true);
 	printf("\n\nNumber of values in the infer queue = %d\n", get_arr_length(infer_queue));
