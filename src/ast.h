@@ -128,6 +128,9 @@ struct Ast_ProcDecl {
 	Scope* scope;
 	void* external_runtime_address;
 	Decl_Site site;
+	struct {
+		Token* extern_library_name;
+	};
 	u32 flags;
 };
 struct Ast_VarDecl {
@@ -137,8 +140,9 @@ struct Ast_VarDecl {
 	Scope* scope;
 	s32 size_bytes;
 	s32 alignment;
-	Decl_Site site;
 	u32 symbol_hash;
+	u32 temporary_register;
+	Decl_Site site;
 };
 struct Ast_StructDecl {
 	Token* name;
@@ -305,7 +309,8 @@ static Scope_Manager scope_manager = { };
 s64 generate_scope_id();
 Scope* create_scope(s32 level, Scope* parent, u32 flags);
 
-Ast* create_proc(Memory_Arena* arena, Token* name, Type_Instance* return_type, Ast** arguments, int nargs, Ast* body, Scope* scope, Decl_Site* site);
+bool ast_is_expression(Ast* ast);
+Ast* create_proc(Memory_Arena* arena, Token* name, Token* extern_name, Type_Instance* return_type, Ast** arguments, int nargs, Ast* body, Scope* scope, Decl_Site* site);
 Ast* create_named_argument(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* default_val, int index, Scope* scope, Decl_Site* site);
 Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* assign_val, Scope* scope, Decl_Site* site);
 Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok);

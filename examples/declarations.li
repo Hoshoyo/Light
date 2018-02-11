@@ -1,0 +1,9 @@
+//ExitProcess :: (exit_code : s32) -> s32 #extern("kernel32.lib");
+//MessageBoxA :: (hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> s32 #extern("user32.lib");
+
+proc :: () -> s32
+{
+	test : s32 = 3 + (5 - 2) / 2;
+	variable : s32 = test;
+	return variable;
+}

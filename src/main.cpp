@@ -7,6 +7,7 @@
 #include "semantic.h"
 #include "interpreter.h"
 #include "code_generator.h"
+#include "llvm_backend.h"
 
 int main(int argc, char** argv) {
 	if (argc <= 1) {
@@ -51,6 +52,12 @@ int main(int argc, char** argv) {
 	printf("\n\nNumber of values in the infer queue = %d\n", get_arr_length(infer_queue));
 	printf("\n\n");
 	DEBUG_print_ast(stdout, ast);
+#endif
+
+	// LLVM backend
+
+#if defined (_WIN32) || defined(_WIN64)
+	llvm_generate_ir(ast);
 #endif
 	return 0;
 }

@@ -6,6 +6,15 @@
 #define ALLOC_AST(A) (Ast*)A->allocate(sizeof(Ast))
 //#define ALLOC_AST(A) (Ast*)malloc(sizeof(Ast))
 
+bool ast_is_expression(Ast* ast) {
+	return (ast->node == AST_NODE_BINARY_EXPRESSION ||
+		AST_NODE_UNARY_EXPRESSION ||
+		AST_NODE_LITERAL_EXPRESSION ||
+		AST_NODE_VARIABLE_EXPRESSION ||
+		AST_NODE_PROCEDURE_CALL ||
+		AST_NODE_EXPRESSION_ASSIGNMENT);
+}
+
 UnaryOperation get_unary_op(Token* token)
 {
 	Token_Type t = token->type;
@@ -58,13 +67,16 @@ BinaryOperation get_binary_op(Token* token)
 	}
 }
 
-Ast* create_proc(Memory_Arena* arena, Token* name, Type_Instance* return_type, Ast** arguments, int nargs, Ast* body, Scope* scope, Decl_Site* site) {
+Ast* create_proc(Memory_Arena* arena, Token* name, Token* extern_name, Type_Instance* return_type, Ast** arguments, int nargs, Ast* body, Scope* scope, Decl_Site* site) {
 	Ast* proc = ALLOC_AST(arena);
 
 	if (body)
 		proc->node = AST_NODE_PROC_DECLARATION;
-	else
+	else if (extern_name) {
+		proc->node = AST_NODE_PROC_DECLARATION;
+	} else
 		proc->node = AST_NODE_PROC_FORWARD_DECL;
+
 	proc->is_decl = true;
 	proc->return_type = 0;
 	proc->type_checked = false;
@@ -77,6 +89,8 @@ Ast* create_proc(Memory_Arena* arena, Token* name, Type_Instance* return_type, A
 	proc->proc_decl.body = body;
 	proc->proc_decl.num_args = nargs;
 	proc->proc_decl.flags = 0;
+	if (extern_name)
+		proc->proc_decl.flags |= PROC_DECL_FLAG_IS_EXTERNAL;
 
 	proc->proc_decl.site.filename = site->filename;
 	proc->proc_decl.site.line = site->line;

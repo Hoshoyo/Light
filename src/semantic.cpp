@@ -180,9 +180,11 @@ int check_and_submit_declarations(Ast* node, Scope* scope) {
 					if (ret != DECL_CHECK_PASSED) error = DECL_CHECK_FAILED;
 				}
 			}
-			int ret = check_and_submit_declarations(node->proc_decl.body, node->proc_decl.scope);
-			if (ret != DECL_CHECK_PASSED) error = DECL_CHECK_FAILED;
-			if (error == DECL_CHECK_FAILED) return DECL_CHECK_FAILED;
+			if (!(!node->proc_decl.body && node->proc_decl.flags & PROC_DECL_FLAG_IS_EXTERNAL)) {
+				int ret = check_and_submit_declarations(node->proc_decl.body, node->proc_decl.scope);
+				if (ret != DECL_CHECK_PASSED) error = DECL_CHECK_FAILED;
+				if (error == DECL_CHECK_FAILED) return DECL_CHECK_FAILED;
+			}
 		}break;
 
 		case AST_NODE_STRUCT_DECLARATION: {

@@ -496,7 +496,7 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 	}
 
 	// (name1 : type1, name2 : type2)
-	Token* curr = require_and_eat((Token_Type)':');
+	Token* curr = require_and_eat(TOKEN_COLON_COLON);
 	//Token* curr = require_and_eat(TOKEN_COLON_COLON);
 	curr = require_and_eat((Token_Type)'(');
 
@@ -544,11 +544,21 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 	}
 
 	Ast* body = 0;
+	Token* extern_name = 0;
 	if (lexer->peek_token_type() == TOKEN_SYMBOL_OPEN_BRACE) {
 		body = parse_block(proc_scope);
-	} else if(lexer->peek_token_type() == ';'){
-		lexer->eat_token();
-		body = 0;
+	} else if(lexer->peek_token_type() == '#'){
+		lexer->eat_token(); // #
+		Token* tag = lexer->eat_token();
+		if (str_equal("extern", sizeof("extern") - 1, tag->value.data, tag->value.length)) {
+			require_and_eat((Token_Type)'(');
+			extern_name = lexer->eat_token();
+			require_and_eat((Token_Type)')');
+		} else {
+			report_syntax_error("#%.*s is not recognized as procedure tag.\n", TOKEN_STR(tag));
+			return 0;
+		}
+		require_and_eat((Token_Type)';');
 	}
 
 	Decl_Site site;
@@ -558,7 +568,7 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 
 	scope->num_declarations += 1;
 	proc_scope->num_declarations += n_args;
-	return create_proc(&arena, name, ret_type, args, n_args, body, proc_scope, &site);
+	return create_proc(&arena, name, extern_name, ret_type, args, n_args, body, proc_scope, &site);
 }
 
 Ast* Parser::parse_variable_decl(Token* name, Scope* scope) 
@@ -672,7 +682,7 @@ Ast* Parser::parse_declaration(Scope* scope)
 
 	Token* decl = lexer->peek_token();
 	
-	if (decl->type == (Token_Type)':') {
+	if (decl->type == TOKEN_COLON_COLON) {
 		Token* next = lexer->peek_token(1);
 		if (next->type == (Token_Type)'(') {
 			return parse_proc_decl(name, scope);
@@ -684,7 +694,7 @@ Ast* Parser::parse_declaration(Scope* scope)
 			return vardecl;
 		}
 	} else {
-		report_syntax_error("invalid declaration of '%.*s', declaration requires ':'\n", TOKEN_STR(name));
+		report_syntax_error("invalid declaration of '%.*s', declaration requires '::'\n", TOKEN_STR(name));
 		return 0;
 	}
 }

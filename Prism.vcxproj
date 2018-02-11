@@ -137,6 +137,7 @@
     <ClCompile Include="src\code_generator.cpp" />
     <ClCompile Include="src\interpreter.cpp" />
     <ClCompile Include="src\lexer.cpp" />
+    <ClCompile Include="src\llvm_backend.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\memory.cpp" />
     <ClCompile Include="src\parser.cpp" />
@@ -150,6 +151,7 @@
     <ClInclude Include="src\code_generator.h" />
     <ClInclude Include="src\interpreter.h" />
     <ClInclude Include="src\lexer.h" />
+    <ClInclude Include="src\llvm_backend.h" />
     <ClInclude Include="src\memory.h" />
     <ClInclude Include="src\parser.h" />
     <ClInclude Include="src\semantic.h" />

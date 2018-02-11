@@ -122,6 +122,8 @@ s64 create_type(Type_Instance** instance, bool swap_and_delete);
 Type_Instance* create_ptr_typeof(Type_Instance* inst);
 bool types_equal(Type_Instance* i1, Type_Instance* i2);
 
+const int INTEGER_SIGNED = 1;
+const int INTEGER_UNSIGNED = 2;
 // return 1 if signed 2 if unsigned 0 if not integer type
 int is_integer_type(Type_Instance* inst);
 int is_floating_point_type(Type_Instance* inst);
