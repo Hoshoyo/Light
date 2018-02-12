@@ -4,6 +4,7 @@
 proc :: () -> s32
 {
 	test : s32 = 3 + (5 - 2) / 2;
-	variable : s32 = test;
+	variable : s32 = test + 5;
+	variable = 1;
 	return variable;
 }

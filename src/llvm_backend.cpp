@@ -5,7 +5,6 @@
 #include <stdio.h>
 
 #define TOKEN_STR(T) T->value.length, T->value.data
-//#define SPRINT_CODE(X) code_generated_ptr += sprintf(code_generated + code_generated_ptr, X)
 
 int LLVM_Code_Generator::sprint(char* msg, ...)
 {
@@ -105,8 +104,8 @@ u32 llvm_emit_ir_for_expression(LLVM_Code_Generator* cg, Ast* expr) {
 		case AST_NODE_BINARY_EXPRESSION: {
 			Ast* left  = expr->expression.binary_exp.left;
 			Ast* right = expr->expression.binary_exp.right;
-			bool left_reg_size = (left->node == AST_NODE_VARIABLE_EXPRESSION || left->node == AST_NODE_LITERAL_EXPRESSION);
-			bool right_reg_size = (right->node == AST_NODE_VARIABLE_EXPRESSION || right->node == AST_NODE_LITERAL_EXPRESSION);
+			bool left_reg_size = left->node == AST_NODE_LITERAL_EXPRESSION;
+			bool right_reg_size = right->node == AST_NODE_LITERAL_EXPRESSION;
 
 			u32 left_temp = 0;
 			u32 right_temp = 0;

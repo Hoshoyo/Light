@@ -9,9 +9,10 @@ decls-0:
  store i32 %3, i32* %0
  %4 = alloca i32, align 4
  %5 = load i32, i32* %0
- store i32 %5, i32* %4
- %6 = load i32, i32* %4
- call cc 64 i32 @ExitProcess(i32 %6)
- ret i32 %6
+ %6 = add i32 %5, 5
+ store i32 %6, i32* %4
+ %7 = load i32, i32* %4
+ call cc 64 i32 @ExitProcess(i32 %7)
+ ret i32 %7
 }
 attributes #0 = {nounwind uwtable}
