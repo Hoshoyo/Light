@@ -337,7 +337,7 @@ int check_and_submit_declarations(Ast** ast, Scope* global_scope)
 		global_scope->symb_table = new Symbol_Table(global_scope->num_declarations * declaration_ratio);
 	}
 
-	size_t num_nodes = get_arr_length(ast);
+	size_t num_nodes = array_get_length(ast);
 
 	for (size_t i = 0; i < num_nodes; ++i) {
 		Ast* node = ast[i];
@@ -478,7 +478,7 @@ void push_infer_queue(Ast* node)
 			ti->flags |= TYPE_FLAG_NOT_DELETE;
 	}
 	infer_node.node = node;
-	push_array(infer_queue, &node);
+	array_push(infer_queue, &node);
 }
 
 // returns 0 if failed to resolve
@@ -1105,7 +1105,7 @@ int infer_node_expr_type(Ast* node, Type_Table* table, Type_Instance* check_agai
 						int proc_call_num_args = 0;
 						
 						if (node->expression.proc_call.args) {
-							proc_call_num_args = get_arr_length(node->expression.proc_call.args);
+							proc_call_num_args = array_get_length(node->expression.proc_call.args);
 						}
 						if (proc_call_num_args != proc_decl_num_args) {
 							if (proc_decl_num_args < proc_call_num_args)
@@ -1513,11 +1513,11 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 
 						instance->type_function.num_arguments = num_args;
 						instance->type_function.return_type = node->proc_decl.proc_ret_type;
-						instance->type_function.arguments_type = create_array(Type_Instance*, num_args);
+						instance->type_function.arguments_type = array_create(Type_Instance*, num_args);
 
 						for (int i = 0; i < num_args; ++i) {
 							Type_Instance* in = get_decl_type(node->proc_decl.arguments[i]);
-							push_array(instance->type_function.arguments_type, &in);
+							array_push(instance->type_function.arguments_type, &in);
 						}
 						create_type(&instance, true);
 						node->proc_decl.proc_type = instance;
@@ -1580,11 +1580,11 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 
 					instance->type_function.num_arguments = num_args;
 					instance->type_function.return_type = node->proc_decl.proc_ret_type;
-					instance->type_function.arguments_type = create_array(Type_Instance*, num_args);
+					instance->type_function.arguments_type = array_create(Type_Instance*, num_args);
 
 					for (int i = 0; i < num_args; ++i) {
 						Type_Instance* in = get_decl_type(node->proc_decl.arguments[i]);
-						push_array(instance->type_function.arguments_type, &in);
+						array_push(instance->type_function.arguments_type, &in);
 					}
 					create_type(&instance, true);
 					node->proc_decl.proc_type = instance;
@@ -1671,17 +1671,16 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 					}
 				}
 				if (infered) {
-					Type_Instance** ftypes = create_array(Type_Instance*, num_fields);
-					string* fnames = create_array(string, num_fields);
+					Type_Instance** ftypes = array_create(Type_Instance*, num_fields);
+					string* fnames = array_create(string, num_fields);
 					s64 size_bytes = 0;
 					for (int i = 0; i < num_fields; ++i) {
 						Type_Instance* ti = get_decl_type(node->struct_decl.fields[i]);
 						Token* name = get_decl_name(node->struct_decl.fields[i]);
-						string s = string();
-						make_immutable_string(s, name->value.data, name->value.length);
-						push_array(fnames, &s);
+						string s = { -1, name->value.length, name->value.data };
+						array_push(fnames, &s);
 						size_bytes += ti->type_size;
-						push_array(ftypes, &ti);
+						array_push(ftypes, &ti);
 					}
 					Type_Instance* struct_instance = new Type_Instance();
 					struct_instance->type = TYPE_STRUCT;
@@ -1759,7 +1758,7 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 int decl_type_inference(Ast** ast, Type_Table* table)
 {
 	int ret_val = 0;
-	size_t num_nodes = get_arr_length(ast);
+	size_t num_nodes = array_get_length(ast);
 	for (size_t i = 0; i < num_nodes; ++i) {
 		Ast* node = ast[i];
 		int err = infer_node_decl_types(node, table);
@@ -1777,10 +1776,10 @@ int decl_type_inference(Ast** ast, Type_Table* table)
 // return -1 if errored
 int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 {
-	infer_queue = create_array(Infer_Node, 16);
+	infer_queue = array_create(Infer_Node, 16);
 	int err = decl_type_inference(ast, type_table);
-	if (get_arr_length(infer_queue) > 0) {
-		int qsize = get_arr_length(infer_queue);
+	if (array_get_length(infer_queue) > 0) {
+		int qsize = array_get_length(infer_queue);
 		while (qsize != 0) {
 			for(int i = 0; i < qsize; ++i) {
 				Infer_Node in = infer_queue[i];
@@ -1793,7 +1792,7 @@ int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 					return -1;
 				}
 			}
-			int newsize = get_arr_length(infer_queue);
+			int newsize = array_get_length(infer_queue);
 			if (qsize == newsize) {
 				report_semantic_error(0, "Detected circulary dependency on type inference, exiting.\n");
 				return -1;

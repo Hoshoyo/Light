@@ -165,7 +165,7 @@ struct Ast_Binary_Exp {
 	Scope* scope;
 };
 
-const u32 UNARY_EXP_FLAG_PREFIXED = FLAG(0);
+const u32 UNARY_EXP_FLAG_PREFIXED  = FLAG(0);
 const u32 UNARY_EXP_FLAG_POSTFIXED = FLAG(1);
 struct Ast_Unary_Exp {
 	Precedence precedence;
@@ -178,6 +178,8 @@ struct Ast_Unary_Exp {
 };
 
 const u32 LITERAL_FLAG_IS_REGSIZE = FLAG(0);
+const u32 LITERAL_FLAG_NUMERIC    = FLAG(1);
+const u32 LITERAL_FLAG_STRING     = FLAG(2);
 struct Ast_Literal {
 	u32 flags;
 	Token* lit_tok;
@@ -331,7 +333,7 @@ UnaryOperation get_unary_op(Token* token);
 BinaryOperation get_binary_op(Token* token);
 
 void block_push_command(Ast* block, Ast* command);
-void push_ast_list(Ast** list, Ast* arg);
+void push_ast_list(Ast*** list, Ast* arg);
 
 
 void DEBUG_print_node(FILE* out, Ast* node);

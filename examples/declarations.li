@@ -1,10 +1,32 @@
-//ExitProcess :: (exit_code : s32) -> s32 #extern("kernel32.lib");
-//MessageBoxA :: (hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> s32 #extern("user32.lib");
+ExitProcess  :: (exit_code : s32) -> s32 #foreign("kernel32");
+MessageBoxA  :: (hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> s32 #foreign("user32");
+GetStdHandle :: (n_std_handle : u32) -> ^void #foreign("kernel32");
+WriteConsole :: (console_output : ^void, buffer : ^s8, num_bytes_to_write : u32, num_bytes_written : ^u32, reserved : ^void) -> s32 #foreign("kernel32");
 
-proc :: () -> s32
-{
+/*
+
+#foreign {
+	ExitProcess  :: (exit_code : s32) -> s32;
+	MessageBoxA  :: (hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> s32;
+	GetStdHandle :: (n_std_handle : u32) -> ^void;
+	WriteConsole :: (console_output : ^void, buffer : ^void, num_bytes_to_write : u32, num_bytes_written : ^u32, ^void reserved) -> s32;
+}
+*/
+proc :: () -> s32 {
 	test : s32 = 3 + (5 - 2) / 2;
 	variable : s32 = test + 5;
 	variable = 1;
 	return variable;
+}
+
+
+main :: () -> s32
+{
+	buffer := "Hello\00";
+	//written : u32;
+	
+	//stdouthandle := GetStdHandle(-11);
+	//res := WriteConsole(stdouthandle, buffer.data, 6, &written, 0);
+
+	return 0;
 }

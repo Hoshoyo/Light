@@ -22,19 +22,18 @@ void initialize_types(Scope* global_scope, Ast** ast)
 
 		str_ti->type_struct.name = "string";
 		str_ti->type_struct.name_length = sizeof("string") - 1;
-		str_ti->type_struct.fields_names = create_array(string, 2);
-		str_ti->type_struct.fields_types = create_array(Type_Instance*, 2);
+		str_ti->type_struct.fields_names = array_create(string, 2);
+		str_ti->type_struct.fields_types = array_create(Type_Instance*, 2);
 
 		Token* t = new Token();
 		t->column = 0;
 		t->line = 0;
-		string filename;
-		make_immutable_string(&filename, "internal_compiler");
+		string filename = MAKE_STRING("internal_compiler");
+
 		t->filename = filename;
 		t->flags = 0;
 		t->type = TOKEN_IDENTIFIER;
-		string name;
-		make_immutable_string(&name, "string");
+		string name = MAKE_STRING("string");
 		t->value = name;
 
 		Token* tlen = new Token();
@@ -43,8 +42,7 @@ void initialize_types(Scope* global_scope, Ast** ast)
 		tlen->filename = filename;
 		tlen->flags = 0;
 		tlen->type = TOKEN_IDENTIFIER;
-		string name_tlen;
-		make_immutable_string(&name_tlen, "length");
+		string name_tlen = MAKE_STRING("length");
 		tlen->value = name_tlen;
 
 		Token* tdata = new Token();
@@ -53,8 +51,7 @@ void initialize_types(Scope* global_scope, Ast** ast)
 		tdata->filename = filename;
 		tdata->flags = 0;
 		tdata->type = TOKEN_IDENTIFIER;
-		string name_tdata;
-		make_immutable_string(&name_tdata, "data");
+		string name_tdata = MAKE_STRING("data");
 		tdata->value = name_tdata;
 
 		Decl_Site decl_site;
@@ -66,23 +63,23 @@ void initialize_types(Scope* global_scope, Ast** ast)
 
 		Type_Instance* tlen_type = get_primitive_type(TYPE_PRIMITIVE_S64);
 		Type_Instance* tdata_type = create_ptr_typeof(get_primitive_type(TYPE_PRIMITIVE_S8));
-		push_array(str_ti->type_struct.fields_types, &tlen_type);
-		push_array(str_ti->type_struct.fields_types, &tdata_type);
-		push_array(str_ti->type_struct.fields_names, &name_tlen);
-		push_array(str_ti->type_struct.fields_names, &name_tdata);
+		array_push(str_ti->type_struct.fields_types, &tlen_type);
+		array_push(str_ti->type_struct.fields_types, &tdata_type);
+		array_push(str_ti->type_struct.fields_names, &name_tlen);
+		array_push(str_ti->type_struct.fields_names, &name_tdata);
 
 		Ast* str_field_length = create_variable_decl(0, tlen, tlen_type, 0, struct_scope, &decl_site);
 		Ast* str_field_data   = create_variable_decl(0, tdata, tdata_type, 0, struct_scope, &decl_site);
-		Ast** fields = create_array(Ast*, 2);
-		push_array(fields, &str_field_length);
-		push_array(fields, &str_field_data);
+		Ast** fields = array_create(Ast*, 2);
+		array_push(fields, &str_field_length);
+		array_push(fields, &str_field_data);
 
 		str_ti->type_struct.struct_descriptor = create_struct_decl(0, t, fields, 2, struct_scope, &decl_site);
 		global_scope->num_declarations += 1;
 		struct_scope->decl_node = str_ti->type_struct.struct_descriptor;
 		struct_scope->num_declarations = 2;
 
-		push_array(ast, &str_ti->type_struct.struct_descriptor);	// put string struct declaration in the AST
+		array_push(ast, &str_ti->type_struct.struct_descriptor);	// put string struct declaration in the AST
 		create_type(&str_ti, false);
 		string_type = str_ti;
 	}
@@ -325,7 +322,7 @@ void mark_non_delete(Type_Instance* instance) {
 		assert(0);	// @todo
 	}break;
 	case TYPE_STRUCT: {
-		int num_field = get_arr_length(instance->type_struct.fields_types);
+		int num_field = array_get_length(instance->type_struct.fields_types);
 		for (int i = 0; i < num_field; ++i)
 			mark_non_delete(instance->type_struct.fields_types[i]);
 	}break;
@@ -537,7 +534,7 @@ void DEBUG_print_node_type(FILE* out, Ast* node, bool decl_only)
 
 void DEBUG_print_node_type(FILE* out, Ast** ast, bool decl_only)
 {
-	int num_nodes = get_arr_length(ast);
+	int num_nodes = array_get_length(ast);
 	for (int i = 0; i < num_nodes; ++i) {
 		Ast* node = ast[i];
 		DEBUG_print_node_type(out, node, decl_only);

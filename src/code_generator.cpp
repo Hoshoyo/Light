@@ -46,7 +46,7 @@ s64 gen_proc_prologue(Ast* proc_body, s64 offset)
 	push_instruction(make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 8 * 4);
 
 	Token t;
-	make_immutable_string(t.value, "MessageBoxA");
+	t.value = MAKE_STRING("MessageBoxA");
 	s64 index = -1;
 	do {
 		if(scope->num_declarations > 0)
@@ -178,7 +178,7 @@ int generate_interpreter_code(Ast** ast)
 {
 	s64 address = gen_entry_point();
 
-	int num_decls = get_arr_length(ast);
+	int num_decls = array_get_length(ast);
 	for (int i = 0; i < num_decls; ++i) {
 		Ast* node = ast[i];
 		int res = gen_interpreter_code_for_node(node, address);

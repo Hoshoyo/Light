@@ -1,5 +1,6 @@
 #pragma once
 #include "util.h"
+#include "hash_table.h"
 
 enum Token_Type
 {
@@ -86,9 +87,9 @@ enum Token_Type
 	TOKEN_UINT8 = 194,
 	TOKEN_REAL32 = 195,
 	TOKEN_REAL64 = 196,
-	TOKEN_CHAR = 197,
-	TOKEN_FLOAT = 198,
-	TOKEN_DOUBLE = 199,
+	//TOKEN_CHAR = 197,
+	//TOKEN_FLOAT = 198,
+	//TOKEN_DOUBLE = 199,
 	TOKEN_BOOL = 200,
 	TOKEN_VOID = 201,
 
@@ -99,8 +100,8 @@ enum Token_Type
 	TOKEN_FOR_STATEMENT = 205,
 	TOKEN_DO_STATEMENT = 206,
 	TOKEN_SWITCH_STATEMENT = 207,
-	TOKEN_CASE_STATEMENT = 208,
-	TOKEN_GOTO_STATEMENT = 209,
+	//TOKEN_CASE_STATEMENT = 208,
+	//TOKEN_GOTO_STATEMENT = 209,
 	TOKEN_BREAK_STATEMENT = 210,
 	TOKEN_CONTINUE_STATEMENT = 211,
 	TOKEN_RETURN_STATEMENT = 212,
@@ -122,8 +123,10 @@ const u32 TOKEN_FLAG_UNARY_POSTFIXED = FLAG(6);
 const u32 TOKEN_FLAG_PRIMITIVE_TYPE = FLAG(7);
 const u32 TOKEN_FLAG_ASSIGNMENT_OPERATOR = FLAG(8);
 
-#define LEXER_SUCCESS 1
-#define LEXER_FAILURE 0
+enum Lexer_Error {
+	LEXER_SUCCESS = 0,
+	LEXER_ERROR = 1,
+};
 
 struct Token
 {
@@ -131,11 +134,19 @@ struct Token
 
 	s32 line;
 	s32 column;
+	s32 offset_in_file;
 
 	u32 flags = 0;
 
 	string filename;
 	string value;
+
+	union literal_value{
+		u64 uint64_v;
+		s64 sint64_v;
+		r32 float32_v;
+		r64 float64_v;
+	};
 };
 
 struct Lexer
@@ -147,8 +158,9 @@ struct Lexer
 	s64 token_count = 0;
 	s64 line_count = 1;
 
+	static void init();
 
-	s32 start(const char* filename);
+	Lexer_Error start(const char* filename);
 	void rewind();
 	Token* peek_token();
 	Token* peek_token(int advance);
@@ -162,6 +174,8 @@ struct Lexer
 
 	char* get_token_string(Token_Type);
 
+	s32 report_lexer_error(char* msg, ...);
+
 	void lex_file();
 	bool read_token(char** at);
 
@@ -170,3 +184,11 @@ struct Lexer
 	s64 current_col = 0;
 	Token* token_array = 0;
 };
+
+struct Keyword {
+	string word;
+	Token_Type token_type;
+	u32 flags;
+};
+
+void internalize_identifier(string* str);

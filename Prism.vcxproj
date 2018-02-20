@@ -135,9 +135,9 @@
   <ItemGroup>
     <ClCompile Include="src\ast.cpp" />
     <ClCompile Include="src\code_generator.cpp" />
+    <ClCompile Include="src\hash_table.cpp" />
     <ClCompile Include="src\interpreter.cpp" />
     <ClCompile Include="src\lexer.cpp" />
-    <ClCompile Include="src\llvm_backend.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\memory.cpp" />
     <ClCompile Include="src\parser.cpp" />
@@ -149,6 +149,7 @@
   <ItemGroup>
     <ClInclude Include="src\ast.h" />
     <ClInclude Include="src\code_generator.h" />
+    <ClInclude Include="src\hash_table.h" />
     <ClInclude Include="src\interpreter.h" />
     <ClInclude Include="src\lexer.h" />
     <ClInclude Include="src\llvm_backend.h" />
