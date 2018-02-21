@@ -1,6 +1,7 @@
 #include "lexer.h"
 #include <ho_system.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 extern Hash_Table keywords = {};
 extern String_Hash_Table identifiers = {};

@@ -5,7 +5,7 @@ BINDIR=./bin/gcc
 
 all: extcall 
 	mkdir -p ./bin/gcc
-	$(CC) $(CFLAGS) $(SRCDIR)/ast.cpp $(SRCDIR)/main.cpp $(SRCDIR)/lexer.cpp $(SRCDIR)/util.cpp $(SRCDIR)/memory.cpp $(SRCDIR)/type.cpp $(SRCDIR)/parser.cpp $(SRCDIR)/semantic.cpp $(SRCDIR)/symbol_table.cpp $(SRCDIR)/interpreter.cpp -o $(BINDIR)/prism $(BINDIR)/external_caller.o 
+	$(CC) $(CFLAGS) $(SRCDIR)/ast.cpp $(SRCDIR)/main.cpp $(SRCDIR)/lexer.cpp $(SRCDIR)/util.cpp $(SRCDIR)/memory.cpp $(SRCDIR)/type.cpp $(SRCDIR)/parser.cpp $(SRCDIR)/semantic.cpp $(SRCDIR)/symbol_table.cpp $(SRCDIR)/interpreter.cpp $(SRCDIR)/hash_table.cpp -o $(BINDIR)/light $(BINDIR)/external_caller.o 
 
 extcall: 
 	nasm -g -f elf64 -o $(BINDIR)/external_caller.o $(SRCDIR)/external_caller_nasm.asm
