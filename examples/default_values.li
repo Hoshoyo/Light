@@ -1,0 +1,36 @@
+
+main :: (argc : s32, argv : ^^u8) -> s32 
+{
+	// Default initialization to zero of everything
+	tuple :: struct {
+		v1 : s32;
+		v2 : s32;
+	}
+	fpoint  : r32;			// 0.0
+	integer : s32;			// 0
+	point   : tuple;		// { 0, 0 }
+	
+	vec3 :: struct {
+		x : r32 = 1.0;
+		y : r32 = 2.0;
+		z : r32 = 3.0;
+	}
+	position : vec3 = ---;	// { ?, ?, ? }       override and uninitialize every field 
+	velocity : vec3;		// { 1.0, 2.0, 3.0 } 	
+	
+	vec2 :: struct {
+		x : r32 = ---;
+		y : r32 = ---;
+	}
+	point : vec2;			// { ?, ? }
+	
+	vec4 :: struct {
+		x : r32 = 1.0;
+		y : r32 = ---;
+		z : r32 = ---;
+		w : r32 = 4.0;
+	}
+	quaternion : vec4;		// { 1.0, ?, ?, 4.0 }
+	
+	return 0;
+}

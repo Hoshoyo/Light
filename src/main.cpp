@@ -11,7 +11,7 @@
 
 int main(int argc, char** argv) {
 	if (argc <= 1) {
-		fprintf(stderr, "No files were given.\nusage: prism [option ...] filename\n");
+		fprintf(stderr, "No files were given.\nusage: %s [option ...] filename\n", argv[0]);
 		return -1;
 	}
 	
@@ -19,12 +19,11 @@ int main(int argc, char** argv) {
 
 	Lexer lexer;
 	if (lexer.start(argv[1]) != LEXER_SUCCESS) {
-		fprintf(stderr, "There were errors, exiting.\n");
 		return -1;
 	}
 
 	Scope* global_scope = create_scope(0, 0, 0);
-	Ast** ast = array_create(Ast*, 2048);	// @TODO estimate size here @IMPORTANT
+	Ast** ast = array_create(Ast*, 2048);	// @TODO estimate size here
 	initialize_types(global_scope, ast);
 
 	Parser parser(&lexer);

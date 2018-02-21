@@ -1,5 +1,5 @@
-#include("user32.dll") MessageBoxA : (hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> int;
-#include("msvcrt.dll") malloc : (size : s64) -> ^s64;
+MessageBoxA : (hwnd : ^void, lptext : ^s8, lpcaption : ^s8, utype : u32) -> int #foreign("user32");
+malloc : (size : s64) -> ^s64 #foreign("msvcrt");
 
 vec3 :: struct{
 	x : float;

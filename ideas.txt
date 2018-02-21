@@ -16,3 +16,11 @@ parse_file :: (filename : string) -> Game_State {
 	// ...
 	return result;
 }
+
+// No rtti yet? hack to get it
+// Has templates
+// Has exceptions
+https://dlang.org/comparison.html
+https://wiki.dlang.org/Memory_Management
+
+https://golang.org/doc/faq

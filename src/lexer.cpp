@@ -7,19 +7,19 @@ extern String_Hash_Table identifiers = {};
 
 // All the keywords in the language
 Keyword keywords_info[] = {
-	{ MAKE_STRING("int"), TOKEN_INT,    TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("bool"), TOKEN_BOOL,  TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("void"), TOKEN_VOID,  TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("r32"), TOKEN_REAL32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("r64"), TOKEN_REAL64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("s64"), TOKEN_SINT64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("s32"), TOKEN_SINT32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("s16"), TOKEN_SINT16, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("s8"),  TOKEN_SINT8,  TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("u64"), TOKEN_UINT64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("u32"), TOKEN_UINT32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("u16"), TOKEN_UINT16, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("u8"),  TOKEN_UINT8,  TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("int"),  TOKEN_INT,    TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("bool"), TOKEN_BOOL,   TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("void"), TOKEN_VOID,   TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("r32"),  TOKEN_REAL32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("r64"),  TOKEN_REAL64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("s64"),  TOKEN_SINT64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("s32"),  TOKEN_SINT32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("s16"),  TOKEN_SINT16, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("s8"),   TOKEN_SINT8,  TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("u64"),  TOKEN_UINT64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("u32"),  TOKEN_UINT32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("u16"),  TOKEN_UINT16, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("u8"),   TOKEN_UINT8,  TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
 
 	{ MAKE_STRING("if"),		TOKEN_IF_STATEMENT,			TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("else"),		TOKEN_ELSE_STATEMENT,		TOKEN_FLAG_RESERVED_WORD },
@@ -586,94 +586,95 @@ static char* make_null_term_string(char* s)
 	return ptr;
 }
 
+
 char* Lexer::get_token_string(Token_Type t)
 {
 	switch (t) {
-	case TOKEN_SYMBOL_NOT:				return  make_null_term_string("!"); break;
-	case TOKEN_SYMBOL_POUND:			return  make_null_term_string("#"); break;
-	case TOKEN_SYMBOL_DOLLAR:			return  make_null_term_string("$"); break;
-	case TOKEN_SYMBOL_MOD:				return  make_null_term_string("%"); break;
-	case TOKEN_SYMBOL_AND:				return  make_null_term_string("&"); break;
-	case TOKEN_SYMBOL_OPEN_PAREN:		return  make_null_term_string("("); break;
-	case TOKEN_SYMBOL_CLOSE_PAREN:		return  make_null_term_string(")"); break;
-	case TOKEN_SYMBOL_TIMES:			return  make_null_term_string("*"); break;
-	case TOKEN_SYMBOL_PLUS:				return  make_null_term_string("+"); break;
-	case TOKEN_SYMBOL_COMMA:			return  make_null_term_string(","); break;
-	case TOKEN_SYMBOL_MINUS:			return  make_null_term_string("-"); break;
-	case TOKEN_SYMBOL_DOT:				return  make_null_term_string("."); break;
-	case TOKEN_SYMBOL_DIV:				return  make_null_term_string("/"); break;
-	case TOKEN_SYMBOL_COLON:			return  make_null_term_string(":"); break;
-	case TOKEN_SYMBOL_SEMICOLON:		return  make_null_term_string(";"); break;
-	case TOKEN_SYMBOL_LESS:				return  make_null_term_string("<"); break;
-	case TOKEN_SYMBOL_EQUAL:			return  make_null_term_string("="); break;
-	case TOKEN_SYMBOL_GREATER:			return  make_null_term_string(">"); break;
-	case TOKEN_SYMBOL_INTERROGATION:	return  make_null_term_string("?"); break;
-	case TOKEN_SYMBOL_AT:				return  make_null_term_string("@"); break;
-	case TOKEN_SYMBOL_OPEN_BRACKET:		return  make_null_term_string("["); break;
-	case TOKEN_SYMBOL_CLOSE_BRACKET:	return  make_null_term_string("]"); break;
-	case TOKEN_SYMBOL_CARAT:			return  make_null_term_string("^"); break;
-	case TOKEN_SYMBOL_BACK_TICK:		return  make_null_term_string("`"); break;
-	case TOKEN_SYMBOL_OPEN_BRACE:		return  make_null_term_string("{"); break;
-	case TOKEN_SYMBOL_PIPE:				return  make_null_term_string("|"); break;
-	case TOKEN_SYMBOL_CLOSE_BRACE:		return  make_null_term_string("}"); break;
-	case TOKEN_SYMBOL_TILDE:			return  make_null_term_string("~"); break;
+	case TOKEN_SYMBOL_NOT:				return  ("!"); break;
+	case TOKEN_SYMBOL_POUND:			return  ("#"); break;
+	case TOKEN_SYMBOL_DOLLAR:			return  ("$"); break;
+	case TOKEN_SYMBOL_MOD:				return  ("%"); break;
+	case TOKEN_SYMBOL_AND:				return  ("&"); break;
+	case TOKEN_SYMBOL_OPEN_PAREN:		return  ("("); break;
+	case TOKEN_SYMBOL_CLOSE_PAREN:		return  (")"); break;
+	case TOKEN_SYMBOL_TIMES:			return  ("*"); break;
+	case TOKEN_SYMBOL_PLUS:				return  ("+"); break;
+	case TOKEN_SYMBOL_COMMA:			return  (","); break;
+	case TOKEN_SYMBOL_MINUS:			return  ("-"); break;
+	case TOKEN_SYMBOL_DOT:				return  ("."); break;
+	case TOKEN_SYMBOL_DIV:				return  ("/"); break;
+	case TOKEN_SYMBOL_COLON:			return  (":"); break;
+	case TOKEN_SYMBOL_SEMICOLON:		return  (";"); break;
+	case TOKEN_SYMBOL_LESS:				return  ("<"); break;
+	case TOKEN_SYMBOL_EQUAL:			return  ("="); break;
+	case TOKEN_SYMBOL_GREATER:			return  (">"); break;
+	case TOKEN_SYMBOL_INTERROGATION:	return  ("?"); break;
+	case TOKEN_SYMBOL_AT:				return  ("@"); break;
+	case TOKEN_SYMBOL_OPEN_BRACKET:		return  ("["); break;
+	case TOKEN_SYMBOL_CLOSE_BRACKET:	return  ("]"); break;
+	case TOKEN_SYMBOL_CARAT:			return  ("^"); break;
+	case TOKEN_SYMBOL_BACK_TICK:		return  ("`"); break;
+	case TOKEN_SYMBOL_OPEN_BRACE:		return  ("{"); break;
+	case TOKEN_SYMBOL_PIPE:				return  ("|"); break;
+	case TOKEN_SYMBOL_CLOSE_BRACE:		return  ("}"); break;
+	case TOKEN_SYMBOL_TILDE:			return  ("~"); break;
 
-	case TOKEN_ARROW:				return  make_null_term_string("->"); break;
-	case TOKEN_EQUAL_COMPARISON:	return  make_null_term_string("=="); break;
-	case TOKEN_LESS_EQUAL:			return  make_null_term_string("<="); break;
-	case TOKEN_GREATER_EQUAL:		return  make_null_term_string(">="); break;
-	case TOKEN_NOT_EQUAL:			return  make_null_term_string("!="); break;
-	case TOKEN_LOGIC_OR:			return  make_null_term_string("||"); break;
-	case TOKEN_LOGIC_AND:			return  make_null_term_string("&&"); break;
-	case TOKEN_COLON_COLON:			return  make_null_term_string("::"); break;
-	case TOKEN_BITSHIFT_LEFT:		return  make_null_term_string("<<"); break;
-	case TOKEN_BITSHIFT_RIGHT:		return  make_null_term_string(">>"); break;
+	case TOKEN_ARROW:				return ("->"); break;
+	case TOKEN_EQUAL_COMPARISON:	return ("=="); break;
+	case TOKEN_LESS_EQUAL:			return ("<="); break;
+	case TOKEN_GREATER_EQUAL:		return (">="); break;
+	case TOKEN_NOT_EQUAL:			return ("!="); break;
+	case TOKEN_LOGIC_OR:			return ("||"); break;
+	case TOKEN_LOGIC_AND:			return ("&&"); break;
+	case TOKEN_COLON_COLON:			return ("::"); break;
+	case TOKEN_BITSHIFT_LEFT:		return ("<<"); break;
+	case TOKEN_BITSHIFT_RIGHT:		return (">>"); break;
 
-	case TOKEN_PLUS_EQUAL:	return  make_null_term_string("+="); break;
-	case TOKEN_MINUS_EQUAL: return  make_null_term_string("-="); break;
-	case TOKEN_TIMES_EQUAL: return  make_null_term_string("*="); break;
-	case TOKEN_DIV_EQUAL:	return  make_null_term_string("/="); break;
-	case TOKEN_MOD_EQUAL:	return  make_null_term_string("%="); break;
-	case TOKEN_AND_EQUAL:	return  make_null_term_string("&="); break;
-	case TOKEN_OR_EQUAL:	return  make_null_term_string("|="); break;
-	case TOKEN_XOR_EQUAL:	return  make_null_term_string("^="); break;
-	case TOKEN_SHL_EQUAL:	return  make_null_term_string("<<="); break;
-	case TOKEN_SHR_EQUAL:	return  make_null_term_string(">>="); break;
+	case TOKEN_PLUS_EQUAL:	return ("+="); break;
+	case TOKEN_MINUS_EQUAL: return ("-="); break;
+	case TOKEN_TIMES_EQUAL: return ("*="); break;
+	case TOKEN_DIV_EQUAL:	return ("/="); break;
+	case TOKEN_MOD_EQUAL:	return ("%="); break;
+	case TOKEN_AND_EQUAL:	return ("&="); break;
+	case TOKEN_OR_EQUAL:	return ("|="); break;
+	case TOKEN_XOR_EQUAL:	return ("^="); break;
+	case TOKEN_SHL_EQUAL:	return ("<<="); break;
+	case TOKEN_SHR_EQUAL:	return (">>="); break;
 
-	case TOKEN_PLUS_PLUS:	return  make_null_term_string("++"); break;
-	case TOKEN_MINUS_MINUS: return  make_null_term_string("--"); break;
-	case TOKEN_CAST:		return  make_null_term_string("cast"); break;
+	case TOKEN_PLUS_PLUS:	return  ("++"); break;
+	case TOKEN_MINUS_MINUS: return  ("--"); break;
+	case TOKEN_CAST:		return  ("cast"); break;
 
-	case TOKEN_DOUBLE_DOT: return  make_null_term_string(".."); break;
+	case TOKEN_DOUBLE_DOT: return (".."); break;
 
-	case TOKEN_INT:			return  make_null_term_string("int"); break;
-	case TOKEN_SINT64:		return  make_null_term_string("s64"); break;
-	case TOKEN_SINT32:		return  make_null_term_string("s32"); break;
-	case TOKEN_SINT16:		return  make_null_term_string("s16"); break;
-	case TOKEN_SINT8:		return  make_null_term_string("s8"); break;
-	case TOKEN_UINT64:		return  make_null_term_string("u64"); break;
-	case TOKEN_UINT32:		return  make_null_term_string("u32"); break;
-	case TOKEN_UINT16:		return  make_null_term_string("u16"); break;
-	case TOKEN_UINT8:		return  make_null_term_string("u8"); break;
-	case TOKEN_REAL32:		return  make_null_term_string("r32"); break;
-	case TOKEN_REAL64:		return  make_null_term_string("r64"); break;
-	case TOKEN_BOOL:		return  make_null_term_string("bool"); break;
-	case TOKEN_VOID:		return  make_null_term_string("void"); break;
+	case TOKEN_INT:			return ("int"); break;
+	case TOKEN_SINT64:		return ("s64"); break;
+	case TOKEN_SINT32:		return ("s32"); break;
+	case TOKEN_SINT16:		return ("s16"); break;
+	case TOKEN_SINT8:		return ("s8"); break;
+	case TOKEN_UINT64:		return ("u64"); break;
+	case TOKEN_UINT32:		return ("u32"); break;
+	case TOKEN_UINT16:		return ("u16"); break;
+	case TOKEN_UINT8:		return ("u8"); break;
+	case TOKEN_REAL32:		return ("r32"); break;
+	case TOKEN_REAL64:		return ("r64"); break;
+	case TOKEN_BOOL:		return ("bool"); break;
+	case TOKEN_VOID:		return ("void"); break;
 
-	case TOKEN_IF_STATEMENT:		return  make_null_term_string("if"); break;
-	case TOKEN_ELSE_STATEMENT:		return  make_null_term_string("else"); break;
-	case TOKEN_WHILE_STATEMENT:		return  make_null_term_string("while"); break;
-	case TOKEN_FOR_STATEMENT:		return  make_null_term_string("for"); break;
-	case TOKEN_DO_STATEMENT:		return  make_null_term_string("do"); break;
-	case TOKEN_SWITCH_STATEMENT:	return  make_null_term_string("switch"); break;
-	case TOKEN_BREAK_STATEMENT:		return  make_null_term_string("break"); break;
-	case TOKEN_CONTINUE_STATEMENT:	return  make_null_term_string("continue"); break;
-	case TOKEN_RETURN_STATEMENT:	return  make_null_term_string("return"); break;
+	case TOKEN_IF_STATEMENT:		return ("if"); break;
+	case TOKEN_ELSE_STATEMENT:		return ("else"); break;
+	case TOKEN_WHILE_STATEMENT:		return ("while"); break;
+	case TOKEN_FOR_STATEMENT:		return ("for"); break;
+	case TOKEN_DO_STATEMENT:		return ("do"); break;
+	case TOKEN_SWITCH_STATEMENT:	return ("switch"); break;
+	case TOKEN_BREAK_STATEMENT:		return ("break"); break;
+	case TOKEN_CONTINUE_STATEMENT:	return ("continue"); break;
+	case TOKEN_RETURN_STATEMENT:	return ("return"); break;
 
-	case TOKEN_INTERNAL_WORD:	return  make_null_term_string("internal"); break;
-	case TOKEN_STRUCT_WORD:		return  make_null_term_string("struct"); break;
-	case TOKEN_UNION_WORD:		return  make_null_term_string("union"); break;
-	case TOKEN_NEW_WORD:		return  make_null_term_string("new"); break;
+	case TOKEN_INTERNAL_WORD:	return ("internal"); break;
+	case TOKEN_STRUCT_WORD:		return ("struct"); break;
+	case TOKEN_UNION_WORD:		return ("union"); break;
+	case TOKEN_NEW_WORD:		return ("new"); break;
 	}
 }
 
