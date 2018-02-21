@@ -12,5 +12,5 @@ void free_library(HMODULE lib);
 // @TODO OPTIMIZE, load library once for all external calls
 void* load_address_of_external_function(string* name, HMODULE library);
 #else
-#error "os not supported"
+//#error "os not supported"
 #endif
