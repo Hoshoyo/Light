@@ -178,8 +178,12 @@ string::string(s64 capac, size_t strlen, char* str)
 {
 	capacity = capac;
 	length = strlen;
-	data = (char*)malloc(capacity);
-	if (strlen) strncpy(data, str, strlen);
+	if (capacity > 0) {
+		data = (char*)malloc(capacity);
+		if (strlen) strncpy(data, str, strlen);
+	} else {
+		data = str;
+	}
 }
 
 string::~string()
@@ -336,4 +340,14 @@ char* make_c_string(string& s)
 	mem[s.length] = 0;
 	memcpy(mem, s.data, s.length);
 	return mem;
+}
+
+u64 fnv_1_hash(char* s, u64 length) {
+	u64 hash = 14695981039346656037;
+	u64 fnv_prime = 1099511628211;
+	for (u64 i = 0; i < length; ++i) {
+		hash = hash * fnv_prime;
+		hash = hash ^ s[i];
+	}
+	return hash;
 }

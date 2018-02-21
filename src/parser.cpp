@@ -57,7 +57,7 @@ Ast** Parser::parse_top_level(Scope* global_scope, Ast** top_level)
 	while (parser_error == PARSER_NO_ERROR && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
 		Ast* decl = parse_declaration(global_scope);
 		if (!decl) break;
-		push_array(top_level, &decl);
+		array_push(top_level, &decl);
 	}
 	if (parser_error == PARSER_ERROR_FATAL) {
 		fprintf(stderr, "There were errors, exiting...\n");
@@ -73,13 +73,13 @@ Ast* Parser::parse_literal()
 
 	u32 flags = 0;
 	if (lit_token->type == TOKEN_INT_LITERAL) {
-		flags |= LITERAL_FLAG_IS_REGSIZE;
+		flags |= LITERAL_FLAG_IS_REGSIZE | LITERAL_FLAG_NUMERIC;
 	} else if (lit_token->type == TOKEN_FLOAT_LITERAL) {
-		flags |= LITERAL_FLAG_IS_REGSIZE;
+		flags |= LITERAL_FLAG_IS_REGSIZE | LITERAL_FLAG_NUMERIC;
 	} else if (lit_token->type == TOKEN_CHAR_LITERAL) {
-		flags |= LITERAL_FLAG_IS_REGSIZE;
+		flags |= LITERAL_FLAG_IS_REGSIZE | LITERAL_FLAG_NUMERIC;
 	} else if (lit_token->type == TOKEN_BOOL_LITERAL) {
-		flags |= LITERAL_FLAG_IS_REGSIZE;
+		flags |= LITERAL_FLAG_IS_REGSIZE | LITERAL_FLAG_NUMERIC;
 	} else if (lit_token->type == TOKEN_STRING_LITERAL) {
 		flags = 0;
 	} else {
@@ -233,10 +233,8 @@ Type_Primitive get_primitive_type(Token* tok)
 	case TOKEN_UINT32:	return Type_Primitive::TYPE_PRIMITIVE_U32; break;
 	case TOKEN_UINT64:	return Type_Primitive::TYPE_PRIMITIVE_U64; break;
 	case TOKEN_INT:		return Type_Primitive::TYPE_PRIMITIVE_S64; break;
-	case TOKEN_CHAR:	return Type_Primitive::TYPE_PRIMITIVE_S8; break;
-	case TOKEN_FLOAT:	return Type_Primitive::TYPE_PRIMITIVE_R32; break;
 	case TOKEN_REAL32:	return Type_Primitive::TYPE_PRIMITIVE_R32; break;
-	case TOKEN_DOUBLE:	return Type_Primitive::TYPE_PRIMITIVE_R64; break;
+	case TOKEN_REAL64:	return Type_Primitive::TYPE_PRIMITIVE_R64; break;
 	case TOKEN_VOID:	return Type_Primitive::TYPE_PRIMITIVE_VOID; break;
 	default: return Type_Primitive::TYPE_PRIMITIVE_UNKNOWN; break;
 	}
@@ -358,10 +356,10 @@ Ast* Parser::parse_proc_call(Scope* scope)
 		require_and_eat((Token_Type)')');
 	}
 	else {
-		args = create_array(Ast*, 4);
+		args = array_create(Ast*, 4);
 		while(true) {
 			Ast* arg = parse_expression(scope);
-			push_ast_list(args, arg);
+			push_ast_list(&args, arg);
 			num_args++;
 			next = lexer->peek_token();
 			if (next->type == (Token_Type)',') {
@@ -502,7 +500,7 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 
 	Scope* proc_scope = create_scope(scope->level + 1, scope, SCOPE_FLAG_PROC_SCOPE);
 
-	Ast** args = create_array(Ast*, 4);
+	Ast** args = array_create(Ast*, 4);
 	int n_args = 0;
 	for (;;) {
 		curr = lexer->eat_token();
@@ -524,7 +522,7 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 			// create the argument node
 			Ast* argument = create_named_argument(&arena, curr, arg_type, arg_def_value, n_args, proc_scope, &site);
 			n_args++;
-			push_array(args, &argument);
+			array_push(args, &argument);
 			if (lexer->peek_token_type() == (Token_Type)',') lexer->eat_token();
 		} else if (curr->type == (Token_Type)')') {
 			break;
@@ -550,7 +548,7 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 	} else if(lexer->peek_token_type() == '#'){
 		lexer->eat_token(); // #
 		Token* tag = lexer->eat_token();
-		if (str_equal("extern", sizeof("extern") - 1, tag->value.data, tag->value.length)) {
+		if (str_equal("foreign", sizeof("foreign") - 1, tag->value.data, tag->value.length)) {
 			require_and_eat((Token_Type)'(');
 			extern_name = lexer->eat_token();
 			require_and_eat((Token_Type)')');
@@ -618,13 +616,13 @@ Ast* Parser::parse_struct(Token* name, Scope* scope)
 	require_and_eat(TOKEN_STRUCT_WORD);
 	require_and_eat(TOKEN_SYMBOL_OPEN_BRACE);
 
-	Ast** fields = create_array(Ast*, 8);
+	Ast** fields = array_create(Ast*, 8);
 	int num_fields = 0;
 	Scope* struct_scope = create_scope(1, scope, SCOPE_FLAG_STRUCT_SCOPE);
 	while (true) {
 		Ast* field = parse_declaration(struct_scope);
 		if (field == 0) return 0;
-		push_array(fields, &field);
+		array_push(fields, &field);
 		num_fields++;
 		if (lexer->peek_token_type() == TOKEN_SYMBOL_CLOSE_BRACE) break;
 	}
@@ -733,10 +731,10 @@ Type_Instance* Parser::parse_type()
 		} else {
 			ti->flags |= TYPE_FLAG_ARRAY_STATIC;
 			// static array
-			Ast** dimension_sizes = create_array(Ast*, 2);
+			Ast** dimension_sizes = array_create(Ast*, 2);
 			for (int i = 0;; ++i) {
 				Ast* value = parse_expression(0);
-				push_array(dimension_sizes, &value);
+				array_push(dimension_sizes, &value);
 				num_dimensions++;
 				f = lexer->eat_token();
 				if (f->type == TOKEN_SYMBOL_COMMA) continue;
@@ -760,10 +758,10 @@ Type_Instance* Parser::parse_type()
 
 		int num_arguments = 0;
 		if (lexer->peek_token_type() != TOKEN_SYMBOL_CLOSE_PAREN) {
-			Type_Instance** arg_types = create_array(Type_Instance*, 8);
+			Type_Instance** arg_types = array_create(Type_Instance*, 8);
 			for (int i = 0;; ++i) {
 				Type_Instance* value = parse_type();
-				push_array(arg_types, &value);
+				array_push(arg_types, &value);
 				num_arguments++;
 				if (lexer->peek_token_type() == ',') {
 					lexer->eat_token();

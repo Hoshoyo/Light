@@ -1,0 +1,26 @@
+vec3 :: struct {
+	x, y, z : r32 = 0.0;
+}
+
+Game_State :: struct {
+	position : vec3;
+	velocity : vec3
+	name : string;
+	mesh : Mesh;
+}
+
+variable : Game_State = #run parse_file("file.txt");
+
+parse_file :: (filename : string) -> Game_State {
+	result : Game_State;
+	// ...
+	return result;
+}
+
+// No rtti yet? hack to get it
+// Has templates
+// Has exceptions
+https://dlang.org/comparison.html
+https://wiki.dlang.org/Memory_Management
+
+https://golang.org/doc/faq

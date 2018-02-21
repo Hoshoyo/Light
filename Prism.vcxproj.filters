@@ -48,7 +48,7 @@
     <ClCompile Include="src\code_generator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\llvm_backend.cpp">
+    <ClCompile Include="src\hash_table.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -84,6 +84,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\llvm_backend.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\hash_table.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

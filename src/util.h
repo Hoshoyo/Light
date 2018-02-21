@@ -2,6 +2,12 @@
 #include <ho_system.h>
 
 #define FLAG(A) (1 << A)
+#define MAX(X, Y) ((X > Y) ? (X) : (Y))
+#define MIN(X, Y) ((X < Y) ? (X) : (Y))
+
+#define MAKE_STRING(X) {-1, sizeof(X) - 1, X}
+
+#define ARRAY_COUNT(X) (sizeof(X) / sizeof((X)[0]))
 
 //
 //	capacity -1 means immutable string
@@ -26,11 +32,6 @@ struct string
 char* make_c_string(string& s);
 string make_new_string(const char*);
 string make_new_string(s64 capacity);
-void make_immutable_string(string& s, const char* val, s64 length);
-void make_immutable_string(string& s, const char* val);
-void make_immutable_string(string& dest, string& src);
-void make_immutable_string(string* s, const char* val);
-
 bool c_str_equal(const char* s1, const char* s2);
 bool str_equal(const char* s1, int s1_len, const char* s2, int s2_len);
 bool str_equal(const string& s1, const string& s2);
@@ -51,3 +52,4 @@ void s64_to_str(s64 val, char* buffer);
 u32 djb2_hash(u8 *str, int size);
 u32 djb2_hash(u32 starting_hash, u8 *str, int size);
 u32 djb2_hash(u32 hash1, u32 hash2);
+u64 fnv_1_hash(char* s, u64 length);

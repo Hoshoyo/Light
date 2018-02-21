@@ -1,0 +1,85 @@
+char  :: s8;
+short :: s16;
+int   :: s32;
+long  :: s64;
+
+uchar  :: u8;
+ushort :: u16;
+uint   :: u32;
+ulong  :: u64;
+
+float  :: r32;
+double :: r64;
+
+// Example of aliased types
+main :: (argc : int, argv : ^^char) -> int {
+	return 0;
+}
+
+// Default u64
+Animal :: enum {
+	LION,			// 0
+	TIGER,			// 1
+	ELEPHANT,		// 2
+	RHINO = 12,		// 12
+	HORSE,			// 13
+	CAT,			// 14
+	DOG,			// 15 optional ','
+}
+
+// Specified type
+Country :: enum u16 {
+	BRAZIL = 0x00,
+	USA,
+	RUSSIA,
+	CHINA,
+	MEXICO,
+	ARGENTINA
+}
+
+main :: (argc : s32, argv : ^s8) -> s32 {
+	City :: enum s32 {
+		PORTO_ALEGRE,
+		CAXIAS,
+		PELOTAS,
+		VIAMAO,
+	}
+	
+	return PORTO_ALEGRE;
+}
+
+// Types aliases
+proc :: () -> Animal {
+	return LION;				// ok
+	//return 12;				// compile error type mismatch
+	//return acast 12;			// auto cast to Animal
+	//return cast(Animal) 12;	// explicit cast;
+}
+
+constant_decls :: () {
+	// Ident : <Type> : Literal / ConstExpression? ;
+	
+	PI    :: 3.14159265359;	// default r32
+	PI64  : r64 : 3.14159265358979323846;
+	SQRT2 :: #run sqrtf(2.0);	// requires msvcrt
+}
+
+// Procedures
+add :: (a : s32, b : s32) -> s32 {
+	return a + b;
+}
+
+// Structs
+vec4 :: struct {
+	x : r32;
+	y : r32;
+	z : r32;
+	w : r32;
+}
+
+// Unions
+Token_Value :: union {
+	value_int    : s32;
+	value_float  : r32;
+	value_double : r64;
+}

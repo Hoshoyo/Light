@@ -1,0 +1,41 @@
+/*
+	Compiler internal struct
+	struct Type_Info {
+		u32 type;
+		u32 size_bytes;
+		union {
+			//... type specific data
+			Type_Info_Primitive primitive;
+			Type_Info_Pointer   pointer;
+		};
+	}
+*/
+
+main :: (argc : s32, argv : ^^u8) -> s32 {
+	
+	variable := 4.0;
+	t : Type_Info = #typeof(variable);			//t := #typeof(variable);
+	
+	if t.type == TYPE_PRIMITIVE 
+	{
+		print("variable is of primitive type: ");
+		if t.primitive.type == TYPE_PRIMITIVE_R32 
+		{
+			print("real32");
+		} 
+		else if t.primitive.type == TYPE_PRIMITIVE_S32 
+		{
+			print("signed32");
+		}
+		print("\n");
+	} 
+	else if t.type == TYPE_POINTER 
+	{
+		print("variable is a pointer\n");
+	}
+	
+	print("%d", #sizeof(t));	// size of the struct Type_Info
+	print("%d", #sizeof(#typeof(variable));
+	
+	return 0;
+}

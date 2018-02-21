@@ -2,6 +2,7 @@
 #include "parser.h"
 #include "type.h"
 #include "symbol_table.h"
+#include "ho_system.h"
 
 #define ALLOC_AST(A) (Ast*)A->allocate(sizeof(Ast))
 //#define ALLOC_AST(A) (Ast*)malloc(sizeof(Ast))
@@ -220,7 +221,7 @@ Ast* create_block(Memory_Arena* arena, Scope* scope)
 	block->type_checked = false;
 
 	block->block.scope = create_scope(scope->level + 1, scope, SCOPE_FLAG_BLOCK_SCOPE);
-	block->block.commands = create_array(Ast*, 16);
+	block->block.commands = array_create(Ast*, 16);
 
 	scope->decl_node = block;
 
@@ -242,6 +243,8 @@ Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope
 	proc_call->expression.proc_call.name = name;
 	proc_call->expression.proc_call.args = args;
 	proc_call->expression.proc_call.scope = scope;
+
+	size_t num_args = array_get_length(proc_call->expression.proc_call.args);
 
 	return proc_call;
 }
@@ -403,12 +406,12 @@ Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* literal_
 
 void block_push_command(Ast* block, Ast* command)
 {
-	push_array(block->block.commands, &command);
+	array_push(block->block.commands, &command);
 }
 
-void push_ast_list(Ast** list, Ast* arg)
+void push_ast_list(Ast*** list, Ast* arg)
 {
-	push_array(list, &arg);
+	array_push(*list, &arg);
 }
 
 s64 generate_scope_id()
@@ -478,7 +481,7 @@ void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
 			fprintf(out, "%.*s", type->type_struct.name_length, type->type_struct.name);
 		} else {
 			fprintf(out, "%.*s struct {\n", type->type_struct.name_length, type->type_struct.name);
-			int num_fields = get_arr_length(type->type_struct.fields_types);
+			int num_fields = array_get_length(type->type_struct.fields_types);
 			for (int i = 0; i < num_fields; ++i) {
 				Type_Instance* field_type = type->type_struct.fields_types[i];
 				string name = type->type_struct.fields_names[i];
@@ -503,7 +506,7 @@ void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
 
 void DEBUG_print_block(FILE* out, Ast* block)
 {
-	size_t num_commands = get_arr_length(block->block.commands);
+	size_t num_commands = array_get_length(block->block.commands);
 	fprintf(out, "{\n");
 	DEBUG_indent_level += 1;
 	for (size_t i = 0; i < num_commands; ++i) {
@@ -603,7 +606,7 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 	case EXPRESSION_TYPE_PROC_CALL: {
 		int num_args = 0;
 		if (node->expression.proc_call.args) {
-			num_args = get_arr_length(node->expression.proc_call.args);
+			num_args = array_get_length(node->expression.proc_call.args);
 		}
 		fprintf(out, "%.*s(", TOKEN_STR(node->expression.proc_call.name));
 		for (int i = 0; i < num_args; ++i) {
@@ -709,8 +712,8 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 }
 
 void DEBUG_print_ast(FILE* out, Ast** ast) {
-	int l = get_arr_length(ast);
-	for (int i = 0; i < get_arr_length(ast); ++i) {
+	int l = array_get_length(ast);
+	for (int i = 0; i < array_get_length(ast); ++i) {
 		DEBUG_print_node(out, ast[i]);
 		fprintf(out, "\n");
 	}
