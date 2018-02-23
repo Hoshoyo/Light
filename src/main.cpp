@@ -10,6 +10,7 @@
 #include "llvm_backend.h"
 
 int main(int argc, char** argv) {
+	u64 h = fnv_1_hash("Hello", sizeof("Hello") - 1);
 	if (argc <= 1) {
 		fprintf(stderr, "No files were given.\nusage: %s [option ...] filename\n", argv[0]);
 		return -1;

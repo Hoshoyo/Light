@@ -1,0 +1,36 @@
+// :set syntax=cpp
+square :: (v1 : s32) -> s32{
+	return v1 * v1;
+}
+
+// Option 1
+#copy square (s32 = r32)
+
+// Option 2
+#copy square :: (v1 : r32) -> r32;
+
+// Option 3
+square :: (v1 : r32) -> r32 #copy;
+square :: (v1 : r32) -> r32 #copy(squaref);
+
+quadratic :: (a : r32, b : r32, c : r32) -> r32 {
+	delta  : r32 = b * b - 4.0 * a * c;
+	result := (-b + sqrt(delta)) / (2.0 * a);
+	return result;
+}
+
+
+// Option 4
+quadratic :: (a : T, b : T, c : T) -> T #replace(T : s32, r32, r64){
+	delta  : T = b * b - 4.0 * a * c;
+	result : T = (-b + sqrt(delta)) / (2.0 * a);
+	return result;
+}
+
+#replace(T : s32, r32, r64; V : s32, s32, s32)
+
+
+// Struct
+vec3 :: struct #replace(T : s32 "ivec3", r32) {
+	x, y, z : T;
+}

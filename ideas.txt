@@ -1,26 +1,15 @@
-vec3 :: struct {
-	x, y, z : r32 = 0.0;
-}
-
-Game_State :: struct {
-	position : vec3;
-	velocity : vec3
-	name : string;
-	mesh : Mesh;
-}
-
-variable : Game_State = #run parse_file("file.txt");
-
-parse_file :: (filename : string) -> Game_State {
-	result : Game_State;
-	// ...
-	return result;
-}
-
 // No rtti yet? hack to get it
 // Has templates
 // Has exceptions
 https://dlang.org/comparison.html
-https://wiki.dlang.org/Memory_Management
 
+// Go
+https://golang.org/doc/effective_go.html
+https://wiki.dlang.org/Memory_Management
 https://golang.org/doc/faq
+http://spf13.com/post/is-go-object-oriented/
+https://golang.org/pkg/reflect/
+
+// C++
+// Expressividade em troca de Carga Mental
+// Nuts! https://stackoverflow.com/questions/22024090/class-with-templated-constructor-as-well-as-copy-and-move-constructor?rq=1
