@@ -9,19 +9,47 @@ Parser::Parser(Lexer* lexer)
 	filename = lexer->filename;
 }
 
+Ast** Parser::parse_top_level(Scope* global_scope, Ast** top_level)
+{
+	// Empty file check
+	if (lexer->token_count == 1 && lexer->peek_token_type() == TOKEN_END_OF_STREAM) {
+		return 0;
+	}
+	
+	parser_error = PARSER_OK;
+
+	while (parser_error == PARSER_OK && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
+		Ast* decl = parse_declaration(global_scope);
+		if (!decl) break;
+		array_push(top_level, &decl);
+	}
+
+	if (parser_error == PARSER_ERROR_FATAL) {
+		fprintf(stderr, "There were errors, exiting...\n");
+		return 0;
+	}
+	return top_level;
+}
+
 void print_error_loc(FILE* out, string filename, int line, int column) {
 	fprintf(out, "%.*s (%d:%d) ", filename.length, filename.data, line, column);
 }
 
-int Parser::report_syntax_error(char* msg, ...)
+int Parser::report_syntax_error(Token* error_token, char* msg, ...)
 {
+	if(error_token)
+		print_error_loc(stderr, error_token->filename, error_token->line, error_token->column);
 	va_list args;
 	va_start(args, msg);
 	fprintf(stderr, "Syntax Error: ");
 	vfprintf(stderr, msg, args);
 	va_end(args);
 	parser_error = PARSER_ERROR_FATAL;
-	exit(-1);
+	return system_exit(-1);
+}
+
+Token* Parser::require_and_eat(char c) {
+	return require_and_eat((Token_Type)c);
 }
 
 Token* Parser::require_and_eat(Token_Type t)
@@ -30,9 +58,9 @@ Token* Parser::require_and_eat(Token_Type t)
 	if (tok->type != t) {
 		print_error_loc(stderr, filename, tok->line, tok->column);
 
-		fprintf(stderr, "Syntax error: expected %s got '%.*s'.\n", lexer->get_token_string(t), TOKEN_STR(tok));
+		fprintf(stderr, "Syntax error: expected '%s' got '%.*s'.\n", lexer->get_token_string(t), TOKEN_STR(tok));
 		parser_error = PARSER_ERROR_FATAL;
-		exit(-1);
+		system_exit(-1);
 	}
 	return tok;
 }
@@ -46,24 +74,6 @@ int Parser::require_token_type(Token* tok, Token_Type type)
 		return -1;
 	}
 	return 0;
-}
-
-Ast** Parser::parse_top_level(Scope* global_scope, Ast** top_level) 
-{
-	if (lexer->token_count == 1 && lexer->peek_token_type() == TOKEN_END_OF_STREAM) {
-		return 0;
-	}
-	parser_error = PARSER_NO_ERROR;
-	while (parser_error == PARSER_NO_ERROR && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
-		Ast* decl = parse_declaration(global_scope);
-		if (!decl) break;
-		array_push(top_level, &decl);
-	}
-	if (parser_error == PARSER_ERROR_FATAL) {
-		fprintf(stderr, "There were errors, exiting...\n");
-		return 0;
-	}
-	return top_level;
 }
 
 Ast* Parser::parse_literal()
@@ -94,21 +104,13 @@ Precedence Parser::get_precedence_level(Token_Type type, bool postfixed, bool un
 {
 	if (unary) {
 		if (postfixed) {
-			if (type == TOKEN_PLUS_PLUS)
-				return PRECEDENCE_6;
-			if (type == TOKEN_MINUS_MINUS)
-				return PRECEDENCE_6;
-		}
-		else {
+			// Note(psv): include postfixed operators here
+		} else {
 			if (type == '*') return PRECEDENCE_7;	// dereference
 			if (type == '&') return PRECEDENCE_7;	// address of
 			if (type == '!') return PRECEDENCE_7;	// not
 			if (type == '~') return PRECEDENCE_6;	// xor
 			if (type == '-') return PRECEDENCE_7;	// minus
-			if (type == TOKEN_PLUS_PLUS)
-				return PRECEDENCE_7;
-			if (type == TOKEN_MINUS_MINUS)
-				return PRECEDENCE_7;
 		}
 	}
 
@@ -232,7 +234,6 @@ Type_Primitive get_primitive_type(Token* tok)
 	case TOKEN_UINT16:	return Type_Primitive::TYPE_PRIMITIVE_U16; break;
 	case TOKEN_UINT32:	return Type_Primitive::TYPE_PRIMITIVE_U32; break;
 	case TOKEN_UINT64:	return Type_Primitive::TYPE_PRIMITIVE_U64; break;
-	case TOKEN_INT:		return Type_Primitive::TYPE_PRIMITIVE_S64; break;
 	case TOKEN_REAL32:	return Type_Primitive::TYPE_PRIMITIVE_R32; break;
 	case TOKEN_REAL64:	return Type_Primitive::TYPE_PRIMITIVE_R64; break;
 	case TOKEN_VOID:	return Type_Primitive::TYPE_PRIMITIVE_VOID; break;
@@ -272,18 +273,17 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 		Ast* operand = parse_expression(scope, unop_precedence, true);
 		left_op = create_unary_expression(&arena, operand, uop, tok, UNARY_EXP_FLAG_PREFIXED, cast_type, unop_precedence, scope);
 	} else {
-		print_error_loc(stderr, first->filename, first->line, first->column);
 		if (first->type == TOKEN_END_OF_STREAM) {
-			report_syntax_error("unexpected end of stream at expression.\n", TOKEN_STR(first));
+			report_syntax_error(0, "unexpected end of stream at expression.\n", TOKEN_STR(first));
 		}
-		report_syntax_error("expected expression but got '%.*s'.\n", TOKEN_STR(first));
+		report_syntax_error(0, "expected expression but got '%.*s'.\n", TOKEN_STR(first));
 	}
 
 	Token* optor = lexer->eat_token();
 	if (optor->flags & TOKEN_FLAG_BINARY_OPERATOR || optor->flags & TOKEN_FLAG_ASSIGNMENT_OPERATOR) {
 		if (optor->type == '.' && lexer->peek_token_type() != TOKEN_IDENTIFIER) {
 			Token* t = lexer->peek_token();
-			report_syntax_error("expected member variable, got '%.*s'.\n", TOKEN_STR(t));
+			report_syntax_error(0, "expected member variable, got '%.*s'.\n", TOKEN_STR(t));
 		}
 		Precedence bop_precedence = get_precedence_level(get_binary_op(optor));
 		if (bop_precedence < caller_prec && quit_on_precedence) {
@@ -384,22 +384,11 @@ Ast* Parser::parse_command(Scope* scope)
 	Ast* command = 0;
 	Token* first = lexer->peek_token();
 	if (first->type == TOKEN_IDENTIFIER) {
-		// variable decl
+		// declaration or procedure call
 		if (lexer->peek_token_type(1) == ':') {
-			if (lexer->peek_token_type(2) == '(') {
-				// proc declaration
-				Token* name = lexer->eat_token();
-				command = parse_proc_decl(name, scope);
-			} else {
-				// variable declaration
-				Ast* vdecl = parse_variable_decl(lexer->eat_token(), scope);
-				require_and_eat((Token_Type)';');
-				command = vdecl;
-			}
-			return command;
-		}
-		// proc call
-		else if (lexer->peek_token_type(1) == '(') {
+			return parse_declaration(scope);
+		} else if (lexer->peek_token_type(1) == '(') {
+			// proc call
 			Ast* call = parse_expression(scope);
 			require_and_eat((Token_Type)';');
 			command = call;
@@ -488,15 +477,7 @@ Ast* Parser::parse_block(Scope* scope)
 
 Ast* Parser::parse_proc_decl(Token* name, Scope* scope) 
 {
-	if (name == 0) {
-		name = lexer->eat_token();
-		if (require_token_type(name, TOKEN_IDENTIFIER) == -1) return 0;
-	}
-
-	// (name1 : type1, name2 : type2)
-	Token* curr = require_and_eat(TOKEN_COLON_COLON);
-	//Token* curr = require_and_eat(TOKEN_COLON_COLON);
-	curr = require_and_eat((Token_Type)'(');
+	Token* curr = require_and_eat((Token_Type)'(');
 
 	Scope* proc_scope = create_scope(scope->level + 1, scope, SCOPE_FLAG_PROC_SCOPE);
 
@@ -527,8 +508,7 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 		} else if (curr->type == (Token_Type)')') {
 			break;
 		} else {
-			print_error_loc(stderr, filename, curr->line, curr->column);
-			report_syntax_error("argument #%d of proc %.*s cannot be nameless.\n", n_args + 1, TOKEN_STR(name));
+			report_syntax_error(curr, "argument #%d of proc %.*s cannot be nameless.\n", n_args + 1, TOKEN_STR(name));
 			return 0;
 		}
 	}
@@ -548,12 +528,13 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 	} else if(lexer->peek_token_type() == '#'){
 		lexer->eat_token(); // #
 		Token* tag = lexer->eat_token();
+		// @todo check internalized string
 		if (str_equal("foreign", sizeof("foreign") - 1, tag->value.data, tag->value.length)) {
 			require_and_eat((Token_Type)'(');
 			extern_name = lexer->eat_token();
 			require_and_eat((Token_Type)')');
 		} else {
-			report_syntax_error("#%.*s is not recognized as procedure tag.\n", TOKEN_STR(tag));
+			report_syntax_error(tag, "#%.*s is not recognized as procedure tag.\n", TOKEN_STR(tag));
 			return 0;
 		}
 		require_and_eat((Token_Type)';');
@@ -569,31 +550,19 @@ Ast* Parser::parse_proc_decl(Token* name, Scope* scope)
 	return create_proc(&arena, name, extern_name, ret_type, args, n_args, body, proc_scope, &site);
 }
 
-Ast* Parser::parse_variable_decl(Token* name, Scope* scope) 
+Ast* Parser::parse_variable_decl(Token* name, Scope* scope, Type_Instance* type) 
 {
-	if (name == 0) {
-		name = lexer->eat_token();
-		if (require_token_type(name, TOKEN_IDENTIFIER) == -1) return 0;
-	}
-	require_and_eat((Token_Type)':');
-
-	Type_Instance* type = 0;
 	Ast* assign_exp = 0;
 
 	if (lexer->peek_token_type() == (Token_Type)'=') {
 		lexer->eat_token();
 		assign_exp = parse_expression(scope);
-	} else {
-		type = parse_type();
-		if (!type) {
-			print_error_loc(stderr, lexer->filename, name->line, name->column);
-			report_syntax_error("expected type definition or assignment after '%.*s' variable declaration.\n", TOKEN_STR(name));
-		}
-		if (lexer->peek_token_type() == (Token_Type)'=') {
-			lexer->eat_token();
-			assign_exp = parse_expression(scope);
-		}
+	} else if (!type) {
+		report_syntax_error(name, "expected type definition or assignment after '%.*s' variable declaration.\n", TOKEN_STR(name));
+		return 0;
 	}
+
+	require_and_eat(';');
 
 	Decl_Site site;
 	site.filename = filename;
@@ -609,10 +578,10 @@ Ast* Parser::parse_struct(Token* name, Scope* scope)
 {
 	if (name && name->type != TOKEN_IDENTIFIER) {
 		print_error_loc(stderr, filename, name->line, name->column);
-		report_syntax_error("invalid identifier %.*s on struct declaration.\n", TOKEN_STR(name));
+		report_syntax_error(name, "invalid identifier %.*s on struct declaration.\n", TOKEN_STR(name));
 		return 0;
 	}
-	require_and_eat((Token_Type)':');
+
 	require_and_eat(TOKEN_STRUCT_WORD);
 	require_and_eat(TOKEN_SYMBOL_OPEN_BRACE);
 
@@ -638,6 +607,61 @@ Ast* Parser::parse_struct(Token* name, Scope* scope)
 	return struct_decl;
 }
 
+Ast* Parser::parse_enum(Token* name, Scope* scope, Type_Instance* type) {
+	if (name && name->type != TOKEN_IDENTIFIER) {
+		print_error_loc(stderr, filename, name->line, name->column);
+		report_syntax_error(name, "invalid identifier %.*s on enum declaration.\n", TOKEN_STR(name));
+		return 0;
+	}
+
+	require_and_eat(TOKEN_ENUM_WORD);
+	require_and_eat(TOKEN_SYMBOL_OPEN_BRACE);
+
+	Ast_EnumField* fields = array_create(Ast_EnumField, 4);
+	int num_fields = 0;
+
+	u64 field_number = 0;
+	while (true) {
+		Ast_EnumField field;
+		Token* field_name = lexer->eat_token();
+		field.name = field_name;
+		if (field_name->type != TOKEN_IDENTIFIER) {
+			report_syntax_error(field_name, "expected enum field name, but got '%.*s'.\n", TOKEN_STR(field_name));
+			return 0;
+		}
+		Token* next = lexer->peek_token();
+		if (next->type == '=') {
+			lexer->eat_token(); // =
+			field.expression = parse_expression(scope);
+		} else {
+			field.expression = create_literal(&arena, LITERAL_FLAG_NUMERIC | LITERAL_FLAG_IS_REGSIZE, 0, field_number);
+		}
+		next = lexer->eat_token();
+		
+		array_push(fields, &field);
+
+		field_number += 1;
+		num_fields += 1;
+
+		if (next->type == ',') {
+			continue;
+		} else if (next->type == '}') {
+			break;
+		} else {
+			report_syntax_error(next, "unexpected '%.*s' after enum field declaration.\n", TOKEN_STR(next));
+			return 0;
+		}
+	}
+
+	if (!type) type = get_primitive_type(TYPE_PRIMITIVE_U64);
+
+	Decl_Site site = SITE_FROM_TOKEN(name);
+
+	scope->num_declarations += 1;
+
+	return create_enum_decl(&arena, name, fields, num_fields, type, scope, &site);
+}
+
 Ast* Parser::parse_directive(Scope* scope)
 {
 	Token* directive = lexer->eat_token();
@@ -647,8 +671,7 @@ Ast* Parser::parse_directive(Scope* scope)
 			require_and_eat((Token_Type)'(');
 			Ast* lit = parse_literal();
 			if (lit->node != AST_NODE_LITERAL_EXPRESSION || lit->expression.literal_exp.lit_tok->type != TOKEN_STRING_LITERAL) {
-				print_error_loc(stderr, filename, directive->line, directive->column);
-				report_syntax_error("directive '%.*s' requires library name as string literal as argument.\n", TOKEN_STR(directive));
+				report_syntax_error(directive, "directive '%.*s' requires library name as string literal as argument.\n", TOKEN_STR(directive));
 				return 0;
 			}
 			require_and_eat((Token_Type)')');
@@ -659,42 +682,83 @@ Ast* Parser::parse_directive(Scope* scope)
 			return create_directive(&arena, directive, lit, decl);
 		}
 	} else {
-		print_error_loc(stderr, filename, directive->line, directive->column);
-		report_syntax_error("directive '%.*s' doest not exist.\n", TOKEN_STR(directive));
+		report_syntax_error(directive, "directive '%.*s' doest not exist.\n", TOKEN_STR(directive));
 		return 0;
 	}
+}
+
+Ast* Parser::parse_constant_decl(Token* name, Scope* scope, Type_Instance* type) {
+	Ast* expr = parse_expression(scope);
+	
+	require_and_eat(';');
+
+	Decl_Site site = SITE_FROM_TOKEN(name);
+
+	scope->num_declarations += 1;
+
+	return create_constant(&arena, name, expr, type, scope);
 }
 
 Ast* Parser::parse_declaration(Scope* scope)
 {
 	Token* name = lexer->eat_token();
+
 	if (name->type == '#') {
 		return parse_directive(scope);
 	}
 
 	if (name->type != TOKEN_IDENTIFIER) {
-		print_error_loc(stderr, filename, name->line, name->column);
-		report_syntax_error("invalid identifier %.*s on declaration.\n", TOKEN_STR(name));
+		report_syntax_error(name, "invalid identifier %.*s on declaration.\n", TOKEN_STR(name));
 		return 0;
 	}
 
-	Token* decl = lexer->peek_token();
+	Token* decl = lexer->eat_token();
 	
-	if (decl->type == TOKEN_COLON_COLON) {
-		Token* next = lexer->peek_token(1);
-		if (next->type == (Token_Type)'(') {
-			return parse_proc_decl(name, scope);
-		} else if (next->type == TOKEN_STRUCT_WORD) {
-			return parse_struct(name, scope);
+	if (decl->type == ':') 
+	{
+		Token* next = lexer->peek_token();
+
+		if (next->type == ':') {
+			// struct, procedure and constant declaration
+			lexer->eat_token(); // :
+			next = lexer->peek_token();
+			if (next->type == '(') {
+				// procedure declaration
+				return parse_proc_decl(name, scope);
+			} else if(next->type == TOKEN_STRUCT_WORD) {
+				// struct declaration
+				return parse_struct(name, scope);
+			} else {
+				// constant with type inference or enum
+				if (lexer->peek_token_type() == TOKEN_ENUM_WORD)
+					return parse_enum(name, scope, 0);
+				else
+					return parse_constant_decl(name, scope, 0);
+				//report_syntax_error(next, "invalid declaration of '%.*s', declaration requires ':'\n", TOKEN_STR(name));
+			}
 		} else {
-			Ast* vardecl = parse_variable_decl(name, scope);
-			require_and_eat((Token_Type)';');
-			return vardecl;
+			// type for a variable, enum or constant declaration
+			Type_Instance* declaration_type = 0;
+			if (lexer->peek_token_type() != '=') {
+				declaration_type = parse_type();
+			}
+			next = lexer->peek_token();
+			if (next->type == ':') {
+				// typed constant
+				lexer->eat_token(); // ':'
+				if (lexer->peek_token_type() == TOKEN_ENUM_WORD)
+					return parse_enum(name, scope, declaration_type);
+				else
+					return parse_constant_decl(name, scope, declaration_type);
+			} else {
+				// variable declaration
+				return parse_variable_decl(name, scope, declaration_type);
+			}
 		}
 	} else {
-		report_syntax_error("invalid declaration of '%.*s', declaration requires '::'\n", TOKEN_STR(name));
-		return 0;
+		report_syntax_error(decl, "invalid declaration of '%.*s', declaration requires ':'\n", TOKEN_STR(name));
 	}
+	return 0;
 }
 
 Type_Instance* Parser::parse_type()

@@ -8,7 +8,6 @@ extern String_Hash_Table identifiers = {};
 
 // All the keywords in the language
 Keyword keywords_info[] = {
-	{ MAKE_STRING("int"),  TOKEN_INT,    TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
 	{ MAKE_STRING("bool"), TOKEN_BOOL,   TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
 	{ MAKE_STRING("void"), TOKEN_VOID,   TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
 	{ MAKE_STRING("r32"),  TOKEN_REAL32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
@@ -32,8 +31,8 @@ Keyword keywords_info[] = {
 	{ MAKE_STRING("continue"),  TOKEN_CONTINUE_STATEMENT,	TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("return"),	TOKEN_RETURN_STATEMENT,		TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("struct"),	TOKEN_STRUCT_WORD,			TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("enum"),		TOKEN_ENUM_WORD,			TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("union"),		TOKEN_UNION_WORD,			TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("new"),		TOKEN_NEW_WORD,				TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("cast"),		TOKEN_CAST,					TOKEN_FLAG_RESERVED_WORD },
 
 	{ MAKE_STRING("true"),  TOKEN_BOOL_LITERAL,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
@@ -255,6 +254,7 @@ bool Lexer::read_token(char** begin)
 	case '~': type = TOKEN_SYMBOL_TILDE;			flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED;  break;
 	case '?': type = TOKEN_SYMBOL_INTERROGATION;	break;
 	case '#': type = TOKEN_SYMBOL_POUND;			break;
+	case ':': type = TOKEN_SYMBOL_COLON;			break;
 
 	case '%': {
 		if (ch_2 == '=') {
@@ -290,8 +290,7 @@ bool Lexer::read_token(char** begin)
 		if (ch_2 == '.') {
 			type = TOKEN_DOUBLE_DOT;
 			length = 2;
-		}
-		else {
+		} else {
 			type = TOKEN_SYMBOL_DOT;
 			flags |= TOKEN_FLAG_BINARY_OPERATOR;
 		}
@@ -313,8 +312,7 @@ bool Lexer::read_token(char** begin)
 			type = TOKEN_PLUS_EQUAL;
 			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 			length = 2;
-		}
-		else {
+		} else {
 			flags |= TOKEN_FLAG_BINARY_OPERATOR;
 			type = TOKEN_SYMBOL_PLUS;
 		}
@@ -428,13 +426,6 @@ bool Lexer::read_token(char** begin)
 			type = TOKEN_SYMBOL_AND;
 			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED;
 		}
-	}break;
-	case ':': {
-		if (ch_2 == ':') {
-			type = TOKEN_COLON_COLON;
-			length = 2;
-		}
-		else type = TOKEN_SYMBOL_COLON;
 	}break;
 
 	case '"': {
@@ -627,7 +618,6 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_NOT_EQUAL:			return ("!="); break;
 	case TOKEN_LOGIC_OR:			return ("||"); break;
 	case TOKEN_LOGIC_AND:			return ("&&"); break;
-	case TOKEN_COLON_COLON:			return ("::"); break;
 	case TOKEN_BITSHIFT_LEFT:		return ("<<"); break;
 	case TOKEN_BITSHIFT_RIGHT:		return (">>"); break;
 
@@ -642,13 +632,10 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_SHL_EQUAL:	return ("<<="); break;
 	case TOKEN_SHR_EQUAL:	return (">>="); break;
 
-	case TOKEN_PLUS_PLUS:	return  ("++"); break;
-	case TOKEN_MINUS_MINUS: return  ("--"); break;
 	case TOKEN_CAST:		return  ("cast"); break;
 
 	case TOKEN_DOUBLE_DOT: return (".."); break;
 
-	case TOKEN_INT:			return ("int"); break;
 	case TOKEN_SINT64:		return ("s64"); break;
 	case TOKEN_SINT32:		return ("s32"); break;
 	case TOKEN_SINT16:		return ("s16"); break;
@@ -672,10 +659,13 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_CONTINUE_STATEMENT:	return ("continue"); break;
 	case TOKEN_RETURN_STATEMENT:	return ("return"); break;
 
-	case TOKEN_INTERNAL_WORD:	return ("internal"); break;
 	case TOKEN_STRUCT_WORD:		return ("struct"); break;
+	case TOKEN_ENUM_WORD:		return ("enum"); break;
 	case TOKEN_UNION_WORD:		return ("union"); break;
-	case TOKEN_NEW_WORD:		return ("new"); break;
+	default: {
+		assert(0);
+		return ("UNKNOWN"); break;
+	}break;
 	}
 }
 

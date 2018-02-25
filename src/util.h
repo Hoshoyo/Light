@@ -53,3 +53,5 @@ u32 djb2_hash(u8 *str, int size);
 u32 djb2_hash(u32 starting_hash, u8 *str, int size);
 u32 djb2_hash(u32 hash1, u32 hash2);
 u64 fnv_1_hash(char* s, u64 length);
+
+s32 system_exit(s32 ret);

@@ -351,3 +351,7 @@ u64 fnv_1_hash(char* s, u64 length) {
 	}
 	return hash;
 }
+
+s32 system_exit(s32 ret) {
+	exit(ret);
+}

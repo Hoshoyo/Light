@@ -7,6 +7,7 @@
 
 struct Ast_ProcDecl;
 struct Ast_VarDecl;
+struct Ast_Constant;
 struct Ast_StructDecl;
 struct Ast_Binary_Exp;
 struct Ast_Unary_Exp;
@@ -15,6 +16,8 @@ struct Ast;
 
 struct Symbol_Table;
 struct Scope;
+
+#define SITE_FROM_TOKEN(T) {(T)->filename, (T)->line, (T)->column }
 
 enum Node_Type {
 	AST_NODE_PROC_DECLARATION,
@@ -33,8 +36,10 @@ enum Node_Type {
 	AST_NODE_BREAK_STATEMENT,
 	AST_NODE_CONTINUE_STATEMENT,
 	AST_NODE_STRUCT_DECLARATION,
+	AST_NODE_ENUM_DECLARATION,
 	AST_NODE_EXPRESSION_ASSIGNMENT,
 	AST_NODE_DIRECTIVE,
+	AST_NODE_CONSTANT,
 };
 
 enum Precedence
@@ -156,6 +161,20 @@ struct Ast_StructDecl {
 	u32 symbol_hash;
 };
 
+struct Ast_EnumField {
+	Token* name;
+	Ast* expression;
+};
+
+struct Ast_EnumDecl {
+	Token* name;
+	Ast_EnumField* fields;
+	int num_fields;
+	Decl_Site site;
+	Scope* scope;
+	Type_Instance* base_type;
+};
+
 struct Ast_Binary_Exp {
 	BinaryOperation op;
 	Precedence precedence;
@@ -180,9 +199,13 @@ struct Ast_Unary_Exp {
 const u32 LITERAL_FLAG_IS_REGSIZE = FLAG(0);
 const u32 LITERAL_FLAG_NUMERIC    = FLAG(1);
 const u32 LITERAL_FLAG_STRING     = FLAG(2);
+const u32 LITERAL_FLAG_EVALUATED = FLAG(3);
 struct Ast_Literal {
 	u32 flags;
-	Token* lit_tok;
+	union {
+		Token* lit_tok;
+		u64 lit_value;
+	};
 	Type_Instance* type;
 };
 
@@ -266,6 +289,13 @@ struct Ast_Directive {
 	Token* token;
 };
 
+struct Ast_Constant {
+	Token* name;
+	Ast* expression;
+	Scope* scope;
+	Type_Instance* type;
+};
+
 struct Ast {
 	Node_Type node;
 	Type_Instance* return_type;
@@ -275,6 +305,7 @@ struct Ast {
 		Ast_ProcDecl proc_decl;
 		Ast_VarDecl var_decl;
 		Ast_StructDecl struct_decl;
+		Ast_EnumDecl enum_decl;
 		Ast_NamedArgument named_arg;
 		Ast_Block block;
 		Ast_If if_stmt;
@@ -283,7 +314,7 @@ struct Ast {
 		Ast_Break break_stmt;
 		Ast_Continue continue_stmt;
 		Ast_Directive directive;
-
+		Ast_Constant constant;
 		Ast_Expression expression;
 	};
 };
@@ -315,7 +346,7 @@ bool ast_is_expression(Ast* ast);
 Ast* create_proc(Memory_Arena* arena, Token* name, Token* extern_name, Type_Instance* return_type, Ast** arguments, int nargs, Ast* body, Scope* scope, Decl_Site* site);
 Ast* create_named_argument(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* default_val, int index, Scope* scope, Decl_Site* site);
 Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* assign_val, Scope* scope, Decl_Site* site);
-Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok);
+Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok, u64 value = 0);
 Ast* create_variable(Memory_Arena* arena, Token* var_token, Scope* scope);
 Ast* create_block(Memory_Arena* arena, Scope* scope);
 Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope);
@@ -327,7 +358,9 @@ Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, T
 Ast* create_break(Memory_Arena* arena, Scope* scope, Token* token);
 Ast* create_continue(Memory_Arena* arena, Scope* scope, Token* token);
 Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_fields, Scope* struct_scope, Decl_Site* site);
+Ast* create_enum_decl(Memory_Arena* arena, Token* name, Ast_EnumField* fields, int num_fields, Type_Instance* base_type, Scope* struct_scope, Decl_Site* site);
 Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* literal_argument, Ast* declaration);
+Ast* create_constant(Memory_Arena* arena, Token* name, Ast* expression, Type_Instance* type, Scope* scope);
 
 UnaryOperation get_unary_op(Token* token);
 BinaryOperation get_binary_op(Token* token);

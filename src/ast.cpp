@@ -154,7 +154,7 @@ Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type,
 	return vdecl;
 }
 
-Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok)
+Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok, u64 value)
 {
 	Ast* lit = ALLOC_AST(arena);
 
@@ -166,8 +166,13 @@ Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok)
 	lit->expression.expression_type = EXPRESSION_TYPE_LITERAL;
 	lit->expression.is_lvalue = false;
 	lit->expression.literal_exp.flags = flags;
-	lit->expression.literal_exp.lit_tok = lit_tok;
 	lit->expression.literal_exp.type = 0;
+	if (lit_tok) {
+		lit->expression.literal_exp.lit_tok = lit_tok;
+	} else {
+		lit->expression.literal_exp.lit_value = value;
+		lit->expression.literal_exp.flags |= LITERAL_FLAG_EVALUATED;
+	}
 	return lit;
 }
 
@@ -387,6 +392,24 @@ Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_
 	return struct_decl;
 }
 
+Ast* create_enum_decl(Memory_Arena* arena, Token* name, Ast_EnumField* fields, int num_fields, Type_Instance* base_type, Scope* enum_scope, Decl_Site* site) {
+	Ast* enum_decl = ALLOC_AST(arena);
+
+	enum_decl->is_decl = true;
+	enum_decl->node = AST_NODE_ENUM_DECLARATION;
+	enum_decl->return_type = 0;
+	enum_decl->type_checked = false;
+
+	enum_decl->enum_decl.base_type = base_type;
+	enum_decl->enum_decl.fields = fields;
+	enum_decl->enum_decl.num_fields = num_fields;
+	enum_decl->enum_decl.name = name;
+	enum_decl->enum_decl.scope = enum_scope;
+	enum_decl->enum_decl.site = *site;
+
+	return enum_decl;
+}
+
 Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* literal_argument, Ast* declaration)
 {
 	Ast* directive = ALLOC_AST(arena);
@@ -402,6 +425,24 @@ Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* literal_
 	directive->directive.literal_argument = literal_argument;
 
 	return directive;
+}
+
+Ast* create_constant(Memory_Arena* arena, Token* name, Ast* expression, Type_Instance* type, Scope* scope) 
+{
+	Ast* constant = ALLOC_AST(arena);
+
+	constant->node = AST_NODE_CONSTANT;
+
+	constant->is_decl = true;
+	constant->return_type = 0;
+	constant->type_checked = false;
+
+	constant->constant.name = name;
+	constant->constant.expression = expression;
+	constant->constant.scope = scope;
+	constant->constant.type = type;
+
+	return constant;
 }
 
 void block_push_command(Ast* block, Ast* command)
@@ -539,7 +580,11 @@ void DEBUG_print_proc(FILE* out, Ast* proc_node) {
 void DEBUG_print_expression(FILE* out, Ast* node) {
 	switch (node->expression.expression_type) {
 	case EXPRESSION_TYPE_LITERAL: {
-		fprintf(out, "%.*s", TOKEN_STR(node->expression.literal_exp.lit_tok));
+		if (node->expression.literal_exp.flags & LITERAL_FLAG_EVALUATED) {
+			fprintf(out, "0x%llu", node->expression.literal_exp.lit_value);
+		} else {
+			fprintf(out, "%.*s", TOKEN_STR(node->expression.literal_exp.lit_tok));
+		}
 	} break;
 	case EXPRESSION_TYPE_BINARY: {
 		fprintf(out, "(");
@@ -618,6 +663,15 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 	}
 }
 
+void DEBUG_print_constant_decl(FILE* out, Ast* node) {
+	fprintf(out, "%.*s : ", TOKEN_STR(node->constant.name));
+	DEBUG_print_type(out, node->constant.type);
+	if (node->constant.expression) {
+		fprintf(out, " = ");
+		DEBUG_print_expression(out, node->constant.expression);
+	}
+}
+
 void DEBUG_print_var_decl(FILE* out, Ast* node) {
 	fprintf(out, "%.*s : ", TOKEN_STR(node->var_decl.name));
 	DEBUG_print_type(out, node->var_decl.type);
@@ -681,7 +735,6 @@ void DEBUG_print_continue_statement(FILE* out, Ast* node)
 
 void DEBUG_print_struct_declaration(FILE* out, Ast* node)
 {
-
 	Ast_StructDecl* sd = &node->struct_decl;
 	fprintf(out, "%.*s :: struct{\n", TOKEN_STR(sd->name));
 	DEBUG_indent_level += 1;
@@ -693,11 +746,27 @@ void DEBUG_print_struct_declaration(FILE* out, Ast* node)
 	fprintf(out, "}\n");
 }
 
+void DEBUG_print_enum_declaration(FILE* out, Ast* node) {
+	Ast_EnumDecl* ed = &node->enum_decl;
+	fprintf(out, "%.*s :", TOKEN_STR(ed->name));
+	DEBUG_print_type(out, ed->base_type);
+	fprintf(out, ": enum {\n");
+	DEBUG_indent_level += 1;
+	for (int i = 0; i < ed->num_fields; ++i) {
+		fprintf(out, "%.*s = ", TOKEN_STR(ed->fields[i].name));
+		DEBUG_print_expression(out, ed->fields[i].expression);
+		fprintf(out, ",\n");
+	}
+	DEBUG_indent_level -= 1;
+	fprintf(out, "}\n");
+}
+
 void DEBUG_print_node(FILE* out, Ast* node) {
 	switch (node->node) {
 	case AST_NODE_PROC_FORWARD_DECL:
 	case AST_NODE_PROC_DECLARATION:		DEBUG_print_proc(out, node); break;
 	case AST_NODE_VARIABLE_DECL:		DEBUG_print_var_decl(out, node); break;
+	case AST_NODE_CONSTANT:				DEBUG_print_constant_decl(out, node); break;
 	case AST_NODE_UNARY_EXPRESSION:		
 	case AST_NODE_BINARY_EXPRESSION:	DEBUG_print_expression(out, node); break;
 	case AST_NODE_BLOCK:				DEBUG_print_block(out, node); break;
@@ -708,6 +777,10 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 	case AST_NODE_BREAK_STATEMENT:		DEBUG_print_break_statement(out, node); break;
 	case AST_NODE_CONTINUE_STATEMENT:	DEBUG_print_continue_statement(out, node); break;
 	case AST_NODE_STRUCT_DECLARATION:	DEBUG_print_struct_declaration(out, node); break;
+	case AST_NODE_ENUM_DECLARATION:		DEBUG_print_enum_declaration(out, node); break;
+	default: {
+		fprintf(out, "<Unsupported AST Node>\n");
+	}break;
 	}
 }
 

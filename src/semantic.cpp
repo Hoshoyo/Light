@@ -222,6 +222,33 @@ int check_and_submit_declarations(Ast* node, Scope* scope) {
 			}
 		}break;
 
+		case AST_NODE_CONSTANT: {
+			assert(scope->symb_table);
+			s64 hash = scope->symb_table->entry_exist(node->constant.name);
+			if (hash == -1) {
+				hash = scope->symb_table->insert(scope, node->constant.name, node);
+			} else {
+				report_semantic_error(&node->named_arg.site, "Constant declaration '%.*s' redefinition.\n", TOKEN_STR(node->named_arg.arg_name));
+				report_declaration_site(scope->symb_table->entries[hash].node);
+				return 0;
+			}
+		}break;
+
+		case AST_NODE_ENUM_DECLARATION: {
+			assert(scope->symb_table);
+			for (int i = 0; i < node->enum_decl.num_fields; ++i) {
+
+				s64 hash = scope->symb_table->entry_exist(node->enum_decl.fields[i].name);
+				if (hash == -1) {
+					hash = scope->symb_table->insert(scope, node->enum_decl.fields[i].name, node);
+				} else {
+					report_semantic_error(&node->named_arg.site, "Enum value declaration '%.*s' redefinition.\n", TOKEN_STR(node->named_arg.arg_name));
+					report_declaration_site(scope->symb_table->entries[hash].node);
+					return 0;
+				}
+			}
+		}break;
+
 		default: {
 			// should not be reached
 			report_semantic_error(0, "Internal compiler error: unknown declaration node type.\n");
@@ -309,6 +336,11 @@ Type_Instance* get_variable_type(Ast* node, Scope* scope)
 		site.line = node->expression.variable_exp.name->line;
 		report_semantic_error(&site, "Variable '%.*s' is a struct typename and can not be addressed.\n");
 		report_declaration_site(decl_node);
+		return 0;
+	} else if (decl_node->node == AST_NODE_CONSTANT) {
+		return decl_node->constant.type;
+	} else {
+		report_semantic_error(0, "Internal compiler error, an unknown node was reached when trying to get a variable type.\n");
 		return 0;
 	}
 }
@@ -542,6 +574,7 @@ Type_Instance* get_decl_type(Ast* node)
 {
 	assert(node->is_decl);
 	switch (node->node) {
+	case AST_NODE_CONSTANT:			  return node->constant.type;
 	case AST_NODE_VARIABLE_DECL:      return node->var_decl.type;
 	case AST_NODE_NAMED_ARGUMENT:     return node->named_arg.arg_type;
 	case AST_NODE_PROC_FORWARD_DECL:
@@ -556,6 +589,7 @@ Token* get_decl_name(Ast* node)
 {
 	assert(node->is_decl);
 	switch (node->node) {
+	case AST_NODE_CONSTANT:			  return node->constant.name;
 	case AST_NODE_VARIABLE_DECL:      return node->var_decl.name;
 	case AST_NODE_NAMED_ARGUMENT:     return node->named_arg.arg_name; 
 	case AST_NODE_PROC_DECLARATION:   return node->proc_decl.name;
@@ -936,6 +970,7 @@ int infer_binary_expr_type(Ast* node, Type_Table* table, Type_Instance* check_ag
 
 		Ast* var_node = node->expression.binary_exp.left;
 		Ast* var_decl = is_declared(var_node);
+		// @TODO support for constants
 		if (var_decl->node != AST_NODE_VARIABLE_DECL) {
 			report_semantic_error(get_site_from_token(node->expression.binary_exp.op_token), "left side of '%.*s' operator is not a variable.\n", TOKEN_STR(node->expression.binary_exp.op_token));
 			report_declaration_site(var_decl, " Defined here.\n");
@@ -1863,6 +1898,8 @@ case AST_NODE_UNARY_EXPRESSION: {
 }break;
 case AST_NODE_VARIABLE_EXPRESSION: {
 
+}break;
+case AST_NODE_CONSTANT{
 }break;
 }
 }
