@@ -15,18 +15,13 @@ int LLVM_Code_Generator::sprint(char* msg, ...)
 	ptr += num_written;
 	return num_written;
 }
-int LLVM_Code_Generator::sprint_type(char* msg, ...)
-{
-	va_list args;
-	va_start(args, msg);
-	int num_written = vsprintf(types_buffer + ptr, msg, args);
-	va_end(args);
-	types_ptr += num_written;
-	return num_written;
-}
 
 u32 LLVM_Code_Generator::alloc_temp() {
 	return temp++;
+}
+
+void LLVM_Code_Generator::reset_temp() {
+	temp = 0;
 }
 
 void report_fatal_error(char* msg, ...) {
@@ -38,352 +33,237 @@ void report_fatal_error(char* msg, ...) {
 	exit(-1);
 }
 
-void llvm_generate_ir(Ast** toplevel) {
-	LLVM_Code_Generator code_generator = {};
+const u32 EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 = FLAG(0);
+const u32 EMIT_TYPE_FLAG_STRUCT_NAMED = FLAG(1);
 
-	size_t num_decls = get_arr_length(toplevel);
-	for (size_t i = 0; i < num_decls; ++i) {
-		Ast* node = toplevel[i];
-
-		llvm_emit_ir_for_node(&code_generator, node);
-	}
-
-	llvm_emit_function_attributes(&code_generator);
-
-	HANDLE out = ho_createfile("temp//llvmtest.ll", FILE_WRITE, CREATE_ALWAYS);
-	ho_writefile(out, code_generator.ptr, (u8*)code_generator.buffer);
-	ho_closefile(out);
-}
-
-void llvm_emit_ir_for_type(LLVM_Code_Generator* cg, Type_Instance* type, bool typedecl, bool convert_void_to_i8 /*= false */) {
-	auto type_emitter = llvm_emit_ir_for_type_code;
-	auto sprint = cg->sprint;
-	if (typedecl) {
-		sprint = cg->sprint_type;
-		type_emitter = llvm_emit_ir_for_type_typedecl;
-	}
-
+void LLVM_Code_Generator::llvm_emit_type(Type_Instance* type, u32 flags) {
 	switch (type->type) {
 		case TYPE_PRIMITIVE: {
-			switch(type->primitive)
-			{
-				case TYPE_PRIMITIVE_U64:
-				case TYPE_PRIMITIVE_S64:	sprint("i64"); break;
-				case TYPE_PRIMITIVE_U32:
-				case TYPE_PRIMITIVE_S32:	sprint("i32"); break;
-				case TYPE_PRIMITIVE_U16:
-				case TYPE_PRIMITIVE_S16:	sprint("i16"); break;
-				case TYPE_PRIMITIVE_U8:
-				case TYPE_PRIMITIVE_S8:		sprint("i8"); break;
-				case TYPE_PRIMITIVE_BOOL:	sprint("i8"); break;
-				case TYPE_PRIMITIVE_R64:	sprint("double"); break;
-				case TYPE_PRIMITIVE_R32:	sprint("float"); break;
-				case TYPE_PRIMITIVE_VOID:	(convert_void_to_i8) ? sprint("i8") : sprint("void"); break;
-				default: assert(0); break;	// @TODO log
+			switch (type->primitive) {
+				case TYPE_PRIMITIVE_S64:  sprint("i64"); break;
+				case TYPE_PRIMITIVE_S32:  sprint("i32"); break;
+				case TYPE_PRIMITIVE_S16:  sprint("i16"); break;
+				case TYPE_PRIMITIVE_S8:	  sprint("i8"); break;
+				case TYPE_PRIMITIVE_U64:  sprint("i64"); break;
+				case TYPE_PRIMITIVE_U32:  sprint("i32"); break;
+				case TYPE_PRIMITIVE_U16:  sprint("i16"); break;
+				case TYPE_PRIMITIVE_U8:	  sprint("i8"); break;
+				case TYPE_PRIMITIVE_BOOL: sprint("i8"); break;
+				case TYPE_PRIMITIVE_R64:  sprint("double"); break;
+				case TYPE_PRIMITIVE_R32:  sprint("float"); break;
+				case TYPE_PRIMITIVE_VOID: {
+					(flags & EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8) ? sprint("i8") : sprint("void");
+					break;
+				}
 			}
 		}break;
 		case TYPE_POINTER: {
-			type_emitter(cg, type->pointer_to, true);
+			llvm_emit_type(type->pointer_to, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
 			sprint("*");
-		} break;
+		}break;
+		case TYPE_FUNCTION: {
+			// @TODO:
+		}break;
+		case TYPE_ARRAY: {
+			// @TODO:
+		}break;
 		case TYPE_STRUCT: {
-			sprint("{");
-			size_t num_fields = get_arr_length(type->type_struct.fields_types);
-			for (size_t i = 0; i < num_fields; ++i) {
-				if (i != 0) sprint(", ");
-				type_emitter(cg, type->type_struct.fields_types[i], true);
+			if (flags & EMIT_TYPE_FLAG_STRUCT_NAMED) {
+				sprint("%%%.*s", type->type_struct.name_length, type->type_struct.name);
+			} else {
+				sprint("{ ");
+				size_t num_fields = array_get_length(type->type_struct.fields_types);
+				for (size_t i = 0; i < num_fields; ++i) {
+					if (i != 0) sprint(", ");
+					llvm_emit_type(type->type_struct.fields_types[i]);
+				}
+				sprint(" }");
 			}
-			sprint("}");
-		} break;
+		}break;
 		default: {
-			assert(0); //@TODO
+			report_fatal_error("Internal compiler error: could not generate LLVM IR for unknown type id=%d\n", type->type);
 		}break;
 	}
 }
 
-void llvm_emit_ir_for_type_code(LLVM_Code_Generator* cg, Type_Instance* type, bool convert_void_to_i8 /*= false*/) {
-	llvm_emit_ir_for_type(cg, type, false, convert_void_to_i8);
-}
-void llvm_emit_ir_for_type_typedecl(LLVM_Code_Generator* cg, Type_Instance* type, bool convert_void_to_i8 /*= false */) {
-	llvm_emit_ir_for_type(cg, type, true, convert_void_to_i8);
-}
-
-u32 llvm_emit_ir_for_expression(LLVM_Code_Generator* cg, Ast* expr) {
-	u32 result_temp = 0;
-	switch (expr->node) {
-		case AST_NODE_VARIABLE_EXPRESSION: {
-			Ast* decl_node = is_declared(expr);
-			if (decl_node) {
-				result_temp = cg->alloc_temp();
-				cg->sprint(" %%%d = load ", result_temp);
-				llvm_emit_ir_for_type_code(cg, expr->return_type, true);
-				cg->sprint(", ");
-				llvm_emit_ir_for_type_code(cg, expr->return_type, true);
-				cg->sprint("* %%%d\n", decl_node->var_decl.temporary_register);
-			} else {
-				report_fatal_error("Internal compiler error: llvm emit expression got a variable that is not declared somehow.\n");
-			}
-		}break;
-
-		case AST_NODE_BINARY_EXPRESSION: {
-			Ast* left  = expr->expression.binary_exp.left;
-			Ast* right = expr->expression.binary_exp.right;
-			bool left_reg_size = left->node == AST_NODE_LITERAL_EXPRESSION;
-			bool right_reg_size = right->node == AST_NODE_LITERAL_EXPRESSION;
-
-			u32 left_temp = 0;
-			u32 right_temp = 0;
-
-			if (!left_reg_size) {
-				left_temp = llvm_emit_ir_for_expression(cg, left);
-			}
-			if (!right_reg_size) {
-				right_temp = llvm_emit_ir_for_expression(cg, right);
-			}
-
-			result_temp = cg->alloc_temp();
-			cg->sprint(" %%%d = ", result_temp);
-			
-			int int_type = is_integer_type(expr->return_type);
-			if (int_type) {
-				char* operation_str = 0;
-				switch (expr->expression.binary_exp.op) {
-					case BINARY_OP_PLUS:  operation_str = "add "; break;
-					case BINARY_OP_MINUS: operation_str = "sub "; break;
-					case BINARY_OP_MULT:  operation_str = "mul "; break;
-					case BINARY_OP_DIV:   operation_str = (int_type == INTEGER_SIGNED) ? "sdiv " : "udiv "; break;
-					case BINARY_OP_MOD:   operation_str = (int_type == INTEGER_SIGNED) ? "srem " : "urem "; break;
-					case BINARY_OP_AND:   operation_str = "and "; break;
-					case BINARY_OP_OR:    operation_str = "or "; break;
-					case BINARY_OP_XOR:   operation_str = "xor "; break;
-				}
-				cg->sprint(operation_str);
-			} else if(is_floating_point_type(expr->return_type)) {
-				switch (expr->expression.binary_exp.op) {
-					case BINARY_OP_PLUS:  cg->sprint("fadd "); break;
-					case BINARY_OP_MINUS: cg->sprint("fsub "); break;
-					case BINARY_OP_MULT:  cg->sprint("fmul "); break;
-					case BINARY_OP_DIV:   cg->sprint("fdiv "); break;
-					//case BINARY_OP_MOD:   cg->sprint("frem "); break;
-				}
-			}
-
-			llvm_emit_ir_for_type_code(cg, left->return_type);
-
-			if (left->node == AST_NODE_LITERAL_EXPRESSION) {
-				cg->sprint(" ");
-				llvm_emit_ir_for_literal(cg, &left->expression.literal_exp);
-			} else
-				cg->sprint(" %%%d", left_temp);
-
-			cg->sprint(", ");
-
-			if (right->node == AST_NODE_LITERAL_EXPRESSION) {
-				llvm_emit_ir_for_literal(cg, &right->expression.literal_exp);
-			} else
-				cg->sprint("%%%d", right_temp);
-
-			cg->sprint("\n");
-
-		}break;
-
-		case AST_NODE_LITERAL_EXPRESSION: {
-			assert(0);	// should not try to load literal in a temp variable
-		}break;
-		default: assert(0); break; // @TODO
-	}
-	return result_temp;
-}
-
-void llvm_emit_ir_for_node(LLVM_Code_Generator* cg, Ast* node)
+void LLVM_Code_Generator::llvm_emit_type_decls(Type_Table* type_table)
 {
+	for (int i = 0; i < type_table->type_entries_index; ++i) {
+		s64 hash = type_table->type_entries_hashes[i];
+		Type_Instance* entry = type_table->get_entry(hash);
+		switch (entry->type) {
+			case TYPE_PRIMITIVE:
+			case TYPE_POINTER:
+			case TYPE_FUNCTION:
+			case TYPE_ARRAY:
+				// ... do nothing since they are all mapped to llvm directly
+				break;
+			case TYPE_STRUCT: {
+				sprint("%%%.*s = type ", entry->type_struct.name_length, entry->type_struct.name);
+				llvm_emit_type(entry);
+				sprint("\n");
+			}break;
+			default: {
+				report_fatal_error("Internal compiler error: could not generate LLVM IR for unknown type id=%d\n", entry->type);
+			}break;
+		}
+	}
+	sprint("\n");
+}
+
+void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 	switch (node->node) {
+
+		case AST_NODE_PROC_FORWARD_DECL: {
+			// @TODO
+		}break;
+
+		/*
+			Emit llvm code for Ast Node Procedure declaration of types:
+			foreign declarations
+			normal procedure calls
+
+			@TODO: local calls
+		*/
 		case AST_NODE_PROC_DECLARATION: {
-			// @TODO(psv): replace with the calling convention
+			sprint("declare ");
+			
 			if (node->proc_decl.flags & PROC_DECL_FLAG_IS_EXTERNAL) {
-				cg->sprint("declare cc 64 ");
+				sprint("cc 64 ");
 			} else {
-				cg->sprint("define ");
+				sprint("ccc i32 ");
 			}
-
-			llvm_emit_ir_for_type_code(cg, node->proc_decl.proc_ret_type);
-
-			// @TODO unique name for nested procedures
-			cg->sprint(" @%.*s(", TOKEN_STR(node->proc_decl.name));
-
+			llvm_emit_type(node->proc_decl.proc_ret_type);
+			sprint(" @%.*s(", TOKEN_STR(node->proc_decl.name));
 			for (size_t i = 0; i < node->proc_decl.num_args; ++i) {
-				Ast* arg = node->proc_decl.arguments[i];
-				assert(arg->node == AST_NODE_NAMED_ARGUMENT);
-				llvm_emit_ir_for_type_code(cg, arg->named_arg.arg_type);
-
-				if (!(node->proc_decl.flags & PROC_DECL_FLAG_IS_EXTERNAL)) {
-					cg->sprint(" %%%.*s", TOKEN_STR(arg->named_arg.arg_name));
-				}
-
-				if (i + 1 < node->proc_decl.num_args)
-					cg->sprint(", ");
+				if (i != 0) sprint(",");
+				llvm_emit_type(node->proc_decl.arguments[i]->named_arg.arg_type);
+				sprint(" %%%.*s", TOKEN_STR(node->proc_decl.arguments[i]->named_arg.arg_name));
 			}
-
-			// attributes for normal function
-			// @TODO noreturn for entry point
-			cg->sprint(") #0\n");
-
-			if (node->proc_decl.body) {
-				cg->sprint("{\n");
-				cg->sprint("decls-0:\n");
-				llvm_emit_ir_for_node(cg, node->proc_decl.body);
-				cg->sprint("}\n");
+			sprint(") ");
+			if (node->proc_decl.flags & PROC_DECL_FLAG_IS_EXTERNAL) {
+				sprint("#0\n");
+			} else {
+				sprint("#1 ");
+				llvm_emit_node(node->proc_decl.body);
 			}
 		}break;
 
 		case AST_NODE_BLOCK: {
-			size_t num_commands = get_arr_length(node->block.commands);
+			size_t num_commands = array_get_length(node->block.commands);
+			sprint("{\n");
 			for (size_t i = 0; i < num_commands; ++i) {
-				llvm_emit_ir_for_node(cg, node->block.commands[i]);
+				sprint("\t");
+				llvm_emit_node(node->block.commands[i]);
+				sprint("\n");
 			}
-		}break;
+			sprint("}\n");
+			reset_temp();
+		} break;
 
 		case AST_NODE_VARIABLE_DECL: {
-			u32 temp = cg->alloc_temp();
+			u32 temp = alloc_temp();
 			node->var_decl.temporary_register = temp;
-			cg->sprint(" %%%d = alloca ", temp);
-			llvm_emit_ir_for_type_code(cg, node->var_decl.type);
-			cg->sprint(", align %d\n", node->var_decl.alignment);
 
-			// has default parameters
-			if (node->var_decl.assignment) {
-				llvm_instr_emit_store(cg, node->var_decl.type, node->var_decl.assignment, node->var_decl.temporary_register);
-			} else {
-				llvm_instr_emit_store(cg, node->var_decl.type, 0, node->var_decl.temporary_register);
-			}
-		}break;
+			sprint("%%%d = alloca ", temp);
+			llvm_emit_type(node->var_decl.type, EMIT_TYPE_FLAG_STRUCT_NAMED);
+			sprint(", align %d", node->var_decl.alignment);
 
-		case AST_NODE_STRUCT_DECLARATION: {
-			llvm_emit_ir_for_type_typedecl(cg, node->struct_decl.type_info);
-		}break;
-
-		case AST_NODE_RETURN_STATEMENT: {
-			bool direct_literal_return = false;
-			u32 temp = 0;
-			if (node->ret_stmt.expr->node != AST_NODE_LITERAL_EXPRESSION) {
-				temp = llvm_emit_ir_for_expression(cg, node->ret_stmt.expr);
-			} else {
-				direct_literal_return = true;
-			}
-
-			//
-			// @TEMPORARY
-			// @TEMPORARY
-			// @TEMPORARY
-			//
-			{
-				cg->sprint(" call cc 64 i32 @ExitProcess(i32 ");
-				if (direct_literal_return)
-					llvm_emit_ir_for_literal(cg, &node->ret_stmt.expr->expression.literal_exp);
-				else
-					cg->sprint("%%%d", temp);
-				cg->sprint(")\n");
-			}
-
-			cg->sprint(" ret ");
-			llvm_emit_ir_for_type_code(cg, node->ret_stmt.expr->return_type, true);
-			if (direct_literal_return) {
-				cg->sprint(" ");
-				llvm_emit_ir_for_literal(cg, &node->ret_stmt.expr->expression.literal_exp);
-				cg->sprint("\n");
-			} else
-				cg->sprint(" %%%d\n", temp);
-
-		}break;
+			// @TODO: assignment if there is
+		} break;
 
 		default: {
-			
-			//assert(0);
+			if (node->is_expr) {
+				llvm_emit_expression(node);
+			}
+		}break;
+	}
+}
+
+u32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
+	u32 result = -1;
+
+	switch (expr->node) {
+		case AST_NODE_PROCEDURE_CALL: {
+			// evaluate the arguments first
+			size_t num_args = 0;
+			if(expr->expression.proc_call.args)
+				num_args = array_get_length(expr->expression.proc_call.args);
+			// temporary array to hold result register
+			s32* arg_temps = array_create(s32, num_args);
+			for (size_t i = 0; i < num_args; ++i) {
+				Ast* e = expr->expression.proc_call.args[i];
+				if (e->node == AST_NODE_LITERAL_EXPRESSION && e->expression.literal_exp.flags & LITERAL_FLAG_NUMERIC) {
+					arg_temps[i] = -1;
+				} else {
+					arg_temps[i] = (s32)llvm_emit_expression(e);
+				}
+			}
+
+			// alloc the proc call result register
+			result = alloc_temp();
+			sprint("%%%d = call ", result);
+			sprint("@%.*s(", TOKEN_STR(expr->expression.proc_call.name));
+			for (size_t i = 0; i < num_args; ++i) {
+				if (i != 0) sprint(", ");
+				Ast* arg = expr->expression.proc_call.args[i];
+				llvm_emit_type(arg->return_type);
+				sprint(" ");
+				if (arg_temps[i] == -1) {
+					llvm_emit_expression(arg);
+				} else {
+					sprint(" %%%d", arg_temps[i]);
+				}
+			}
+			sprint(")\n");
+			array_release(arg_temps);
+		}break;
+
+		case AST_NODE_LITERAL_EXPRESSION: {
+			Ast_Literal* l = &expr->expression.literal_exp;
+			//if(expr->expression.literal_exp.flags)
+			switch (l->lit_tok->type) {
+				case TOKEN_INT_LITERAL: {
+					// @TODO: convert it properly
+					sprint("%.*s", TOKEN_STR(l->lit_tok));
+				}break;
+				case TOKEN_FLOAT_LITERAL: {
+					// @TODO: convert it properly
+					sprint("%.*s", TOKEN_STR(l->lit_tok));
+				}break;
+				case TOKEN_CHAR_LITERAL: {
+					// @TODO:
+				}break;
+				case TOKEN_BOOL_LITERAL: {
+					if (l->lit_value == 0) {
+						sprint("false");
+					} else {
+						sprint("true");
+					}
+				}break;
+			}
 		} break;
 	}
+
+	return result;
 }
 
-void llvm_emit_function_attributes(LLVM_Code_Generator* cg) {
-	cg->sprint("attributes #0 = {nounwind uwtable}");
-}
+void llvm_generate_ir(Ast** toplevel, Type_Table* type_table) {
+	LLVM_Code_Generator code_generator = {};
 
-void llvm_emit_ir_for_literal(LLVM_Code_Generator* cg, Ast_Literal* lit_exp) {
-	// @TODO(psv): substitute literal token for more sofisticated print
-	cg->sprint("%.*s", TOKEN_STR(lit_exp->lit_tok));
-}
+	code_generator.llvm_emit_type_decls(type_table);
 
-void llvm_instr_emit_store(LLVM_Code_Generator* cg, Type_Instance* type_variable, Ast* value, u32 temp_reg) {
-	if (!value) {
-		cg->sprint(" store ");
-		llvm_emit_ir_for_type_code(cg, type_variable, true);
-		cg->sprint(" zeroinitializer, ");
-		llvm_emit_ir_for_type_code(cg, type_variable, true);
-		cg->sprint("* %%%d\n", temp_reg);
-		return;
+	size_t num_decls = array_get_length(toplevel);
+	for (size_t i = 0; i < num_decls; ++i) {
+		Ast* node = toplevel[i];
+		code_generator.llvm_emit_node(node);
 	}
 
-	if (ast_is_expression(value)) {
-		if (value->expression.expression_type == EXPRESSION_TYPE_LITERAL && value->expression.literal_exp.flags & LITERAL_FLAG_NUMERIC) {
-			cg->sprint(" store ");
-			llvm_emit_ir_for_type_code(cg, type_variable, true);
-			cg->sprint(" ");
-			llvm_emit_ir_for_literal(cg, &value->expression.literal_exp);
-			cg->sprint(", ");
-			llvm_emit_ir_for_type_code(cg, type_variable, true);
-			cg->sprint("* %%%d\n", temp_reg);
-		} else if (value->expression.expression_type == EXPRESSION_TYPE_VARIABLE) {
-			Ast* decl_node = is_declared(value);
-			if (decl_node) {
-				u32 load_temp = cg->alloc_temp();
-				cg->sprint(" %%%d = load ", load_temp);
-				llvm_emit_ir_for_type_code(cg, type_variable, true);
-				cg->sprint(", ");
-				llvm_emit_ir_for_type_code(cg, type_variable, true);
-				cg->sprint("* %%%d\n", decl_node->var_decl.temporary_register);
+	code_generator.sprint("\n");
+	code_generator.sprint("attributes #0 = { nounwind uwtable }\n");
+	code_generator.sprint("attributes #1 = { nounwind uwtable }\n");
 
-				cg->sprint(" store ");
-				llvm_emit_ir_for_type_code(cg, decl_node->var_decl.type);
-				cg->sprint(" %%%d, ", load_temp);
-				llvm_emit_ir_for_type_code(cg, decl_node->var_decl.type);
-				cg->sprint("* %%%d\n", temp_reg);
-			} else {
-				report_fatal_error("Internal compiler error: llvm code generator tried to use a not declared variable.\n");
-			}
-		} else if (value->expression.expression_type == EXPRESSION_TYPE_LITERAL && value->expression.literal_exp.lit_tok->flags & TOKEN_STRING_LITERAL) {
-			// strings only for now
-			u32 index = llvm_defer_string_literal(cg, value);
-			cg->sprint(" %%%d getelementptr ", cg->alloc_temp());
-			llvm_emit_ir_for_type_code(cg, type_variable, true);
-			cg->sprint(", ");
-			llvm_emit_ir_for_type_code(cg, type_variable, true);
-			cg->sprint("* %%%d, i64 0,", temp_reg);
-
-			//% 1 = getelementptr{ i64, i8* }, { i64, i8* }*%0, i64 0, i32 0
-		} else {
-			u32 temp_exp = llvm_emit_ir_for_expression(cg, value);
-			cg->sprint(" store ");
-			llvm_emit_ir_for_type_code(cg, type_variable, true);
-			cg->sprint(" %%%d, ", temp_exp);
-			llvm_emit_ir_for_type_code(cg, type_variable);
-			cg->sprint("* %%%d\n", temp_reg);
-		}
-	}
-}
-
-u32 llvm_defer_string_literal(LLVM_Code_Generator* cg, Ast* node) {
-	if (!cg->deferred_string_literals) {
-		cg->deferred_string_literals = create_array(Ast*, 16);
-	}
-	push_array(cg->deferred_string_literals, &node);
-
-	cg->string_literal_temp += 1;
-	return cg->string_literal_temp - 1;
-}
-
-void LLVM_Code_Generator::add_struct_type(Type_Instance* type) {
-	sprint_type("%%..%.*s = type ", type->type_struct.name_length, type->type_struct.name);
-	size_t num_fields = get_arr_length(type->type_struct.fields_types);
-	for (size_t i = 0; i < num_fields; ++i) {
-		llvm_emit_ir_for_type_typedecl(this, type, true);
-	}
+	HANDLE out = ho_createfile("temp//llvmtest.ll", FILE_WRITE, CREATE_ALWAYS);
+	ho_writefile(out, code_generator.ptr, (u8*)code_generator.buffer);
+	ho_closefile(out);
 }

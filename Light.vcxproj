@@ -138,6 +138,7 @@
     <ClCompile Include="src\hash_table.cpp" />
     <ClCompile Include="src\interpreter.cpp" />
     <ClCompile Include="src\lexer.cpp" />
+    <ClCompile Include="src\llvm_backend.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\memory.cpp" />
     <ClCompile Include="src\parser.cpp" />

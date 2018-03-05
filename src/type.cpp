@@ -4,8 +4,8 @@
 #include "ast.h"
 
 Type_Table type_table;
-static s64 DEBUG_type_entries[1024] = { 0 };
-static s64 DEBUG_type_index = 0;
+//static s64 DEBUG_type_entries[2048] = { 0 };
+//static s64 DEBUG_type_index = 0;
 
 static Type_Instance* string_type;
 
@@ -262,7 +262,7 @@ bool Type_Table::insert_type(Type_Instance* instance, s64* hash)
 	type_table.entries[h].entry = instance;
 	type_table.entries[h].used = true;
 
-	DEBUG_type_entries[DEBUG_type_index++] = h;
+	type_entries_hashes[type_entries_index++] = h;
 
 	if (hash) *hash = h;
 
@@ -392,13 +392,13 @@ int is_pointer_type(Type_Instance* inst) {
 }
 
 #include "ast.h"
-void DEBUG_print_type_table()
+void DEBUG_print_type_table(Type_Table* type_table)
 {
-	printf("The type table has %d entries.\n", DEBUG_type_index);
-	for (int i = 0; i < DEBUG_type_index; ++i) {
-		s64 hash = DEBUG_type_entries[i];
-		printf("entry[%d/%u]: %p\n", i, hash, type_table.get_entry(hash));
-		DEBUG_print_type(stdout, type_table.get_entry(hash));
+	printf("The type table has %d entries.\n", type_table->type_entries_index);
+	for (int i = 0; i < type_table->type_entries_index; ++i) {
+		s64 hash = type_table->type_entries_hashes[i];
+		printf("entry[%d/%u]: %p\n", i, hash, type_table->get_entry(hash));
+		DEBUG_print_type(stdout, type_table->get_entry(hash));
 		printf("\n");
 	}
 }

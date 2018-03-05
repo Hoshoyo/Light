@@ -300,6 +300,7 @@ struct Ast {
 	Node_Type node;
 	Type_Instance* return_type;
 	bool is_decl;
+	bool is_expr;
 	bool type_checked;
 	union {
 		Ast_ProcDecl proc_decl;

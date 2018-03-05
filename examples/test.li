@@ -1,0 +1,15 @@
+vec4 :: struct {
+	x : r32;
+	y : r32;
+	z : r32;
+	w : r32;
+}
+
+proc :: (v1 : r32, v2 : s32, v3 : s32) -> s32 {
+	return 0;
+}
+
+main :: () {
+	variable : u32;
+	proc(1.1, 2, 3);
+}

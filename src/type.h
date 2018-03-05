@@ -94,6 +94,9 @@ struct Type_Table {
 	int max_entries;
 	int num_entries;
 	int num_collisions;
+
+	s64 type_entries_hashes[2048];
+	s64 type_entries_index;
 	
 	Type_Table() {
 		entries = (Type_Table_Entry*)calloc(1, 1024 * 1024 * sizeof(Type_Table_Entry));
@@ -132,5 +135,5 @@ int is_pointer_type(Type_Instance* inst);
 
 s32 get_size_of_primitive_type(Type_Primitive primitive);
 
-void DEBUG_print_type_table();
+void DEBUG_print_type_table(Type_Table* type_table);
 void DEBUG_print_node_type(FILE* out, Ast** ast, bool decl_only);

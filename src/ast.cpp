@@ -79,6 +79,7 @@ Ast* create_proc(Memory_Arena* arena, Token* name, Token* extern_name, Type_Inst
 		proc->node = AST_NODE_PROC_FORWARD_DECL;
 
 	proc->is_decl = true;
+	proc->is_expr = false;
 	proc->return_type = 0;
 	proc->type_checked = false;
 
@@ -110,6 +111,7 @@ Ast* create_named_argument(Memory_Arena* arena, Token* name, Type_Instance* type
 
 	narg->node = AST_NODE_NAMED_ARGUMENT;
 	narg->is_decl = true;
+	narg->is_expr = false;
 	narg->return_type = 0;
 	narg->type_checked = false;
 
@@ -137,6 +139,7 @@ Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type,
 
 	vdecl->node = AST_NODE_VARIABLE_DECL;
 	vdecl->is_decl = true;
+	vdecl->is_expr = false;
 	vdecl->return_type = 0;
 	vdecl->type_checked = false;
 
@@ -160,6 +163,7 @@ Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok, u64 value)
 
 	lit->node = AST_NODE_LITERAL_EXPRESSION;
 	lit->is_decl = false;
+	lit->is_expr = true;
 	lit->return_type = 0;
 	lit->type_checked = false;
 
@@ -182,6 +186,7 @@ Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, T
 
 	binop->node = AST_NODE_BINARY_EXPRESSION;
 	binop->is_decl = false;
+	binop->is_expr = true;
 	binop->return_type = 0;
 	binop->type_checked = false;
 
@@ -203,6 +208,7 @@ Ast* create_variable(Memory_Arena* arena, Token* var_token, Scope* scope)
 
 	var->node = AST_NODE_VARIABLE_EXPRESSION;
 	var->is_decl = false;
+	var->is_expr = true;
 	var->return_type = 0;
 	var->type_checked = false;
 
@@ -222,6 +228,7 @@ Ast* create_block(Memory_Arena* arena, Scope* scope)
 
 	block->node = AST_NODE_BLOCK;
 	block->is_decl = false;
+	block->is_expr = false;
 	block->return_type = 0;
 	block->type_checked = false;
 
@@ -239,6 +246,7 @@ Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope
 
 	proc_call->node = AST_NODE_PROCEDURE_CALL;
 	proc_call->is_decl = false;
+	proc_call->is_expr = true;
 	proc_call->return_type = 0;
 	proc_call->type_checked = false;
 
@@ -249,7 +257,7 @@ Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope
 	proc_call->expression.proc_call.args = args;
 	proc_call->expression.proc_call.scope = scope;
 
-	size_t num_args = array_get_length(proc_call->expression.proc_call.args);
+	//size_t num_args = array_get_length(proc_call->expression.proc_call.args);
 
 	return proc_call;
 }
@@ -259,6 +267,7 @@ Ast* create_if(Memory_Arena* arena, Ast* bool_exp, Ast* body, Ast* else_stmt, Sc
 	Ast* if_stmt = ALLOC_AST(arena);
 	if_stmt->node = AST_NODE_IF_STATEMENT;
 	if_stmt->is_decl = false;
+	if_stmt->is_expr = false;
 	if_stmt->return_type = 0;
 	if_stmt->type_checked = false;
 
@@ -275,6 +284,7 @@ Ast* create_while(Memory_Arena* arena, Ast* bool_exp, Ast* body, Scope* scope)
 	Ast* while_stmt = ALLOC_AST(arena);
 	while_stmt->node = AST_NODE_WHILE_STATEMENT;
 	while_stmt->is_decl = false;
+	while_stmt->is_expr = false;
 	while_stmt->return_type = 0;
 	while_stmt->type_checked = false;
 
@@ -290,6 +300,7 @@ Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope, Token* token)
 	Ast* ret_stmt = ALLOC_AST(arena);
 	ret_stmt->node = AST_NODE_RETURN_STATEMENT;
 	ret_stmt->is_decl = false;
+	ret_stmt->is_expr = false;
 	ret_stmt->return_type = 0;
 	ret_stmt->type_checked = false;
 
@@ -309,6 +320,7 @@ Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation o
 
 	unop->node = AST_NODE_UNARY_EXPRESSION;
 	unop->is_decl = false;
+	unop->is_expr = true;
 	unop->return_type = 0;
 	unop->type_checked = false;
 
@@ -330,6 +342,7 @@ Ast* create_break(Memory_Arena* arena, Scope* scope, Token* token)
 	Ast* break_stmt = ALLOC_AST(arena);
 
 	break_stmt->is_decl = false;
+	break_stmt->is_expr = false;
 	break_stmt->node = AST_NODE_BREAK_STATEMENT;
 	break_stmt->return_type = 0;
 	break_stmt->type_checked = false;
@@ -348,6 +361,7 @@ Ast* create_continue(Memory_Arena* arena, Scope* scope, Token* token)
 	Ast* continue_stmt = ALLOC_AST(arena);
 
 	continue_stmt->is_decl = false;
+	continue_stmt->is_expr = false;
 	continue_stmt->node = AST_NODE_CONTINUE_STATEMENT;
 	continue_stmt->return_type = 0;
 	continue_stmt->type_checked = false;
@@ -371,6 +385,7 @@ Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_
 	}
 
 	struct_decl->is_decl = true;
+	struct_decl->is_expr = false;
 	struct_decl->node = AST_NODE_STRUCT_DECLARATION;
 	struct_decl->return_type = 0;
 	struct_decl->type_checked = false;
@@ -396,6 +411,7 @@ Ast* create_enum_decl(Memory_Arena* arena, Token* name, Ast_EnumField* fields, i
 	Ast* enum_decl = ALLOC_AST(arena);
 
 	enum_decl->is_decl = true;
+	enum_decl->is_expr = false;
 	enum_decl->node = AST_NODE_ENUM_DECLARATION;
 	enum_decl->return_type = 0;
 	enum_decl->type_checked = false;
@@ -418,6 +434,7 @@ Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* literal_
 
 	directive->return_type = 0;
 	directive->is_decl = true;
+	directive->is_expr = false;
 	directive->type_checked = false;
 
 	directive->directive.declaration = declaration;
@@ -434,6 +451,7 @@ Ast* create_constant(Memory_Arena* arena, Token* name, Ast* expression, Type_Ins
 	constant->node = AST_NODE_CONSTANT;
 
 	constant->is_decl = true;
+	constant->is_expr = false;
 	constant->return_type = 0;
 	constant->type_checked = false;
 

@@ -10,7 +10,6 @@
 #include "llvm_backend.h"
 
 int main(int argc, char** argv) {
-	u64 h = fnv_1_hash("Hello", sizeof("Hello") - 1);
 	if (argc <= 1) {
 		fprintf(stderr, "No files were given.\nusage: %s [option ...] filename\n", argv[0]);
 		return -1;
@@ -48,7 +47,7 @@ int main(int argc, char** argv) {
 
 #if 1
 	//printf("\n\n");
-	//DEBUG_print_type_table();
+	DEBUG_print_type_table(&type_table);
 	//DEBUG_print_node_type(stdout, ast, true);
 	printf("\n\nNumber of values in the infer queue = %d\n", array_get_length(infer_queue));
 	printf("\n\n");
@@ -57,7 +56,7 @@ int main(int argc, char** argv) {
 
 	// LLVM backend
 #if defined (_WIN32) || defined(_WIN64)
-	//llvm_generate_ir(ast);
+	llvm_generate_ir(ast, &type_table);
 #endif
 	return 0;
 }
