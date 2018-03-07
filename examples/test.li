@@ -6,10 +6,11 @@ vec4 :: struct {
 }
 
 proc :: (v1 : r32, v2 : s32, v3 : s32) -> s32 {
-	return 0;
+	if(1 < 2) return 1+1;
+	else return 4;
 }
 
 main :: () {
-	variable : u32;
-	proc(1.1, 2, 3);
+	variable : s32;
+	proc(1.1, variable, 3);
 }

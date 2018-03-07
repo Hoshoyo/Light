@@ -129,6 +129,7 @@ const int INTEGER_SIGNED = 1;
 const int INTEGER_UNSIGNED = 2;
 // return 1 if signed 2 if unsigned 0 if not integer type
 int is_integer_type(Type_Instance* inst);
+int is_integer_signed_type(Type_Instance* inst);
 int is_floating_point_type(Type_Instance* inst);
 int is_boolean_type(Type_Instance* inst);
 int is_pointer_type(Type_Instance* inst);

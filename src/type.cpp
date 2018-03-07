@@ -363,6 +363,14 @@ int is_integer_type(Type_Instance* inst)
 	}
 	return 0;
 }
+int is_integer_signed_type(Type_Instance* inst) {
+	if (!inst) return 0;
+	if (inst->type == TYPE_PRIMITIVE) {
+		if (inst->primitive >= TYPE_PRIMITIVE_S64 && inst->primitive <= TYPE_PRIMITIVE_S8)
+			return 1;
+	}
+	return 0;
+}
 
 int is_floating_point_type(Type_Instance* inst) {
 	if (!inst) return 0;
