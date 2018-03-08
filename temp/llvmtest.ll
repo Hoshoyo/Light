@@ -2,13 +2,9 @@
 %vec4 = type { float, float, float, float }
 
 declare ccc i32 i32 @proc(float %v1,i32 %v2,i32 %v3) #1 {
-%0 = icmp ult i8 1, 2
-br i1 %0, label %if-stmt-0, label %if-stmt-1
-if-stmt-0:
-%1 = add i32 1, 1
-ret i32 %1
-if-stmt-1:
-ret i32 4
+%0 = alloca i64, align 4
+store i64 3, i64* %0
+%1 = load i64, i64* %0
 }
 declare ccc i32 void @main() #1 {
 %0 = alloca i32, align 4

@@ -20,6 +20,7 @@ struct LLVM_Code_Generator {
 	void llvm_emit_type_decls(Type_Table* type_table);
 
 	s32  llvm_emit_expression(Ast* expr);
+	s32  llvm_emit_assignment(Ast* expr);
 	void llvm_emit_node(Ast* node);
 	void llvm_emit_type(Type_Instance* type, u32 flags = 0);
 };

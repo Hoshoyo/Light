@@ -293,11 +293,11 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 		} break;
 
 		case AST_NODE_VARIABLE_EXPRESSION: {
-			Ast_Variable* v = &expr->expression.variable_exp;
-			s64 index = v->scope->symb_table->entry_exist(v->name);
-			Ast* var_decl = v->scope->symb_table->entries[index].node;
+			Ast* var_decl = get_declaration_from_variable_expression(expr);
+
+			// @TODO IMPORTANT variable expression node doesnt get type from type inference pass
+			
 			assert(var_decl->node == AST_NODE_VARIABLE_DECL);
-			assert(v->type);
 			assert(expr->return_type);
 
 			// get temporary register containing the variable address
@@ -306,92 +306,17 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 			result = alloc_temp_register();
 
 			sprint("%%%d = load ", result);
-			llvm_emit_type(v->type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+			llvm_emit_type(expr->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
 			sprint(", ");
-			llvm_emit_type(v->type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+			llvm_emit_type(expr->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
 			sprint("* %%%d", var_temp_reg);
 		} break;
 
 		case AST_NODE_BINARY_EXPRESSION: {
-			s32 temp_left = -1;
-			s32 temp_right = -1;
-
-			// left composite expression
-			if (!ast_node_is_embeded_literal(expr->expression.binary_exp.left)) {
-				temp_left = llvm_emit_expression(expr->expression.binary_exp.left);
-				sprint("\n");
-			}
-			// right composite expression
-			if (!ast_node_is_embeded_literal(expr->expression.binary_exp.right)) {
-				temp_right = llvm_emit_expression(expr->expression.binary_exp.right);
-				sprint("\n");
-			}
-			result = alloc_temp_register();
-
-			sprint("%%%d = ", result);
-			char* operation = 0;
-
-			if (is_floating_point_type(expr->return_type)) {
-				// Floating point type operations
-				switch (expr->expression.binary_exp.op) {
-					case BINARY_OP_PLUS:	operation = "fadd"; break;
-					case BINARY_OP_MINUS:	operation = "fsub"; break;
-					case BINARY_OP_MULT:	operation = "fmul"; break;
-					case BINARY_OP_DIV:		operation = "fdiv"; break;
-
-					case BINARY_OP_EQUAL_EQUAL:		operation = "fcmp ueq"; break;
-					case BINARY_OP_NOT_EQUAL:		operation = "fcmp une"; break;
-					case BINARY_OP_GREATER_EQUAL:	operation = "fcmp uge"; break;
-					case BINARY_OP_GREATER_THAN:	operation = "fcmp ugt"; break;
-					case BINARY_OP_LESS_THAN:		operation = "fcmp ult"; break;
-					case BINARY_OP_LESS_EQUAL:		operation = "fcmp ule"; break;
-				}
+			if (expr_is_assignment(&expr->expression)) {
+				result = llvm_emit_assignment(expr);
 			} else {
-				// Integer and pointer arithmetic operations
-				bool signed_int_type = is_integer_signed_type(expr->return_type);
-				switch (expr->expression.binary_exp.op) {
-					case BINARY_OP_PLUS:	operation = "add"; break;
-					case BINARY_OP_MINUS:	operation = "sub"; break;
-					case BINARY_OP_MULT:	operation = "mul"; break;
-					case BINARY_OP_AND:		operation = "and"; break;
-					case BINARY_OP_OR:		operation = "or";  break;
-					case BINARY_OP_XOR:		operation = "xor"; break;
-					case BINARY_OP_DIV:		operation = (signed_int_type) ? "sdiv" : "udiv"; break;
-					case BINARY_OP_MOD:		operation = (signed_int_type) ? "srem" : "urem"; break;
 
-					case BINARY_OP_BITSHIFT_LEFT:	operation = "shl"; break;
-					case BINARY_OP_BITSHIFT_RIGHT:	operation = (signed_int_type) ? "ashr" : "lshr"; break;
-
-					case BINARY_OP_EQUAL_EQUAL:		operation = "icmp eq"; break;
-					case BINARY_OP_NOT_EQUAL:		operation = "icmp ne"; break;
-					case BINARY_OP_GREATER_EQUAL:	operation = (signed_int_type) ? "icmp sge" : "icmp uge"; break;
-					case BINARY_OP_GREATER_THAN:	operation = (signed_int_type) ? "icmp sgt" : "icmp ugt"; break;
-					case BINARY_OP_LESS_THAN:		operation = (signed_int_type) ? "icmp slt" : "icmp ult"; break;
-					case BINARY_OP_LESS_EQUAL:		operation = (signed_int_type) ? "icmp sle" : "icmp ule"; break;
-
-					//case BINARY_OP_LOGIC_AND:
-					//case BINARY_OP_LOGIC_OR:
-				}
-			}
-			// Operation
-			sprint("%s ", operation);
-			
-			// Left side
-			llvm_emit_type(expr->return_type);
-			sprint(" ");
-			if (temp_left == -1) {
-				llvm_emit_expression(expr->expression.binary_exp.left);
-			} else {
-				sprint("%%%d, ", temp_left);
-			}
-
-			sprint(", ");
-
-			// Right side
-			if (temp_right == -1) {
-				llvm_emit_expression(expr->expression.binary_exp.right);
-			} else {
-				sprint("%%%d", temp_right);
 			}
 			
 		} break;
@@ -418,6 +343,43 @@ void llvm_generate_ir(Ast** toplevel, Type_Table* type_table) {
 	HANDLE out = ho_createfile("temp//llvmtest.ll", FILE_WRITE, CREATE_ALWAYS);
 	ho_writefile(out, code_generator.ptr, (u8*)code_generator.buffer);
 	ho_closefile(out);
+}
+
+s32 LLVM_Code_Generator::llvm_emit_assignment(Ast* expr) {
+	Ast* left  = expr->expression.binary_exp.left;
+	Ast* right = expr->expression.binary_exp.right;
+	// TODO(psv): get lvalue (address of expression in the left)
+	// assume variable for now
+	Ast* var_decl = get_declaration_from_variable_expression(left);
+	s32 temp = var_decl->var_decl.temporary_register;
+	
+	s32 temp_right = -1;
+
+	sprint("store ");
+	llvm_emit_type(left->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+	if (ast_node_is_embeded_literal(right)) {
+		sprint(" ");
+		llvm_emit_expression(right);
+	} else {
+		s32 temp_right = llvm_emit_expression(right);
+		sprint(" %%%d", temp_right);
+	}
+
+	sprint(", ");
+	llvm_emit_type(left->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+	sprint("* %%%d", temp);
+
+	// guarantee the return value is correct
+	if (temp_right == -1) {
+		temp_right = alloc_temp_register();
+		sprint("\n%%%d = load ", temp_right);
+		llvm_emit_type(left->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+		sprint(", ");
+		llvm_emit_type(left->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+		sprint("* %%%d", temp);
+	}
+
+	return temp_right;
 }
 
 bool ast_node_is_embeded_literal(Ast* node) {

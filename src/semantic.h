@@ -23,3 +23,7 @@ Ast* is_declared(Ast* node);
 
 const u32 DECL_CHECK_PASSED = 1;
 const u32 DECL_CHECK_FAILED = 0;
+
+
+bool expr_is_assignment(Ast_Expression* expr);
+Ast* get_declaration_from_variable_expression(Ast* var);

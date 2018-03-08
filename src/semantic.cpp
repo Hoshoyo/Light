@@ -612,6 +612,14 @@ Ast* get_struct_field(Ast* struct_decl, Token* name) {
 	return 0;
 }
 
+Ast* get_declaration_from_variable_expression(Ast* var) {
+	assert(var->node == AST_NODE_VARIABLE_EXPRESSION);
+	Ast_Variable* v = &var->expression.variable_exp;
+	s64 index = v->scope->symb_table->entry_exist(v->name);
+	Ast* var_decl = v->scope->symb_table->entries[index].node;
+	return var_decl;
+}
+
 int check_assignment_types(Type_Instance* left, Type_Instance* right, Ast* binop)
 {
 	Type_Instance* coerced = left;
@@ -1841,6 +1849,10 @@ int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 		}
 	}
 	return 0;
+}
+
+bool expr_is_assignment(Ast_Expression* expr) {
+	return(expr->binary_exp.op >= ASSIGNMENT_OPERATION_EQUAL && expr->binary_exp.op <= ASSIGNMENT_OPERATION_SHR_EQUAL);
 }
 
 /*
