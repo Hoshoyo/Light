@@ -16,12 +16,26 @@ int LLVM_Code_Generator::sprint(char* msg, ...)
 	return num_written;
 }
 
+int LLVM_Code_Generator::sprint_strlit(char* msg, ...)
+{
+	va_list args;
+	va_start(args, msg);
+	int num_written = vsprintf(strlit_buffer + strlit_ptr, msg, args);
+	va_end(args);
+	strlit_ptr += num_written;
+	return num_written;
+}
+
 s32 LLVM_Code_Generator::alloc_temp_register() {
 	return temp++;
 }
 
 s32 LLVM_Code_Generator::gen_branch_label() {
 	return br_label_temp++;
+}
+
+s32 LLVM_Code_Generator::alloc_strlit_temp() {
+	return str_lit_temp++;
 }
 
 void LLVM_Code_Generator::reset_temp() {
@@ -131,12 +145,10 @@ void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 			@TODO: local calls
 		*/
 		case AST_NODE_PROC_DECLARATION: {
-			sprint("declare ");
-			
 			if (node->proc_decl.flags & PROC_DECL_FLAG_IS_EXTERNAL) {
-				sprint("cc 64 ");
+				sprint("declare cc 64 ");
 			} else {
-				sprint("ccc i32 ");
+				sprint("define ");
 			}
 			llvm_emit_type(node->proc_decl.proc_ret_type);
 			sprint(" @%.*s(", TOKEN_STR(node->proc_decl.name));
@@ -149,8 +161,7 @@ void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 			if (node->proc_decl.flags & PROC_DECL_FLAG_IS_EXTERNAL) {
 				sprint("#0\n");
 			} else {
-				sprint("#1 ");
-				sprint("{\n");
+				sprint("#1 {\ndecls-0:\n");
 				llvm_emit_node(node->proc_decl.body);
 				sprint("}\n");
 				reset_temp();
@@ -230,9 +241,10 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 			size_t num_args = 0;
 			s32* arg_temps = 0;
 			
+			if (expr->expression.proc_call.args)
+				num_args = array_get_length(expr->expression.proc_call.args);
+
 			if (num_args) {
-				if (expr->expression.proc_call.args)
-					num_args = array_get_length(expr->expression.proc_call.args);
 				// temporary array to hold result register
 				arg_temps = array_create(s32, num_args);
 				for (size_t i = 0; i < num_args; ++i) {
@@ -250,7 +262,8 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 			// alloc the proc call result register
 			result = alloc_temp_register();
 			sprint("%%%d = call ", result);
-			sprint("@%.*s(", TOKEN_STR(expr->expression.proc_call.name));
+			llvm_emit_type(expr->return_type);
+			sprint(" @%.*s(", TOKEN_STR(expr->expression.proc_call.name));
 			for (size_t i = 0; i < num_args; ++i) {
 				assert(arg_temps);
 				if (i != 0) sprint(", ");
@@ -289,6 +302,12 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 						sprint("true");
 					}
 				}break;
+				case TOKEN_STRING_LITERAL: {
+					result = alloc_temp_register();
+					s32 index = llvm_define_string_literal(l);
+					size_t len = l->lit_tok->value.length + 1; // \0
+					sprint("%%%d = getelementptr [%d x i8], [%d x i8]* @__str$%d, i64 0, i64 0\n", result, len, len, index);
+				}break;
 			}
 		} break;
 
@@ -298,7 +317,11 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 			// @TODO IMPORTANT variable expression node doesnt get type from type inference pass
 			
 			assert(var_decl->node == AST_NODE_VARIABLE_DECL);
-			assert(expr->return_type);
+			//assert(expr->return_type);
+			// @TODO HACK, return_type should be set earlier
+			if (!expr->return_type) {
+				expr->return_type = var_decl->var_decl.type;
+			}
 
 			// get temporary register containing the variable address
 			s32 var_temp_reg = var_decl->var_decl.temporary_register;
@@ -316,7 +339,7 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 			if (expr_is_assignment(&expr->expression)) {
 				result = llvm_emit_assignment(expr);
 			} else {
-
+				result = llvm_emit_binary_expression(expr);
 			}
 			
 		} break;
@@ -325,45 +348,77 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 	return result;
 }
 
-void llvm_generate_ir(Ast** toplevel, Type_Table* type_table) {
-	LLVM_Code_Generator code_generator = {};
+s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
+	assert(expr->node == AST_NODE_BINARY_EXPRESSION);
 
-	code_generator.llvm_emit_type_decls(type_table);
+	BinaryOperation op = expr->expression.binary_exp.op;
 
-	size_t num_decls = array_get_length(toplevel);
-	for (size_t i = 0; i < num_decls; ++i) {
-		Ast* node = toplevel[i];
-		code_generator.llvm_emit_node(node);
+	s32 t_left = -1;
+	s32 t_right = -1;
+	if (!ast_node_is_embeded_literal(expr->expression.binary_exp.left)) {
+		t_left = llvm_emit_expression(expr->expression.binary_exp.left);
 	}
+	if (!ast_node_is_embeded_literal(expr->expression.binary_exp.right)) {
+		t_right = llvm_emit_expression(expr->expression.binary_exp.right);
+	}
+	s32 temp_reg = alloc_temp_register();
+	sprint("%%%d = ", temp_reg);
 
-	code_generator.sprint("\n");
-	code_generator.sprint("attributes #0 = { nounwind uwtable }\n");
-	code_generator.sprint("attributes #1 = { nounwind uwtable }\n");
+	// If it is a floating point type llvm offers operations like
+	// fcmp, fadd, fsub, ...
+	if (is_floating_point_type(expr->return_type)) {
+		switch (op) {
+			case BINARY_OP_PLUS:		sprint("fadd "); break;
+			case BINARY_OP_MINUS:		sprint("fsub "); break;
+			case BINARY_OP_MULT:		sprint("fmul "); break;
+			case BINARY_OP_DIV:			sprint("fdiv "); break;
 
-	HANDLE out = ho_createfile("temp//llvmtest.ll", FILE_WRITE, CREATE_ALWAYS);
-	ho_writefile(out, code_generator.ptr, (u8*)code_generator.buffer);
-	ho_closefile(out);
+			case BINARY_OP_EQUAL_EQUAL:		sprint("fcmp oeq "); break;
+			case BINARY_OP_GREATER_EQUAL:	sprint("fcmp oge "); break;
+			case BINARY_OP_GREATER_THAN:	sprint("fcmp ogt "); break;
+			case BINARY_OP_LESS_EQUAL:		sprint("fcmp ole "); break;
+			case BINARY_OP_LESS_THAN:		sprint("fcmp olt "); break;
+		}
+		// float or double always
+		llvm_emit_type(expr->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+		sprint(" ");
+		if (t_left == -1) {
+			llvm_emit_expression(expr->expression.binary_exp.left);
+			sprint(", ");
+		} else {
+			sprint("%%%d, ", t_left);
+		}
+
+		if (t_right == -1) {
+			llvm_emit_expression(expr->expression.binary_exp.right);
+		} else {
+			sprint("%%%d", t_right);
+		}
+
+	} else {
+
+	}
+	return temp_reg;
 }
 
 s32 LLVM_Code_Generator::llvm_emit_assignment(Ast* expr) {
-	Ast* left  = expr->expression.binary_exp.left;
+	Ast* left = expr->expression.binary_exp.left;
 	Ast* right = expr->expression.binary_exp.right;
 	// TODO(psv): get lvalue (address of expression in the left)
 	// assume variable for now
 	Ast* var_decl = get_declaration_from_variable_expression(left);
 	s32 temp = var_decl->var_decl.temporary_register;
-	
+
 	s32 temp_right = -1;
+	
+	if (!ast_node_is_embeded_literal(right)) {
+		temp_right = llvm_emit_expression(right);
+		sprint("\n");
+	}
 
 	sprint("store ");
 	llvm_emit_type(left->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
-	if (ast_node_is_embeded_literal(right)) {
-		sprint(" ");
-		llvm_emit_expression(right);
-	} else {
-		s32 temp_right = llvm_emit_expression(right);
-		sprint(" %%%d", temp_right);
-	}
+	sprint(" %%%d", temp_right);
 
 	sprint(", ");
 	llvm_emit_type(left->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
@@ -382,6 +437,120 @@ s32 LLVM_Code_Generator::llvm_emit_assignment(Ast* expr) {
 	return temp_right;
 }
 
+s32 LLVM_Code_Generator::llvm_define_string_literal(Ast_Literal* lit) {
+	s32 n = alloc_strlit_temp();
+
+	size_t litlength = lit->lit_tok->value.length;
+	lit->llvm_index = n;
+	// @TODO(psv): temporary print of literal string
+	sprint_strlit("@__str$%d = private global [%d x i8] c\"%.*s\\00\"\n", n, litlength + 1, TOKEN_STR(lit->lit_tok));
+	return n;
+}
+
 bool ast_node_is_embeded_literal(Ast* node) {
 	return (node->node == AST_NODE_LITERAL_EXPRESSION && node->expression.literal_exp.flags & LITERAL_FLAG_NUMERIC);
+}
+
+
+
+
+
+
+
+
+
+
+
+static size_t filename_length_strip_extension(char* f) {
+	// Extract the base filename without the extension
+	size_t baselen = strlen(f);
+	size_t startlen = baselen;
+	while (f[baselen] != '.') baselen--;
+	if (baselen == 0) baselen = startlen;
+	return baselen;
+}
+
+// @TEMPORARY Windows only for now
+void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
+	LLVM_Code_Generator code_generator = {};
+	code_generator.in_filename = filename;
+
+	code_generator.llvm_emit_type_decls(type_table);
+
+	size_t num_decls = array_get_length(toplevel);
+	for (size_t i = 0; i < num_decls; ++i) {
+		Ast* node = toplevel[i];
+		code_generator.llvm_emit_node(node);
+	}
+
+
+code_generator.sprint(R"(define void @print_double(double %%value) #0 {
+	%%str = getelementptr[3 x i8], [3 x i8] * @__str$4, i64 0, i64 0
+	%%1 = call i32(i8*, ...) @printf(i8* %%str, double %%value)
+	ret void
+}
+
+@__str$4 = private global [3 x i8] c"%%f\00"
+)");
+	code_generator.sprint("\n");
+	code_generator.sprint("attributes #0 = { nounwind uwtable }\n");
+	code_generator.sprint("attributes #1 = { nounwind uwtable }\n");
+
+	size_t fname_len = filename_length_strip_extension(filename);
+	string out_obj(fname_len + sizeof(".ll"), fname_len, filename);
+	out_obj.cat(".ll", sizeof(".ll"));
+	
+	HANDLE out = ho_createfile(out_obj.data, FILE_WRITE, CREATE_ALWAYS);
+	ho_writefile(out, code_generator.ptr, (u8*)code_generator.buffer);
+	ho_writefile(out, code_generator.strlit_ptr, (u8*)code_generator.strlit_buffer);
+	ho_closefile(out);
+
+	char cmdbuffer[1024];
+	sprintf(cmdbuffer, "llc -filetype=obj -march=x86-64 %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
+	system(cmdbuffer);
+	sprintf(cmdbuffer, "ld %.*s.obj -nostdlib -o %.*s.exe lib//kernel32.lib lib/msvcrt.lib", fname_len, out_obj.data, fname_len, out_obj.data);
+	system(cmdbuffer);
+}
+
+
+void LLVM_Code_Generator::llvm_generate_temporary_code() {
+#if 0
+	char temp_code[] = R"(
+define void @print_int(i32 %value) #0 {
+	%str = getelementptr [3 x i8], [3 x i8]* @__str$3, i64 0, i64 0
+	%1 = call i32 (i8*, ...) @printf(i8* %str, i32 %value)
+	ret void
+}
+
+define void @print_double(double %value) #0 {
+	%str = getelementptr [3 x i8], [3 x i8]* @__str$4, i64 0, i64 0
+	%1 = call i32 (i8*, ...) @printf(i8* %str, double %value)
+	ret void
+}
+declare cc 64 i32 @ExitProcess(i32) #0
+declare cc 64 i8* @GetStdHandle(i32) #1
+declare cc 64 i32 @WriteConsoleA(i8*, i8*, i32, i32*, i64) #1
+)";
+
+	char entrypoint[] = R"(
+section .data
+section .text
+
+extern main
+
+global _start
+_start:
+	call main
+	mov ebx, eax
+	mov eax, 1
+	int 80h
+	)";
+	FILE* entry_file = fopen("temp/entry.asm", "w");
+	size_t written = fwrite(entrypoint, sizeof(entrypoint), 1, entry_file);
+	fclose(entry_file);
+
+	// @TODO linux only
+	system("nasm -g -f elf64 temp/entry.asm -o temp/entry.o");
+	//system("ld ")
+#endif	
 }

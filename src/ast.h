@@ -206,6 +206,7 @@ struct Ast_Literal {
 		Token* lit_tok;
 		u64 lit_value;
 	};
+	s32 llvm_index;
 	Type_Instance* type;
 };
 

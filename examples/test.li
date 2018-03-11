@@ -1,16 +1,10 @@
-vec4 :: struct {
-	x : r32;
-	y : r32;
-	z : r32;
-	w : r32;
-}
-
-proc :: (v1 : r32, v2 : s32, v3 : s32) -> s32 {
-	var := 5;
-	var = 3;
-}
+ExitProcess  :: (exit_code : s32) -> s32 #foreign("kernel32");
 
 main :: () {
-	variable : s32;
-	proc(1.1, variable, 3);
+	a : string;
+	a = "hello";
+	
+	
+	ExitProcess(0);
+	return;
 }

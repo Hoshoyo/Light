@@ -8,4 +8,5 @@ all: extcall
 	$(CC) $(CFLAGS) $(SRCDIR)/ast.cpp $(SRCDIR)/main.cpp $(SRCDIR)/lexer.cpp $(SRCDIR)/util.cpp $(SRCDIR)/memory.cpp $(SRCDIR)/type.cpp $(SRCDIR)/parser.cpp $(SRCDIR)/semantic.cpp $(SRCDIR)/symbol_table.cpp $(SRCDIR)/interpreter.cpp $(SRCDIR)/hash_table.cpp -o $(BINDIR)/light $(BINDIR)/external_caller.o 
 
 extcall: 
-	nasm -g -f elf64 -o $(BINDIR)/external_caller.o $(SRCDIR)/external_caller_nasm.asm
+	mkdir -p $(BINDIR)
+	nasm -g -f elf64 $(SRCDIR)/external_caller_nasm.asm -o $(BINDIR)/external_caller.o
