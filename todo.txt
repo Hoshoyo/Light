@@ -23,3 +23,5 @@ cast(type) value
 value as type
 value -> type
 
+// when proc returns void this is allowed somehow
+b := proc();

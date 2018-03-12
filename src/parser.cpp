@@ -91,7 +91,7 @@ Ast* Parser::parse_literal()
 	} else if (lit_token->type == TOKEN_BOOL_LITERAL) {
 		flags |= LITERAL_FLAG_IS_REGSIZE | LITERAL_FLAG_NUMERIC;
 	} else if (lit_token->type == TOKEN_STRING_LITERAL) {
-		flags = 0;
+		flags |= LITERAL_FLAG_STRING;
 	} else {
 		assert(0);
 	}

@@ -1612,8 +1612,9 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 				}
 
 				int err = 0;
-				if(node->proc_decl.body)
-					infer_node_decl_types(node->proc_decl.body, table);
+				if (node->proc_decl.body) {
+					err = infer_node_decl_types(node->proc_decl.body, table);
+				}
 
 				if (infered) {
 					Type_Instance* instance = new Type_Instance();
@@ -1848,7 +1849,7 @@ int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 			}
 		}
 	}
-	return 0;
+	return err;
 }
 
 bool expr_is_assignment(Ast_Expression* expr) {

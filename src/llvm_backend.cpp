@@ -184,7 +184,10 @@ void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 			llvm_emit_type(node->var_decl.type, EMIT_TYPE_FLAG_STRUCT_NAMED);
 			sprint(", align %d", node->var_decl.alignment);
 
-			// @TODO: assignment if there is
+			if (node->var_decl.assignment) {
+				sprint("\n");
+				llvm_emit_assignment(node);
+			}
 		} break;
 
 		case AST_NODE_RETURN_STATEMENT: {
@@ -206,7 +209,8 @@ void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 		case AST_NODE_IF_STATEMENT: {
 			// TODO(psv): need a few more jumps
 			s32 true_label  = gen_branch_label();
-			s32 false_label = gen_branch_label();
+			s32 false_label = (node->if_stmt.else_exp) ? gen_branch_label() : -1;
+			s32 end_label = true_label;
 
 			if (ast_node_is_embeded_literal(node->if_stmt.bool_exp)) {
 				sprint("br i1 ");
@@ -215,13 +219,20 @@ void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 				s32 boolexp_temp = llvm_emit_expression(node->if_stmt.bool_exp);
 				sprint("\nbr i1 %%%d", boolexp_temp);
 			}
-			sprint(", label %%if-stmt-%d, label %%if-stmt-%d\n", true_label, false_label);
+			if (false_label != -1)
+				sprint(", label %%if-stmt-%d, label %%if-stmt-%d\n", true_label, false_label);
+			else
+				sprint(", label %%if-stmt-%d, label %%if-end-%d\n", true_label, end_label);
 			sprint("if-stmt-%d:\n", true_label);
 			llvm_emit_node(node->if_stmt.body);
-			sprint("\nif-stmt-%d:\n", false_label);
+			sprint("\nbr label %%if-end-%d\n", end_label);
+			if(false_label != -1)
+				sprint("if-stmt-%d:\n", false_label);
 			if (node->if_stmt.else_exp) {
 				llvm_emit_node(node->if_stmt.else_exp);
+				sprint("br label %%if-end-%d\n", end_label);
 			}
+			sprint("\nif-end-%d:\n", end_label);
 		}break;
 
 		default: {
@@ -260,8 +271,12 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 			}
 
 			// alloc the proc call result register
-			result = alloc_temp_register();
-			sprint("%%%d = call ", result);
+			if (expr->return_type->type == TYPE_PRIMITIVE && expr->return_type->primitive == TYPE_PRIMITIVE_VOID) {
+				sprint("call ");
+			} else {
+				result = alloc_temp_register();
+				sprint("%%%d = call ", result);
+			}
 			llvm_emit_type(expr->return_type);
 			sprint(" @%.*s(", TOKEN_STR(expr->expression.proc_call.name));
 			for (size_t i = 0; i < num_args; ++i) {
@@ -341,7 +356,6 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 			} else {
 				result = llvm_emit_binary_expression(expr);
 			}
-			
 		} break;
 	}
 
@@ -352,21 +366,25 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 	assert(expr->node == AST_NODE_BINARY_EXPRESSION);
 
 	BinaryOperation op = expr->expression.binary_exp.op;
+	Type_Instance* left_type  = expr->expression.binary_exp.left->return_type;
+	Type_Instance* right_type = expr->expression.binary_exp.right->return_type;
 
 	s32 t_left = -1;
 	s32 t_right = -1;
 	if (!ast_node_is_embeded_literal(expr->expression.binary_exp.left)) {
 		t_left = llvm_emit_expression(expr->expression.binary_exp.left);
+		sprint("\n");
 	}
 	if (!ast_node_is_embeded_literal(expr->expression.binary_exp.right)) {
 		t_right = llvm_emit_expression(expr->expression.binary_exp.right);
+		sprint("\n");
 	}
 	s32 temp_reg = alloc_temp_register();
 	sprint("%%%d = ", temp_reg);
 
 	// If it is a floating point type llvm offers operations like
 	// fcmp, fadd, fsub, ...
-	if (is_floating_point_type(expr->return_type)) {
+	if (is_floating_point_type(left_type) && is_floating_point_type(right_type)) {
 		switch (op) {
 			case BINARY_OP_PLUS:		sprint("fadd "); break;
 			case BINARY_OP_MINUS:		sprint("fsub "); break;
@@ -380,7 +398,7 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 			case BINARY_OP_LESS_THAN:		sprint("fcmp olt "); break;
 		}
 		// float or double always
-		llvm_emit_type(expr->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+		llvm_emit_type(left_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
 		sprint(" ");
 		if (t_left == -1) {
 			llvm_emit_expression(expr->expression.binary_exp.left);
@@ -396,45 +414,83 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 		}
 
 	} else {
-
+		// is integer type or pointer arithmetic
 	}
 	return temp_reg;
 }
 
 s32 LLVM_Code_Generator::llvm_emit_assignment(Ast* expr) {
-	Ast* left = expr->expression.binary_exp.left;
-	Ast* right = expr->expression.binary_exp.right;
 	// TODO(psv): get lvalue (address of expression in the left)
 	// assume variable for now
-	Ast* var_decl = get_declaration_from_variable_expression(left);
-	s32 temp = var_decl->var_decl.temporary_register;
 
-	s32 temp_right = -1;
-	
-	if (!ast_node_is_embeded_literal(right)) {
-		temp_right = llvm_emit_expression(right);
-		sprint("\n");
+	Ast* left = 0;
+	Ast* right = 0;
+	Ast* var_decl = 0;
+	Type_Instance* node_type = 0;
+	if (expr->node == AST_NODE_BINARY_EXPRESSION) {
+		left = expr->expression.binary_exp.left;
+		right = expr->expression.binary_exp.right;
+		var_decl = get_declaration_from_variable_expression(left);
+		node_type = left->return_type;
+	} else if(expr->node == AST_NODE_VARIABLE_DECL) {
+		right = expr->var_decl.assignment;
+		var_decl = expr;
+		node_type = var_decl->var_decl.type;
 	}
 
-	sprint("store ");
-	llvm_emit_type(left->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
-	sprint(" %%%d", temp_right);
+	s32 temp = var_decl->var_decl.temporary_register;
+	
+	if (!ast_node_is_embeded_literal(right)) {
+		switch (right->return_type->type) {
+			case TYPE_STRUCT: {
+				if (right->node == AST_NODE_LITERAL_EXPRESSION && right->expression.literal_exp.flags & LITERAL_FLAG_STRING) {
+					s32 str_index = llvm_define_string_literal(&right->expression.literal_exp);
+					s32 temp_char_ptr = alloc_temp_register();
+					size_t length = right->expression.literal_exp.lit_tok->value.length + 1;
+					// get char array ptr to put on data field of string
+					sprint("%%%d = getelementptr [%lld x i8], [%lld x i8]* @__str$%d, i64 0, i64 0\n", temp_char_ptr, length, length, str_index);
+					s32 length_reg = alloc_temp_register();
+					s32 data_reg   = alloc_temp_register();
+					sprint("%%%d = getelementptr %%string, %%string* %%%d, i64 0, i32 0\n", length_reg, temp);
+					sprint("%%%d = getelementptr %%string, %%string* %%%d, i64 0, i32 1\n", data_reg, temp);
+					sprint("store i64 %lld, i64* %%%d\n", length, length_reg);
+					sprint("store i8* %%%d, i8** %%%d\n", temp_char_ptr, data_reg);
 
-	sprint(", ");
-	llvm_emit_type(left->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
-	sprint("* %%%d", temp);
+				} else if (right->node == AST_NODE_VARIABLE_EXPRESSION) {
+					int x = 0;
+				} else {
+					// @TODO(psv): other kinds of literals
+					report_fatal_error("other literals are not yet supported\n");
+				}
+			}break;
 
-	// guarantee the return value is correct
-	if (temp_right == -1) {
-		temp_right = alloc_temp_register();
-		sprint("\n%%%d = load ", temp_right);
-		llvm_emit_type(left->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+			case TYPE_POINTER:
+			case TYPE_FUNCTION:
+			case TYPE_ARRAY:
+			case TYPE_UNKNOWN: {
+				report_fatal_error("type not supported or unknown\n");
+			}break;
+			case TYPE_PRIMITIVE: {
+				s32 result = llvm_emit_expression(right);
+				sprint("\nstore ");
+				llvm_emit_type(right->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+				sprint(" %%%d, ", result);
+				llvm_emit_type(right->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+				sprint("* %%%d", temp);
+			}break;
+		}
+	} else {
+		sprint("store ");
+		llvm_emit_type(node_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+		sprint(" ");
+		llvm_emit_expression(right);
+
 		sprint(", ");
-		llvm_emit_type(left->return_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+		llvm_emit_type(node_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
 		sprint("* %%%d", temp);
 	}
 
-	return temp_right;
+	return 0;
 }
 
 s32 LLVM_Code_Generator::llvm_define_string_literal(Ast_Literal* lit) {
@@ -448,6 +504,7 @@ s32 LLVM_Code_Generator::llvm_define_string_literal(Ast_Literal* lit) {
 }
 
 bool ast_node_is_embeded_literal(Ast* node) {
+	if (node->return_type->type != TYPE_PRIMITIVE) return false;
 	return (node->node == AST_NODE_LITERAL_EXPRESSION && node->expression.literal_exp.flags & LITERAL_FLAG_NUMERIC);
 }
 
@@ -475,6 +532,7 @@ void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
 	LLVM_Code_Generator code_generator = {};
 	code_generator.in_filename = filename;
 
+	code_generator.sprint("target triple = \"x86_64-pc-windows-msvc\"\n\n");
 	code_generator.llvm_emit_type_decls(type_table);
 
 	size_t num_decls = array_get_length(toplevel);
@@ -483,15 +541,6 @@ void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
 		code_generator.llvm_emit_node(node);
 	}
 
-
-code_generator.sprint(R"(define void @print_double(double %%value) #0 {
-	%%str = getelementptr[3 x i8], [3 x i8] * @__str$4, i64 0, i64 0
-	%%1 = call i32(i8*, ...) @printf(i8* %%str, double %%value)
-	ret void
-}
-
-@__str$4 = private global [3 x i8] c"%%f\00"
-)");
 	code_generator.sprint("\n");
 	code_generator.sprint("attributes #0 = { nounwind uwtable }\n");
 	code_generator.sprint("attributes #1 = { nounwind uwtable }\n");
@@ -508,7 +557,7 @@ code_generator.sprint(R"(define void @print_double(double %%value) #0 {
 	char cmdbuffer[1024];
 	sprintf(cmdbuffer, "llc -filetype=obj -march=x86-64 %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj -nostdlib -o %.*s.exe lib//kernel32.lib lib/msvcrt.lib", fname_len, out_obj.data, fname_len, out_obj.data);
+	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib", fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 }
 
