@@ -2,6 +2,12 @@ ExitProcess  :: (exit_code : s32) -> s32 #foreign("kernel32");
 print_string :: (length : s64, data : ^s8) -> void #foreign("msvcrt");
 print_s64 :: (v : s64) -> s64 #foreign("msvcrt");
 print_double :: (v : r64) -> void #foreign("msvcrt");
+
+pstr :: (v : r64) {
+	print_double(v);
+	return;
+}
+
 main :: () {
 	/*
 		d = 0.0;
@@ -20,13 +26,15 @@ main :: () {
 		d == d;
 		d != d;
 	*/
-	
+	/*
 	a : r64 = 2.0 - 3.0;
-	if a > 0.0
+	if a > 0.0 {
 		print_double(a);
-	else
+	} else
 		print_double(99.9);
+	*/
+	//pstr(66.4);
 	
-	ExitProcess(0);
+	//ExitProcess(0);
 	return;
 }

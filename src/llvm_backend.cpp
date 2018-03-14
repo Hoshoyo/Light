@@ -204,6 +204,7 @@ void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 				llvm_emit_type(node->ret_stmt.expr->return_type);
 				sprint(" %%%d", temp);
 			}
+			sprint("\n");
 		} break;
 
 		case AST_NODE_IF_STATEMENT: {
@@ -225,19 +226,20 @@ void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 				sprint(", label %%if-stmt-%d, label %%if-end-%d\n", true_label, end_label);
 			sprint("if-stmt-%d:\n", true_label);
 			llvm_emit_node(node->if_stmt.body);
-			sprint("\nbr label %%if-end-%d\n", end_label);
+			sprint("br label %%if-end-%d\n", end_label);
 			if(false_label != -1)
-				sprint("if-stmt-%d:\n", false_label);
+				sprint("if-stmt-%d:", false_label);
 			if (node->if_stmt.else_exp) {
 				llvm_emit_node(node->if_stmt.else_exp);
 				sprint("br label %%if-end-%d\n", end_label);
 			}
-			sprint("\nif-end-%d:\n", end_label);
+			sprint("if-end-%d:\n", end_label);
 		}break;
 
 		default: {
 			if (node->is_expr) {
 				llvm_emit_expression(node);
+				sprint("\n");
 			}
 		}break;
 	}

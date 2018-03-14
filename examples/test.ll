@@ -20,16 +20,17 @@ call void @print_double(double  %4)
 
 br label %if-end-0
 if-stmt-1:
-
 call void @print_double(double 99.9)
-br label %if-end-0
 
+br label %if-end-0
 if-end-0:
 
 
 %5 = call i32 @ExitProcess(i32 0)
 
+
 ret void
+
 }
 
 attributes #0 = { nounwind uwtable }

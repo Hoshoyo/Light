@@ -1628,6 +1628,7 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 
 					for (int i = 0; i < num_args; ++i) {
 						Type_Instance* in = get_decl_type(node->proc_decl.arguments[i]);
+						resolve_type()
 						array_push(instance->type_function.arguments_type, &in);
 					}
 					create_type(&instance, true);
