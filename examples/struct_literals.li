@@ -1,0 +1,31 @@
+Person :: struct {
+	name   : string;
+	age    : s32;
+	height : r32;
+}
+
+proc :: () {
+	person1 := Person{ "P1", 26, 1.75 };
+	println(person1);
+
+	person2 := &Person{ "P2", 24, 1.78 };
+	println(person2);
+
+	person3 : Person;
+	person3.name = "P3";
+	person3.age = 17;
+	person3.height = 1.65;
+	println(person3);
+
+	person4 := Person{ name : "P4", age : 48 };
+	println(person4);
+}
+
+/* 
+	Output:
+	
+	Person{ "P1", 26, 1.75 }
+	0xdeadbeef
+	Person{ "P3", 17, 1.65 }
+	Person{ "P4", 48, 0.0 }
+*/

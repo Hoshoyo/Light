@@ -1,0 +1,4 @@
+
+main :: (argc : s32, argv : [..]string) -> s32 {
+	print("Hello World");
+}
