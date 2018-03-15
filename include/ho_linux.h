@@ -83,7 +83,7 @@ void HO_API ho_bigfree(void* block, size_t size)
 #include <errno.h>
 int HO_API ho_createfile(const char* filename, int access_flags, int action_flags)
 {
-	int err =  open(filename, access_flags | action_flags, 0644);
+	int err =  open(filename, access_flags | action_flags | O_TRUNC, 0644);
 	if (err == -1) {
 		printf("ERROR CODE: %d %d\n",EACCES, errno);
 	}

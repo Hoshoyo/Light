@@ -1,13 +1,10 @@
 //ExitProcess  :: (exit_code : s32) -> s32 #foreign("kernel32");
-//print_string :: (length : s64, data : ^s8) -> void #foreign("msvcrt");
+print_string :: (length : s64, data : ^s8) -> void #foreign("msvcrt");
 //print_s64 :: (v : s64) -> s64 #foreign("msvcrt");
-//print_double :: (v : r64) -> void #foreign("msvcrt");
-
-pstr :: (v : r64) -> s32 {
-	hello : s32;
-	return 67;
-}
+print_double :: (v : r64) -> void #foreign("print_string");
 
 main :: () -> s32{
-	return pstr(6.0);
+	print_double(6.3 + 7.1);
+
+	return 2;
 }
