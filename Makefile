@@ -5,7 +5,7 @@ BINDIR=./bin/gcc
 
 all: extcall 
 	mkdir -p ./bin/gcc
-	$(CC) $(CFLAGS) $(SRCDIR)/ast.cpp $(SRCDIR)/main.cpp $(SRCDIR)/lexer.cpp $(SRCDIR)/util.cpp $(SRCDIR)/memory.cpp $(SRCDIR)/type.cpp $(SRCDIR)/parser.cpp $(SRCDIR)/semantic.cpp $(SRCDIR)/symbol_table.cpp $(SRCDIR)/interpreter.cpp $(SRCDIR)/hash_table.cpp -o $(BINDIR)/light $(BINDIR)/external_caller.o 
+	$(CC) $(CFLAGS) $(SRCDIR)/ast.cpp $(SRCDIR)/main.cpp $(SRCDIR)/lexer.cpp $(SRCDIR)/util.cpp $(SRCDIR)/memory.cpp $(SRCDIR)/type.cpp $(SRCDIR)/parser.cpp $(SRCDIR)/semantic.cpp $(SRCDIR)/symbol_table.cpp $(SRCDIR)/interpreter.cpp $(SRCDIR)/hash_table.cpp $(SRCDIR)/llvm_backend.cpp -o $(BINDIR)/light $(BINDIR)/external_caller.o 
 
 extcall: 
 	mkdir -p $(BINDIR)

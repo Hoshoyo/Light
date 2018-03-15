@@ -5,7 +5,7 @@ static bool semantic_error = 0;
 static int scope_error = 0;
 static int declaration_ratio = 8;
 
-#define PRINT_SCOPE_INFO 0
+#define PRINT_SCOPE_INFO 1
 
 #define TOKEN_STR(X) X->value.length, X->value.data
 
@@ -1628,6 +1628,7 @@ int infer_node_decl_types(Ast* node, Type_Table* table)
 
 					for (int i = 0; i < num_args; ++i) {
 						Type_Instance* in = get_decl_type(node->proc_decl.arguments[i]);
+						in->flags |= TYPE_FLAG_NOT_DELETE;
 						array_push(instance->type_function.arguments_type, &in);
 					}
 					create_type(&instance, true);

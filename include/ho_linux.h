@@ -16,6 +16,7 @@
 typedef int HANDLE;
 #define INVALID_HANDLE_VALUE -1
 #define OPEN_EXISTING O_RDWR
+#define CREATE_ALWAYS O_CREAT
 /* Files */
 #define FILE_READ O_RDONLY
 #define FILE_WRITE O_WRONLY
@@ -79,11 +80,14 @@ void HO_API ho_bigfree(void* block, size_t size)
 {
 	free(block);
 }
-
+#include <errno.h>
 int HO_API ho_createfile(const char* filename, int access_flags, int action_flags)
 {
-	// @implement
-	return 0;
+	int err =  open(filename, access_flags | action_flags, 0644);
+	if (err == -1) {
+		printf("ERROR CODE: %d %d\n",EACCES, errno);
+	}
+	return err;
 }
 
 int HO_API ho_openfile(const char* filename, int access_flags)

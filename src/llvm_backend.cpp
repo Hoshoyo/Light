@@ -3,6 +3,7 @@
 #include "ho_system.h"
 #include "semantic.h"
 #include <stdio.h>
+#include <stdarg.h>
 
 #define TOKEN_STR(T) T->value.length, T->value.data
 
@@ -529,6 +530,7 @@ static size_t filename_length_strip_extension(char* f) {
 	return baselen;
 }
 
+#if 0//defined(_WIN32) || defined(_WIN64)
 // @TEMPORARY Windows only for now
 void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
 	LLVM_Code_Generator code_generator = {};
@@ -562,46 +564,41 @@ void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
 	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib", fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 }
+#elif defined(__linux__)
+void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
+	LLVM_Code_Generator code_generator = {};
+	code_generator.in_filename = filename;
 
+	code_generator.sprint("target triple = \"x86_64-linux-gnu\"\n\n");
+	code_generator.llvm_emit_type_decls(type_table);
 
-void LLVM_Code_Generator::llvm_generate_temporary_code() {
-#if 0
-	char temp_code[] = R"(
-define void @print_int(i32 %value) #0 {
-	%str = getelementptr [3 x i8], [3 x i8]* @__str$3, i64 0, i64 0
-	%1 = call i32 (i8*, ...) @printf(i8* %str, i32 %value)
-	ret void
+	size_t num_decls = array_get_length(toplevel);
+	for (size_t i = 0; i < num_decls; ++i) {
+		Ast* node = toplevel[i];
+		code_generator.llvm_emit_node(node);
+	}
+
+	code_generator.sprint("\n");
+	code_generator.sprint("attributes #0 = { nounwind uwtable }\n");
+	code_generator.sprint("attributes #1 = { nounwind uwtable }\n");
+
+	size_t fname_len = filename_length_strip_extension(filename);
+	string out_obj(fname_len + sizeof(".ll"), fname_len, filename);
+	out_obj.cat(".ll", sizeof(".ll"));
+	
+	HANDLE out = ho_createfile(out_obj.data, FILE_WRITE, CREATE_ALWAYS);
+	if(out == INVALID_HANDLE_VALUE){
+		report_fatal_error("Could not create file %s", out_obj.data);
+	}
+	ho_writefile(out, code_generator.ptr, (u8*)code_generator.buffer);
+	ho_writefile(out, code_generator.strlit_ptr, (u8*)code_generator.strlit_buffer);
+	ho_closefile(out);
+
+	char cmdbuffer[1024];
+	sprintf(cmdbuffer, "llc -filetype=obj -march=x86-64 %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
+	system(cmdbuffer);
+	//sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib", fname_len, out_obj.data, fname_len, out_obj.data);
+	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj temp/entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc", fname_len, out_obj.data, fname_len, out_obj.data);
+	system(cmdbuffer);
 }
-
-define void @print_double(double %value) #0 {
-	%str = getelementptr [3 x i8], [3 x i8]* @__str$4, i64 0, i64 0
-	%1 = call i32 (i8*, ...) @printf(i8* %str, double %value)
-	ret void
-}
-declare cc 64 i32 @ExitProcess(i32) #0
-declare cc 64 i8* @GetStdHandle(i32) #1
-declare cc 64 i32 @WriteConsoleA(i8*, i8*, i32, i32*, i64) #1
-)";
-
-	char entrypoint[] = R"(
-section .data
-section .text
-
-extern main
-
-global _start
-_start:
-	call main
-	mov ebx, eax
-	mov eax, 1
-	int 80h
-	)";
-	FILE* entry_file = fopen("temp/entry.asm", "w");
-	size_t written = fwrite(entrypoint, sizeof(entrypoint), 1, entry_file);
-	fclose(entry_file);
-
-	// @TODO linux only
-	system("nasm -g -f elf64 temp/entry.asm -o temp/entry.o");
-	//system("ld ")
-#endif	
-}
+#endif

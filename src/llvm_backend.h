@@ -43,6 +43,5 @@ struct LLVM_Code_Generator {
 
 void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename);
 
-
 // helper functions
 bool ast_node_is_embeded_literal(Ast* node);

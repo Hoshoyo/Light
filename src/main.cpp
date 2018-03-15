@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
 #endif
 
 	// LLVM backend
-#if defined (_WIN32) || defined(_WIN64)
+#if 1//defined (_WIN32) || defined(_WIN64)
 	llvm_generate_ir(ast, &type_table, argv[1]);
 #endif
 	return 0;
