@@ -11,8 +11,5 @@ factorial :: (val : s32) -> s32 {
 }
 
 main :: () -> s32{
-	a : s32 = 4;
-	print_double(a);
-
-	return 2;
+	return factorial(4);
 }

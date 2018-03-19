@@ -205,6 +205,9 @@ void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 				llvm_emit_type(node->ret_stmt.expr->return_type);
 				sprint(" %%%d", temp);
 			}
+			// This needs to be here because llvm expects a label named after a return statement for some reason
+			// see: https://stackoverflow.com/questions/36094685/instruction-expected-to-be-numbered
+			alloc_temp_register();
 			sprint("\n");
 		} break;
 
@@ -398,29 +401,65 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 			case BINARY_OP_DIV:			sprint("fdiv "); break;
 
 			case BINARY_OP_EQUAL_EQUAL:		sprint("fcmp oeq "); break;
+			case BINARY_OP_NOT_EQUAL:		sprint("fcmp one "); break;
 			case BINARY_OP_GREATER_EQUAL:	sprint("fcmp oge "); break;
 			case BINARY_OP_GREATER_THAN:	sprint("fcmp ogt "); break;
 			case BINARY_OP_LESS_EQUAL:		sprint("fcmp ole "); break;
 			case BINARY_OP_LESS_THAN:		sprint("fcmp olt "); break;
 		}
 		// float or double always
-		llvm_emit_type(left_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
-		sprint(" ");
-		if (t_left == -1) {
-			llvm_emit_expression(expr->expression.binary_exp.left);
-			sprint(", ");
-		} else {
-			sprint("%%%d, ", t_left);
-		}
-
-		if (t_right == -1) {
-			llvm_emit_expression(expr->expression.binary_exp.right);
-		} else {
-			sprint("%%%d", t_right);
-		}
-
 	} else {
 		// is integer type or pointer arithmetic
+		if(is_integer_type(left_type) && is_integer_type(right_type)){
+			bool comparison = false;
+			switch(op){
+				case BINARY_OP_PLUS:		sprint("add "); break;
+				case BINARY_OP_MINUS:		sprint("sub "); break;
+				case BINARY_OP_MULT:		sprint("mul "); break;
+				case BINARY_OP_DIV:			sprint("div "); break;
+
+				case BINARY_OP_EQUAL_EQUAL:
+				case BINARY_OP_NOT_EQUAL:
+				case BINARY_OP_GREATER_EQUAL:
+				case BINARY_OP_GREATER_THAN:
+				case BINARY_OP_LESS_EQUAL:
+				case BINARY_OP_LESS_THAN:	comparison = true; sprint("icmp "); break;
+			}
+			if(comparison && is_integer_signed_type(left_type) && is_integer_signed_type(right_type)){
+				switch(op){
+					case BINARY_OP_EQUAL_EQUAL:		sprint("eq "); break;
+					case BINARY_OP_NOT_EQUAL:		sprint("ne "); break;
+					case BINARY_OP_GREATER_EQUAL:	sprint("sge "); break;
+					case BINARY_OP_GREATER_THAN:	sprint("sgt "); break;
+					case BINARY_OP_LESS_EQUAL:		sprint("sle "); break;
+					case BINARY_OP_LESS_THAN:		sprint("slt "); break;
+				}
+			} else {
+				switch(op){
+					case BINARY_OP_EQUAL_EQUAL:		sprint("eq "); break;
+					case BINARY_OP_NOT_EQUAL:		sprint("ne "); break;
+					case BINARY_OP_GREATER_EQUAL:	sprint("uge "); break;
+					case BINARY_OP_GREATER_THAN:	sprint("ugt "); break;
+					case BINARY_OP_LESS_EQUAL:		sprint("ule "); break;
+					case BINARY_OP_LESS_THAN:		sprint("ult "); break;
+				}
+			}
+		}
+	}
+
+	llvm_emit_type(left_type, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+	sprint(" ");
+	if (t_left == -1) {
+		llvm_emit_expression(expr->expression.binary_exp.left);
+		sprint(", ");
+	} else {
+		sprint("%%%d, ", t_left);
+	}
+
+	if (t_right == -1) {
+		llvm_emit_expression(expr->expression.binary_exp.right);
+	} else {
+		sprint("%%%d", t_right);
 	}
 	return temp_reg;
 }
