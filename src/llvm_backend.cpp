@@ -266,7 +266,8 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 				arg_temps = array_create(s32, num_args);
 				for (size_t i = 0; i < num_args; ++i) {
 					Ast* e = expr->expression.proc_call.args[i];
-					if (e->node == AST_NODE_LITERAL_EXPRESSION && e->expression.literal_exp.flags & LITERAL_FLAG_NUMERIC) {
+					//if (e->node == AST_NODE_LITERAL_EXPRESSION && e->expression.literal_exp.flags & LITERAL_FLAG_NUMERIC) {
+					if(ast_node_is_embeded_literal(e)) {
 						arg_temps[i] = -1;
 					}
 					else {
@@ -409,6 +410,7 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 		}
 		// float or double always
 	} else {
+		bool is_signed = is_integer_signed_type(left_type) && is_integer_signed_type(right_type);
 		// is integer type or pointer arithmetic
 		if(is_integer_type(left_type) && is_integer_type(right_type)){
 			bool comparison = false;
@@ -417,6 +419,7 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 				case BINARY_OP_MINUS:		sprint("sub "); break;
 				case BINARY_OP_MULT:		sprint("mul "); break;
 				case BINARY_OP_DIV:			sprint("div "); break;
+				case BINARY_OP_MOD:			(is_signed) ? sprint("srem ") : sprint("urem "); break;
 
 				case BINARY_OP_EQUAL_EQUAL:
 				case BINARY_OP_NOT_EQUAL:
@@ -425,7 +428,7 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 				case BINARY_OP_LESS_EQUAL:
 				case BINARY_OP_LESS_THAN:	comparison = true; sprint("icmp "); break;
 			}
-			if(comparison && is_integer_signed_type(left_type) && is_integer_signed_type(right_type)){
+			if(comparison && is_signed){
 				switch(op){
 					case BINARY_OP_EQUAL_EQUAL:		sprint("eq "); break;
 					case BINARY_OP_NOT_EQUAL:		sprint("ne "); break;
@@ -649,3 +652,4 @@ void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
 	system(cmdbuffer);
 }
 #endif
+

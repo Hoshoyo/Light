@@ -1,0 +1,10 @@
+factorial :: (value : s32) -> s32 {
+	if value == 1 {
+		return 1;
+	}
+	return value * factorial(value - 1);
+}
+
+main :: () -> s32 {
+	return factorial(5);
+}

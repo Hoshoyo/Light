@@ -23,12 +23,20 @@ ret i32 %4
 }
 define i32 @main() #1 {
 decls-0:
+%0 = alloca %string, align 4
+%1 = getelementptr [6 x i8], [6 x i8]* @__str$0, i64 0, i64 0
+%2 = getelementptr %string, %string* %0, i64 0, i32 0
+%3 = getelementptr %string, %string* %0, i64 0, i32 1
+store i64 6, i64* %2
+store i8* %1, i8** %3
 
-%0 = call i32 @factorial(i32 4)
 
-ret i32 %0
+%4 = call i32 @factorial(i32 4)
+
+ret i32 %4
 
 }
 
 attributes #0 = { nounwind uwtable }
 attributes #1 = { nounwind uwtable }
+@__str$0 = private global [6 x i8] c"hello\00"

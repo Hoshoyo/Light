@@ -1,0 +1,10 @@
+gcd :: (a : s32, b : s32) -> s32 {
+	if b != 0 {
+		return gcd(b, a % b);
+	}
+	return a;
+}
+
+main :: () -> s32 {
+	return gcd(27, 9);
+}
