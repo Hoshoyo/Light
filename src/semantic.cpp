@@ -615,8 +615,9 @@ Ast* get_struct_field(Ast* struct_decl, Token* name) {
 Ast* get_declaration_from_variable_expression(Ast* var) {
 	assert(var->node == AST_NODE_VARIABLE_EXPRESSION);
 	Ast_Variable* v = &var->expression.variable_exp;
-	s64 index = v->scope->symb_table->entry_exist(v->name);
-	Ast* var_decl = v->scope->symb_table->entries[index].node;
+	//s64 index = v->scope->symb_table->entry_exist(v->name);
+	//Ast* var_decl = v->scope->symb_table->entries[index].node;
+	Ast* var_decl = is_declared(var);
 	return var_decl;
 }
 

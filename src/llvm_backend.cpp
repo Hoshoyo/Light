@@ -331,7 +331,10 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 
 		case AST_NODE_VARIABLE_EXPRESSION: {
 			Ast* var_decl = get_declaration_from_variable_expression(expr);
-
+			if(ast_node_is_embeded_literal(expr)){
+				sprint("%%%.*s", TOKEN_STR(expr->expression.variable_exp.name));
+				return -1;
+			}
 			// @TODO IMPORTANT variable expression node doesnt get type from type inference pass
 			
 			assert(var_decl->node == AST_NODE_VARIABLE_DECL);
@@ -508,6 +511,11 @@ s32 LLVM_Code_Generator::llvm_define_string_literal(Ast_Literal* lit) {
 
 bool ast_node_is_embeded_literal(Ast* node) {
 	if (node->return_type->type != TYPE_PRIMITIVE) return false;
+	if(node->node == AST_NODE_VARIABLE_EXPRESSION) {
+		Ast* decl = get_declaration_from_variable_expression(node);
+		if(decl->node == AST_NODE_NAMED_ARGUMENT && decl->named_arg.scope->flags & SCOPE_FLAG_PROC_SCOPE)
+			return true;
+	}
 	return (node->node == AST_NODE_LITERAL_EXPRESSION && node->expression.literal_exp.flags & LITERAL_FLAG_NUMERIC);
 }
 

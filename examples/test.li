@@ -3,8 +3,20 @@ print_string :: (length : s64, data : ^s8) -> void #foreign("msvcrt");
 //print_s64 :: (v : s64) -> s64 #foreign("msvcrt");
 print_double :: (v : r64) -> void #foreign("print_string");
 
+hello :: (a : r64, b : r64) -> r64 {
+	return a + b;
+}
+factorial :: (val : s32) -> s32 {
+	if(val == 1) {
+		return 1;
+	}
+	return val * factorial(val - 1);
+}
+
 main :: () -> s32{
-	print_double(6.3 + 7.1);
+	a : r64;
+	a = hello(1.2, 2.3);
+	print_double(a);
 
 	return 2;
 }
