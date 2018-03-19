@@ -10,6 +10,23 @@ decls-0:
 ret double %0
 
 }
+define i32 @factorial(i32 %val) #1 {
+decls-0:
+%0 = 
+br i1 %0, label %if-stmt-0, label %if-end-0
+if-stmt-0:
+ret i32 1
+
+br label %if-end-0
+if-end-0:
+
+%1 = 
+%2 = call i32 @factorial(i32  %1)
+
+%3 = 
+ret i32 %3
+
+}
 define i32 @main() #1 {
 decls-0:
 %0 = alloca double, align 4

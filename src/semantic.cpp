@@ -1851,7 +1851,7 @@ int do_type_inference(Ast** ast, Scope* global_scope, Type_Table* type_table)
 			}
 		}
 	}
-	return err;
+	return 0;
 }
 
 bool expr_is_assignment(Ast_Expression* expr) {
