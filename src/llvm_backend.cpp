@@ -392,6 +392,11 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 	s32 temp_reg = alloc_temp_register();
 	sprint("%%%d = ", temp_reg);
 
+	if(op == BINARY_OP_DOT){
+		// Struct accessing
+		printf("Here");
+	}
+
 	// If it is a floating point type llvm offers operations like
 	// fcmp, fadd, fsub, ...
 	if (is_floating_point_type(left_type) && is_floating_point_type(right_type)) {
@@ -512,12 +517,12 @@ s32 LLVM_Code_Generator::llvm_emit_assignment(Ast* expr) {
 				}
 			}break;
 
-			case TYPE_POINTER:
 			case TYPE_FUNCTION:
 			case TYPE_ARRAY:
 			case TYPE_UNKNOWN: {
 				report_fatal_error("type not supported or unknown\n");
 			}break;
+			case TYPE_POINTER:
 			case TYPE_PRIMITIVE: {
 				s32 result = llvm_emit_expression(right);
 				sprint("\nstore ");

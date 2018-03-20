@@ -1858,6 +1858,77 @@ bool expr_is_assignment(Ast_Expression* expr) {
 	return(expr->binary_exp.op >= ASSIGNMENT_OPERATION_EQUAL && expr->binary_exp.op <= ASSIGNMENT_OPERATION_SHR_EQUAL);
 }
 
+
+
+
+
+
+
+
+bool DEBUG_check_returntype_node(Ast* node)
+{
+	if(!node) return;
+
+	//assert(node->return_type);
+	if(!node->return_type){
+		fprintf(stderr, "NULL node: %d ", node->node);
+		DEBUG_print_node(stderr, node);
+		fprintf(stderr, "\n");
+	}
+
+	switch (node->node) 
+	{
+		case AST_NODE_PROC_DECLARATION: {
+			DEBUG_check_returntype_ast(node->proc_decl.arguments);
+			DEBUG_check_returntype_node(node->proc_decl.body);
+		}break;
+		case AST_NODE_STRUCT_DECLARATION: {
+			DEBUG_check_returntype_ast(node->struct_decl.fields);
+		}break;
+		case AST_NODE_VARIABLE_DECL: {
+			DEBUG_check_returntype_node(node->var_decl.assignment);
+		}break;
+		case AST_NODE_BINARY_EXPRESSION: {
+			DEBUG_check_returntype_node(node->expression.binary_exp.left);
+			DEBUG_check_returntype_node(node->expression.binary_exp.right);
+		}break;
+		case AST_NODE_BLOCK: {
+			DEBUG_check_returntype_ast(node->block.commands);
+		}break;
+		case AST_NODE_BREAK_STATEMENT: break;
+		case AST_NODE_CONTINUE_STATEMENT: break;
+		case AST_NODE_EXPRESSION_ASSIGNMENT: break; // @deprecated
+		case AST_NODE_IF_STATEMENT: {
+			DEBUG_check_returntype_node(node->if_stmt.bool_exp);
+			DEBUG_check_returntype_node(node->if_stmt.body);
+			DEBUG_check_returntype_node(node->if_stmt.else_exp);
+		}break;
+		case AST_NODE_LITERAL_EXPRESSION: break;
+		case AST_NODE_NAMED_ARGUMENT: {
+			DEBUG_check_returntype_node(node->named_arg.default_value);
+		}break;
+		case AST_NODE_PROCEDURE_CALL: {
+			DEBUG_check_returntype_ast(node->expression.proc_call.args);
+		}break;
+		case AST_NODE_RETURN_STATEMENT: {
+			DEBUG_check_returntype_node(node->ret_stmt.expr);
+		}break;
+		case AST_NODE_UNARY_EXPRESSION: {
+			DEBUG_check_returntype_node(node->expression.unary_exp.operand);
+		}break;
+		case AST_NODE_VARIABLE_EXPRESSION: break;
+		case AST_NODE_CONSTANT: {
+			// @todo
+		}break;
+	}
+}
+
+bool DEBUG_check_returntype_ast(Ast** ast) {
+	for(size_t i = 0; i < array_get_length(ast); ++i){
+		DEBUG_check_returntype_node(ast[i]);
+	}
+}
+
 /*
 
 // return 1 if passed

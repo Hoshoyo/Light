@@ -1,0 +1,15 @@
+print_s64 :: (v : s64) -> void #foreign("print_string");
+
+count :: (v : s64) -> void {
+	if v == 0 {
+		return;
+	}
+	print_s64(v);
+	count(v - 1);
+	return;
+}
+
+main :: () -> s32 {
+	count(10);
+	return 0;
+}

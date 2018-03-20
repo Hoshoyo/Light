@@ -27,3 +27,5 @@ const u32 DECL_CHECK_FAILED = 0;
 
 bool expr_is_assignment(Ast_Expression* expr);
 Ast* get_declaration_from_variable_expression(Ast* var);
+
+bool DEBUG_check_returntype_ast(Ast** ast);

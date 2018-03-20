@@ -48,11 +48,12 @@ int main(int argc, char** argv) {
 	run_interpreter();
 #endif
 
-#if 0
-	DEBUG_print_type_table(&type_table);
+#if 1
+	//DEBUG_print_type_table(&type_table);
 	//DEBUG_print_node_type(stdout, ast, true);
-	printf("\n\nNumber of values in the infer queue = %d\n\n", array_get_length(infer_queue));
+	//printf("\n\nNumber of values in the infer queue = %d\n\n", array_get_length(infer_queue));
 	DEBUG_print_ast(stdout, ast);
+	DEBUG_check_returntype_ast(ast);
 #endif
 
 	// LLVM backend
