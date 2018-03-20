@@ -30,12 +30,15 @@ int main(int argc, char** argv) {
 	ast = parser.parse_top_level(global_scope, ast);
 	if (ast == 0) {
 		// file is empty
+		fprintf(stderr, "There were errors, exiting...\n");
 		return -1; 
 	}
 	if (check_and_submit_declarations(ast, global_scope) != DECL_CHECK_PASSED) {
+		fprintf(stderr, "There were errors, exiting...\n");
 		return -1;
 	}
 	if (do_type_inference(ast, global_scope, &type_table) != 0) {
+		fprintf(stderr, "There were errors, exiting...\n");
 		return -1;
 	}
 
@@ -45,18 +48,14 @@ int main(int argc, char** argv) {
 	run_interpreter();
 #endif
 
-#if 1
-	//printf("\n\n");
+#if 0
 	DEBUG_print_type_table(&type_table);
 	//DEBUG_print_node_type(stdout, ast, true);
-	printf("\n\nNumber of values in the infer queue = %d\n", array_get_length(infer_queue));
-	printf("\n\n");
+	printf("\n\nNumber of values in the infer queue = %d\n\n", array_get_length(infer_queue));
 	DEBUG_print_ast(stdout, ast);
 #endif
 
 	// LLVM backend
-#if 1//defined (_WIN32) || defined(_WIN64)
 	llvm_generate_ir(ast, &type_table, argv[1]);
-#endif
 	return 0;
 }

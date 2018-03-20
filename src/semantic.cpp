@@ -5,7 +5,7 @@ static bool semantic_error = 0;
 static int scope_error = 0;
 static int declaration_ratio = 8;
 
-#define PRINT_SCOPE_INFO 1
+#define PRINT_SCOPE_INFO 0
 
 #define TOKEN_STR(X) X->value.length, X->value.data
 
