@@ -1,7 +1,8 @@
-target triple = "x86_64-linux-gnu"
+target triple = "x86_64-pc-windows-msvc"
 
 %string = type { i64, i8* }
 
+declare cc 64 i32 @ExitProcess(i32 %v) #0
 define i32 @factorial(i32 %value) #1 {
 decls-0:
 %0 = icmp eq i32 %value, 1
@@ -22,9 +23,10 @@ ret i32 %4
 define i32 @main() #1 {
 decls-0:
 
-%0 = call i32 @factorial(i32 5)
+%0 = call i32 @ExitProcess(i32 32)
 
-ret i32 %0
+
+ret i32 0
 
 }
 

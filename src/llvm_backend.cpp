@@ -580,7 +580,7 @@ static size_t filename_length_strip_extension(char* f) {
 	return baselen;
 }
 
-#if 0//defined(_WIN32) || defined(_WIN64)
+#if defined(_WIN32) || defined(_WIN64)
 // @TEMPORARY Windows only for now
 void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
 	LLVM_Code_Generator code_generator = {};
@@ -611,7 +611,7 @@ void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
 	char cmdbuffer[1024];
 	sprintf(cmdbuffer, "llc -filetype=obj -march=x86-64 %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib", fname_len, out_obj.data, fname_len, out_obj.data);
+	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -emain -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib", fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 }
 #elif defined(__linux__)

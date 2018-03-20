@@ -1,4 +1,4 @@
-//ExitProcess  :: (exit_code : s32) -> s32 #foreign("kernel32");
+ExitProcess  :: (exit_code : s32) -> s32 #foreign("kernel32");
 print_string :: (length : s64, data : ^s8) -> void #foreign("msvcrt");
 //print_s64 :: (v : s64) -> s64 #foreign("msvcrt");
 print_double :: (v : r64) -> void #foreign("print_string");
@@ -10,7 +10,8 @@ factorial :: (val : s32) -> s32 {
 	return val * factorial(val - 1);
 }
 
-main :: () -> s32{
-	hello := "hello";
-	return factorial(4);
+main :: () -> s32 {
+	f := factorial(4);
+	ExitProcess(f);
+	return 0;
 }
