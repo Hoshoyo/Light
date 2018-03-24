@@ -1,0 +1,2 @@
+string literal
+"Hello" == struct string{ 5, array u8{ 'H', 'e', 'l', 'l', 'o' }}

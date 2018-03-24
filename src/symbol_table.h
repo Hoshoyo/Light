@@ -1,6 +1,8 @@
 #pragma once
 #include <ho_system.h>
+#include "lexer.h"
 #include "ast.h"
+#include "util.h"
 
 struct Symbol_Entry {
 	Token* identifier;

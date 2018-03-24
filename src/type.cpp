@@ -3,6 +3,7 @@
 #include "util.h"
 #include "ast.h"
 
+#if 0
 Type_Table type_table;
 //static s64 DEBUG_type_entries[2048] = { 0 };
 //static s64 DEBUG_type_index = 0;
@@ -548,3 +549,5 @@ void DEBUG_print_node_type(FILE* out, Ast** ast, bool decl_only)
 		DEBUG_print_node_type(out, node, decl_only);
 	}
 }
+
+#endif

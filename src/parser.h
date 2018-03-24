@@ -3,19 +3,20 @@
 #include "ast.h"
 #include "memory.h"
 
-const u32 PARSER_OK = 0;
-const u32 PARSER_ERROR_FATAL = 1;
-const u32 PARSER_ERROR_WARNING = 2;
-const u32 PARSER_ERROR_END = 3;
-const u32 PARSER_INTERNAL_COMPILER_ERROR = 4;
+enum Parser_Error {
+	PARSER_OK = 0,
+	PARSER_ERROR_FATAL,
+	PARSER_ERROR_WARNING,
+	PARSER_INTERNAL_COMPILER_ERROR,
+};
 
+#if 0
 struct Parser {
 	int parser_error;
 
 	string filename;
-	Ast** top_level;
+	Ast**  ast_top_level;
 	Lexer* lexer;
-	Memory_Arena arena;
 
 	Parser(Lexer* lexer);
 
@@ -48,5 +49,4 @@ struct Parser {
 	int require_token_type(Token* tok, Token_Type type);
 	int report_syntax_error(Token* error_token, char* msg, ...);
 };
-
-#define TOKEN_STR(T) T->value.length, T->value.data
+#endif

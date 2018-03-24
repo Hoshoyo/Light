@@ -1,349 +1,299 @@
 #pragma once
-#include "util.h"
-#include "lexer.h"
 #include "type.h"
-#include "memory.h"
-#include <stdio.h>
-
-struct Ast_ProcDecl;
-struct Ast_VarDecl;
-struct Ast_Constant;
-struct Ast_StructDecl;
-struct Ast_Binary_Exp;
-struct Ast_Unary_Exp;
-struct Ast_ProcDecl;
-struct Ast;
-
-struct Symbol_Table;
-struct Scope;
+#include "lexer.h"
 
 #define SITE_FROM_TOKEN(T) {(T)->filename, (T)->line, (T)->column }
 
-enum Node_Type {
-	AST_NODE_PROC_DECLARATION,
-	AST_NODE_PROC_FORWARD_DECL,
-	AST_NODE_NAMED_ARGUMENT,
-	AST_NODE_VARIABLE_DECL,
-	AST_NODE_BINARY_EXPRESSION,
-	AST_NODE_UNARY_EXPRESSION,
-	AST_NODE_LITERAL_EXPRESSION,
-	AST_NODE_VARIABLE_EXPRESSION,
-	AST_NODE_BLOCK,
-	AST_NODE_PROCEDURE_CALL,
-	AST_NODE_IF_STATEMENT,
-	AST_NODE_WHILE_STATEMENT,
-	AST_NODE_RETURN_STATEMENT,
-	AST_NODE_BREAK_STATEMENT,
-	AST_NODE_CONTINUE_STATEMENT,
-	AST_NODE_STRUCT_DECLARATION,
-	AST_NODE_ENUM_DECLARATION,
-	AST_NODE_EXPRESSION_ASSIGNMENT,
-	AST_NODE_DIRECTIVE,
-	AST_NODE_CONSTANT,
+enum Ast_NodeType {
+	AST_UNKNOWN = 0,
+	
+	// Declarations
+	AST_DECL_PROCEDURE,
+	AST_DECL_VARIABLE,
+	AST_DECL_STRUCT,
+	AST_DECL_UNION,
+	AST_DECL_ENUM,
+	AST_DECL_CONSTANT,
+
+	// Commands
+	AST_COMMAND_BLOCK,
+	AST_COMMAND_VARIABLE_ASSIGNMENT,
+	AST_COMMAND_IF,
+	AST_COMMAND_FOR,
+	AST_COMMAND_BREAK,
+	AST_COMMAND_CONTINUE,
+	AST_COMMAND_RETURN,
+
+	// Expressions
+	AST_EXPRESSION_BINARY,
+	AST_EXPRESSION_UNARY,
+	AST_EXPRESSION_CAST,
+	AST_EXPRESSION_LITERAL,
+	AST_EXPRESSION_VARIABLE,
+	AST_EXPRESSION_PROCEDURE_CALL,
+
 };
 
-enum Precedence
-{
-	PRECEDENCE_0 = 0,	//	 assignments
-	PRECEDENCE_1 = 1,	//	 || &&
-	PRECEDENCE_2 = 2,	//	 == >= <= != > <
-	PRECEDENCE_3 = 3,	//	 ^ | & >> <<
-	PRECEDENCE_4 = 4,	//	 + -
-	PRECEDENCE_5 = 5,	//	 * / %
-	PRECEDENCE_6 = 6,	//	 &(addressof) ~ ++POST --POST
-	PRECEDENCE_7 = 7,	//	 *(dereference)	cast ! ++PRE --PRE
-	PRECEDENCE_8 = 8,	//	 .
-	PRECEDENCE_MAX,
+enum Literal_Type {
+	LITERAL_UNKNOWN = 0,
+
+	LITERAL_SINT,
+	LITERAL_UINT,
+	LITERAL_HEX_INT,
+	LITERAL_BIN_INT,
+	LITERAL_FLOAT,
+	LITERAL_BOOL,
+
+	LITERAL_STRUCT,
+	LITERAL_ARRAY,
 };
 
-enum BinaryOperation
-{
-	BINARY_OP_UNKNOWN = 0,
+enum Operator_Unary {
+	OP_UNARY_UNKNOWN = 0,
+	
+	OP_UNARY_PLUS,
+	OP_UNARY_MINUS,
+	OP_UNARY_DEREFERENCE,
+	OP_UNARY_ADDRESSOF,
+	OP_UNARY_BITWISE_NOT,
 
-	BINARY_OP_PLUS = 1,
-	BINARY_OP_MINUS = 2,
-	BINARY_OP_MULT = 3,
-	BINARY_OP_DIV = 4,
-	BINARY_OP_AND = 5,
-	BINARY_OP_OR = 6,
-	BINARY_OP_XOR = 7,
-	BINARY_OP_MOD = 8,
-	BINARY_OP_LOGIC_AND = 9,
-	BINARY_OP_LOGIC_OR = 10,
-	BINARY_OP_BITSHIFT_LEFT = 11,
-	BINARY_OP_BITSHIFT_RIGHT = 12,
-
-	BINARY_OP_LESS_THAN = 13,
-	BINARY_OP_GREATER_THAN = 14,
-	BINARY_OP_LESS_EQUAL = 15,
-	BINARY_OP_GREATER_EQUAL = 16,
-	BINARY_OP_EQUAL_EQUAL = 17,
-	BINARY_OP_NOT_EQUAL = 18,
-
-	BINARY_OP_DOT = 19,
-
-	ASSIGNMENT_OPERATION_EQUAL,
-	ASSIGNMENT_OPERATION_PLUS_EQUAL,
-	ASSIGNMENT_OPERATION_MINUS_EQUAL,
-	ASSIGNMENT_OPERATION_TIMES_EQUAL,
-	ASSIGNMENT_OPERATION_DIVIDE_EQUAL,
-	ASSIGNMENT_OPERATION_MOD_EQUAL,
-	ASSIGNMENT_OPERATION_AND_EQUAL,
-	ASSIGNMENT_OPERATION_OR_EQUAL,
-	ASSIGNMENT_OPERATION_XOR_EQUAL,
-	ASSIGNMENT_OPERATION_SHL_EQUAL,
-	ASSIGNMENT_OPERATION_SHR_EQUAL,
+	OP_UNARY_LOGIC_NOT,
 };
 
-enum UnaryOperation
-{
-	UNARY_OP_UNKNOWN = 0,
+enum Operator_Binary {
+	OP_BINARY_UNKNOWN = 0,
 
-	UNARY_OP_MINUS,
-	UNARY_OP_PLUS,
-	UNARY_OP_DEREFERENCE,
-	UNARY_OP_ADDRESS_OF,
-	UNARY_OP_VECTOR_ACCESS,
-	UNARY_OP_NOT_LOGICAL,
-	UNARY_OP_NOT_BITWISE,
-	UNARY_OP_CAST,
+	OP_BINARY_PLUS,			// +
+	OP_BINARY_MINUS,		// -
+	OP_BINARY_MULT,			// *
+	OP_BINARY_DIV,			// /
+	OP_BINARY_MOD,			// %
+	OP_BINARY_AND,			// &
+	OP_BINARY_OR,			// |
+	OP_BINARY_XOR,			// ^
+	OP_BINARY_SHL,			// <<
+	OP_BINARY_SHR,			// >>
+
+	OP_BINARY_LT,			// <
+	OP_BINARY_GT,			// >
+	OP_BINARY_LE,			// <=
+	OP_BINARY_GE,			// >=
+	OP_BINARY_EQUAL,		// ==
+	OP_BINARY_NOT_EQUAL,	// !=
+
+	OP_BINARY_LOGIC_AND,	// &&
+	OP_BINARY_LOGIC_OR,		// ||
+
+	OP_BINARY_DOT,			// .
 };
+struct Symbol_Table;
+struct Ast;
 
-struct Decl_Site {
-	string filename;
-	int line;
-	int column;
-};
-
-struct Expr_Site {
-	string filename;
-	int line;
-	int column;
-};
-
-const u32 PROC_DECL_FLAG_IS_EXTERNAL = FLAG(0);
-// declarations
-struct Ast_ProcDecl {
-	Token* name;
-	Ast** arguments;
-	Ast* body;
-	int num_args;
-	Type_Instance* proc_ret_type;
-	Type_Instance* proc_type;
-	Scope* scope;
-	void* external_runtime_address;
-	Decl_Site site;
-	struct {
-		Token* extern_library_name;
+const u32 SCOPE_PROCEDURE_ARGUMENTS = FLAG(0);
+const u32 SCOPE_PROCEDURE_BODY      = FLAG(1);
+const u32 SCOPE_STRUCTURE           = FLAG(2);
+const u32 SCOPE_FILESCOPE           = FLAG(3);
+struct Scope {
+	s32           id;
+	s32           level;
+	s32           decl_count;
+	u32           flags;
+	Symbol_Table* symb_table;
+	Scope*        parent;
+	union {
+		Ast*   creator_node;
+		string filename;
 	};
-	u32 flags;
 };
-struct Ast_VarDecl {
-	Token* name;
-	Ast* assignment;
-	Type_Instance* type;
-	Scope* scope;
+
+struct Site {
+	string filename;
+	s32    line;
+	s32    column;
+};
+
+// ----------------------------------------
+// ------------ Declarations --------------
+// ----------------------------------------
+
+struct Ast_Decl_Procedure {
+	Token*         name;
+	Ast**          arguments;		// DECL_VARIABLE
+	Ast*           body;			// COMMAND_BLOCK
+	Type_Instance* type_return;
+	Type_Instance* type_procedure;
+
+	Site   site;
+
+	u32    flags;
+	s32    arguments_count;
+	
+	Token* extern_library_name;
+};
+
+struct Ast_Decl_Variable {
+	Token*         name;
+	Ast*           assignment;		// EXPRESSION
+	Type_Instance* variable_type;
+
+	Site site;
+
+	u32 flags;
 	s32 size_bytes;
 	s32 alignment;
-	u32 symbol_hash;
 	u32 temporary_register;
-	Decl_Site site;
 };
-struct Ast_StructDecl {
-	Token* name;
-	Ast** fields;
-	int num_fields;
+struct Ast_Decl_Struct {
+	Token*         name;
+	Ast**          fields;			// DECL_VARIABLE
+	Type_Instance* type_info;
+
+	Site site;
+
+	u32 flags;
+	s32 fields_count;
 	s32 alignment;
 	s64 size_bytes;
+};
+struct Ast_Decl_Union {
+	Token*         name;
+	Ast**          fields;			// DECL_VARIABLE
 	Type_Instance* type_info;
-	Scope* scope;
-	Decl_Site site;
-	u32 symbol_hash;
+
+	Site site;
+
+	u32 flags;
+	s32 fields_count;
+	s32 alignment;
+	s64 size_bytes;
+};
+struct Ast_Decl_Enum {
+	Token*         name;
+	Ast**          fields;			// DECL_CONSTANT
+	Type_Instance* type_hint;
+
+	Site site;
+
+	u32 flags;
+	s32 fields_count;
+};
+struct Ast_Decl_Constant {
+	Token*         name;
+	Ast*           value;		// LITERAL | CONSTANT
+	Type_Instance* type_info;
+
+	Site site;
+
+	u32 flags;
 };
 
-struct Ast_EnumField {
-	Token* name;
-	Ast* expression;
+// ----------------------------------------
+// -------------- Commands ----------------
+// ----------------------------------------
+
+struct Ast_Comm_Block {
+	Ast**  commands;	// COMMANDS
+};
+struct Ast_Comm_VariableAssign {
+	Ast*   lvalue;	// EXPRESSION
+	Ast*   rvalue;	// EXPRESSION
+};
+struct Ast_Comm_If {
+	Ast* condition;		// EXPRESSION (boolean)
+	Ast* body_true;		// COMMAND
+	Ast* body_false;	// COMMAND
+};
+struct Ast_Comm_For {
+	Ast* condition;		// EXPRESSION (boolean)
+	Ast* body;			// COMMAND
+};
+struct Ast_Comm_Break {
+	Ast* level;			// INT LITERAL [0, MAX_INT]
+};
+struct Ast_Comm_Return {
+	Ast* expression;	// EXPRESSION
 };
 
-struct Ast_EnumDecl {
-	Token* name;
-	Ast_EnumField* fields;
-	int num_fields;
-	Decl_Site site;
-	Scope* scope;
-	Type_Instance* base_type;
-};
+// ----------------------------------------
+// ------------- Expressions --------------
+// ----------------------------------------
 
-struct Ast_Binary_Exp {
-	BinaryOperation op;
-	Precedence precedence;
-	Token* op_token;
+struct Ast_Expr_Binary {
 	Ast* left;
 	Ast* right;
-	Scope* scope;
+	Operator_Binary op;
+};
+struct Ast_Expr_Unary {
+	Ast*           operand;
+	Operator_Unary op;
+};
+struct Ast_Expr_Cast {
+	Ast*           operand;
+	Type_Instance* type_to_cast;
 };
 
-const u32 UNARY_EXP_FLAG_PREFIXED  = FLAG(0);
-const u32 UNARY_EXP_FLAG_POSTFIXED = FLAG(1);
-struct Ast_Unary_Exp {
-	Precedence precedence;
-	u32 flags;
-	UnaryOperation op;
-	Ast* operand;
-	Type_Instance* cast_type;
-	Scope* scope;
-	Token* op_token;
-};
-
-const u32 LITERAL_FLAG_IS_REGSIZE = FLAG(0);
-const u32 LITERAL_FLAG_NUMERIC    = FLAG(1);
-const u32 LITERAL_FLAG_STRING     = FLAG(2);
-const u32 LITERAL_FLAG_EVALUATED = FLAG(3);
-struct Ast_Literal {
+const u32 LITERAL_FLAG_STRING = FLAG(0);
+struct Ast_Expr_Literal {
+	Literal_Type type;
 	u32 flags;
 	union {
-		Token* lit_tok;
-		u64 lit_value;
-	};
-	s32 llvm_index;
-	Type_Instance* type;
-};
+		u64 value_u64;
+		s64 value_s64;
 
-struct Ast_Variable {
-	Token* name;
-	Type_Instance* type;
-	Scope* scope;
-};
+		r32 value_r32;
+		r64 value_r64;
 
-struct Ast_ProcCall {
-	Scope* scope;
-	Token* name;
-	Ast** args;
-};
+		bool value_bool;
 
-const u32 EXPRESSION_TYPE_LITERAL = 1;
-const u32 EXPRESSION_TYPE_BINARY = 2;
-const u32 EXPRESSION_TYPE_UNARY = 3;
-const u32 EXPRESSION_TYPE_VARIABLE = 4;
-const u32 EXPRESSION_TYPE_PROC_CALL = 5;
-
-struct Ast_Expression {
-	u32 expression_type;
-	bool is_lvalue;
-	union {
-		Ast_Binary_Exp binary_exp;
-		Ast_Unary_Exp unary_exp;
-		Ast_Literal literal_exp;
-		Ast_Variable variable_exp;
-		Ast_ProcCall proc_call;
+		Ast*  value_struct;		// LITERALS
+		void* value_array;		// DATA IN MEMORY
 	};
 };
-
-struct Ast_NamedArgument {
-	Token* arg_name;
-	Type_Instance* arg_type;
-	Ast* default_value;
-	int index;
-	Ast* next;
-	Scope* scope;
-	Decl_Site site;
-};
-
-struct Ast_Block {
-	Scope* scope;
-	Ast** commands;
-};
-
-struct Ast_If {
-	Ast* bool_exp;
-	Ast* body;
-	Ast* else_exp;
-	Scope* scope;
-};
-
-struct Ast_While {
-	Ast* bool_exp;
-	Ast* body;
-	Scope* scope;
-};
-
-struct Ast_Return {
-	Ast* expr;
-	Scope* scope;
-	Expr_Site site;
-};
-
-struct Ast_Break {
-	Scope* scope;
-	Expr_Site site;
-};
-
-struct Ast_Continue {
-	Scope* scope;
-	Expr_Site site;
-};
-
-struct Ast_Directive {
-	Ast* declaration;
-	Ast* literal_argument;
-	Token* token;
-};
-
-struct Ast_Constant {
+struct Ast_Expr_Variable {
 	Token* name;
-	Ast* expression;
-	Scope* scope;
-	Type_Instance* type;
+};
+struct Ast_Expr_ProcCall {
+	Token* name;
+	Ast**  args;		// EXPRESSIONS
 };
 
+const u32 AST_FLAG_IS_DECLARATION = FLAG(0);
+const u32 AST_FLAG_IS_COMMAND     = FLAG(1);
+const u32 AST_FLAG_IS_EXPRESSION  = FLAG(2);
 struct Ast {
-	Node_Type node;
-	Type_Instance* return_type;
-	bool is_decl;
-	bool is_expr;
-	bool type_checked;
+	Ast_NodeType   node_type;
+	Type_Instance* type_return;
+	Scope*         scope;
+	
+	u32 flags;
+
 	union {
-		Ast_ProcDecl proc_decl;
-		Ast_VarDecl var_decl;
-		Ast_StructDecl struct_decl;
-		Ast_EnumDecl enum_decl;
-		Ast_NamedArgument named_arg;
-		Ast_Block block;
-		Ast_If if_stmt;
-		Ast_While while_stmt;
-		Ast_Return ret_stmt;
-		Ast_Break break_stmt;
-		Ast_Continue continue_stmt;
-		Ast_Directive directive;
-		Ast_Constant constant;
-		Ast_Expression expression;
+		Ast_Decl_Procedure      decl_procedure;
+		Ast_Decl_Variable       decl_variable;
+		Ast_Decl_Struct         decl_struct;
+		Ast_Decl_Union          decl_union;
+		Ast_Decl_Enum           decl_enum;
+		Ast_Decl_Constant       decl_constant;
+
+		Ast_Comm_Block          comm_block;
+		Ast_Comm_VariableAssign comm_var_assign;
+		Ast_Comm_If             comm_if;
+		Ast_Comm_For            comm_for;
+		Ast_Comm_Break          comm_break;
+		Ast_Comm_Return         comm_return;
+
+		Ast_Expr_Binary         expr_binary;
+		Ast_Expr_Unary          expr_unary;
+		Ast_Expr_Cast           expr_cast;
+		Ast_Expr_Literal        expr_literal;
+		Ast_Expr_Variable       expr_variable;
+		Ast_Expr_ProcCall       expr_proc_call;
 	};
 };
 
-const u32 SCOPE_FLAG_STRUCT_SCOPE = FLAG(1);
-const u32 SCOPE_FLAG_PROC_SCOPE = FLAG(2);
-const u32 SCOPE_FLAG_BLOCK_SCOPE = FLAG(3);
+Scope* scope_create(Ast* creator, Scope* parent, u32 flags);
 
-struct Scope {
-	s64 id;
-	s32 level;
-	u32 flags;
-	s32 num_declarations;
-	Symbol_Table* symb_table;
-	Scope* parent;
-	Ast* decl_node;
-};
-
-struct Scope_Manager {
-	s64 current_id = 0;
-};
-
-static Scope_Manager scope_manager = { };
-
-s64 generate_scope_id();
-Scope* create_scope(s32 level, Scope* parent, u32 flags);
-
+#if 0
 bool ast_is_expression(Ast* ast);
 Ast* create_proc(Memory_Arena* arena, Token* name, Token* extern_name, Type_Instance* return_type, Ast** arguments, int nargs, Ast* body, Scope* scope, Decl_Site* site);
 Ast* create_named_argument(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* default_val, int index, Scope* scope, Decl_Site* site);
@@ -376,3 +326,5 @@ void DEBUG_print_ast(FILE* out, Ast** ast);
 void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_ = true);
 
 void DEBUG_print_indent_level();
+
+#endif

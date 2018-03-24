@@ -1,4 +1,26 @@
 #include "util.h"
+#include "string.h"
+
+string string_make(const char* v) {
+	string result;
+	s64 len = str_length(v);
+	result.data   = (const u8*)v;
+	result.length = len;
+	return result;
+}
+
+string string_make(const char* v, s64 length) {
+	string result;
+	result.data = (const u8*)v;
+	result.length = length;
+	return result;
+}
+
+s64 str_length(const char* str) {
+	s64 length = 0;
+	while (*str++) ++length;
+	return length;
+}
 
 bool c_str_equal(const char* str1, const char* str2)
 {
@@ -41,30 +63,24 @@ bool str_equal(const string& s1, const string& s2)
 
 bool is_white_space(char str)
 {
-	if (str == ' ' ||
+	return (str == ' ' ||
 		str == '\t' ||
 		str == '\n' ||
 		str == '\v' ||
 		str == '\f' ||
-		str == '\r')
-	{
-		return true;
-	}
-	return false;
+		str == '\r');
 }
 
-bool is_number(char c)
-{
-	if (c >= '0' && c <= '9')
-		return true;
-	return false;
+bool is_hex_digit(char c) {
+	return (is_number(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
 }
 
-bool is_letter(char c)
-{
-	if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
-		return true;
-	return false;
+bool is_number(char c) {
+	return (c >= '0' && c <= '9');
+}
+
+bool is_letter(char c) {
+	return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'));
 }
 
 s64 str_to_s64(char* text, int length)
@@ -167,141 +183,6 @@ void s64_to_str(s64 val, char* buffer)
 	}
 }
 
-string::string()
-{
-	capacity = 0;
-	length = 0;
-	data = 0;
-}
-
-string::string(s64 capac, size_t strlen, char* str)
-{
-	capacity = capac;
-	length = strlen;
-	if (capacity > 0) {
-		data = (char*)malloc(capacity);
-		if (strlen) strncpy(data, str, strlen);
-	} else {
-		data = str;
-	}
-}
-
-string::~string()
-{
-	capacity = 0;
-	length = 0;
-	if(capacity > 0) free(data);
-	data = 0;
-}
-
-void string::cat(string& r)
-{
-	if (length + r.length >= capacity)
-	{
-		size_t newcap = capacity * 2 + r.length;
-		capacity = newcap;
-		data = (char*)realloc(data, newcap);
-	}
-	memcpy(&data[length], r.data, r.length);
-	length += r.length;
-}
-
-void string::cat(char* str, size_t len)
-{
-	if (length + len >= capacity)
-	{
-		size_t newcap = capacity * 2 + len;
-		capacity = newcap;
-		data = (char*)realloc(data, newcap);
-	}
-	memcpy(&data[length], str, len);
-	length += len;
-}
-
-void string::cat(s64 num)
-{
-	char buffer[128];
-	s64 m = 10;
-	int i = 0;
-	for (; num; ++i)
-	{
-		s64 res = num % m;
-		s64 nres = res / (m / 10);
-		buffer[64 - i] = nres + 0x30;
-		num -= res;
-		m *= 10;
-	}
-	int len = 64 - i;
-
-	if (length + len >= capacity)
-	{
-		size_t newcap = capacity * 2 + len;
-		capacity = newcap;
-		data = (char*)realloc(data, newcap);
-	}
-	memcpy(&data[length], buffer, len);
-	length += len;
-}
-
-bool string::is_mutable()
-{
-	if (capacity == -1) return false;
-	return true;
-}
-
-string make_new_string(s64 capacity)
-{
-	string res;
-	res.capacity = capacity;
-	res.length = 0;
-	res.data = (char*)malloc(res.capacity);
-	return res;
-}
-
-string make_new_string(const char* val)
-{
-	string res;
-	size_t len = strlen(val);
-	res.capacity = len + 1;
-	res.length = len;
-	if (len) {
-		res.data = (char*)malloc(res.capacity);
-		strncpy(res.data, val, len);
-	}
-	return res;
-}
-
-void make_immutable_string(string& s, const char* val, s64 length)
-{
-	s.capacity = -1;
-	// yes i dont give a damn I say when it is or it is'nt const
-	s.data = (char*)val;
-	s.length = length;
-}
-
-void make_immutable_string(string& s, const char* val)
-{
-	s.capacity = -1;
-	// yes i dont give a damn I say when it is or it is'nt const
-	s.data = (char*)val;
-	s.length = strlen(val);
-}
-
-void make_immutable_string(string* s, const char* val)
-{
-	s->capacity = -1;
-	// yes i dont give a damn I say when it is or it is'nt const
-	s->data = (char*)val;
-	s->length = strlen(val);
-}
-
-void make_immutable_string(string& dest, string& src)
-{
-	dest.capacity = -1;
-	dest.data = src.data;
-	dest.length = src.length;
-}
-
 u32 djb2_hash(u8 *str, int size)
 {
 	u32 hash = 5381;
@@ -342,7 +223,7 @@ char* make_c_string(string& s)
 	return mem;
 }
 
-u64 fnv_1_hash(char* s, u64 length) {
+u64 fnv_1_hash(const u8* s, u64 length) {
 	u64 hash = 14695981039346656037;
 	u64 fnv_prime = 1099511628211;
 	for (u64 i = 0; i < length; ++i) {

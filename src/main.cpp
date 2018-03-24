@@ -1,14 +1,31 @@
 #define HO_SYSTEM_IMPLEMENT
 #include <ho_system.h>
 #include "lexer.h"
-#include "parser.h"
-#include "type.h"
-#include "symbol_table.h"
-#include "semantic.h"
-#include "interpreter.h"
-#include "code_generator.h"
-#include "llvm_backend.h"
+#include "ast.h"
+#include "util.h"
 
+void initialize() {
+	Lexer::init();
+}
+
+int main(int argc, char** argv) {
+	initialize();
+
+	Lexer lexer;
+	if (lexer.start(argv[1]) != LEXER_OK)
+		return EXIT_FAILURE;
+
+	// Global scope
+	Scope  global_scope = { 0 };
+
+	Scope* filescope = scope_create(0, &global_scope, SCOPE_FILESCOPE);
+	filescope->filename = string_make(argv[1]);
+	//Ast** ast_top_level = parse_top_level(filescope, &lexer);
+
+	return 0;
+}
+
+#if 0
 int main(int argc, char** argv) {
 	if (argc <= 1) {
 		fprintf(stderr, "No files were given.\nusage: %s [option ...] filename\n", argv[0]);
@@ -60,3 +77,4 @@ int main(int argc, char** argv) {
 	llvm_generate_ir(ast, &type_table, argv[1]);
 	return 0;
 }
+#endif

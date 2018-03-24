@@ -1,5 +1,9 @@
 #include "parser.h"
 #include "ast.h"
+
+
+
+#if 0
 #include <stdarg.h>
 #include "symbol_table.h"
 
@@ -869,3 +873,4 @@ Type_Instance* Parser::parse_type()
 	}
 	return ti;
 }
+#endif

@@ -1,12 +1,28 @@
 #include "ast.h"
-#include "parser.h"
-#include "type.h"
-#include "symbol_table.h"
-#include "ho_system.h"
+#include "memory.h"
+
+static Memory_Arena arena_scope(65536);
+static Memory_Arena arena_ast(65536);
 
 #define ALLOC_AST(A) (Ast*)A->allocate(sizeof(Ast))
-//#define ALLOC_AST(A) (Ast*)malloc(sizeof(Ast))
+#define ALLOC_SCOPE() (Scope*)arena_scope.allocate(sizeof(Scope))
 
+Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {
+	static s64 id = 1;
+
+	Scope* scope = ALLOC_SCOPE();
+	scope->id = id++;
+	scope->level = parent->level + 1;
+	scope->creator_node = creator;
+	scope->decl_count = 0;
+	scope->flags = 0;
+	scope->parent = parent;
+	scope->symb_table = 0;
+
+	return scope;
+}
+
+#if 0
 bool ast_is_expression(Ast* ast) {
 	return (ast->node == AST_NODE_BINARY_EXPRESSION ||
 		AST_NODE_UNARY_EXPRESSION ||
@@ -809,3 +825,5 @@ void DEBUG_print_ast(FILE* out, Ast** ast) {
 		fprintf(out, "\n");
 	}
 }
+
+#endif

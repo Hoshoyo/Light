@@ -98,6 +98,7 @@
       <SDLCheck>false</SDLCheck>
       <AdditionalIncludeDirectories>include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/wd4624 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -134,37 +135,23 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\ast.cpp" />
-    <ClCompile Include="src\code_generator.cpp" />
     <ClCompile Include="src\hash_table.cpp" />
-    <ClCompile Include="src\interpreter.cpp" />
     <ClCompile Include="src\lexer.cpp" />
-    <ClCompile Include="src\llvm_backend.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\memory.cpp" />
     <ClCompile Include="src\parser.cpp" />
-    <ClCompile Include="src\semantic.cpp" />
     <ClCompile Include="src\symbol_table.cpp" />
-    <ClCompile Include="src\type.cpp" />
     <ClCompile Include="src\util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ast.h" />
-    <ClInclude Include="src\code_generator.h" />
     <ClInclude Include="src\hash_table.h" />
-    <ClInclude Include="src\interpreter.h" />
     <ClInclude Include="src\lexer.h" />
-    <ClInclude Include="src\llvm_backend.h" />
     <ClInclude Include="src\memory.h" />
     <ClInclude Include="src\parser.h" />
-    <ClInclude Include="src\semantic.h" />
     <ClInclude Include="src\symbol_table.h" />
     <ClInclude Include="src\type.h" />
     <ClInclude Include="src\util.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <MASM Include="src\external_caller.asm">
-      <FileType>Document</FileType>
-    </MASM>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -15,14 +15,14 @@ u32 Symbol_Table::hash_of_ident(Token* id) {
 s64 Symbol_Table::entry_exist(Token* ident) {
 	u32 hash = hash_of_ident(ident);
 	if (entries[hash].used) {
-		if (str_equal(ident->value.data, ident->value.length, entries[hash].identifier->value.data, entries[hash].identifier->value.length)) {
+		if (str_equal(ident->value, entries[hash].identifier->value)) {
 			return (s64)hash;
 		}
 		else {
 			while (entries[hash].collided) {
 				hash += 1;
 				if (hash >= max_entries) hash = 0;
-				if (str_equal(ident->value.data, ident->value.length, entries[hash].identifier->value.data, entries[hash].identifier->value.length)) {
+				if (str_equal(ident->value, entries[hash].identifier->value)) {
 					return (s64)hash;
 				}
 			}

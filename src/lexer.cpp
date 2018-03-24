@@ -8,35 +8,33 @@ extern String_Hash_Table identifiers = {};
 
 // All the keywords in the language
 Keyword keywords_info[] = {
-	{ MAKE_STRING("bool"), TOKEN_BOOL,   TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("void"), TOKEN_VOID,   TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("r32"),  TOKEN_REAL32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("r64"),  TOKEN_REAL64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("s64"),  TOKEN_SINT64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("s32"),  TOKEN_SINT32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("s16"),  TOKEN_SINT16, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("s8"),   TOKEN_SINT8,  TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("u64"),  TOKEN_UINT64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("u32"),  TOKEN_UINT32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("u16"),  TOKEN_UINT16, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
-	{ MAKE_STRING("u8"),   TOKEN_UINT8,  TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("bool"),		TOKEN_BOOL,   TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("void"),		TOKEN_VOID,   TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("r32"),		TOKEN_REAL32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("r64"),		TOKEN_REAL64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("s64"),		TOKEN_SINT64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("s32"),		TOKEN_SINT32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("s16"),		TOKEN_SINT16, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("s8"),		TOKEN_SINT8,  TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("u64"),		TOKEN_UINT64, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("u32"),		TOKEN_UINT32, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("u16"),		TOKEN_UINT16, TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
+	{ MAKE_STRING("u8"),		TOKEN_UINT8,  TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_PRIMITIVE_TYPE },
 
-	{ MAKE_STRING("if"),		TOKEN_IF_STATEMENT,			TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("else"),		TOKEN_ELSE_STATEMENT,		TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("for"),		TOKEN_FOR_STATEMENT,		TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("while"),		TOKEN_WHILE_STATEMENT,		TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("do"),		TOKEN_DO_STATEMENT,			TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("switch"),	TOKEN_SWITCH_STATEMENT,		TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("break"),		TOKEN_BREAK_STATEMENT,		TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("continue"),  TOKEN_CONTINUE_STATEMENT,	TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("return"),	TOKEN_RETURN_STATEMENT,		TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("struct"),	TOKEN_STRUCT_WORD,			TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("enum"),		TOKEN_ENUM_WORD,			TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("union"),		TOKEN_UNION_WORD,			TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("if"),		TOKEN_KEYWORD_IF,			TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("else"),		TOKEN_KEYWORD_ELSE,			TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("for"),		TOKEN_KEYWORD_FOR,			TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("break"),		TOKEN_KEYWORD_BREAK,		TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("continue"),  TOKEN_KEYWORD_CONTINUE,		TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("return"),	TOKEN_KEYWORD_RETURN,		TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("struct"),	TOKEN_KEYWORD_STRUCT,		TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("enum"),		TOKEN_KEYWORD_ENUM,			TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("union"),		TOKEN_KEYWORD_UNION,		TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("array"),		TOKEN_KEYWORD_ARRAY,		TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("cast"),		TOKEN_CAST,					TOKEN_FLAG_RESERVED_WORD },
 
-	{ MAKE_STRING("true"),  TOKEN_BOOL_LITERAL,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
-	{ MAKE_STRING("false"),  TOKEN_BOOL_LITERAL,	TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
+	{ MAKE_STRING("true"),   TOKEN_LITERAL_BOOL,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
+	{ MAKE_STRING("false"),  TOKEN_LITERAL_BOOL,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
 };
 
 s32 Lexer::report_lexer_error(char* msg, ...)
@@ -54,8 +52,8 @@ static u64 keyword_hash(void* data) {
 	return fnv_1_hash(kw->word.data, kw->word.length);
 }
 static bool keyword_equal(void* k1, void* k2) {
-	Keyword* kw1 = (Keyword*)kw1;
-	Keyword* kw2 = (Keyword*)kw2;
+	Keyword* kw1 = (Keyword*)k1;
+	Keyword* kw2 = (Keyword*)k2;
 	if (kw1->word.length != kw2->word.length) return false;
 	return (memcmp(kw1->word.data, kw2->word.data, kw1->word.length) == 0);
 }
@@ -79,14 +77,13 @@ void Lexer::init() {
 
 Lexer_Error Lexer::start(const char* filename)
 {
-	this->filename = { -1, strlen(filename), (char*)filename };
+	this->filename = string_make(filename);
 	file_size = ho_getfilesize(filename);
 	HANDLE filehandle = ho_openfile(filename, OPEN_EXISTING);
 	if (filehandle == INVALID_HANDLE_VALUE) {
 		report_lexer_error("Could not open file %s.\n", filename);
-		return LEXER_ERROR;
+		return LEXER_ERROR_FATAL;
 	}
-	this->file_size = file_size;
 	void* file_memory = malloc(file_size + 1);
 	*((char*)file_memory + file_size) = 0;
 	filedata = (char*)ho_readentirefile(filehandle, file_size, file_memory);
@@ -94,7 +91,7 @@ Lexer_Error Lexer::start(const char* filename)
 
 	lex_file();
 	current_token = 0;
-	return LEXER_SUCCESS;
+	return LEXER_OK;
 }
 
 static int remove_comments(char** start, s64* col_ptr);
@@ -176,7 +173,7 @@ static int remove_white_space(char** start, s64* col_ptr)
 static Token_Type resolve_id_vs_keyword(char* text, int length, u32* flags, s64* entry_index)
 {
 	Keyword k;
-	k.word = { -1, (u64)length, text };
+	k.word = string_make(text, length);
 	s64 index = hash_table_entry_exist(&keywords, &k);
 	*entry_index = index;
 	if (index != -1) {
@@ -187,34 +184,6 @@ static Token_Type resolve_id_vs_keyword(char* text, int length, u32* flags, s64*
 	return TOKEN_IDENTIFIER;
 }
 
-char* Lexer::get_first_char_in_current_line()
-{
-	s32 current = current_token - 1;
-	if (current < 0) current = 0;
-	Token* res = 0;
-	char* at = token_array[current].value.data;
-	while (at > filedata) {
-		if (*at == '\n') {
-			at++;
-			break;
-		}
-		at--;
-	}
-	return at;
-}
-
-char* Lexer::get_first_char_in_line(s64 line)
-{
-	assert(line <= line_count);
-	s64 count = 0;
-	for (int i = 0; i < token_count; ++i) {
-		if (token_array[i].line == line) {
-			break;
-		}
-		++count;
-	}
-	return token_array[count].value.data;
-}
 bool Lexer::read_token(char** begin)
 {
 	Token& token = this->token_array[current_token];
@@ -287,13 +256,8 @@ bool Lexer::read_token(char** begin)
 		}
 	}break;
 	case '.': {
-		if (ch_2 == '.') {
-			type = TOKEN_DOUBLE_DOT;
-			length = 2;
-		} else {
-			type = TOKEN_SYMBOL_DOT;
-			flags |= TOKEN_FLAG_BINARY_OPERATOR;
-		}
+		type = TOKEN_SYMBOL_DOT;
+		flags |= TOKEN_FLAG_BINARY_OPERATOR;
 	}break;
 
 	case '/': {
@@ -430,7 +394,7 @@ bool Lexer::read_token(char** begin)
 
 	case '"': {
 		flags |= TOKEN_FLAG_LITERAL;
-		type = TOKEN_STRING_LITERAL;
+		type = TOKEN_LITERAL_STRING;
 		int i = 0;
 		at++;
 		for (; at[i] != '"'; ++i) {
@@ -446,7 +410,7 @@ bool Lexer::read_token(char** begin)
 
 	case '\'': {
 		flags |= TOKEN_FLAG_LITERAL;
-		type = TOKEN_CHAR_LITERAL;
+		type = TOKEN_LITERAL_CHAR;
 		int i = 0;
 		at++;
 		length = 0;
@@ -472,29 +436,47 @@ bool Lexer::read_token(char** begin)
 			}
 		}
 		else if (is_number(ch_1)) {
-			bool floating_point = false;
-			int i = 0;
-			length = 0;
-			do {
-				++i;
-				length++;
-				if (at[i] == '.' && !floating_point) {
-					floating_point = true;
-					++i;
+			if (ch_1 == '0' && ch_2 == 'x') {
+				// hex
+				length = 2;
+				while(at[length] && is_hex_digit(at[length])) {
 					length++;
 				}
-			} while (at[i] && (is_number(at[i])));
+				flags |= TOKEN_FLAG_NUMERIC_LITERAL | TOKEN_FLAG_LITERAL;
+				type = TOKEN_LITERAL_HEX_INT;
+			} else if (ch_1 == '0' && ch_2 == 'b') {
+				// binary
+				length = 2;
+				while (at[length] && (at[length] == '1' || at[length] == '0')) {
+					length++;
+				}
+				flags |= TOKEN_FLAG_NUMERIC_LITERAL | TOKEN_FLAG_LITERAL;
+				type = TOKEN_LITERAL_BIN_INT;
+			} else {
+				// float and int
+				bool floating_point = false;
+				int i = 0;
+				length = 0;
+				do {
+					++i;
+					length++;
+					if (at[i] == '.' && !floating_point) {
+						floating_point = true;
+						++i;
+						length++;
+					}
+				} while (at[i] && (is_number(at[i])));
 
-			flags |= TOKEN_FLAG_NUMERIC_LITERAL | TOKEN_FLAG_LITERAL;
-			type = (floating_point) ? TOKEN_FLOAT_LITERAL : TOKEN_INT_LITERAL;
-		}
-		else {
+				flags |= TOKEN_FLAG_NUMERIC_LITERAL | TOKEN_FLAG_LITERAL;
+				type = (floating_point) ? TOKEN_LITERAL_FLOAT : TOKEN_LITERAL_INT;
+			}	
+		} else {
 			type = TOKEN_UNKNOWN;
 		}
 	}break;
 	}
 
-	token.value = { -1, (size_t)length, at };
+	token.value = string_make(at, length);
 	token.type = type;
 	token.line = line_count;
 	token.column = current_col;
@@ -578,7 +560,6 @@ static char* make_null_term_string(char* s)
 	return ptr;
 }
 
-
 char* Lexer::get_token_string(Token_Type t)
 {
 	switch (t) {
@@ -634,8 +615,6 @@ char* Lexer::get_token_string(Token_Type t)
 
 	case TOKEN_CAST:		return  ("cast"); break;
 
-	case TOKEN_DOUBLE_DOT: return (".."); break;
-
 	case TOKEN_SINT64:		return ("s64"); break;
 	case TOKEN_SINT32:		return ("s32"); break;
 	case TOKEN_SINT16:		return ("s16"); break;
@@ -649,19 +628,17 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_BOOL:		return ("bool"); break;
 	case TOKEN_VOID:		return ("void"); break;
 
-	case TOKEN_IF_STATEMENT:		return ("if"); break;
-	case TOKEN_ELSE_STATEMENT:		return ("else"); break;
-	case TOKEN_WHILE_STATEMENT:		return ("while"); break;
-	case TOKEN_FOR_STATEMENT:		return ("for"); break;
-	case TOKEN_DO_STATEMENT:		return ("do"); break;
-	case TOKEN_SWITCH_STATEMENT:	return ("switch"); break;
-	case TOKEN_BREAK_STATEMENT:		return ("break"); break;
-	case TOKEN_CONTINUE_STATEMENT:	return ("continue"); break;
-	case TOKEN_RETURN_STATEMENT:	return ("return"); break;
+	case TOKEN_KEYWORD_IF:			return ("if"); break;
+	case TOKEN_KEYWORD_ELSE:		return ("else"); break;
+	case TOKEN_KEYWORD_FOR:			return ("for"); break;
+	case TOKEN_KEYWORD_BREAK:		return ("break"); break;
+	case TOKEN_KEYWORD_CONTINUE:	return ("continue"); break;
+	case TOKEN_KEYWORD_RETURN:		return ("return"); break;
 
-	case TOKEN_STRUCT_WORD:		return ("struct"); break;
-	case TOKEN_ENUM_WORD:		return ("enum"); break;
-	case TOKEN_UNION_WORD:		return ("union"); break;
+	case TOKEN_KEYWORD_STRUCT:		return ("struct"); break;
+	case TOKEN_KEYWORD_ENUM:		return ("enum"); break;
+	case TOKEN_KEYWORD_UNION:		return ("union"); break;
+	case TOKEN_KEYWORD_ARRAY:		return ("array"); break;
 	default: {
 		assert(0);
 		return ("UNKNOWN"); break;
