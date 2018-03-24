@@ -1,0 +1,109 @@
+EXPRESSION :=
+	'(' EXPRESSION ')'
+|	EXPRESSION_BINARY
+|	EXPRESSION_UNARY
+|	LITERAL
+|	VARIABLE
+|	PROCEDURE_CALL
+;
+
+OPERATOR_UNARY_PREFIXED :=
+	'-'
+|	'+'
+|	'*'
+|	'&'
+|	'!'
+|	'~'
+|	cast '(' TYPE ')'
+;
+
+OPERATOR_UNARY_POSTFIXED :=
+|	'[' EXPRESSION ']'
+;
+
+OPERATOR_BINARY := 
+	'+' 
+|	'-' 
+|	'*' 
+|	'/'
+|	'%'
+|	'&'
+|	'|'
+|	'^'
+|	'&&'
+|	'||'
+|	'<<'
+|	'>>'
+|	'<'
+|	'>'
+|	'<='
+|	'>='
+|	'=='
+|	'!='
+|	'.'
+;
+
+EXPRESSION_UNARY :=
+	OPERATOR_UNARY_PREFIXED EXPRESSION
+|	EXPRESSION OPERATOR_UNARY_POSTFIXED
+;
+
+EXPRESSION_BINARY :=
+	EXPRESSION OPERATOR_BINARY EXPRESSION
+;
+
+VARIABLE :=
+	IDENTIFIER
+;
+
+LITERAL :=
+	LITERAL_INT
+|	LITERAL_FLOAT
+|	LITERAL_BOOL
+|	LITERAL_STRUCT
+|	LITERAL_ARRAY
+;
+
+LITERAL_INT :=
+	[0-9]+
+|	0x([0-9]|[a-f]|[A-F])+
+|	0b(0|1)+
+;
+
+LITERAL_FLOAT :=
+	[0-9]+\.[0-9]+
+;
+
+LITERAL_BOOL :=
+	true
+|	false
+;
+
+IDENTIFIER :=
+	[a-z|a
+;
+
+LITERAL_STRUCT := 
+	struct IDENTIFIER '{' '}'
+|	struct IDENTIFIER '{' HELPER_LITERAL_LIST '}'
+;
+	
+HELPER_LITERAL_LIST :=
+	LITERAL
+|	LITERAL ',' HELPER_LITERAL_LIST
+;
+
+LITERAL_ARRAY :=
+	'{' '}'
+|	'{' HELPER_LITERAL_LIST '}'
+;
+
+HELPER_EXPRESSION_LIST :=
+	EXPRESSION
+|	EXPRESSION ',' HELPER_EXPRESSION_LIST
+;
+
+PROCEDURE_CALL :=
+	IDENTIFIER '(' ')'
+|	IDENTIFIER '(' HELPER_EXPRESSION_LIST ')'
+;

@@ -1,0 +1,35 @@
+TYPE :=
+TYPE_PRIMITIVE |
+TYPE_PTR |
+TYPE_STRUCT |
+TYPE_ARRAY |
+TYPE_FUNCTION
+;
+
+TYPE_PRIMITIVE := 
+s8  | s16 | s32  | s64
+u8  | u16 | u32  | u64
+r32 | r64 | bool | void
+;
+
+TYPE_PTR := 
+	^TYPE
+;
+
+TYPE_STRUCT := 
+	IDENTIFIER
+;
+
+TYPE_ARRAY := 
+	'[' INT_LITERAL ']'  TYPE
+|	'[' CONSTANT_NAME ']' TYPE
+;
+
+HELPER_TYPE_LIST :=
+	TYPE
+|	TYPE ',' HELPER_TYPE_LIST
+
+TYPE_FUNCTION := 
+	'(' ')' -> TYPE
+|	'(' HELPER_TYPE_LIST ')' -> TYPE
+;
