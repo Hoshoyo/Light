@@ -22,11 +22,43 @@ if-end-0:
 ret i32 %4
 
 }
+define i32 @fibonacci(i32 %val) #1 {
+decls-0:
+%0 = icmp eq i32 %val, 0
+br i1 %0, label %if-stmt-0, label %if-stmt-1
+if-stmt-0:
+ret i32 0
+
+br label %if-end-0
+if-stmt-1:%2 = icmp eq i32 %val, 1
+br i1 %2, label %if-stmt-2, label %if-stmt-3
+if-stmt-2:
+ret i32 1
+
+br label %if-end-2
+if-stmt-3:%4 = sub i32 %val, 1
+%5 = call i32 @fibonacci(i32  %4)
+
+%6 = sub i32 %val, 2
+%7 = call i32 @fibonacci(i32  %6)
+
+%8 = add i32 %5, %7
+ret i32 %8
+
+br label %if-end-2
+if-end-2:
+
+br label %if-end-0
+if-end-0:
+
+ret i32 0
+
+}
 define i32 @main() #1 {
 decls-0:
 %0 = alloca i32, align 4
 
-%1 = call i32 @factorial(i32 4)
+%1 = call i32 @fibonacci(i32 4)
 
 store i32 %1, i32* %0
 %2 = load i32, i32* %0

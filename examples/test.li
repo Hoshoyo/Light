@@ -10,8 +10,21 @@ factorial :: (val : s32) -> s32 {
 	return val * factorial(val - 1);
 }
 
+fibonacci :: (val : s32) -> s32 {
+	if(val == 0) {
+		return 0;
+	} else {
+		if(val == 1) {
+			return 1;
+		} else {
+			return fibonacci(val - 1) + fibonacci(val - 2);
+		}
+	}
+	return 0;
+}
+
 main :: () -> s32 {
-	f := factorial(4);
+	f := fibonacci(4);
 	ExitProcess(f);
 	return 0;
 }

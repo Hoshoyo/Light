@@ -1867,7 +1867,7 @@ bool expr_is_assignment(Ast_Expression* expr) {
 
 bool DEBUG_check_returntype_node(Ast* node)
 {
-	if(!node) return;
+	if(!node) return true;
 
 	//assert(node->return_type);
 	if(!node->return_type){
@@ -1921,12 +1921,14 @@ bool DEBUG_check_returntype_node(Ast* node)
 			// @todo
 		}break;
 	}
+	return true;
 }
 
 bool DEBUG_check_returntype_ast(Ast** ast) {
 	for(size_t i = 0; i < array_get_length(ast); ++i){
 		DEBUG_check_returntype_node(ast[i]);
 	}
+	return true;
 }
 
 /*
