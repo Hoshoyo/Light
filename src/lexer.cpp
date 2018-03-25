@@ -33,8 +33,8 @@ Keyword keywords_info[] = {
 	{ MAKE_STRING("array"),		TOKEN_KEYWORD_ARRAY,		TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("cast"),		TOKEN_CAST,					TOKEN_FLAG_RESERVED_WORD },
 
-	{ MAKE_STRING("true"),   TOKEN_LITERAL_BOOL,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
-	{ MAKE_STRING("false"),  TOKEN_LITERAL_BOOL,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
+	{ MAKE_STRING("true"),   TOKEN_LITERAL_BOOL_TRUE,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
+	{ MAKE_STRING("false"),  TOKEN_LITERAL_BOOL_FALSE,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
 };
 
 s32 Lexer::report_lexer_error(char* msg, ...)
@@ -576,7 +576,12 @@ u64 Lexer::literal_integer_to_u64(Token* t) {
 		u64 res = 0;
 		for (s32 i = t->value.length - 1; i >= 2 /* 0x */; --i) {
 			res <<= 4;
-			res |= (t->value.data[i] >= 'A') ? t->value.data[i] - 0x31 : t->value.data[i] - 0x30;
+			u8 c1 = t->value.data[i] & 0x0f;
+			res |= (c1 >= 'A') ? (c1 >= 'a') ? c1 - 0x57 : c1 - 0x37 : c1 - 0x30;
+
+			res <<= 4;
+			u8 c2 = t->value.data[i] & 0xf0;
+			res |= (c2 >= 'A') ? (c2 >= 'a') ? c2 - 0x57 : c2 - 0x37 : c2- 0x30;
 		}
 		return res;
 	}

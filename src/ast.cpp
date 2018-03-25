@@ -144,6 +144,21 @@ Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type) {
 	return ev;
 }
 
+Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, u32 flags, Type_Instance* type) {
+	Ast* el = ALLOC_AST();
+
+	el->node_type = AST_EXPRESSION_LITERAL;
+	el->type_return = type;
+	el->scope = scope;
+	el->flags = AST_FLAG_IS_EXPRESSION;
+
+	el->expr_literal.flags = flags;
+
+	el->expr_literal.type = literal_type;
+
+	return el;
+}
+
 #if 0
 bool ast_is_expression(Ast* ast) {
 	return (ast->node == AST_NODE_BINARY_EXPRESSION ||

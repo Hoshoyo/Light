@@ -301,6 +301,7 @@ Ast* ast_create_decl_enum(Token* name, Scope* scope, Ast** fields, Type_Instance
 Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instance* type, u32 flags);
 
 Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type);
+Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Type_Instance* type);
 
 
 #if 0

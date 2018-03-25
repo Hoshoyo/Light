@@ -30,12 +30,16 @@ struct Parser {
 	Ast* parse_declaration(Scope* scope);
 	Ast* parse_decl_proc(Token* name, Scope* scope);
 	Ast* parse_decl_variable(Token* name, Scope* scope);
+	Ast* parse_decl_variable(Token* name, Scope* scope, Type_Instance* type);
 	Ast* parse_decl_struct(Token* name, Scope* scope);
 	Ast* parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint);
 	Ast* parse_decl_constant(Token* name, Scope* scope, Type_Instance* type);
 
 	// Expression parsing
-	Ast* parse_expr_literal();
+	Ast* parse_expr_literal(Scope* scope);
+
+	// Command parsing
+	Ast* parse_comm_block(Scope* scope);
 
 	// Error report
 	void   report_syntax_error(Token* error_token, char* msg, ...);

@@ -47,6 +47,10 @@ Ast** Parser::parse_top_level() {
 	return ast_top_level;
 }
 
+// -------------------------------------------
+// ------------- Declarations ----------------
+// -------------------------------------------
+
 Ast* Parser::parse_declaration(Scope* scope) {
 	Token* name = lexer->eat_token();
 
@@ -69,7 +73,7 @@ Ast* Parser::parse_declaration(Scope* scope) {
 			} else if (next->type == TOKEN_KEYWORD_ENUM) {
 				return parse_decl_enum(name, scope, 0);
 			} else {
-				return 0;// parse_decl_constant(name, scope, 0);
+				return parse_decl_constant(name, scope, 0);
 			}
 		} else {
 			// type for a variable, enum or constant declaration
@@ -83,10 +87,10 @@ Ast* Parser::parse_declaration(Scope* scope) {
 				if (lexer->peek_token_type() == TOKEN_KEYWORD_ENUM)
 					return parse_decl_enum(name, scope, declaration_type);
 				else
-					return 0;// parse_constant_decl(name, scope, declaration_type);
+					return parse_constant_decl(name, scope, declaration_type);
 			} else {
 				// variable declaration
-				return 0;// parse_decl_variable(name, scope, declaration_type);
+				return parse_decl_variable(name, scope, declaration_type);
 			}
 		}
 	} else {
@@ -137,23 +141,27 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 	return node;
 }
 
-Ast* Parser::parse_decl_variable(Token* name, Scope* scope) {
-	require_and_eat(':');
-
-	Type_Instance* var_type = 0;
+Ast* Parser::parse_decl_variable(Token* name, Scope* scope, Type_Instance* type) {
 	Ast* assignment = 0;
 
-	Token* next = lexer->peek_token();
-	if (next->type != '=') {
-		var_type = parse_type();
-	}
-
-	next = lexer->eat_token();
+	Token* next = lexer->eat_token();
 	if (next->type == '=') {
 		// TODO: expression
 		assignment = 0;//parse_expression();
 	}
-	return ast_create_decl_variable(name, scope, assignment, var_type, 0);
+	return ast_create_decl_variable(name, scope, assignment, type, 0);
+}
+
+Ast* Parser::parse_decl_variable(Token* name, Scope* scope) {
+	require_and_eat(':');
+
+	Type_Instance* var_type = 0;
+
+	Token* next = lexer->peek_token();
+	if (next->type != '=')
+		var_type = parse_type();
+
+	return parse_decl_variable(name, scope, var_type);
 }
 
 Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
@@ -230,17 +238,92 @@ Ast* Parser::parse_decl_constant(Token* name, Scope* scope, Type_Instance* type)
 	if (next->type == TOKEN_IDENTIFIER) {
 		value = ast_create_expr_variable(name, scope, type);
 	} else {
-		//value = parse_expr_literal();
+		value = parse_expr_literal(scope);
 	}
 
 	return ast_create_decl_constant(name, scope, value, type, 0);
 }
 
-Ast* Parser::parse_expr_literal() {
+// -------------------------------------------
+// ------------- Expressions -----------------
+// -------------------------------------------
+
+Ast* Parser::parse_expr_literal(Scope* scope) {
+	Token* first = lexer->eat_token();
+	Ast* node = ast_create_expr_literal(scope, LITERAL_UNKNOWN, 0);
+	bool negate = false;
+	bool prefixed = false;
+	switch (first->type) {
+		case '-':
+			negate = true;
+		case '+':
+			first = lexer->eat_token();
+			prefixed = true;
+		break;
+		default: break;
+	}
+	if (prefixed && first->type == TOKEN_LITERAL_INT) {
+		node->expr_literal.type = LITERAL_SINT;
+		node->expr_literal.value_s64 = str_to_s64((char*)first->value.data, first->value.length);
+		if (negate)
+			node->expr_literal.value_s64 = -node->expr_literal.value_s64;
+	} else if (prefixed) {
+		report_syntax_error(first, "expected integer literal after %c operator but got '%.*s'\n", (char)first->type, TOKEN_STR(first));
+	}
+	switch(first->type) {
+		case TOKEN_LITERAL_HEX_INT: {
+			node->expr_literal.type = LITERAL_HEX_INT;
+			node->expr_literal.value_u64 = lexer->literal_integer_to_u64(first);
+		} break;
+		case TOKEN_LITERAL_BIN_INT: {
+			node->expr_literal.type = LITERAL_BIN_INT;
+			node->expr_literal.value_u64 = lexer->literal_integer_to_u64(first);
+		} break;
+		case TOKEN_LITERAL_BOOL_FALSE: {
+			node->expr_literal.type = LITERAL_BOOL;
+			node->expr_literal.value_bool = false;
+		} break;
+		case TOKEN_LITERAL_BOOL_TRUE: {
+			node->expr_literal.type = LITERAL_BOOL;
+			node->expr_literal.value_bool = true;
+		} break;
+		case TOKEN_LITERAL_CHAR:
+			// TODO(psv): utf8 encoding
+			node->expr_literal.type = LITERAL_UINT;
+			node->type_return = type_primitive_get(TYPE_PRIMITIVE_U32);
+			break;
+		case TOKEN_LITERAL_FLOAT:
+			node->expr_literal.type = LITERAL_FLOAT;
+		case TOKEN_LITERAL_STRING:
+			node->expr_literal.flags |= LITERAL_FLAG_STRING;
+			// TODO(psv): get type string here already
+		default: {
+			// TODO(psv):
+			// struct literal
+			// array literal
+		}break;
+	}
+
+	return node;
+}
+
+// -------------------------------------------
+// --------------- Commands ------------------
+// -------------------------------------------
+
+Ast* Parser::parse_comm_block(Scope* scope) {
+	require_and_eat('{');
+
+	require_and_eat('}');
 	return 0;
 }
 
+
+// -------------------------------------------
+// ---------------- Types --------------------
+// -------------------------------------------
 // Parse Type, doest not internalize types yet
+
 Type_Instance* Parser::parse_type() {
 	Token* tok = lexer->eat_token();
 	switch (tok->type) {
