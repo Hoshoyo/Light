@@ -56,6 +56,8 @@ enum Operator_Unary {
 	OP_UNARY_DEREFERENCE,
 	OP_UNARY_ADDRESSOF,
 	OP_UNARY_BITWISE_NOT,
+	OP_UNARY_VECTOR_ACCESSER,
+	OP_UNARY_CAST,
 
 	OP_UNARY_LOGIC_NOT,
 };
@@ -86,6 +88,20 @@ enum Operator_Binary {
 
 	OP_BINARY_DOT,			// .
 };
+
+enum Precedence {
+	PRECEDENCE_0 = 0,	//	 assignments
+	PRECEDENCE_1 = 1,	//	 || &&
+	PRECEDENCE_2 = 2,	//	 == >= <= != > <
+	PRECEDENCE_3 = 3,	//	 ^ | & >> <<
+	PRECEDENCE_4 = 4,	//	 + -
+	PRECEDENCE_5 = 5,	//	 * / %
+	PRECEDENCE_6 = 6,	//	 &(addressof) ~ 
+	PRECEDENCE_7 = 7,	//	 *(dereference)	cast !
+	PRECEDENCE_8 = 8,	//	 .
+	PRECEDENCE_MAX,
+};
+
 struct Symbol_Table;
 struct Ast;
 
@@ -94,6 +110,8 @@ const u32 SCOPE_PROCEDURE_BODY      = FLAG(1);
 const u32 SCOPE_STRUCTURE           = FLAG(2);
 const u32 SCOPE_ENUM                = FLAG(3);
 const u32 SCOPE_FILESCOPE           = FLAG(4);
+const u32 SCOPE_BLOCK               = FLAG(5);
+const u32 SCOPE_LOOP                = FLAG(6);
 struct Scope {
 	s32           id;
 	s32           level;
@@ -194,6 +212,8 @@ struct Ast_Decl_Constant {
 
 struct Ast_Comm_Block {
 	Ast**  commands;	// COMMANDS
+	Scope* block_scope;
+	s32    command_count;
 };
 struct Ast_Comm_VariableAssign {
 	Ast*   lvalue;	// EXPRESSION
@@ -224,9 +244,12 @@ struct Ast_Expr_Binary {
 	Ast* right;
 	Operator_Binary op;
 };
+const u32 UNARY_EXPR_FLAG_PREFIXED  = FLAG(0);
+const u32 UNARY_EXPR_FLAG_POSTFIXED = FLAG(1);
 struct Ast_Expr_Unary {
 	Ast*           operand;
 	Operator_Unary op;
+	u32            flags;
 };
 struct Ast_Expr_Cast {
 	Ast*           operand;
@@ -301,8 +324,16 @@ Ast* ast_create_decl_enum(Token* name, Scope* scope, Ast** fields, Type_Instance
 Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instance* type, u32 flags);
 
 Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type);
-Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Type_Instance* type);
+Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, u32 flags, Type_Instance* type);
+Ast* ast_create_expr_binary(Scope* scope, Ast* left, Ast* right, Operator_Binary op);
 
+Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** commands, s32 command_count);
+Ast* ast_create_comm_if(Scope* scope, Ast* condition, Ast* command_true, Ast* command_false);
+Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body);
+Ast* ast_create_comm_break(Scope* scope, Ast* lit);
+Ast* ast_create_comm_continue(Scope* scope);
+Ast* ast_create_comm_return(Scope* scope, Ast* expr);
+Ast* ast_create_comm_variable_assignment(Scope* scope, Ast* lvalue, Ast* rvalue);
 
 #if 0
 bool ast_is_expression(Ast* ast);
@@ -339,3 +370,7 @@ void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_ = true);
 void DEBUG_print_indent_level();
 
 #endif
+
+void DEBUG_print_node(FILE* out, Ast* node);
+void DEBUG_print_ast(FILE* out, Ast** ast);
+void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_ = true);

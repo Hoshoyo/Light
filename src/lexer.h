@@ -74,7 +74,7 @@ enum Token_Type
 	TOKEN_SHL_EQUAL,
 	TOKEN_SHR_EQUAL,
 
-	TOKEN_CAST,
+	TOKEN_KEYWORD_CAST,
 
 	// Type tokens
 	TOKEN_SINT64,
@@ -177,3 +177,9 @@ struct Keyword {
 };
 
 void internalize_identifier(string* str);
+
+enum Operator_Unary;
+enum Operator_Binary;
+
+Operator_Unary  token_to_unary_op(Token* t);
+Operator_Binary token_to_binary_op(Token* t);

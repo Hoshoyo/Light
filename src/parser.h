@@ -37,9 +37,21 @@ struct Parser {
 
 	// Expression parsing
 	Ast* parse_expr_literal(Scope* scope);
+	Ast* parse_expression(Scope* scope, Precedence caller_prec = PRECEDENCE_0, bool quit_on_precedence = false);
+
+	// Expression auxiliary
+	Precedence unary_op_precedence_level(Operator_Unary unop, bool prefixed);
+	Precedence binary_op_precedence_level(Operator_Binary bo);
 
 	// Command parsing
+	Ast* parse_command(Scope* scope);
 	Ast* parse_comm_block(Scope* scope);
+	Ast* parse_comm_if(Scope* scope);
+	Ast* parse_comm_for(Scope* scope);
+	Ast* parse_comm_break(Scope* scope);
+	Ast* parse_comm_continue(Scope* scope);
+	Ast* parse_comm_return(Scope* scope);
+	Ast* parse_comm_variable_assignment(Scope* scope);
 
 	// Error report
 	void   report_syntax_error(Token* error_token, char* msg, ...);

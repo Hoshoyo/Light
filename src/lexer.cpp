@@ -2,6 +2,7 @@
 #include <ho_system.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include "ast.h"
 
 extern Hash_Table keywords = {};
 extern String_Hash_Table identifiers = {};
@@ -31,7 +32,7 @@ Keyword keywords_info[] = {
 	{ MAKE_STRING("enum"),		TOKEN_KEYWORD_ENUM,			TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("union"),		TOKEN_KEYWORD_UNION,		TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("array"),		TOKEN_KEYWORD_ARRAY,		TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("cast"),		TOKEN_CAST,					TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("cast"),		TOKEN_KEYWORD_CAST,			TOKEN_FLAG_RESERVED_WORD },
 
 	{ MAKE_STRING("true"),   TOKEN_LITERAL_BOOL_TRUE,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
 	{ MAKE_STRING("false"),  TOKEN_LITERAL_BOOL_FALSE,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
@@ -232,13 +233,13 @@ bool Lexer::read_token(char** begin)
 			length = 2;
 		} else {
 			type = TOKEN_SYMBOL_MOD;
+			flags |= TOKEN_FLAG_BINARY_OPERATOR;
 		}
-		flags |= TOKEN_FLAG_BINARY_OPERATOR;
 	}break;
 	case '*': {
 		if (ch_2 == '=') {
 			type = TOKEN_TIMES_EQUAL;
-			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 			length = 2;
 		} else {
 			type = TOKEN_SYMBOL_TIMES;
@@ -248,7 +249,7 @@ bool Lexer::read_token(char** begin)
 	case '^': {
 		if (ch_2 == '=') {
 			type = TOKEN_XOR_EQUAL;
-			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 			length = 2;
 		} else {
 			type = TOKEN_SYMBOL_CARAT;
@@ -264,7 +265,7 @@ bool Lexer::read_token(char** begin)
 		if (ch_2 == '=') {
 			type = TOKEN_DIV_EQUAL;
 			length = 2;
-			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 		} else {
 			flags |= TOKEN_FLAG_BINARY_OPERATOR;
 			type = TOKEN_SYMBOL_DIV;
@@ -274,7 +275,7 @@ bool Lexer::read_token(char** begin)
 	case '+': {
 		if (ch_2 == '=') {
 			type = TOKEN_PLUS_EQUAL;
-			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_ASSIGNMENT_OPERATOR;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 			length = 2;
 		} else {
 			flags |= TOKEN_FLAG_BINARY_OPERATOR;
@@ -289,7 +290,7 @@ bool Lexer::read_token(char** begin)
 		}
 		else if (ch_2 == '=') {
 			type = TOKEN_MINUS_EQUAL;
-			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR | TOKEN_FLAG_BINARY_OPERATOR;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 			length = 2;
 		}
 		else {
@@ -303,8 +304,7 @@ bool Lexer::read_token(char** begin)
 			type = TOKEN_EQUAL_COMPARISON;
 			length = 2;
 			flags |= TOKEN_FLAG_BINARY_OPERATOR;
-		}
-		else {
+		} else {
 			type = TOKEN_SYMBOL_EQUAL;
 			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 		}
@@ -367,7 +367,7 @@ bool Lexer::read_token(char** begin)
 		else if (ch_2 == '=') {
 			type = TOKEN_OR_EQUAL;
 			length = 2;
-			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR | TOKEN_FLAG_BINARY_OPERATOR;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 		}
 		else {
 			type = TOKEN_SYMBOL_PIPE;
@@ -384,7 +384,7 @@ bool Lexer::read_token(char** begin)
 		else if (ch_2 == '=') {
 			type = TOKEN_AND_EQUAL;
 			length = 2;
-			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR | TOKEN_FLAG_BINARY_OPERATOR;
+			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 		}
 		else {
 			type = TOKEN_SYMBOL_AND;
@@ -646,7 +646,7 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_SHL_EQUAL:	return ("<<="); break;
 	case TOKEN_SHR_EQUAL:	return (">>="); break;
 
-	case TOKEN_CAST:		return  ("cast"); break;
+	case TOKEN_KEYWORD_CAST:		return  ("cast"); break;
 
 	case TOKEN_SINT64:		return ("s64"); break;
 	case TOKEN_SINT32:		return ("s32"); break;
@@ -677,6 +677,50 @@ char* Lexer::get_token_string(Token_Type t)
 		return ("UNKNOWN"); break;
 	}break;
 	}
+}
+
+Operator_Unary token_to_unary_op(Token* t) {
+	assert(t->flags & TOKEN_FLAG_UNARY_OPERATOR);
+	switch (t->type) {
+		case '-': return OP_UNARY_MINUS;
+		case '+': return OP_UNARY_PLUS;
+		case '*': return OP_UNARY_DEREFERENCE;
+		case '&': return OP_UNARY_ADDRESSOF;
+		case '!': return OP_UNARY_LOGIC_NOT;
+		case '~': return OP_UNARY_BITWISE_NOT;
+		case TOKEN_KEYWORD_CAST: return OP_UNARY_CAST;
+		case '[': return OP_UNARY_VECTOR_ACCESSER;
+	}
+	return OP_UNARY_UNKNOWN;
+}
+
+Operator_Binary token_to_binary_op(Token* t) {
+	assert(t->flags & TOKEN_FLAG_BINARY_OPERATOR);
+	switch (t->type) {
+		case '+': return OP_BINARY_PLUS;
+		case '-': return OP_BINARY_MINUS;
+		case '*': return OP_BINARY_MULT;
+		case '/': return OP_BINARY_DIV;
+		case '%': return OP_BINARY_MOD;
+		case '&': return OP_BINARY_AND;
+		case '|': return OP_BINARY_OR;
+		case '^': return OP_BINARY_XOR;
+		case TOKEN_LOGIC_AND:		return OP_BINARY_LOGIC_AND;
+		case TOKEN_LOGIC_OR:		return OP_BINARY_LOGIC_OR;
+		case TOKEN_BITSHIFT_LEFT:	return OP_BINARY_SHL;
+		case TOKEN_BITSHIFT_RIGHT:	return OP_BINARY_SHR;
+		case '<':					return OP_BINARY_LT;
+		case '>':					return OP_BINARY_GT;
+		case TOKEN_GREATER_EQUAL:	return OP_BINARY_GE;
+		case TOKEN_LESS_EQUAL:		return OP_BINARY_LE;
+		case TOKEN_EQUAL_COMPARISON:return OP_BINARY_EQUAL;
+		case TOKEN_NOT_EQUAL:		return OP_BINARY_NOT_EQUAL;
+		case '.':					return OP_BINARY_DOT;
+		default: {
+			assert(0);
+		}
+	}
+	return OP_BINARY_UNKNOWN;
 }
 
 void internalize_identifier(string* str) {
