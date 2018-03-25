@@ -5,7 +5,7 @@
 #define MAX(X, Y) ((X > Y) ? (X) : (Y))
 #define MIN(X, Y) ((X < Y) ? (X) : (Y))
 
-#define MAKE_STRING(X) { sizeof(X), (u8*)(X) }
+#define MAKE_STRING(X) { sizeof(X) - 1, (u8*)(X) }
 
 #define ARRAY_COUNT(X) (sizeof(X) / sizeof((X)[0]))
 
@@ -27,6 +27,7 @@ s64  str_length(const char* str);
 bool c_str_equal(const char* s1, const char* s2);
 bool str_equal(const char* s1, int s1_len, const char* s2, int s2_len);
 bool str_equal(const string& s1, const string& s2);
+u64  str_to_u64(char* text, int length);
 s64  str_to_s64(char* text, int length);
 s32  str_to_s32(char* text, int length);
 r64  str_to_r64(char* text, int length);
@@ -42,3 +43,5 @@ u32 djb2_hash(u32 hash1, u32 hash2);
 u64 fnv_1_hash(const u8* s, u64 length);
 
 s32 system_exit(s32 ret);
+
+void report_internal_compiler_error(char* filename, int line, char* msg, ...);

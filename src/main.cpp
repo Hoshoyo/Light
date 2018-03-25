@@ -1,10 +1,12 @@
 #define HO_SYSTEM_IMPLEMENT
 #include <ho_system.h>
 #include "lexer.h"
+#include "parser.h"
 #include "ast.h"
 #include "util.h"
 
 void initialize() {
+	Type_Instance::init();
 	Lexer::init();
 }
 
@@ -18,9 +20,8 @@ int main(int argc, char** argv) {
 	// Global scope
 	Scope  global_scope = { 0 };
 
-	Scope* filescope = scope_create(0, &global_scope, SCOPE_FILESCOPE);
-	filescope->filename = string_make(argv[1]);
-	//Ast** ast_top_level = parse_top_level(filescope, &lexer);
+	Parser parser(&lexer, &global_scope);
+	Ast** ast_top_level = parser.parse_top_level();
 
 	return 0;
 }

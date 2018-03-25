@@ -1,7 +1,365 @@
 #include "parser.h"
 #include "ast.h"
+#include "util.h"
+#include "type.h"
+#include <ho_system.h>
+
+void Parser::report_syntax_error(Token* error_token, char* msg, ...) {
+	va_list args;
+	va_start(args, msg);
+	fprintf(stderr, "Syntax Error: ");
+	vfprintf(stderr, msg, args);
+	va_end(args);
+	system_exit(-1);
+}
+
+Token* Parser::require_and_eat(Token_Type tt) {
+	Token* t = lexer->eat_token();
+	if(t->type == TOKEN_END_OF_STREAM && tt != TOKEN_END_OF_STREAM)
+		report_syntax_error(t, "unexpected end of stream, expected '%s'\n", lexer->get_token_string(tt));
+	if (t->type != tt) 
+		report_syntax_error(t, "expected '%s', but got '%.*s'\n", lexer->get_token_string(tt), TOKEN_STR(t));
+	return t;
+}
+Token* Parser::require_and_eat(char t) {
+	return require_and_eat((Token_Type)t);
+}
 
 
+Ast** Parser::parse_top_level() {
+	// Empty file check
+	if (lexer->token_count == 1 && lexer->peek_token_type() == TOKEN_END_OF_STREAM)
+		return 0;
+	Parser_Error perr = PARSER_OK;
+
+	Ast** ast_top_level = array_create(Ast*, 64);
+
+	while (perr == PARSER_OK && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
+		Ast* decl = parse_declaration(global_scope);
+		if (!decl) break;
+		array_push(ast_top_level, &decl);
+	}
+
+	if (perr == PARSER_ERROR_FATAL) {
+		fprintf(stderr, "There were errors, exiting...\n");
+		return 0;
+	}
+	return ast_top_level;
+}
+
+Ast* Parser::parse_declaration(Scope* scope) {
+	Token* name = lexer->eat_token();
+
+	if (name->type != TOKEN_IDENTIFIER)
+		report_syntax_error(name, "invalid identifier %.*s on declaration.\n", TOKEN_STR(name));
+
+	Token* decl = lexer->eat_token();
+
+	if (decl->type == ':')
+	{
+		Token* next = lexer->peek_token();
+		if (next->type == ':') {
+			// struct, procedure and constant declaration
+			lexer->eat_token(); // :
+			next = lexer->peek_token();
+			if (next->type == '(') {
+				return parse_decl_proc(name, scope);
+			} else if (next->type == TOKEN_KEYWORD_STRUCT) {
+				return parse_decl_struct(name, scope);
+			} else if (next->type == TOKEN_KEYWORD_ENUM) {
+				return parse_decl_enum(name, scope, 0);
+			} else {
+				return 0;// parse_decl_constant(name, scope, 0);
+			}
+		} else {
+			// type for a variable, enum or constant declaration
+			Type_Instance* declaration_type = 0;
+			if (lexer->peek_token_type() != '=')
+				declaration_type = parse_type();
+			next = lexer->peek_token();
+			if (next->type == ':') {
+				// typed constant
+				lexer->eat_token(); // ':'
+				if (lexer->peek_token_type() == TOKEN_KEYWORD_ENUM)
+					return parse_decl_enum(name, scope, declaration_type);
+				else
+					return 0;// parse_constant_decl(name, scope, declaration_type);
+			} else {
+				// variable declaration
+				return 0;// parse_decl_variable(name, scope, declaration_type);
+			}
+		}
+	} else {
+		report_syntax_error(decl, "invalid declaration of '%.*s', declaration requires ':'\n", TOKEN_STR(name));
+	}
+	return 0;
+}
+
+Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
+	require_and_eat(':');
+	require_and_eat(':');
+	require_and_eat('(');
+
+	Ast**          arguments = 0;
+	Scope*         arguments_scope = 0;
+	Type_Instance* return_type = 0;
+	s32 nargs = 0;
+
+	if (lexer->peek_token_type() != ')') {
+		Token* name = require_and_eat(TOKEN_IDENTIFIER);
+		arguments_scope = scope_create(0, scope, SCOPE_PROCEDURE_ARGUMENTS);
+		arguments = array_create(Ast*, 4);
+
+		for (;; ++nargs) {
+			if (nargs != 0)
+				require_and_eat(',');
+
+			Ast* arg = parse_decl_variable(name, arguments_scope);
+			array_push(arguments, &arg);
+
+			if (lexer->peek_token_type() != ',')
+				break;
+		}
+		require_and_eat(')');
+	}
+	if (lexer->peek_token_type() == '{') {
+		return_type = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	} else {
+		require_and_eat(TOKEN_ARROW);
+		return_type = parse_type();
+	}
+
+	// TODO(psv): forward declared procs (foreign)
+	Ast* body = 0;// parse_comm_block();
+
+	Ast* node = ast_create_decl_proc(name, scope, arguments, body, return_type, 0, nargs);
+	arguments_scope->creator_node = node;
+	return node;
+}
+
+Ast* Parser::parse_decl_variable(Token* name, Scope* scope) {
+	require_and_eat(':');
+
+	Type_Instance* var_type = 0;
+	Ast* assignment = 0;
+
+	Token* next = lexer->peek_token();
+	if (next->type != '=') {
+		var_type = parse_type();
+	}
+
+	next = lexer->eat_token();
+	if (next->type == '=') {
+		// TODO: expression
+		assignment = 0;//parse_expression();
+	}
+	return ast_create_decl_variable(name, scope, assignment, var_type, 0);
+}
+
+Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
+	require_and_eat(':');
+	require_and_eat(':');
+	require_and_eat(TOKEN_KEYWORD_STRUCT);
+
+	s32    fields_count = 0;
+	Ast**  fields = array_create(Ast*, 8);
+	Scope* scope_struct = scope_create(0, scope, SCOPE_STRUCTURE);
+
+	require_and_eat('{');
+
+	for (;; ++fields_count) {
+		if (fields_count != 0)
+			require_and_eat(';');
+		Token* field_name = lexer->eat_token();
+		if (field_name->type != TOKEN_IDENTIFIER) {
+			report_syntax_error(field_name, "expected struct field declaration, but got '%.*s'\n", TOKEN_STR(field_name));
+		}
+		Ast* field = parse_decl_variable(field_name, scope_struct);
+		array_push(fields, &field);
+		if (lexer->peek_token_type() != ';')
+			break;
+	}
+
+	require_and_eat('}');
+
+	Ast* node = ast_create_decl_struct(name, scope, fields, 0, fields_count);
+	scope_struct->creator_node = node;
+	return node;
+}
+
+Ast* Parser::parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint_type) {
+
+	require_and_eat(':');
+	require_and_eat(TOKEN_KEYWORD_ENUM);
+	require_and_eat('{');
+
+	if (!hint_type) {
+		// TODO(psv): decide default value
+		hint_type = type_primitive_get(TYPE_PRIMITIVE_U32);
+	}
+
+	s32    fields_count = 0;
+	Ast**  fields = 0;
+	Scope* enum_scope = scope_create(0, scope, SCOPE_ENUM);
+
+	for (;; ++fields_count) {
+		if (fields_count != 0)
+			require_and_eat(',');
+		Token* const_name = lexer->eat_token();
+		if (const_name->type != TOKEN_IDENTIFIER)
+			report_syntax_error(const_name, "expected enum field constant declaration, but got '%.*s'\n", TOKEN_STR(const_name));
+		Ast* field = parse_decl_constant(const_name, enum_scope, hint_type);
+		array_push(fields, &field);
+		if (lexer->peek_token_type() != ',')
+			break;
+	}
+
+	require_and_eat('}');
+
+	Ast* node = ast_create_decl_enum(name, scope, fields, hint_type, 0, fields_count);
+	enum_scope->creator_node = node;
+	return node;
+}
+
+Ast* Parser::parse_decl_constant(Token* name, Scope* scope, Type_Instance* type) {
+	require_and_eat(':');
+	// either literal or another constant
+	Ast* value = 0;
+
+	Token* next = lexer->peek_token();
+	if (next->type == TOKEN_IDENTIFIER) {
+		value = ast_create_expr_variable(name, scope, type);
+	} else {
+		//value = parse_expr_literal();
+	}
+
+	return ast_create_decl_constant(name, scope, value, type, 0);
+}
+
+Ast* Parser::parse_expr_literal() {
+	return 0;
+}
+
+// Parse Type, doest not internalize types yet
+Type_Instance* Parser::parse_type() {
+	Token* tok = lexer->eat_token();
+	switch (tok->type) {
+		case TOKEN_SINT64:
+		case TOKEN_SINT32:
+		case TOKEN_SINT16:
+		case TOKEN_SINT8:
+		case TOKEN_UINT64:
+		case TOKEN_UINT32:
+		case TOKEN_UINT16:
+		case TOKEN_UINT8:
+		case TOKEN_REAL32:
+		case TOKEN_REAL64:
+		case TOKEN_BOOL:
+		case TOKEN_VOID:
+			return parse_type_primitive();
+
+		case '^':
+			return parse_type_pointer();
+
+		case TOKEN_IDENTIFIER:
+			return parse_type_struct(tok);
+
+		case '[':
+			return parse_type_array();
+
+		case '(':
+			return parse_type_function();
+
+		default:
+			report_syntax_error(tok, "expected type declaration, but got '%.*s'\n", TOKEN_STR(tok));
+		break;
+	}
+	return 0;
+}
+
+Type_Instance* Parser::parse_type_primitive() {
+	switch (lexer->last_token()->type) {
+		case TOKEN_SINT64:	return type_primitive_get(TYPE_PRIMITIVE_S64);
+		case TOKEN_SINT32:  return type_primitive_get(TYPE_PRIMITIVE_S32);
+		case TOKEN_SINT16:  return type_primitive_get(TYPE_PRIMITIVE_S16);
+		case TOKEN_SINT8:   return type_primitive_get(TYPE_PRIMITIVE_S8);
+		case TOKEN_UINT64:  return type_primitive_get(TYPE_PRIMITIVE_U64);
+		case TOKEN_UINT32:  return type_primitive_get(TYPE_PRIMITIVE_U32);
+		case TOKEN_UINT16:  return type_primitive_get(TYPE_PRIMITIVE_U16);
+		case TOKEN_UINT8:   return type_primitive_get(TYPE_PRIMITIVE_U8);
+		case TOKEN_REAL32:  return type_primitive_get(TYPE_PRIMITIVE_R32);
+		case TOKEN_REAL64:  return type_primitive_get(TYPE_PRIMITIVE_R64);
+		case TOKEN_BOOL:    return type_primitive_get(TYPE_PRIMITIVE_BOOL);
+		case TOKEN_VOID:    return type_primitive_get(TYPE_PRIMITIVE_VOID);
+		default: report_internal_compiler_error(__FILE__, __LINE__, "tried to parse unknown primitive type\n"); break;
+	}
+}
+Type_Instance* Parser::parse_type_pointer() {
+	Type_Instance* t = type_new_temporary();
+	t->kind  = KIND_POINTER;
+	t->flags = TYPE_INSTANCE_SIZE_RESOLVED;
+	t->type_size_bits = type_pointer_size();
+	t->pointer_to = parse_type();
+	return t;
+}
+Type_Instance* Parser::parse_type_struct(Token* name) {
+	Type_Instance* t = type_new_temporary();
+	t->kind = KIND_STRUCT;
+	t->flags = 0;
+	t->type_size_bits = 0;
+
+	t->struct_desc.name = name;
+	return t;
+}
+Type_Instance* Parser::parse_type_array() {
+	Token* dimension = lexer->eat_token();
+	Type_Instance* t = type_new_temporary();
+	t->kind = KIND_ARRAY;
+	t->flags = 0;
+	t->type_size_bits = 0;
+	t->array_desc.dimension = 0;
+
+	if (dimension->flags & TOKEN_FLAG_NUMERIC_LITERAL) {
+		// numeric literal
+		t->array_desc.dimension = lexer->literal_integer_to_u64(dimension);
+		t->array_desc.dimension_evaluated = true;
+	} else if (dimension->type == TOKEN_IDENTIFIER) {
+		// TODO: constant or enum constant
+		t->array_desc.constant_dimension_name = require_and_eat(TOKEN_IDENTIFIER);
+		t->array_desc.dimension_evaluated = false;
+	}
+	require_and_eat(']');
+	t->array_desc.array_of = parse_type();
+	return t;
+}
+Type_Instance* Parser::parse_type_function() {
+	Type_Instance* t = type_new_temporary();
+	t->kind = KIND_FUNCTION;
+	t->flags = 0;
+	t->type_size_bits = 0;
+	if (lexer->peek_token_type() == ')') {
+		t->function_desc.arguments_names = 0;
+		t->function_desc.arguments_type = 0;
+		t->function_desc.num_arguments = 0;
+		require_and_eat(')');
+	} else {
+		t->function_desc.arguments_type = array_create(Type_Instance*, 4);
+		t->function_desc.num_arguments = 0;
+		t->function_desc.arguments_names = 0;
+		for(s32 i = 0; ; ++i) {
+			if (i != 0)
+				require_and_eat(',');
+			t->function_desc.arguments_type[i] = parse_type();
+			t->function_desc.num_arguments += 1;
+			if (lexer->peek_token_type() != ',')
+				break;
+		}
+		require_and_eat(')');
+		require_and_eat(TOKEN_ARROW);
+		t->function_desc.return_type = parse_type();
+	}
+	return t;
+}
 
 #if 0
 #include <stdarg.h>

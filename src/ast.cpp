@@ -4,7 +4,7 @@
 static Memory_Arena arena_scope(65536);
 static Memory_Arena arena_ast(65536);
 
-#define ALLOC_AST(A) (Ast*)A->allocate(sizeof(Ast))
+#define ALLOC_AST() (Ast*)arena_ast.allocate(sizeof(Ast))
 #define ALLOC_SCOPE() (Scope*)arena_scope.allocate(sizeof(Scope))
 
 Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {
@@ -20,6 +20,128 @@ Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {
 	scope->symb_table = 0;
 
 	return scope;
+}
+
+Ast* ast_create_decl_proc(Token* name, Scope* scope, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count) {
+	Ast* dp = ALLOC_AST();
+
+	dp->node_type = AST_DECL_PROCEDURE;
+	dp->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	dp->scope = scope;
+	dp->flags = AST_FLAG_IS_DECLARATION;
+
+	dp->decl_procedure.name = name;
+	dp->decl_procedure.arguments = arguments;
+	dp->decl_procedure.body = body;
+	dp->decl_procedure.type_return = type_return;
+	dp->decl_procedure.flags = 0;
+	dp->decl_procedure.arguments_count = arguments_count;
+	dp->decl_procedure.extern_library_name = 0;
+	dp->decl_procedure.type_procedure = 0;
+
+	dp->decl_procedure.site.filename = name->filename;
+	dp->decl_procedure.site.line = name->line;
+	dp->decl_procedure.site.column = name->column;
+
+	return dp;
+}
+
+Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_Instance* var_type, u32 flags) {
+	Ast* dv = ALLOC_AST();
+
+	dv->node_type = AST_DECL_VARIABLE;
+	dv->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	dv->scope = scope;
+	dv->flags = AST_FLAG_IS_DECLARATION;
+
+	dv->decl_variable.name = name;
+	dv->decl_variable.flags = flags;
+	dv->decl_variable.size_bytes = 0;
+	dv->decl_variable.temporary_register = 0;
+	dv->decl_variable.variable_type = var_type;
+
+	dv->decl_variable.site.filename = name->filename;
+	dv->decl_variable.site.line = name->line;
+	dv->decl_variable.site.column = name->column;
+
+	return dv;
+}
+
+Ast* ast_create_decl_struct(Token* name, Scope* scope, Ast** fields, u32 flags, s32 field_count) {
+	Ast* ds = ALLOC_AST();
+
+	ds->node_type = AST_DECL_STRUCT;
+	ds->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	ds->scope = scope;
+	ds->flags = AST_FLAG_IS_DECLARATION;
+
+	ds->decl_struct.name = name;
+	ds->decl_struct.fields = fields;
+	ds->decl_struct.fields_count = field_count;
+	ds->decl_struct.flags = flags;
+	ds->decl_struct.size_bytes = 0;
+	ds->decl_struct.alignment = 0;
+
+	ds->decl_struct.site.filename = name->filename;
+	ds->decl_struct.site.line = name->line;
+	ds->decl_struct.site.column = name->column;
+
+	return ds;
+}
+
+Ast* ast_create_decl_enum(Token* name, Scope* scope, Ast** fields, Type_Instance* type_hint, u32 flags, s32 field_count) {
+	Ast* de = ALLOC_AST();
+
+	de->node_type = AST_DECL_ENUM;
+	de->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	de->scope = scope;
+	de->flags = AST_FLAG_IS_DECLARATION;
+
+	de->decl_enum.name = name;
+	de->decl_enum.fields = fields;
+	de->decl_enum.fields_count = field_count;
+	de->decl_enum.flags = flags;
+	de->decl_enum.type_hint = type_hint;
+
+	de->decl_enum.site.filename = name->filename;
+	de->decl_enum.site.line = name->line;
+	de->decl_enum.site.column = name->column;
+
+	return de;
+}
+
+Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instance* type, u32 flags) {
+	Ast* dc = ALLOC_AST();
+
+	dc->node_type = AST_DECL_CONSTANT;
+	dc->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	dc->scope = scope;
+	dc->flags = AST_FLAG_IS_DECLARATION;
+
+	dc->decl_constant.name = name;
+	dc->decl_constant.flags = flags;
+	dc->decl_constant.type_info = type;
+	dc->decl_constant.value = value;
+
+	dc->decl_constant.site.filename = name->filename;
+	dc->decl_constant.site.line = name->line;
+	dc->decl_constant.site.column = name->column;
+
+	return dc;
+}
+
+// Expressions
+Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type) {
+	Ast* ev = ALLOC_AST();
+
+	ev->node_type = AST_EXPRESSION_VARIABLE;
+	ev->type_return = type;
+	ev->scope = scope;
+	ev->flags = AST_FLAG_IS_EXPRESSION;
+
+	ev->expr_variable.name = name;
+
+	return ev;
 }
 
 #if 0

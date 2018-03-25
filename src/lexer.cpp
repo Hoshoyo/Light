@@ -442,7 +442,7 @@ bool Lexer::read_token(char** begin)
 				while(at[length] && is_hex_digit(at[length])) {
 					length++;
 				}
-				flags |= TOKEN_FLAG_NUMERIC_LITERAL | TOKEN_FLAG_LITERAL;
+				flags |= TOKEN_FLAG_NUMERIC_LITERAL | TOKEN_FLAG_LITERAL | TOKEN_FLAG_INTEGER_LITERAL;
 				type = TOKEN_LITERAL_HEX_INT;
 			} else if (ch_1 == '0' && ch_2 == 'b') {
 				// binary
@@ -450,7 +450,7 @@ bool Lexer::read_token(char** begin)
 				while (at[length] && (at[length] == '1' || at[length] == '0')) {
 					length++;
 				}
-				flags |= TOKEN_FLAG_NUMERIC_LITERAL | TOKEN_FLAG_LITERAL;
+				flags |= TOKEN_FLAG_NUMERIC_LITERAL | TOKEN_FLAG_LITERAL | TOKEN_FLAG_INTEGER_LITERAL;
 				type = TOKEN_LITERAL_BIN_INT;
 			} else {
 				// float and int
@@ -468,6 +468,7 @@ bool Lexer::read_token(char** begin)
 				} while (at[i] && (is_number(at[i])));
 
 				flags |= TOKEN_FLAG_NUMERIC_LITERAL | TOKEN_FLAG_LITERAL;
+				if (!floating_point) flags |= TOKEN_FLAG_INTEGER_LITERAL;
 				type = (floating_point) ? TOKEN_LITERAL_FLOAT : TOKEN_LITERAL_INT;
 			}	
 		} else {
@@ -558,6 +559,33 @@ static char* make_null_term_string(char* s)
 	memcpy(ptr, s, len);
 	ptr[len] = 0;
 	return ptr;
+}
+
+u64 Lexer::literal_integer_to_u64(Token* t) {
+	assert(t->flags & TOKEN_FLAG_INTEGER_LITERAL);
+	switch (t->type) {
+	case TOKEN_LITERAL_BIN_INT: {
+		u64 res = 0;
+		for (s32 i = t->value.length - 1; i >= 2 /* 0b */; --i) {
+			res <<= 1;
+			res |= (t->value.data[i] & 1);
+		}
+		return res;
+	}
+	case TOKEN_LITERAL_HEX_INT: {
+		u64 res = 0;
+		for (s32 i = t->value.length - 1; i >= 2 /* 0x */; --i) {
+			res <<= 4;
+			res |= (t->value.data[i] >= 'A') ? t->value.data[i] - 0x31 : t->value.data[i] - 0x30;
+		}
+		return res;
+	}
+	case TOKEN_LITERAL_INT: {
+		return str_to_u64((char*)t->value.data, t->value.length);
+	}
+	default: assert(0); break;
+	}
+	return 0;
 }
 
 char* Lexer::get_token_string(Token_Type t)

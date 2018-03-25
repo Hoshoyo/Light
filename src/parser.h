@@ -10,6 +10,39 @@ enum Parser_Error {
 	PARSER_INTERNAL_COMPILER_ERROR,
 };
 
+struct Parser {
+	Lexer* lexer;
+	Scope* global_scope;
+
+	Parser(Lexer* lexer, Scope* global_scope) : lexer(lexer), global_scope(global_scope) {}
+
+	Ast** parse_top_level();
+
+	// Type parsing
+	Type_Instance* parse_type();
+	Type_Instance* parse_type_primitive();
+	Type_Instance* parse_type_pointer();
+	Type_Instance* parse_type_struct(Token* name);
+	Type_Instance* parse_type_array();
+	Type_Instance* parse_type_function();
+
+	// Declaration parsing
+	Ast* parse_declaration(Scope* scope);
+	Ast* parse_decl_proc(Token* name, Scope* scope);
+	Ast* parse_decl_variable(Token* name, Scope* scope);
+	Ast* parse_decl_struct(Token* name, Scope* scope);
+	Ast* parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint);
+	Ast* parse_decl_constant(Token* name, Scope* scope, Type_Instance* type);
+
+	// Expression parsing
+	Ast* parse_expr_literal();
+
+	// Error report
+	void   report_syntax_error(Token* error_token, char* msg, ...);
+	Token* require_and_eat(Token_Type t);
+	Token* require_and_eat(char c);
+};
+
 #if 0
 struct Parser {
 	int parser_error;

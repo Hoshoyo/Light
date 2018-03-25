@@ -92,7 +92,8 @@ struct Ast;
 const u32 SCOPE_PROCEDURE_ARGUMENTS = FLAG(0);
 const u32 SCOPE_PROCEDURE_BODY      = FLAG(1);
 const u32 SCOPE_STRUCTURE           = FLAG(2);
-const u32 SCOPE_FILESCOPE           = FLAG(3);
+const u32 SCOPE_ENUM                = FLAG(3);
+const u32 SCOPE_FILESCOPE           = FLAG(4);
 struct Scope {
 	s32           id;
 	s32           level;
@@ -292,6 +293,15 @@ struct Ast {
 };
 
 Scope* scope_create(Ast* creator, Scope* parent, u32 flags);
+
+Ast* ast_create_decl_proc(Token* name, Scope* scope, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count);
+Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_Instance* var_type, u32 flags);
+Ast* ast_create_decl_struct(Token* name, Scope* scope, Ast** fields, u32 flags, s32 field_count);
+Ast* ast_create_decl_enum(Token* name, Scope* scope, Ast** fields, Type_Instance* type_hint, u32 flags, s32 field_count);
+Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instance* type, u32 flags);
+
+Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type);
+
 
 #if 0
 bool ast_is_expression(Ast* ast);

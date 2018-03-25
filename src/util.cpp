@@ -83,6 +83,15 @@ bool is_letter(char c) {
 	return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'));
 }
 
+u64 str_to_u64(char* text, int length)
+{
+	u64 result = 0;
+	u64 tenths = 1;
+	for (int i = length - 1; i >= 0; --i, tenths *= 10)
+		result += (text[i] - 0x30) * tenths;
+	return result;
+}
+
 s64 str_to_s64(char* text, int length)
 {
 	s64 result = 0;
@@ -235,4 +244,13 @@ u64 fnv_1_hash(const u8* s, u64 length) {
 
 s32 system_exit(s32 ret) {
 	exit(ret);
+}
+
+void report_internal_compiler_error(char* filename, int line, char* msg, ...) {
+	va_list args;
+	va_start(args, msg);
+	fprintf(stderr, "Internal compiler Error: ", __FILE__, __LINE__);
+	vfprintf(stderr, msg, args);
+	va_end(args);
+	system_exit(-1);
 }

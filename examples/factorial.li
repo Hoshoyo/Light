@@ -1,14 +1,1 @@
-ExitProcess :: (v : u32) -> u32 #foreign("kernel32");
-
-factorial :: (value : u32) -> u32 {
-	if value == 1 {
-		return 1;
-	}
-	return value * factorial(value - 1);
-}
-
-main :: () -> s32 {
-	//x := factorial(5);
-	ExitProcess(32);
-	return 0;
-}
+factorial : u32 : enum {}

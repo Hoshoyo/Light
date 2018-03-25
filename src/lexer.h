@@ -111,6 +111,7 @@ const u32 TOKEN_FLAG_UNARY_PREFIXED = FLAG(5);
 const u32 TOKEN_FLAG_UNARY_POSTFIXED = FLAG(6);
 const u32 TOKEN_FLAG_PRIMITIVE_TYPE = FLAG(7);
 const u32 TOKEN_FLAG_ASSIGNMENT_OPERATOR = FLAG(8);
+const u32 TOKEN_FLAG_INTEGER_LITERAL = FLAG(9);
 
 enum Lexer_Error {
 	LEXER_OK = 0,
@@ -162,6 +163,8 @@ struct Lexer
 
 	void lex_file();
 	bool read_token(char** at);
+
+	u64 literal_integer_to_u64(Token* t);
 
 	static void init();
 };

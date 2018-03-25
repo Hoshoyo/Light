@@ -1,5 +1,6 @@
 #pragma once
 #include "util.h"
+#include "lexer.h"
 
 enum Type_Kind {
 	KIND_UNKNOWN = 0,
@@ -32,11 +33,15 @@ struct Type_Instance;
 
 struct Type_Array {
 	Type_Instance* array_of;
-	u64            dimension;		// LITERAL or CONSTANT
+	bool dimension_evaluated;
+	union {
+		u64    dimension;
+		Token* constant_dimension_name;
+	};
 };
 
 struct Type_Struct {
-	string          name;
+	Token*          name;
 	Type_Instance** fields_types;
 	string*         fields_names;
 };
@@ -48,16 +53,24 @@ struct Type_Function {
 	s32             num_arguments;
 };
 
-const u32 TYPE_INSTANCE_RESOLVED     = FLAG(0);
-const u32 TYPE_INSTANCE_INTERNALIZED = FLAG(1);
+const u32 TYPE_INSTANCE_RESOLVED      = FLAG(0);
+const u32 TYPE_INSTANCE_INTERNALIZED  = FLAG(1);
+const u32 TYPE_INSTANCE_SIZE_RESOLVED = FLAG(2);
 struct Type_Instance {
-	Type_Kind type;
+	Type_Kind kind;
 	u32 flags;
-	s32 type_size;
+	s32 type_size_bits;
 	union {
 		Type_Primitive primitive;
 		Type_Instance* pointer_to;
 		Type_Array     array_desc;
 		Type_Struct    struct_desc;
+		Type_Function  function_desc;
 	};
+
+	static void init();
 };
+
+Type_Instance* type_primitive_get(Type_Primitive p);
+Type_Instance* type_new_temporary();
+s64            type_pointer_size();

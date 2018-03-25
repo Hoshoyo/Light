@@ -1,7 +1,87 @@
 #include "type.h"
-#include "lexer.h"
-#include "util.h"
-#include "ast.h"
+#include "memory.h"
+
+#define ALLOC_TYPE(ARENA) (Type_Instance*)(ARENA).allocate(sizeof(Type_Instance))
+
+static Memory_Arena types_internal(65536);
+static Memory_Arena types_temporary(65536);
+
+// @TEMPORARY, before type table
+static Type_Instance* type_s8;
+static Type_Instance* type_s16;
+static Type_Instance* type_s32;
+static Type_Instance* type_s64;
+static Type_Instance* type_u8;
+static Type_Instance* type_u16;
+static Type_Instance* type_u32;
+static Type_Instance* type_u64;
+static Type_Instance* type_r32;
+static Type_Instance* type_r64;
+static Type_Instance* type_bool;
+static Type_Instance* type_void;
+
+inline Type_Instance* type_setup_primitive(Type_Primitive p) {
+	Type_Instance* res = ALLOC_TYPE(types_internal);
+	res->kind = KIND_PRIMITIVE;
+	res->flags = TYPE_INSTANCE_RESOLVED | TYPE_INSTANCE_INTERNALIZED | TYPE_INSTANCE_SIZE_RESOLVED;
+	res->primitive = p;
+	switch (p) {
+	case TYPE_PRIMITIVE_S64:  res->type_size_bits = 64; break;
+	case TYPE_PRIMITIVE_S32:  res->type_size_bits = 32; break;
+	case TYPE_PRIMITIVE_S16:  res->type_size_bits = 16; break;
+	case TYPE_PRIMITIVE_S8:   res->type_size_bits = 8; break;
+	case TYPE_PRIMITIVE_U64:  res->type_size_bits = 64; break;
+	case TYPE_PRIMITIVE_U32:  res->type_size_bits = 32; break;
+	case TYPE_PRIMITIVE_U16:  res->type_size_bits = 16; break;
+	case TYPE_PRIMITIVE_U8:   res->type_size_bits = 8; break;
+	case TYPE_PRIMITIVE_R32:  res->type_size_bits = 32; break;
+	case TYPE_PRIMITIVE_R64:  res->type_size_bits = 64; break;
+	case TYPE_PRIMITIVE_BOOL: res->type_size_bits = 8; break;
+	case TYPE_PRIMITIVE_VOID: res->type_size_bits = 0; break;
+	}
+	return res;
+}
+
+void Type_Instance::init() {
+	type_s64   = type_setup_primitive(TYPE_PRIMITIVE_S64);
+	type_s32   = type_setup_primitive(TYPE_PRIMITIVE_S32);
+	type_s16   = type_setup_primitive(TYPE_PRIMITIVE_S16);
+	type_s8    = type_setup_primitive(TYPE_PRIMITIVE_S8);
+	type_u64   = type_setup_primitive(TYPE_PRIMITIVE_U64);
+	type_u32   = type_setup_primitive(TYPE_PRIMITIVE_U32);
+	type_u16   = type_setup_primitive(TYPE_PRIMITIVE_U16);
+	type_u8    = type_setup_primitive(TYPE_PRIMITIVE_U8);
+	type_r32   = type_setup_primitive(TYPE_PRIMITIVE_R32);
+	type_r64   = type_setup_primitive(TYPE_PRIMITIVE_R64);
+	type_bool  = type_setup_primitive(TYPE_PRIMITIVE_BOOL);
+	type_void  = type_setup_primitive(TYPE_PRIMITIVE_VOID);
+}
+
+Type_Instance* type_primitive_get(Type_Primitive p) {
+	switch (p) {
+		case TYPE_PRIMITIVE_S64:  return type_s64;
+		case TYPE_PRIMITIVE_S32:  return type_s32;
+		case TYPE_PRIMITIVE_S16:  return type_s16;
+		case TYPE_PRIMITIVE_S8:   return type_s8;
+		case TYPE_PRIMITIVE_U64:  return type_u64;
+		case TYPE_PRIMITIVE_U32:  return type_u32;
+		case TYPE_PRIMITIVE_U16:  return type_u16;
+		case TYPE_PRIMITIVE_U8:   return type_u8;
+		case TYPE_PRIMITIVE_R32:  return type_r32;
+		case TYPE_PRIMITIVE_R64:  return type_r64;
+		case TYPE_PRIMITIVE_BOOL: return type_bool;
+		case TYPE_PRIMITIVE_VOID: return type_void;
+		default: report_internal_compiler_error(__FILE__, __LINE__, "tried to get unknown primitive type from type table\n"); break;
+	}
+}
+
+Type_Instance* type_new_temporary() {
+	return ALLOC_TYPE(types_temporary);
+}
+
+s64 type_pointer_size() {
+	return 8;
+}
 
 #if 0
 Type_Table type_table;
