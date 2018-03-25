@@ -41,6 +41,8 @@ u32 djb2_hash(u8 *str, int size);
 u32 djb2_hash(u32 starting_hash, u8 *str, int size);
 u32 djb2_hash(u32 hash1, u32 hash2);
 u64 fnv_1_hash(const u8* s, u64 length);
+u64 fnv_1_hash_combine(u64 hash1, u64 hash2);
+u64 fnv_1_hash_from_start(u64 hash, const u8* s, u64 length);
 
 s32 system_exit(s32 ret);
 

@@ -38,6 +38,7 @@ struct Parser {
 	// Expression parsing
 	Ast* parse_expr_literal(Scope* scope);
 	Ast* parse_expression(Scope* scope, Precedence caller_prec = PRECEDENCE_0, bool quit_on_precedence = false);
+	Ast* parse_expr_proc_call(Scope* scope);
 
 	// Expression auxiliary
 	Precedence unary_op_precedence_level(Operator_Unary unop, bool prefixed);
@@ -55,6 +56,7 @@ struct Parser {
 
 	// Error report
 	void   report_syntax_error(Token* error_token, char* msg, ...);
+	void   report_error_location(Token* tok);
 	Token* require_and_eat(Token_Type t);
 	Token* require_and_eat(char c);
 };

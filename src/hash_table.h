@@ -25,8 +25,10 @@ struct Hash_Table {
 void hash_table_init(Hash_Table* table, s64 max_entries, hash_function_type* hash_function, hash_entries_equal_type* compare_entries);
 void hash_table_release(Hash_Table* table);
 
-void hash_table_add(Hash_Table* table, void* data, s64 data_size_bytes);
+s64 hash_table_add(Hash_Table* table, void* data, s64 data_size_bytes);
+s64 hash_table_add(Hash_Table* table, void* data, s64 data_size_bytes, u64 hash);
 s64  hash_table_entry_exist(Hash_Table* table, void* data);
+s64 hash_table_entry_exist(Hash_Table* table, void* data, u64 hash);
 void hash_table_remove(Hash_Table* table, void* data);
 void* hash_table_get_entry(Hash_Table* table, s64 index);
 

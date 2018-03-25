@@ -1,56 +1,52 @@
 #include "symbol_table.h"
+#include "lexer.h"
 
-Symbol_Table::Symbol_Table(s32 size) {
-	entries = (Symbol_Entry*)calloc(1, size * sizeof(Symbol_Entry));
-	max_entries = size;
-	num_entries = 0;
-	num_collisions = 0;
+void symbol_table_init(Symbol_Table* table, s64 max_entries) {
+	table->entries = (Symbol_Table::Entry*)calloc(max_entries, sizeof(Symbol_Table::Entry));
+	table->entries_capacity = max_entries;
+	table->entries_count = 0;
 }
 
-u32 Symbol_Table::hash_of_ident(Token* id) {
-	u32 hash = djb2_hash((u8*)id->value.data, id->value.length) % max_entries;
-	return hash;
+// Assumes it was already check for the existance of the entry
+u64 symbol_table_add(Symbol_Table* table, Token* t, Ast* decl_node) {
+	u64 index = (u64)t->value.data % table->entries_capacity;
+
+	while (table->entries[index].occupied) {
+		++index;
+		if (index == table->entries_capacity)
+			index = 0;
+	}
+
+	table->entries[index].identifier = t;
+	table->entries[index].decl_node = decl_node;
+	table->entries[index].occupied = true;
+	table->entries_count += 1;
+	return index;
 }
 
-s64 Symbol_Table::entry_exist(Token* ident) {
-	u32 hash = hash_of_ident(ident);
-	if (entries[hash].used) {
-		if (str_equal(ident->value, entries[hash].identifier->value)) {
-			return (s64)hash;
-		}
-		else {
-			while (entries[hash].collided) {
-				hash += 1;
-				if (hash >= max_entries) hash = 0;
-				if (str_equal(ident->value, entries[hash].identifier->value)) {
-					return (s64)hash;
-				}
-			}
-		}
+s64 symbol_table_entry_exist(Symbol_Table* table, Token* t) {
+	u64 index = (u64)t->value.data % table->entries_capacity;
+	if (table->entries[index].occupied &&
+		table->entries[index].identifier->value.data == t->value.data) {
+		return (s64)index;
 	}
 	return -1;
 }
 
-s64 Symbol_Table::insert(Scope* scope, Token* ident, Ast* node) {
-	assert(num_entries < max_entries);
-
-	u32 hash = hash_of_ident(ident);
-	bool collided = false;
-	if (entries[hash].used) {
-		int entry_size = 0;
-		while (entries[hash].used) {
-			collided = true;
-			entries[hash].collided = true;
-			hash += 1;
-			num_collisions += 1;
-			if (hash >= max_entries) hash = 0;
-		}
+void symbol_table_remove(Symbol_Table* table, Token* t) {
+	u64 index = (u64)t->value.data % table->entries_capacity;
+	if (table->entries[index].occupied &&
+		table->entries[index].identifier->value.data == t->value.data) {
+		table->entries->occupied = false;
 	}
-	entries[hash].used = true;
-	entries[hash].identifier = ident;
-	entries[hash].node = node;
-	entries[hash].scope = scope;
+}
 
-	num_entries += 1;
-	return hash;
+Token* symbol_table_get_entry(Symbol_Table* table, u64 index) {
+	return table->entries[index].identifier;
+}
+
+void symbol_table_release(Symbol_Table* table) {
+	free(table->entries);
+	table->entries_count = 0;
+	table->entries_capacity = 0;
 }

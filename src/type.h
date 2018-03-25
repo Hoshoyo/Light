@@ -67,8 +67,6 @@ struct Type_Instance {
 		Type_Struct    struct_desc;
 		Type_Function  function_desc;
 	};
-
-	static void init();
 };
 
 Type_Instance* type_primitive_get(Type_Primitive p);

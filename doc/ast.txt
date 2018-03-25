@@ -1,2 +1,17 @@
 string literal
 "Hello" == struct string{ 5, array u8{ 'H', 'e', 'l', 'l', 'o' }}
+
+func :: () -> void {
+	a := x;
+	b := myvector.x;
+}
+
+x := 2;
+myvector : vec4;
+
+vec4 :: struct {
+	x : r32;
+	y : r32;
+	z : r32;
+	w : r32;
+}

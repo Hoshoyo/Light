@@ -18,8 +18,7 @@ void hash_table_release(Hash_Table* table) {
 	table->hash_collision_count = 0;
 }
 
-void hash_table_add(Hash_Table* table, void* data, s64 data_size_bytes) {
-	u64 hash = table->hash_function(data);
+s64 hash_table_add(Hash_Table* table, void* data, s64 data_size_bytes, u64 hash) {
 	u64 index = hash % table->entries_capacity;
 
 	bool collided = false;
@@ -44,10 +43,15 @@ void hash_table_add(Hash_Table* table, void* data, s64 data_size_bytes) {
 	table->entries_count += 1;
 
 	table->entries_count++;
+	return index;
 }
 
-s64 hash_table_entry_exist(Hash_Table* table, void* data) {
+s64 hash_table_add(Hash_Table* table, void* data, s64 data_size_bytes) {
 	u64 hash = table->hash_function(data);
+	return hash_table_add(table, data, data_size_bytes, hash);
+}
+
+s64 hash_table_entry_exist(Hash_Table* table, void* data, u64 hash) {
 	u64 index = hash % table->entries_capacity;
 
 	while (table->entries[index].occupied) {
@@ -56,8 +60,11 @@ s64 hash_table_entry_exist(Hash_Table* table, void* data) {
 				return index;
 			} else {
 				//Hash_Table::Entry entry = { hash, s, length, false, true };
-				if (table->entries_equal(&table->entries[index], data)) {
+				if (table->entries && table->entries_equal(&table->entries[index], data)) {
 					return index;
+				}
+				else {
+					return -1;
 				}
 			}
 		}
@@ -67,6 +74,11 @@ s64 hash_table_entry_exist(Hash_Table* table, void* data) {
 			index = 0;
 	}
 	return -1;
+}
+
+s64 hash_table_entry_exist(Hash_Table* table, void* data) {
+	u64 hash = table->hash_function(data);
+	return hash_table_entry_exist(table, data, hash);
 }
 
 void hash_table_remove(Hash_Table* table, void* data) {

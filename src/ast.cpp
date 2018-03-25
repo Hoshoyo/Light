@@ -15,14 +15,14 @@ Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {
 	scope->level = parent->level + 1;
 	scope->creator_node = creator;
 	scope->decl_count = 0;
-	scope->flags = 0;
+	scope->flags = flags;
 	scope->parent = parent;
-	scope->symb_table = 0;
+	scope->symb_table = { 0 };
 
 	return scope;
 }
 
-Ast* ast_create_decl_proc(Token* name, Scope* scope, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count) {
+Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count) {
 	Ast* dp = ALLOC_AST();
 
 	dp->node_type = AST_DECL_PROCEDURE;
@@ -38,6 +38,7 @@ Ast* ast_create_decl_proc(Token* name, Scope* scope, Ast** arguments, Ast* body,
 	dp->decl_procedure.arguments_count = arguments_count;
 	dp->decl_procedure.extern_library_name = 0;
 	dp->decl_procedure.type_procedure = 0;
+	dp->decl_procedure.arguments_scope = arguments_scope;
 
 	dp->decl_procedure.site.filename = name->filename;
 	dp->decl_procedure.site.line = name->line;
@@ -68,7 +69,7 @@ Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_I
 	return dv;
 }
 
-Ast* ast_create_decl_struct(Token* name, Scope* scope, Ast** fields, u32 flags, s32 field_count) {
+Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Ast** fields, u32 flags, s32 field_count) {
 	Ast* ds = ALLOC_AST();
 
 	ds->node_type = AST_DECL_STRUCT;
@@ -82,6 +83,7 @@ Ast* ast_create_decl_struct(Token* name, Scope* scope, Ast** fields, u32 flags, 
 	ds->decl_struct.flags = flags;
 	ds->decl_struct.size_bytes = 0;
 	ds->decl_struct.alignment = 0;
+	ds->decl_struct.struct_scope = struct_scope;
 
 	ds->decl_struct.site.filename = name->filename;
 	ds->decl_struct.site.line = name->line;
@@ -90,7 +92,7 @@ Ast* ast_create_decl_struct(Token* name, Scope* scope, Ast** fields, u32 flags, 
 	return ds;
 }
 
-Ast* ast_create_decl_enum(Token* name, Scope* scope, Ast** fields, Type_Instance* type_hint, u32 flags, s32 field_count) {
+Ast* ast_create_decl_enum(Token* name, Scope* scope, Scope* enum_scope, Ast** fields, Type_Instance* type_hint, u32 flags, s32 field_count) {
 	Ast* de = ALLOC_AST();
 
 	de->node_type = AST_DECL_ENUM;
@@ -103,6 +105,7 @@ Ast* ast_create_decl_enum(Token* name, Scope* scope, Ast** fields, Type_Instance
 	de->decl_enum.fields_count = field_count;
 	de->decl_enum.flags = flags;
 	de->decl_enum.type_hint = type_hint;
+	de->decl_enum.enum_scope = enum_scope;
 
 	de->decl_enum.site.filename = name->filename;
 	de->decl_enum.site.line = name->line;
@@ -132,6 +135,36 @@ Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instan
 }
 
 // Expressions
+Ast* ast_create_expr_proc_call(Scope* scope, Token* name, Ast** arguments, s32 args_count) {
+	Ast* epc = ALLOC_AST();
+
+	epc->node_type = AST_EXPRESSION_PROCEDURE_CALL;
+	epc->type_return = 0;
+	epc->scope = scope;
+	epc->flags = AST_FLAG_IS_EXPRESSION;
+
+	epc->expr_proc_call.name = name;
+	epc->expr_proc_call.args = arguments;
+	epc->expr_proc_call.args_count = args_count;
+
+	return epc;
+}
+
+Ast* ast_create_expr_unary(Scope* scope, Ast* operand, Operator_Unary op, u32 flags) {
+	Ast* eu = ALLOC_AST();
+
+	eu->node_type = AST_EXPRESSION_UNARY;
+	eu->type_return = 0;
+	eu->scope = scope;
+	eu->flags = AST_FLAG_IS_EXPRESSION;
+
+	eu->expr_unary.flags = flags;
+	eu->expr_unary.op = op;
+	eu->expr_unary.operand = operand;
+
+	return eu;
+}
+
 Ast* ast_create_expr_binary(Scope* scope, Ast* left, Ast* right, Operator_Binary op) {
 	Ast* eb = ALLOC_AST();
 
@@ -270,6 +303,18 @@ Ast* ast_create_comm_return(Scope* scope, Ast* expr) {
 
 	return cr;
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 #if 1
 

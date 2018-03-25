@@ -1,18 +1,6 @@
-factorial :: (y : s32, z : s64) -> void {
-	{
-		x := 8;
-	}
-	x : s32 = 7 * 4;
-	x = 2 + 2 / 3 + 1 << 2;
-	x += 2 * 3;
-	break;
-	break 3;
-	continue;
-	if a == 1 break; else continue;
-	for a > 0 {
-		x = a + 2;
-		y -= a;
-		if x != 0
-			a %= 3;
-	}
+hello :: () -> void {
+	a := x;
 }
+
+x := &b;
+b := 3;

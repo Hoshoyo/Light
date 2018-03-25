@@ -4,9 +4,14 @@
 #include "type.h"
 #include <ho_system.h>
 
+void Parser::report_error_location(Token* tok) {
+	fprintf(stderr, "%.*s (%d:%d) ", tok->filename.length, tok->filename.data, tok->line, tok->column);
+}
+
 void Parser::report_syntax_error(Token* error_token, char* msg, ...) {
 	va_list args;
 	va_start(args, msg);
+	report_error_location(error_token);
 	fprintf(stderr, "Syntax Error: ");
 	vfprintf(stderr, msg, args);
 	va_end(args);
@@ -36,6 +41,14 @@ Ast** Parser::parse_top_level() {
 
 	while (perr == PARSER_OK && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
 		Ast* decl = parse_declaration(global_scope);
+		switch (decl->node_type) {
+			case AST_DECL_VARIABLE:
+			case AST_DECL_CONSTANT:
+				require_and_eat(';');
+				break;
+			default:
+				break;
+		}
 		if (!decl) break;
 		array_push(ast_top_level, &decl);
 	}
@@ -130,11 +143,11 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 		require_and_eat(TOKEN_ARROW);
 		return_type = parse_type();
 	}
-
+	scope->decl_count += 1;
 	// TODO(psv): forward declared procs (foreign)
 	Ast* body = parse_comm_block(scope);
 
-	Ast* node = ast_create_decl_proc(name, scope, arguments, body, return_type, 0, nargs);
+	Ast* node = ast_create_decl_proc(name, scope, arguments_scope, arguments, body, return_type, 0, nargs);
 	if(arguments_scope)
 		arguments_scope->creator_node = node;
 	return node;
@@ -148,6 +161,7 @@ Ast* Parser::parse_decl_variable(Token* name, Scope* scope, Type_Instance* type)
 		next = lexer->eat_token();
 		assignment = parse_expression(scope);
 	}
+	scope->decl_count += 1;
 	return ast_create_decl_variable(name, scope, assignment, type, 0);
 }
 
@@ -160,6 +174,7 @@ Ast* Parser::parse_decl_variable(Token* name, Scope* scope) {
 	if (next->type != '=')
 		var_type = parse_type();
 
+	scope->decl_count += 1;
 	return parse_decl_variable(name, scope, var_type);
 }
 
@@ -180,15 +195,18 @@ Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
 			report_syntax_error(field_name, "expected struct field declaration, but got '%.*s'\n", TOKEN_STR(field_name));
 		}
 		Ast* field = parse_decl_variable(field_name, scope_struct);
+		require_and_eat(';');
 		array_push(fields, &field);
 		++fields_count;
-		if (lexer->peek_token_type() != ';')
+		if (lexer->peek_token_type() == '}')
 			break;
 	}
 
 	require_and_eat('}');
 
-	Ast* node = ast_create_decl_struct(name, scope, fields, 0, fields_count);
+	scope->decl_count += 1;
+
+	Ast* node = ast_create_decl_struct(name, scope, scope_struct, fields, 0, fields_count);
 	scope_struct->creator_node = node;
 	return node;
 }
@@ -223,7 +241,9 @@ Ast* Parser::parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint_type
 
 	require_and_eat('}');
 
-	Ast* node = ast_create_decl_enum(name, scope, fields, hint_type, 0, fields_count);
+	scope->decl_count += 1;
+
+	Ast* node = ast_create_decl_enum(name, scope, enum_scope, fields, hint_type, 0, fields_count);
 	enum_scope->creator_node = node;
 	return node;
 }
@@ -240,12 +260,39 @@ Ast* Parser::parse_decl_constant(Token* name, Scope* scope, Type_Instance* type)
 		value = parse_expr_literal(scope);
 	}
 
+	scope->decl_count += 1;
+
 	return ast_create_decl_constant(name, scope, value, type, 0);
 }
 
 // -------------------------------------------
 // ------------- Expressions -----------------
 // -------------------------------------------
+
+Ast* Parser::parse_expr_proc_call(Scope* scope) {
+	Token* name = lexer->eat_token();
+	Ast**  arguments = 0;
+	s32    args_count = 0;
+	
+	require_and_eat('(');
+	if (lexer->peek_token_type() == ')') {
+		lexer->eat_token();
+	} else {
+		arguments = array_create(Ast*, 4);
+		for (;;) {
+			if (args_count != 0)
+				require_and_eat(',');
+			Ast* argument = parse_expression(scope);
+			array_push(arguments, &argument);
+			++args_count;
+			if (lexer->peek_token_type() != ',')
+				break;
+		}
+	}
+	require_and_eat(')');
+
+	return ast_create_expr_proc_call(scope, name, arguments, args_count);
+}
 
 Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on_precedence)
 {
@@ -258,7 +305,7 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 	else if (first->type == TOKEN_IDENTIFIER) {
 		if (lexer->peek_token_type(1) == '(') {
 			// proc call
-			left_op = 0;//parse_proc_call(scope);
+			left_op = parse_expr_proc_call(scope);
 		} else {
 			first = lexer->eat_token();
 			left_op = ast_create_expr_variable(first, scope, 0);
@@ -278,7 +325,7 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 			require_and_eat((Token_Type)')');
 		}
 		Ast* operand = parse_expression(scope, unop_precedence, true);
-		left_op = 0;//create_unary_expression(&arena, operand, uop, tok, UNARY_EXP_FLAG_PREFIXED, cast_type, unop_precedence, scope);
+		left_op = ast_create_expr_unary(scope, operand, uop, UNARY_EXPR_FLAG_PREFIXED);
 	}
 	else {
 		if (first->type == TOKEN_END_OF_STREAM) {
@@ -662,6 +709,7 @@ Type_Instance* Parser::parse_type_function() {
 Precedence Parser::unary_op_precedence_level(Operator_Unary unop, bool prefixed)
 {
 	if (prefixed) {
+		if (unop == OP_UNARY_PLUS)			return PRECEDENCE_7;
 		if (unop == OP_UNARY_DEREFERENCE)	return PRECEDENCE_7;	// dereference
 		if (unop == OP_UNARY_ADDRESSOF)		return PRECEDENCE_7;	// address of
 		if (unop == OP_UNARY_BITWISE_NOT)	return PRECEDENCE_7;	// not

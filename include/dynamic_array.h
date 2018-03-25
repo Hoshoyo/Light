@@ -62,6 +62,10 @@ HO_EXPORT size_t  HO_API array_get_capacity(void* array_);
 HO_EXPORT size_t  HO_API array_get_length(void* array_);
 HO_EXPORT size_t  HO_API array_get_element_size(void* array_);
 
+HO_EXPORT void    HO_API array_set_capacity(void* array_, size_t s);
+HO_EXPORT void    HO_API array_set_length(void* array_, size_t s);
+HO_EXPORT void    HO_API array_set_element_size(void* array_, size_t s);
+
 // array_pop		: removes the last element of the array if it exists and returns it.
 HO_EXPORT   void* HO_API array_pop(void* array);
 
@@ -74,6 +78,12 @@ HO_EXPORT   void  HO_API array_remove(void* array_, size_t index);
 
 // array_clear		: clears all the elements in the array but keeps the current capacity allocated.
 HO_EXPORT   void  HO_API array_clear(void* array_);
+
+HO_EXPORT size_t  HO_API array_get_header_size();
+
+// array_copy		: copies the array to the dest, the dest must be the address of the base of the array
+// and should have the array size + the size of the array_header, the pointer to the first element is returned
+HO_EXPORT void*   HO_API array_copy(void* dest, void* array_);
 
 // _array_create
 // _array_push
@@ -213,6 +223,18 @@ HO_EXPORT void HO_API _array_reserve(void** array_, size_t num_elements)
 	}
 }
 
+HO_EXPORT void* HO_API array_copy(void* dest, void* array_) {
+	dynamic_array* base = (dynamic_array*)((char*)*array_ - sizeof(dynamic_array));
+	memcpy(dest, base, sizeof(dynamic_array) + base->length * base->size_element);
+	dynamic_array* new_base = (dynamic_array*)base;
+	new_base->capacity = new_base->length;
+	return (void*)((u8*)new_base + sizeof(dynamic_array));
+}
+
+HO_EXPORT size_t  HO_API array_get_header_size() {
+	return sizeof(dynamic_array);
+}
+
 HO_EXPORT size_t HO_API array_get_capacity(void* array_)
 {
 	return ((dynamic_array*)((char*)array_ - sizeof(dynamic_array)))->capacity;
@@ -228,10 +250,30 @@ HO_EXPORT size_t HO_API array_get_element_size(void* array_)
 	return ((dynamic_array*)((char*)array_ - sizeof(dynamic_array)))->size_element;
 }
 
+HO_EXPORT void HO_API array_set_capacity(void* array_, size_t c)
+{
+	((dynamic_array*)((char*)array_ - sizeof(dynamic_array)))->capacity = c;
+}
+
+HO_EXPORT void HO_API array_set_length(void* array_, size_t l)
+{
+	((dynamic_array*)((char*)array_ - sizeof(dynamic_array)))->length = l;
+}
+
+HO_EXPORT void HO_API array_set_element_size(void* array_, size_t es)
+{
+	((dynamic_array*)((char*)array_ - sizeof(dynamic_array)))->size_element = es;
+}
+
 HO_EXPORT void HO_API array_clear(void* array_)
 {
 	((dynamic_array*)((char*)array_ - sizeof(dynamic_array)))->length = 0;
 }
+
+HO_EXPORT dynamic_array* HO_API array_get_base(void* array_) {
+	return ((dynamic_array*)((char*)array_ - sizeof(dynamic_array)));
+}
+
 #endif	// DYNAMIC_ARRAY_IMPLEMENT
 
 #undef HO_API

@@ -1,26 +1,23 @@
 #pragma once
 #include <ho_system.h>
-#include "lexer.h"
-#include "ast.h"
 #include "util.h"
 
-struct Symbol_Entry {
-	Token* identifier;
-	Ast* node;
-	Scope* scope;
-	bool used;
-	bool collided;
+struct Token;
+struct Ast;
+
+struct Symbol_Table {
+	s64 entries_count;
+	s64 entries_capacity;
+	struct Entry {
+		Token* identifier;
+		Ast*   decl_node;
+		bool   occupied;
+	}*entries;
 };
 
-struct Symbol_Table{
-	Symbol_Entry* entries;
-	int num_entries;
-	int max_entries;
-	int num_collisions;
-
-	Symbol_Table(s32 size);
-
-	u32 hash_of_ident(Token* id);
-	s64 entry_exist(Token* ident);
-	s64 insert(Scope* scope, Token* ident, Ast* node);
-};
+void   symbol_table_init(Symbol_Table* table, s64 max_entries);
+u64    symbol_table_add(Symbol_Table* table, Token* t, Ast* decl_node);
+s64    symbol_table_entry_exist(Symbol_Table* table, Token* t);
+void   symbol_table_remove(Symbol_Table* table, Token* t);
+Token* symbol_table_get_entry(Symbol_Table* table, u64 index);
+void   symbol_table_release(Symbol_Table* table);

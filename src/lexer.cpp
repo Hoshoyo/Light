@@ -278,7 +278,7 @@ bool Lexer::read_token(char** begin)
 			flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
 			length = 2;
 		} else {
-			flags |= TOKEN_FLAG_BINARY_OPERATOR;
+			flags |= TOKEN_FLAG_BINARY_OPERATOR | TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_PREFIXED;
 			type = TOKEN_SYMBOL_PLUS;
 		}
 	} break;
@@ -478,6 +478,10 @@ bool Lexer::read_token(char** begin)
 	}
 
 	token.value = string_make(at, length);
+	if (type == TOKEN_IDENTIFIER) {
+		internalize_identifier(&token.value);
+	}
+
 	token.type = type;
 	token.line = line_count;
 	token.column = current_col;
