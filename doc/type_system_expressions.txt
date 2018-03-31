@@ -1,0 +1,71 @@
+TYPE_PRIMITIVE_SINT   = s8 s16 s32 s64
+TYPE_PRIMITIVE_UINT   = u8 u16 u32 u64
+TYPE_PRIMITIVE_FLOAT = r32 r64
+TYPE_PRIMITIVE_VOID  = void
+TYPE_PRIMITIVE_BOOL  = bool
+
+COMPARISON_OP	< > <= >= == !=
+BOOL_OP			&& || COMPARISON_OP
+ARITH_OP		- + / *
+BITWISE_OP		& | ^ << >>
+ARITH_AND_BITWISE_OP ARITH_OP % BITWISE_OP
+
+	
+	- SIGNED INTEGER(Commutative):
+		s8 ARITH_AND_BITWISE_OP s8   |-> s8
+		s8 ARITH_AND_BITWISE_OP s16  |-> s16
+		s8 ARITH_AND_BITWISE_OP s32  |-> s32
+		s8 ARITH_AND_BITWISE_OP s64  |-> s64
+		
+		s16 ARITH_AND_BITWISE_OP s16 |-> s16
+		s16 ARITH_AND_BITWISE_OP s32 |-> s32
+		s16 ARITH_AND_BITWISE_OP s64 |-> s64
+		
+		s32 ARITH_AND_BITWISE_OP s32 |-> s32
+		s32 ARITH_AND_BITWISE_OP s64 |-> s64
+		
+		s64 ARITH_AND_BITWISE_OP s64 |-> s64
+
+	- UNSIGNED INTEGER(Commutative):
+		u8 ARITH_AND_BITWISE_OP u8   |-> u8
+		u8 ARITH_AND_BITWISE_OP u16  |-> u16
+		u8 ARITH_AND_BITWISE_OP u32  |-> u32
+		u8 ARITH_AND_BITWISE_OP u64  |-> u64
+
+		u16 ARITH_AND_BITWISE_OP u16 |-> u16
+		u16 ARITH_AND_BITWISE_OP u32 |-> u32
+		u16 ARITH_AND_BITWISE_OP u64 |-> u64
+
+		u32 ARITH_AND_BITWISE_OP u32 |-> u32
+		u32 ARITH_AND_BITWISE_OP u64 |-> u64
+
+		u64 ARITH_AND_BITWISE_OP u64 |-> u64
+		
+	
+	- FLOAT(Commutative):
+		r32 ARITH_OP r32  |-> r32
+		r32 ARITH_OP r64  |-> r64
+		r64 ARITH_OP r64  |-> r64
+		
+	- BOOLEAN(Commutative):
+		bool && bool |-> bool
+		bool || bool |-> bool
+		bool == bool |-> bool
+		bool != bool |-> bool
+		bool ^ bool  |-> bool
+	
+		TYPE_PRIMITIVE_SINT BOOL_OP TYPE_PRIMITIVE_SINT   |-> bool
+		TYPE_PRIMITIVE_UINT BOOL_OP TYPE_PRIMITIVE_UINT   |-> bool
+		
+		r32 COMPARISON_OP r32 |-> bool
+		r32 COMPARISON_OP r64 |-> bool
+		r64 COMPARISON_OP r64 |-> bool
+
+	- POINTER ARITHMETIC
+		^t + TYPE_PRIMITIVE_UINT |-> ^TYPE
+		^t + TYPE_PRIMITIVE_SINT |-> ^TYPE
+		^t - TYPE_PRIMITIVE_UINT |-> ^TYPE
+		^t - TYPE_PRIMITIVE_SINT |-> ^TYPE
+		^t - ^t                  |-> s64
+		^t COMPARISON_OP ^t      |-> bool
+		

@@ -81,17 +81,13 @@ HO_EXPORT   void  HO_API array_clear(void* array_);
 
 HO_EXPORT size_t  HO_API array_get_header_size();
 
-// array_copy		: copies the array to the dest, the dest must be the address of the base of the array
-// and should have the array size + the size of the array_header, the pointer to the first element is returned
-HO_EXPORT void*   HO_API array_copy(void* dest, void* array_);
-
 // _array_create
 // _array_push
 // _array_emplace
 // use the array_create macro instead
 HO_EXPORT   void  HO_API _array_allocate(void** array_, size_t num_elements);
 HO_EXPORT   void* HO_API _array_create(int num_elements, size_t size);
-HO_EXPORT   void  HO_API _array_push(void** array_, void* data);
+HO_EXPORT size_t  HO_API _array_push(void** array_, void* data);
 HO_EXPORT size_t  HO_API _array_emplace(void** array_);
 
 #if defined(DYNAMIC_ARRAY_IMPLEMENT)
@@ -142,7 +138,7 @@ HO_EXPORT void* HO_API _array_create(int num_elements, size_t size)
 	return (char*)arr + sizeof(dynamic_array);
 }
 
-HO_EXPORT void HO_API _array_push(void** array_, void* data)
+HO_EXPORT size_t HO_API _array_push(void** array_, void* data)
 {
 	dynamic_array* base = (dynamic_array*)((char*)*array_ - sizeof(dynamic_array));
 	size_t capacity = base->capacity;
@@ -162,6 +158,7 @@ HO_EXPORT void HO_API _array_push(void** array_, void* data)
 	void* dst = (char*)*array_ + length * size_element;
 	base->length++;
 	memcpy(dst, data, size_element);
+	return base->length - 1;
 }
 
 HO_EXPORT size_t HO_API _array_emplace(void** array_)
@@ -221,14 +218,6 @@ HO_EXPORT void HO_API _array_reserve(void** array_, size_t num_elements)
 		base = (dynamic_array*)new_mem;
 		*array_ = (char*)new_mem + sizeof(dynamic_array);
 	}
-}
-
-HO_EXPORT void* HO_API array_copy(void* dest, void* array_) {
-	dynamic_array* base = (dynamic_array*)((char*)*array_ - sizeof(dynamic_array));
-	memcpy(dest, base, sizeof(dynamic_array) + base->length * base->size_element);
-	dynamic_array* new_base = (dynamic_array*)base;
-	new_base->capacity = new_base->length;
-	return (void*)((u8*)new_base + sizeof(dynamic_array));
 }
 
 HO_EXPORT size_t  HO_API array_get_header_size() {

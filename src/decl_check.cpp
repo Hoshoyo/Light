@@ -2,11 +2,11 @@
 #include "symbol_table.h"
 #include "type_table.h"
 
-void report_error_location(Token* tok) {
+static void report_error_location(Token* tok) {
 	fprintf(stderr, "%.*s (%d:%d) ", tok->filename.length, tok->filename.data, tok->line, tok->column);
 }
 
-Decl_Error report_declaration_error(Decl_Error e, char* fmt, ...) {
+static Decl_Error report_semantic_error(Decl_Error e, char* fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
 	fprintf(stderr, "Semantic Error: ");
@@ -14,6 +14,62 @@ Decl_Error report_declaration_error(Decl_Error e, char* fmt, ...) {
 	va_end(args);
 	return e;
 }
+
+static Ast** infer_queue;
+inline void infer_queue_push(Ast* node) {
+	if (node->flags & AST_FLAG_QUEUED)
+		return;
+	node->flags |= AST_FLAG_QUEUED;
+	node->infer_queue_index = array_push(infer_queue, &node);
+}
+inline void infer_queue_remove(Ast* node) {
+	if (node->flags & AST_FLAG_QUEUED) {
+		if(node->infer_queue_index != -1)
+			array_remove(infer_queue, node->infer_queue_index);
+	}
+}
+
+static void print_name_of_decl(FILE* out, Ast* decl) {
+	switch (decl->node_type) {
+		case AST_DECL_CONSTANT: {
+			fprintf(out, "constant %.*s", TOKEN_STR(decl->decl_constant.name));
+		}break;
+		case AST_DECL_VARIABLE: {
+			fprintf(out, "variable %.*s", TOKEN_STR(decl->decl_variable.name));
+		}break;
+		case AST_DECL_PROCEDURE: {
+			fprintf(out, "procedure %.*s", TOKEN_STR(decl->decl_procedure.name));
+		}break;
+		case AST_DECL_ENUM: {
+			fprintf(out, "enum %.*s", TOKEN_STR(decl->decl_enum.name));
+		}break;
+		case AST_DECL_UNION: {
+			fprintf(out, "union %.*s", TOKEN_STR(decl->decl_union.name));
+		}break;
+		case AST_DECL_STRUCT: {
+			fprintf(out, "struct %.*s", TOKEN_STR(decl->decl_struct.name));
+		}break;
+	}
+}
+
+static void print_dependency(FILE* out, Ast* decl) {
+
+}
+
+static void report_dependencies_error() {
+	fprintf(stderr, "Semantic Error: dependencies unresolved:\n");
+	size_t n = array_get_length(infer_queue);
+	for (size_t i = 0; i < n; ++i) {
+		print_name_of_decl(stderr, infer_queue[i]);
+		fprintf(stderr, " is depending on ");
+		print_dependency(stderr, infer_queue[i]);
+		fprintf(stderr, "\n");
+	}
+}
+
+// ---------------------------------------------
+// -------------- Declarations -----------------
+// ---------------------------------------------
 
 Decl_Error report_redeclaration(char* node_type, Token* redeclared, Token* existing) {
 	report_error_location(redeclared);
@@ -52,9 +108,175 @@ Decl_Error decl_check_redefinition(Scope* scope, Ast* node) {
 	return error;
 }
 
+// resolves and internalizes type if it can, if the type was resolved set TYPE_FLAG_INTERNALIZE and TYPE_FLAG_RESOLVED flags
+Type_Instance* resolve_type(Scope* scope, Type_Instance* type) {
+	if (type->flags & TYPE_FLAG_RESOLVED)
+		return type;
+
+	switch (type->kind) {
+		case KIND_PRIMITIVE:
+			return type;
+		case KIND_POINTER: {
+			type->flags |= TYPE_FLAG_SIZE_RESOLVED;
+			type->type_size_bits = type_pointer_size();
+			type->pointer_to = resolve_type(scope, type->pointer_to);
+			if (type->pointer_to->flags & TYPE_FLAG_INTERNALIZED) {
+				type->flags |= TYPE_FLAG_RESOLVED;
+				return internalize_type(&type, true);
+			} else {
+				return type;
+			}
+		} break;
+		case KIND_STRUCT: {
+			Ast* struct_decl = decl_from_name(scope, type->struct_desc.name);
+			if (!struct_decl) {
+				return type;
+			}
+			Type_Instance* t = struct_decl->decl_struct.type_info;
+			if (t->flags & TYPE_FLAG_INTERNALIZED) {
+				return t;
+			} else {
+				return type;
+			}
+		} break;
+		case KIND_ARRAY: {
+			type->array_desc.array_of = resolve_type(scope, type->array_desc.array_of);
+			if (type->array_desc.array_of->flags & TYPE_FLAG_INTERNALIZED) {
+				type->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+				type->array_desc.array_of->type_size_bits = type->array_desc.dimension * type->array_desc.array_of->type_size_bits;
+				return internalize_type(&type, true);
+			} else {
+				return type;
+			}
+		} break;
+		case KIND_FUNCTION: {
+			Type_Instance* ret_type = resolve_type(scope, type->function_desc.return_type);
+			if (!(ret_type->flags & TYPE_FLAG_INTERNALIZED)) {
+				return type;
+			} else {
+				size_t nargs = type->function_desc.num_arguments;
+				for (size_t i = 0; i < nargs; ++i) {
+					Type_Instance* t = type->function_desc.arguments_type[i];
+					t = resolve_type(scope, type->function_desc.arguments_type[i]);
+					type->function_desc.arguments_type[i] = t;
+					if (!(t->flags & TYPE_FLAG_INTERNALIZED)) {
+						return type;
+					}
+				}
+				type->flags |= TYPE_FLAG_RESOLVED;
+				type = internalize_type(&type, true);
+				return type;
+			}
+		} break;
+	}
+	return 0;
+}
+
+Decl_Error resolve_types_decls(Scope* scope, Ast* node) {
+	if (!(node->flags & AST_FLAG_IS_DECLARATION)) {
+		return DECL_OK;
+	}
+
+	Decl_Error error = DECL_OK;
+
+	switch (node->node_type) {
+		case AST_DECL_VARIABLE:{
+			if (!node->decl_variable.variable_type) {
+				// infer from expr
+				assert(0);
+				return error;
+			}
+			if (node->decl_variable.variable_type->flags & TYPE_FLAG_RESOLVED) {
+				return error;
+			} else {
+				Type_Instance* type = resolve_type(scope, node->decl_variable.variable_type);
+				if (type->flags & TYPE_FLAG_RESOLVED) {
+					node->decl_variable.variable_type = type;
+					infer_queue_remove(node);
+				} else {
+					infer_queue_push(node);
+					error |= DECL_QUEUED_TYPE;
+				}
+			}
+		} break;
+		case AST_DECL_STRUCT:{
+			if (node->decl_struct.type_info->flags & TYPE_FLAG_RESOLVED) {
+				return error;
+			} else {
+				size_t nfields = node->decl_struct.fields_count;
+				Type_Instance* tinfo = node->decl_struct.type_info;
+
+				size_t type_size_bits = 0;
+				for (size_t i = 0; i < nfields; ++i) {
+					Decl_Error e = resolve_types_decls(node->decl_struct.struct_scope, node->decl_struct.fields[i]);
+					error |= e;
+					if (e & DECL_QUEUED_TYPE) {
+						continue;
+					} else {
+						tinfo->struct_desc.fields_types[i] = node->decl_struct.fields[i]->decl_variable.variable_type;
+						type_size_bits += tinfo->struct_desc.fields_types[i]->type_size_bits;
+					}
+				}
+				if (error & DECL_QUEUED_TYPE) {
+					infer_queue_push(node);
+					error |= DECL_QUEUED_TYPE;
+				} else {
+					node->decl_struct.type_info->type_size_bits = type_size_bits;
+					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED;
+					node->decl_struct.type_info->flags |= TYPE_FLAG_SIZE_RESOLVED;
+					node->decl_struct.type_info->flags |= TYPE_FLAG_LVALUE;
+					node->decl_struct.type_info = internalize_type(&tinfo, true);
+					infer_queue_remove(node);
+				}
+			}
+		} break;
+		case AST_DECL_PROCEDURE: {
+			if (!(node->decl_procedure.type_return->flags & TYPE_FLAG_RESOLVED)) {
+				node->decl_procedure.type_return = resolve_type(scope, node->decl_procedure.type_return);
+				if (!(node->decl_procedure.type_return->flags & TYPE_FLAG_INTERNALIZED)) {
+					infer_queue_push(node);
+					error |= DECL_QUEUED_TYPE;
+					return error;
+				}
+			}
+			size_t nargs = node->decl_procedure.arguments_count;
+			for (size_t i = 0; i < nargs; ++i) {
+				error |= resolve_types_decls(scope, node->decl_procedure.arguments[i]);
+			}
+			if (error & DECL_QUEUED_TYPE) {
+				infer_queue_push(node);
+				return error;
+			}
+
+			if (!(node->decl_procedure.type_procedure->flags & TYPE_FLAG_RESOLVED)) {
+				// return type must be resolved if we are here, so check only arguments				
+				for (size_t i = 0; i < nargs; ++i) {
+					Type_Instance* t = resolve_type(scope, node->decl_procedure.type_procedure->function_desc.arguments_type[i]);
+					if (t->flags & TYPE_FLAG_INTERNALIZED) {
+						node->decl_procedure.type_procedure->function_desc.arguments_type[i] = t;
+					} else {
+						infer_queue_push(node);
+						error |= DECL_QUEUED_TYPE;
+						return error;
+					}
+				}
+				node->decl_procedure.type_procedure->flags |= TYPE_FLAG_RESOLVED;
+				node->decl_procedure.type_procedure = internalize_type(&node->decl_procedure.type_procedure, true);
+				infer_queue_remove(node);
+			}
+		} break;
+		case AST_DECL_ENUM:		// TODO(psv): types in namespaces
+		case AST_DECL_CONSTANT:	// TODO(psv): only type aliases
+		default: // TODO(psv): internal error here
+			break;
+	}
+	return error;
+}
+
 Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 	Decl_Error error = DECL_OK;
 
+	infer_queue = array_create(Ast*, 16);
 	// Initialize the global scope symbol table
 	symbol_table_init(&global_scope->symb_table, (global_scope->decl_count + 4) * 8);
 
@@ -64,77 +286,40 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		assert(node->flags & AST_FLAG_IS_DECLARATION);
 
 		error |= decl_check_redefinition(global_scope, node);
+		error |= resolve_types_decls(global_scope, node);
 	}
+	
+	if (error & DECL_ERROR_FATAL) {
+		return DECL_ERROR_FATAL;
+	}
+
+	size_t n = array_get_length(infer_queue);
+	while (error) {
+		error = DECL_OK;
+		for (size_t i = 0; i < n; ++i) {
+			error |= resolve_types_decls(global_scope, infer_queue[i]);
+		}
+		size_t infer_queue_end_size = array_get_length(infer_queue);
+		if (infer_queue_end_size == n) {
+			report_dependencies_error();
+			return DECL_ERROR_FATAL;
+		}
+	}
+
 	return error;
 }
 
-
-static Ast** infer_queue;
-
-Decl_Error infer_type_decl(Ast* node) {
-	Decl_Error error = DECL_OK;
-	Scope* scope = node->scope;
-
-	switch (node->node_type) {
-		case AST_DECL_CONSTANT:{
-			if (!(node->decl_constant.type_info->flags & TYPE_INSTANCE_RESOLVED)) {
-				// try to resolve
+Ast* decl_from_name(Scope* scope, Token* name) {
+	if (scope && scope->symb_table.entries_count > 0) {
+		while (scope) {
+			s64 index = symbol_table_entry_exist(&scope->symb_table, name);
+			if (index != -1) {
+				return scope->symb_table.entries[index].decl_node;
 			}
-		} break;
-		case AST_DECL_VARIABLE: {
-			if (!(node->decl_variable.variable_type->flags & TYPE_INSTANCE_RESOLVED)) {
-				// try to resolve
-			} else {
-				// is resolved but not internalized
-				if (!(node->decl_variable.variable_type->flags & TYPE_INSTANCE_INTERNALIZED)) {
-					internalize_type(&node->decl_variable.variable_type);
-				}
-			}
-		}break;
-		case AST_DECL_PROCEDURE:
-		case AST_DECL_STRUCT:
-		case AST_DECL_ENUM:
-		case AST_DECL_UNION: assert(0);
+			scope = scope->parent;
+		}
 	}
-	return error;
-}
-
-Decl_Error infer_type_command(Ast* node) {
 	return 0;
-}
-
-Decl_Error infer_type_expression(Ast* node) {
-	return 0;
-}
-
-Decl_Error infer_type_node(Ast* node) {
-	Decl_Error error = DECL_OK;
-
-	if (node->flags & AST_FLAG_IS_DECLARATION) {
-		error |= infer_type_decl(node);
-	} else if (node->flags & AST_FLAG_IS_COMMAND) {
-
-	} else if (node->flags & AST_FLAG_IS_EXPRESSION) {
-
-	} else {
-		// internal compiler error
-		assert(0);
-	}
-	return error;
-}
-
-Decl_Error infer_types(Scope* global_scope, Ast** ast_top_level) {
-	Decl_Error error = DECL_OK;
-	size_t n = array_get_length(ast_top_level);
-
-	infer_queue = array_create(Ast*, n);
-
-	for (size_t i = 0; i < n; ++i) {
-		Ast* node = ast_top_level[i];
-		error |= infer_type_node(node);
-	}
-
-	return error;
 }
 
 

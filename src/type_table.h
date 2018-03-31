@@ -2,4 +2,11 @@
 #include "type.h"
 
 void type_table_init();
-void internalize_type(Type_Instance** type, bool copy = true);
+
+Type_Instance* type_primitive_get(Type_Primitive p);
+Type_Instance* type_new_temporary();
+s64            type_pointer_size();
+
+Type_Instance* internalize_type(Type_Instance** type, bool copy = true);
+
+void DEBUG_print_type_table();

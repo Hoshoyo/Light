@@ -266,7 +266,7 @@ s32 system_exit(s32 ret) {
 void report_internal_compiler_error(char* filename, int line, char* msg, ...) {
 	va_list args;
 	va_start(args, msg);
-	fprintf(stderr, "Internal compiler Error: ", __FILE__, __LINE__);
+	fprintf(stderr, "Internal compiler Error: ", filename, line);
 	vfprintf(stderr, msg, args);
 	va_end(args);
 	system_exit(-1);

@@ -246,22 +246,23 @@ struct Ast_Comm_Return {
 struct Ast_Expr_Binary {
 	Ast* left;
 	Ast* right;
+	Token*          token_op;
 	Operator_Binary op;
 };
+
 const u32 UNARY_EXPR_FLAG_PREFIXED  = FLAG(0);
 const u32 UNARY_EXPR_FLAG_POSTFIXED = FLAG(1);
 struct Ast_Expr_Unary {
 	Ast*           operand;
+	Token*         token_op;
 	Operator_Unary op;
-	u32            flags;
-};
-struct Ast_Expr_Cast {
-	Ast*           operand;
 	Type_Instance* type_to_cast;
+	u32            flags;
 };
 
 const u32 LITERAL_FLAG_STRING = FLAG(0);
 struct Ast_Expr_Literal {
+	Token*       token;
 	Literal_Type type;
 	u32 flags;
 	union {
@@ -289,11 +290,16 @@ struct Ast_Expr_ProcCall {
 const u32 AST_FLAG_IS_DECLARATION = FLAG(0);
 const u32 AST_FLAG_IS_COMMAND     = FLAG(1);
 const u32 AST_FLAG_IS_EXPRESSION  = FLAG(2);
+const u32 AST_FLAG_WEAK_TYPE      = FLAG(3);
+const u32 AST_FLAG_STRONG_TYPE    = FLAG(4);
+const u32 AST_FLAG_QUEUED         = FLAG(5);
+
 struct Ast {
 	Ast_NodeType   node_type;
 	Type_Instance* type_return;
 	Scope*         scope;
 	
+	s64 infer_queue_index;
 	u32 flags;
 
 	union {
@@ -313,7 +319,6 @@ struct Ast {
 
 		Ast_Expr_Binary         expr_binary;
 		Ast_Expr_Unary          expr_unary;
-		Ast_Expr_Cast           expr_cast;
 		Ast_Expr_Literal        expr_literal;
 		Ast_Expr_Variable       expr_variable;
 		Ast_Expr_ProcCall       expr_proc_call;
@@ -322,17 +327,17 @@ struct Ast {
 
 Scope* scope_create(Ast* creator, Scope* parent, u32 flags);
 
-Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count);
+Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Type_Instance* ptype, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count);
 Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_Instance* var_type, u32 flags);
-Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Ast** fields, u32 flags, s32 field_count);
+Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Type_Instance* stype, Ast** fields, u32 flags, s32 field_count);
 Ast* ast_create_decl_enum(Token* name, Scope* scope, Scope* enum_scope, Ast** fields, Type_Instance* type_hint, u32 flags, s32 field_count);
 Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instance* type, u32 flags);
 
 Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type);
-Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, u32 flags, Type_Instance* type);
-Ast* ast_create_expr_binary(Scope* scope, Ast* left, Ast* right, Operator_Binary op);
+Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Token* token, u32 flags, Type_Instance* type);
+Ast* ast_create_expr_binary(Scope* scope, Ast* left, Ast* right, Operator_Binary op, Token* token_op);
 Ast* ast_create_expr_proc_call(Scope* scope, Token* name, Ast** arguments, s32 args_count);
-Ast* ast_create_expr_unary(Scope* scope, Ast* operand, Operator_Unary op, u32 flags);
+Ast* ast_create_expr_unary(Scope* scope, Ast* operand, Operator_Unary op, Token* token_op, Type_Instance* type_to_cast, u32 flags);
 
 Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** commands, s32 command_count);
 Ast* ast_create_comm_if(Scope* scope, Ast* condition, Ast* command_true, Ast* command_false);

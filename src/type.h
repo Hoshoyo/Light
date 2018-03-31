@@ -53,13 +53,24 @@ struct Type_Function {
 	s32             num_arguments;
 };
 
-const u32 TYPE_INSTANCE_RESOLVED      = FLAG(0);
-const u32 TYPE_INSTANCE_INTERNALIZED  = FLAG(1);
-const u32 TYPE_INSTANCE_SIZE_RESOLVED = FLAG(2);
+// Auxiliary for a single node, while is not resolved can't internalize only the node itself 
+// can change this flag. Inferring nodes should not read nor write this flag.
+const u32 TYPE_FLAG_RESOLVED = FLAG(0);
+
+// Expected state of node from the outside, another node can only infer its type from this
+// instance if the type is internalized, otherwise wait and depend on it in the infer queue.
+const u32 TYPE_FLAG_INTERNALIZED = FLAG(1);
+
+// When the type size is resolved this flag is set, can only be set by the internalizer node
+const u32 TYPE_FLAG_SIZE_RESOLVED = FLAG(2);
+
+// Indicates if a type is lvalue, meaning it has an address linked to it
+const u32 TYPE_FLAG_LVALUE = FLAG(3);
 struct Type_Instance {
 	Type_Kind kind;
 	u32 flags;
-	s32 type_size_bits;
+	s32 type_queue_index;
+	s64 type_size_bits;
 	union {
 		Type_Primitive primitive;
 		Type_Instance* pointer_to;
@@ -69,6 +80,8 @@ struct Type_Instance {
 	};
 };
 
-Type_Instance* type_primitive_get(Type_Primitive p);
-Type_Instance* type_new_temporary();
-s64            type_pointer_size();
+
+bool type_primitive_int_signed(Type_Primitive p);
+bool type_primitive_int_unsigned(Type_Primitive p);
+bool type_primitive_int(Type_Primitive p);
+bool type_primitive_float(Type_Primitive p);

@@ -1,5 +1,21 @@
 #include "type.h"
 
+bool type_primitive_int_signed(Type_Primitive p) {
+	return (p >= TYPE_PRIMITIVE_S8 && p <= TYPE_PRIMITIVE_S64);
+}
+
+bool type_primitive_int_unsigned(Type_Primitive p) {
+	return (p >= TYPE_PRIMITIVE_U8 && p <= TYPE_PRIMITIVE_U64);
+}
+
+bool type_primitive_int(Type_Primitive p) {
+	return (p >= TYPE_PRIMITIVE_S8 && p <= TYPE_PRIMITIVE_U64);
+}
+
+bool type_primitive_float(Type_Primitive p) {
+	return (p == TYPE_PRIMITIVE_R32 || p == TYPE_PRIMITIVE_R64);
+}
+
 #if 0
 Type_Table type_table;
 //static s64 DEBUG_type_entries[2048] = { 0 };

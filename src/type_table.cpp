@@ -134,10 +134,11 @@ Type_Instance* type_copy_internal(Type_Instance* type) {
 	default:
 		assert(0);
 	}
+	return result;
 }
 
-void internalize_type(Type_Instance** type, bool copy) {
-	assert((*type)->flags & TYPE_INSTANCE_RESOLVED);
+Type_Instance* internalize_type(Type_Instance** type, bool copy) {
+	assert((*type)->flags & TYPE_FLAG_RESOLVED);
 	u64 hash = type_hash(*type);
 
 	s64 index = hash_table_entry_exist(&type_table, *type, hash);
@@ -152,13 +153,14 @@ void internalize_type(Type_Instance** type, bool copy) {
 		}
 	}
 	*type = (Type_Instance*)type_table.entries[index].data;
-	(*type)->flags |= TYPE_INSTANCE_INTERNALIZED;
+	(*type)->flags |= TYPE_FLAG_INTERNALIZED;
+	return *type;
 }
 
 inline Type_Instance* type_setup_primitive(Type_Primitive p) {
 	Type_Instance* res = ALLOC_TYPE(types_internal);
 	res->kind = KIND_PRIMITIVE;
-	res->flags = TYPE_INSTANCE_RESOLVED | TYPE_INSTANCE_INTERNALIZED | TYPE_INSTANCE_SIZE_RESOLVED;
+	res->flags = TYPE_FLAG_RESOLVED | TYPE_FLAG_INTERNALIZED | TYPE_FLAG_SIZE_RESOLVED;
 	res->primitive = p;
 	switch (p) {
 		case TYPE_PRIMITIVE_S64:  res->type_size_bits = 64; break;
@@ -197,9 +199,25 @@ Type_Instance* type_primitive_get(Type_Primitive p) {
 }
 
 Type_Instance* type_new_temporary() {
-	return ALLOC_TYPE(types_temporary);
+	Type_Instance* t = ALLOC_TYPE(types_temporary);
+	t->type_queue_index = -1;
+	t->flags = 0;
+	t->kind = KIND_UNKNOWN;
+	t->type_size_bits = 0;
+	return t;
 }
 
 s64 type_pointer_size() {
 	return 8;
+}
+
+#include "ast.h"
+void DEBUG_print_type_table() {
+	for (size_t i = 0; i < type_table.entries_capacity; ++i) {
+		if (type_table.entries[i].occupied) {
+			Type_Instance* t = (Type_Instance*)type_table.entries[i].data;
+			DEBUG_print_type(stdout, t, true);
+			fprintf(stdout, " -> size: %lld\n", t->type_size_bits);
+		}
+	}
 }

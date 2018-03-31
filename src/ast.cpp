@@ -1,5 +1,6 @@
 #include "ast.h"
 #include "memory.h"
+#include "type_table.h"
 
 static Memory_Arena arena_scope(65536);
 static Memory_Arena arena_ast(65536);
@@ -22,13 +23,14 @@ Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {
 	return scope;
 }
 
-Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count) {
+Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Type_Instance* ptype, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count) {
 	Ast* dp = ALLOC_AST();
 
 	dp->node_type = AST_DECL_PROCEDURE;
 	dp->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	dp->scope = scope;
 	dp->flags = AST_FLAG_IS_DECLARATION;
+	dp->infer_queue_index = -1;
 
 	dp->decl_procedure.name = name;
 	dp->decl_procedure.arguments = arguments;
@@ -37,7 +39,7 @@ Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Ast
 	dp->decl_procedure.flags = 0;
 	dp->decl_procedure.arguments_count = arguments_count;
 	dp->decl_procedure.extern_library_name = 0;
-	dp->decl_procedure.type_procedure = 0;
+	dp->decl_procedure.type_procedure = ptype;
 	dp->decl_procedure.arguments_scope = arguments_scope;
 
 	dp->decl_procedure.site.filename = name->filename;
@@ -54,6 +56,7 @@ Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_I
 	dv->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	dv->scope = scope;
 	dv->flags = AST_FLAG_IS_DECLARATION;
+	dv->infer_queue_index = -1;
 
 	dv->decl_variable.name = name;
 	dv->decl_variable.flags = flags;
@@ -69,13 +72,14 @@ Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_I
 	return dv;
 }
 
-Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Ast** fields, u32 flags, s32 field_count) {
+Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Type_Instance* stype, Ast** fields, u32 flags, s32 field_count) {
 	Ast* ds = ALLOC_AST();
 
 	ds->node_type = AST_DECL_STRUCT;
 	ds->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	ds->scope = scope;
 	ds->flags = AST_FLAG_IS_DECLARATION;
+	ds->infer_queue_index = -1;
 
 	ds->decl_struct.name = name;
 	ds->decl_struct.fields = fields;
@@ -83,6 +87,7 @@ Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Ast*
 	ds->decl_struct.flags = flags;
 	ds->decl_struct.size_bytes = 0;
 	ds->decl_struct.alignment = 0;
+	ds->decl_struct.type_info = stype;
 	ds->decl_struct.struct_scope = struct_scope;
 
 	ds->decl_struct.site.filename = name->filename;
@@ -99,6 +104,7 @@ Ast* ast_create_decl_enum(Token* name, Scope* scope, Scope* enum_scope, Ast** fi
 	de->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	de->scope = scope;
 	de->flags = AST_FLAG_IS_DECLARATION;
+	de->infer_queue_index = -1;
 
 	de->decl_enum.name = name;
 	de->decl_enum.fields = fields;
@@ -121,6 +127,7 @@ Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instan
 	dc->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	dc->scope = scope;
 	dc->flags = AST_FLAG_IS_DECLARATION;
+	dc->infer_queue_index = -1;
 
 	dc->decl_constant.name = name;
 	dc->decl_constant.flags = flags;
@@ -142,6 +149,7 @@ Ast* ast_create_expr_proc_call(Scope* scope, Token* name, Ast** arguments, s32 a
 	epc->type_return = 0;
 	epc->scope = scope;
 	epc->flags = AST_FLAG_IS_EXPRESSION;
+	epc->infer_queue_index = -1;
 
 	epc->expr_proc_call.name = name;
 	epc->expr_proc_call.args = arguments;
@@ -150,32 +158,39 @@ Ast* ast_create_expr_proc_call(Scope* scope, Token* name, Ast** arguments, s32 a
 	return epc;
 }
 
-Ast* ast_create_expr_unary(Scope* scope, Ast* operand, Operator_Unary op, u32 flags) {
+Ast* ast_create_expr_unary(Scope* scope, Ast* operand, Operator_Unary op, Token* op_token, Type_Instance* type_to_cast, u32 flags) {
 	Ast* eu = ALLOC_AST();
 
 	eu->node_type = AST_EXPRESSION_UNARY;
 	eu->type_return = 0;
 	eu->scope = scope;
 	eu->flags = AST_FLAG_IS_EXPRESSION;
+	eu->infer_queue_index = -1;
 
 	eu->expr_unary.flags = flags;
 	eu->expr_unary.op = op;
 	eu->expr_unary.operand = operand;
 
+	eu->expr_unary.token_op = op_token;
+	eu->expr_unary.type_to_cast = type_to_cast;
+
 	return eu;
 }
 
-Ast* ast_create_expr_binary(Scope* scope, Ast* left, Ast* right, Operator_Binary op) {
+Ast* ast_create_expr_binary(Scope* scope, Ast* left, Ast* right, Operator_Binary op, Token* op_token) {
 	Ast* eb = ALLOC_AST();
 
 	eb->node_type = AST_EXPRESSION_BINARY;
 	eb->type_return = 0;
 	eb->scope = scope;
 	eb->flags = AST_FLAG_IS_EXPRESSION;
+	eb->infer_queue_index = -1;
 
 	eb->expr_binary.left  = left;
 	eb->expr_binary.right = right;
 	eb->expr_binary.op    = op;
+
+	eb->expr_binary.token_op = op_token;
 
 	return eb;
 }
@@ -187,23 +202,27 @@ Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type) {
 	ev->type_return = type;
 	ev->scope = scope;
 	ev->flags = AST_FLAG_IS_EXPRESSION;
+	ev->infer_queue_index = -1;
 
 	ev->expr_variable.name = name;
 
 	return ev;
 }
 
-Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, u32 flags, Type_Instance* type) {
+Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Token* token, u32 flags, Type_Instance* type) {
 	Ast* el = ALLOC_AST();
 
 	el->node_type = AST_EXPRESSION_LITERAL;
 	el->type_return = type;
 	el->scope = scope;
 	el->flags = AST_FLAG_IS_EXPRESSION;
+	el->infer_queue_index = -1;
 
 	el->expr_literal.flags = flags;
 
 	el->expr_literal.type = literal_type;
+
+	el->expr_literal.token = token;
 
 	return el;
 }
@@ -216,6 +235,7 @@ Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** comman
 	cb->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	cb->scope = parent_scope;
 	cb->flags = AST_FLAG_IS_COMMAND;
+	cb->infer_queue_index = -1;
 
 	cb->comm_block.block_scope = block_scope;
 	cb->comm_block.commands = commands;
@@ -231,6 +251,7 @@ Ast* ast_create_comm_variable_assignment(Scope* scope, Ast* lvalue, Ast* rvalue)
 	cva->type_return = 0;
 	cva->scope = scope;
 	cva->flags = AST_FLAG_IS_COMMAND;
+	cva->infer_queue_index = -1;
 
 	cva->comm_var_assign.lvalue = lvalue;
 	cva->comm_var_assign.rvalue = rvalue;
@@ -245,6 +266,7 @@ Ast* ast_create_comm_if(Scope* scope, Ast* condition, Ast* command_true, Ast* co
 	ci->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	ci->scope = scope;
 	ci->flags = AST_FLAG_IS_COMMAND;
+	ci->infer_queue_index = -1;
 
 	ci->comm_if.condition = condition;
 	ci->comm_if.body_true = command_true;
@@ -260,6 +282,7 @@ Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body) {
 	cf->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	cf->scope = scope;
 	cf->flags = AST_FLAG_IS_COMMAND;
+	cf->infer_queue_index = -1;
 
 	cf->comm_for.condition = condition;
 	cf->comm_for.body = body;
@@ -274,6 +297,7 @@ Ast* ast_create_comm_break(Scope* scope, Ast* lit) {
 	cb->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	cb->scope = scope;
 	cb->flags = AST_FLAG_IS_COMMAND;
+	cb->infer_queue_index = -1;
 
 	cb->comm_break.level = lit;
 
@@ -287,6 +311,7 @@ Ast* ast_create_comm_continue(Scope* scope) {
 	cc->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	cc->scope = scope;
 	cc->flags = AST_FLAG_IS_COMMAND;
+	cc->infer_queue_index = -1;
 
 	return cc;
 }
@@ -298,6 +323,7 @@ Ast* ast_create_comm_return(Scope* scope, Ast* expr) {
 	cr->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	cr->scope = scope;
 	cr->flags = AST_FLAG_IS_COMMAND;
+	cr->infer_queue_index = -1;
 
 	cr->comm_return.expression = expr;
 
@@ -377,6 +403,10 @@ void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
 		}
 		fprintf(out, ") -> ");
 		DEBUG_print_type(out, type->function_desc.return_type);
+	} else if (type->kind == KIND_ARRAY) {
+		fprintf(out, "[%llu", type->array_desc.dimension);
+		fprintf(out, "]");
+		DEBUG_print_type(out, type->array_desc.array_of);
 	}
 
 }
