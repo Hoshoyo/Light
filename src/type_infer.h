@@ -4,4 +4,4 @@
 #include "ast.h"
 #include "decl_check.h"
 
-Type_Instance* infer_from_expression(Ast* expr, Decl_Error* error);
+Type_Instance* infer_from_expression(Ast* expr, Decl_Error* error, bool report_undeclared);

@@ -1,23 +1,13 @@
 /*
-var := 1.0 + 2.3;
-hey := wor;
-
-wor : [3][4]s32;
-*/
-
-vec4 :: struct {
-	x : r32;
-	y : r32;
-	z : r32;
-	value : hello;
+string :: struct {
+	data   : ^u8;
+	length : s64;
 }
+Person :: struct {
+	name : string;
+	age  : s32;
+}*/
 
-hello :: struct {
-	h : foo;
+main :: (argc : s32, argv : ^^char) -> s32 {
+	return 0;
 }
-
-foo :: struct {
-	hello := xxx;
-}
-
-xxx := 3.3;

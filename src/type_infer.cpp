@@ -9,23 +9,17 @@ Decl_Error report_type_mismatch(Type_Instance* t1, Type_Instance* t2) {
 	return DECL_ERROR_FATAL;
 }
 
-Decl_Error report_undeclared(Token* name) {
-	report_error_location(name);
-	fprintf(stderr, "Semantic Error: Undeclared variable '%.*s'\n", TOKEN_STR(name));
-	return DECL_ERROR_FATAL;
-}
-
 Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Decl_Error* error);
-Type_Instance* infer_from_expression(Ast* expr, Decl_Error* error);
-Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error);
-Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error);
-Type_Instance* infer_from_literal_expr(Ast* expr, Decl_Error* error);
-Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error);
-Type_Instance* infer_from_proc_call_expr(Ast* expr, Decl_Error* error);
+Type_Instance* infer_from_expression(Ast* expr, Decl_Error* error, bool rep_undeclared);
+Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_undeclared);
+Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_undeclared);
+Type_Instance* infer_from_literal_expr(Ast* expr, Decl_Error* error, bool rep_undeclared);
+Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error, bool rep_undeclared);
+Type_Instance* infer_from_proc_call_expr(Ast* expr, Decl_Error* error, bool rep_undeclared);
 
-Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error) {
-	Type_Instance* left  = infer_from_expression(expr->expr_binary.left, error);
-	Type_Instance* right = infer_from_expression(expr->expr_binary.right, error);
+Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_undeclared) {
+	Type_Instance* left  = infer_from_expression(expr->expr_binary.left, error, rep_undeclared);
+	Type_Instance* right = infer_from_expression(expr->expr_binary.right, error, rep_undeclared);
 
 	if (!left || !right)
 		return 0;
@@ -135,12 +129,12 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error) {
 	return 0;
 }
 
-Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error) {
+Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_undeclared) {
 	assert(expr->node_type == AST_EXPRESSION_UNARY);
 
 	switch (expr->expr_unary.op) {
 		case OP_UNARY_CAST:{
-			Type_Instance* res = resolve_type(expr->scope, expr->expr_unary.type_to_cast);
+			Type_Instance* res = resolve_type(expr->scope, expr->expr_unary.type_to_cast, rep_undeclared);
 			if (!res) {
 				*error |= report_type_error(DECL_ERROR_FATAL, "could not infer type of cast, type '");
 				DEBUG_print_type(stderr, expr->expr_unary.type_to_cast, true);
@@ -150,12 +144,12 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error) {
 		}break;
 		case OP_UNARY_ADDRESSOF: {
 			// TODO(psv): check if it can only ask for address of lvalue (strong type)
-			Type_Instance* res = infer_from_expression(expr->expr_unary.operand, error);
+			Type_Instance* res = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared);
 			if (*error & DECL_ERROR_FATAL) return 0;
 			Type_Instance* newtype = type_new_temporary();
 			newtype->kind = KIND_POINTER;
 			newtype->pointer_to = res;
-			newtype->type_size_bits = type_pointer_size();
+			newtype->type_size_bits = type_pointer_size() * 8;
 			newtype->flags = TYPE_FLAG_SIZE_RESOLVED;
 			if (res->flags & TYPE_FLAG_INTERNALIZED) {
 				newtype->flags |= TYPE_FLAG_RESOLVED;
@@ -167,7 +161,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error) {
 		}break;
 		case OP_UNARY_VECTOR_ACCESSER:
 		case OP_UNARY_DEREFERENCE: {
-			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error);
+			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared);
 			if (*error & DECL_ERROR_FATAL) return 0;
 			if (operand_type->kind != KIND_POINTER) {
 				report_error_location(expr);
@@ -180,7 +174,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error) {
 			return res;
 		}break;
 		case OP_UNARY_LOGIC_NOT: {
-			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error);
+			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared);
 			if (*error & DECL_ERROR_FATAL) return 0;
 			if (type_primitive_bool(operand_type)) {
 				assert(operand_type->flags & TYPE_FLAG_INTERNALIZED);
@@ -191,7 +185,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error) {
 			}
 		}break;
 		case OP_UNARY_BITWISE_NOT: {
-			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error);
+			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared);
 			if (*error & DECL_ERROR_FATAL) return 0;
 			if (type_primitive_int(operand_type)) {
 				return operand_type;
@@ -202,7 +196,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error) {
 		}break;
 		case OP_UNARY_PLUS:
 		case OP_UNARY_MINUS: {
-			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error);
+			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared);
 			if (*error & DECL_ERROR_FATAL) return 0;
 			if (type_primitive_int(operand_type) || type_primitive_float(operand_type)) {
 				return operand_type;
@@ -215,7 +209,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error) {
 	return 0;
 }
 
-Type_Instance* infer_from_literal_expr(Ast* expr, Decl_Error* error) {
+Type_Instance* infer_from_literal_expr(Ast* expr, Decl_Error* error, bool rep_undeclared) {
 	Type_Instance* result = type_new_temporary();
 	result->flags = 0 | TYPE_FLAG_WEAK;
 	switch (expr->expr_literal.type) {
@@ -241,12 +235,13 @@ Type_Instance* infer_from_literal_expr(Ast* expr, Decl_Error* error) {
 	return result;
 }
 
-Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error) {
+Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error, bool rep_undeclared) {
 	assert(expr->node_type == AST_EXPRESSION_VARIABLE);
 
 	Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
 	if (!decl) {
-		//*error |= report_undeclared(expr->expr_variable.name);
+		if(rep_undeclared)
+			*error |= report_undeclared(expr->expr_variable.name);
 		return 0;
 	}
 	if (decl->node_type != AST_DECL_VARIABLE && decl->node_type != AST_DECL_CONSTANT) {
@@ -258,7 +253,7 @@ Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error) {
 	return type;
 }
 
-Type_Instance* infer_from_proc_call_expr(Ast* expr, Decl_Error* error) {
+Type_Instance* infer_from_proc_call_expr(Ast* expr, Decl_Error* error, bool rep_undeclared) {
 	Ast* decl = decl_from_name(expr->scope, expr->expr_proc_call.name);
 	if (!decl) {
 		*error |= report_undeclared(expr->expr_proc_call.name);
@@ -274,17 +269,17 @@ Type_Instance* infer_from_proc_call_expr(Ast* expr, Decl_Error* error) {
 	return type;
 }
 
-Type_Instance* infer_from_expression(Ast* expr, Decl_Error* error) {
+Type_Instance* infer_from_expression(Ast* expr, Decl_Error* error, bool rep_undeclared) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 	
 	Type_Instance* type = 0;
 	
 	switch (expr->node_type) {
-		case AST_EXPRESSION_BINARY:				type = infer_from_binary_expr(expr, error); break;
-		case AST_EXPRESSION_UNARY:				type = infer_from_unary_expr(expr, error); break;
-		case AST_EXPRESSION_LITERAL:			type = infer_from_literal_expr(expr, error); break;
-		case AST_EXPRESSION_VARIABLE:			type = infer_from_variable_expr(expr, error); break;
-		case AST_EXPRESSION_PROCEDURE_CALL:		type = infer_from_proc_call_expr(expr, error); break;
+		case AST_EXPRESSION_BINARY:				type = infer_from_binary_expr(expr, error, rep_undeclared); break;
+		case AST_EXPRESSION_UNARY:				type = infer_from_unary_expr(expr, error, rep_undeclared); break;
+		case AST_EXPRESSION_LITERAL:			type = infer_from_literal_expr(expr, error, rep_undeclared); break;
+		case AST_EXPRESSION_VARIABLE:			type = infer_from_variable_expr(expr, error, rep_undeclared); break;
+		case AST_EXPRESSION_PROCEDURE_CALL:		type = infer_from_proc_call_expr(expr, error, rep_undeclared); break;
 	}
 	return type;
 }
