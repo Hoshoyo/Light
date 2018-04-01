@@ -8,6 +8,10 @@ Person :: struct {
 	age  : s32;
 }*/
 
-main :: (argc : s32, argv : ^^char) -> s32 {
-	return 0;
-}
+//main :: (argc : s32, argv : ^^char) -> s32 {
+//	return 0;
+//}
+
+i := x;
+x := y;
+y := 3.3;

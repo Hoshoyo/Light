@@ -243,6 +243,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 					return error;
 				}
 				type->flags |= TYPE_FLAG_RESOLVED;
+				infer_queue_remove(node);
 				node->decl_variable.variable_type = internalize_type(&type, true);
 				return error;
 			}
