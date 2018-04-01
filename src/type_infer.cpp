@@ -281,7 +281,75 @@ Type_Instance* infer_from_expression(Ast* expr, Decl_Error* error, bool rep_unde
 		case AST_EXPRESSION_VARIABLE:			type = infer_from_variable_expr(expr, error, rep_undeclared); break;
 		case AST_EXPRESSION_PROCEDURE_CALL:		type = infer_from_proc_call_expr(expr, error, rep_undeclared); break;
 	}
+	expr->type_return = type;
 	return type;
+}
+
+Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Decl_Error* error);
+
+Decl_Error type_update_weak(Ast* expr, Type_Instance* strong) {
+	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
+	Decl_Error error = DECL_OK;
+	
+	switch (expr->node_type) {
+		case AST_EXPRESSION_BINARY:{
+			expr->type_return = strong;
+
+			// This expression is weak, meaning it can't have pointer, struct '.' nor boolean type
+			// and so both sides of a binary expression must be of the same type
+			//														- PSV 1 Apr 2018
+			error |= type_update_weak(expr->expr_binary.left, strong);
+			error |= type_update_weak(expr->expr_binary.left, strong);
+		}break;
+		case AST_EXPRESSION_LITERAL: {
+			expr->type_return = type_transform_weak_to_strong(expr->type_return, strong, expr, &error);
+		}break;
+		case AST_EXPRESSION_UNARY: {
+			switch (expr->expr_unary.op) {
+			case OP_UNARY_BITWISE_NOT:
+			case OP_UNARY_MINUS:
+			case OP_UNARY_PLUS: {
+				error |= type_update_weak(expr->expr_unary.operand, strong);
+			}break;
+
+			case OP_UNARY_VECTOR_ACCESSER:	// cannot be weak, because a vector operand has strong type
+			case OP_UNARY_ADDRESSOF:		// cannot be weak, because a variable operand has strong type
+			case OP_UNARY_CAST:				// cannot be weak by definition
+			case OP_UNARY_DEREFERENCE:		// cannot be weak, because a variable operand has strong type
+			case OP_UNARY_LOGIC_NOT:		// cannot be weak, because bool is always strong
+				assert(0); break;
+			}
+		}break;
+
+		case AST_EXPRESSION_VARIABLE:
+		case AST_EXPRESSION_PROCEDURE_CALL: {
+			assert(0); break; // a procedure call or variable can never be weak, and so it should not get here.
+		}break;
+	}
+
+	return error;
+}
+
+Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Decl_Error* error) {
+	assert(weak->flags & TYPE_FLAG_WEAK);
+	assert(type_hash(weak) != type_hash(strong));
+
+	switch (weak->kind) {
+		case KIND_PRIMITIVE: {
+			if (type_primitive_int(weak) || type_primitive_float(weak))
+				return strong;
+			report_error_location(expr);
+			*error |= report_type_mismatch(weak, strong);
+		}break;
+		case KIND_STRUCT:
+		case KIND_ARRAY:
+		case KIND_POINTER: {
+			report_error_location(expr);
+			*error |= report_type_mismatch(weak, strong);
+		}break;
+		case KIND_FUNCTION: assert(0); break; // internal compiler error
+	}
+	return 0;
 }
 
 // Resolve the strength of a type TODO(psv): "and updated its children when necessary."
@@ -304,15 +372,19 @@ Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* 
 	if (t1->flags & TYPE_FLAG_WEAK && t2->flags & TYPE_FLAG_STRONG) {
 		if (type_hash(t1) == type_hash(t2)) return t2;
 		// transform t1 into t2 and update expr1
-		assert(0);
-		return t2;
+		Type_Instance* transformed = type_transform_weak_to_strong(t1, t2, expr1, error);
+		if (transformed)
+			*error |= type_update_weak(expr1, transformed);
+		return transformed;
 	}
 	if (t1->flags & TYPE_FLAG_STRONG && t2->flags & TYPE_FLAG_WEAK) {
 		if (type_hash(t1) == type_hash(t2)) return t1;
 
 		// transform t2 into t1 and update expr2
-		assert(0);
-		return t1;
+		Type_Instance* transformed = type_transform_weak_to_strong(t2, t1, expr2, error);
+		if(transformed)
+			*error |= type_update_weak(expr2, transformed);
+		return transformed;
 	}
 
 	if (t1->flags & TYPE_FLAG_STRONG && t2->flags & TYPE_FLAG_STRONG) {

@@ -416,6 +416,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 					var_type = infer_from_expression(node->decl_variable.assignment, &error, true);
 					if (error & DECL_ERROR_FATAL) return error;
 					assert(var_type);
+					var_type->flags |= TYPE_FLAG_RESOLVED;	// if inferred and is weak, keep it as strong
 					node->decl_variable.variable_type = internalize_type(&var_type, true);
 					node->decl_variable.assignment->type_return = var_type;
 				} else {
@@ -437,6 +438,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 					const_type = infer_from_expression(node->decl_constant.value, &error, true);
 					if (error & DECL_ERROR_FATAL) return error;
 					assert(const_type);
+					const_type->flags |= TYPE_FLAG_RESOLVED;	// if inferred and is weak, keep it as strong
 					node->decl_constant.type_info = internalize_type(&const_type, true);
 					node->decl_constant.value->type_return = const_type;
 				} else {
@@ -656,32 +658,6 @@ void DEBUG_print_scope_decls(Scope* scope) {
 		if (scope->symb_table.entries[i].occupied) {
 			DEBUG_print_indent_level(indent_level);
 			printf("%d: %.*s\n", i, TOKEN_STR(scope->symb_table.entries[i].identifier));
-			
-			/*
-			Ast* n = scope->symb_table.entries[i].decl_node;
-			switch (n->node_type) {
-				case AST_DECL_CONSTANT:
-				case AST_DECL_VARIABLE:
-					break;
-				case AST_DECL_PROCEDURE:
-					indent_level += 1;
-					DEBUG_print_scope_decls(n->decl_procedure.arguments_scope);
-					indent_level -= 1;
-					break;
-				case AST_DECL_ENUM:
-					indent_level += 1;
-					DEBUG_print_scope_decls(n->decl_enum.enum_scope);
-					indent_level -= 1;
-					break;
-				case AST_DECL_STRUCT:
-					indent_level += 1;
-					DEBUG_print_scope_decls(n->decl_struct.struct_scope);
-					indent_level -= 1;
-					break;
-				case AST_DECL_UNION: assert(0); break;
-				default:             assert(0); break;
-			}
-			*/
 		}
 	}
 }

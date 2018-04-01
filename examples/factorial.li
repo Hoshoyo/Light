@@ -10,9 +10,9 @@ Person :: struct {
 
 main :: (argc : s32, argv : ^^u8) -> s32 {
 	i : s16 = 0;
-	ptr := &i;
+	ptr : s16 = 1;
 	for true {
-		i -= 1;
+		i -= 1 + ptr;
 		if i < 0 break;
 	}
 	return 0;
