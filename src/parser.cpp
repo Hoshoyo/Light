@@ -320,19 +320,6 @@ Ast* Parser::parse_expr_proc_call(Scope* scope) {
 	return ast_create_expr_proc_call(scope, name, arguments, args_count);
 }
 
-/*
-PRECEDENCE_0 = 0,	//
-PRECEDENCE_1 = 1,	//	 || &&
-PRECEDENCE_2 = 2,	//	 == >= <= != > <
-PRECEDENCE_3 = 3,	//	 ^ | & >> <<
-PRECEDENCE_4 = 4,	//	 + -
-PRECEDENCE_5 = 5,	//	 * / %
-PRECEDENCE_6 = 6,	//	 ~ !
-PRECEDENCE_7 = 7,	//	 *(dereference)	cast &(addressof)
-PRECEDENCE_8 = 8,	//	 .
-PRECEDENCE_MAX,
-*/
-
 Ast* Parser::parse_expression_precedence10(Scope* scope) {
 	Token* t = lexer->peek_token();
 	if (t->flags & TOKEN_FLAG_LITERAL) {
@@ -359,7 +346,7 @@ Ast* Parser::parse_expression_precedence9(Scope* scope) {
 	{
 		Token* op = lexer->eat_token();
 		Ast* right = parse_expression_precedence9(scope);
-		return ast_create_expr_binary(scope, right, expr, OP_BINARY_DOT, op);
+		return ast_create_expr_binary(scope, expr, right, OP_BINARY_DOT, op);
 	}
 	return expr;
 }
@@ -381,11 +368,7 @@ Ast* Parser::parse_expression_precedence8(Scope* scope) {
 
 Ast* Parser::parse_expression_precedence7(Scope* scope) {
 	Token_Type next = lexer->peek_token_type();
-	if (next == '*') {
-		Token* op = lexer->eat_token();
-		Ast* operand = parse_expression_precedence7(scope);
-		return ast_create_expr_unary(scope, operand, token_to_unary_op(op), op, 0, UNARY_EXPR_FLAG_PREFIXED);
-	} else if (next == TOKEN_KEYWORD_CAST) {
+	if (next == TOKEN_KEYWORD_CAST) {
 		// parse cast
 		Token* cast = lexer->eat_token();
 		require_and_eat('(');
@@ -399,7 +382,7 @@ Ast* Parser::parse_expression_precedence7(Scope* scope) {
 
 Ast* Parser::parse_expression_precedence6(Scope* scope) {
 	Token_Type next = lexer->peek_token_type();
-	if (next == '~' || next == '!') {
+	if (next == '~' || next == '!' || next == '&' || next == '*') {
 		Token* op = lexer->eat_token();
 		Ast* operand = parse_expression_precedence6(scope);
 		return ast_create_expr_unary(scope, operand, token_to_unary_op(op), op, 0, UNARY_EXPR_FLAG_PREFIXED);
@@ -470,85 +453,6 @@ Ast* Parser::parse_expression_precedence1(Scope* scope) {
 Ast* Parser::parse_expression(Scope* scope) {
 	return parse_expression_precedence1(scope);
 }
-
-
-
-/*
-Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on_precedence)
-{
-	Ast* left_op = 0;
-	Token* first = lexer->peek_token();
-
-	if (first->flags & TOKEN_FLAG_LITERAL) {
-		left_op = parse_expr_literal(scope);
-	}
-	else if (first->type == TOKEN_IDENTIFIER) {
-		if (lexer->peek_token_type(1) == '(') {
-			// proc call
-			left_op = parse_expr_proc_call(scope);
-		} else {
-			first = lexer->eat_token();
-			left_op = ast_create_expr_variable(first, scope, 0);
-		}
-	} else if (first->type == (Token_Type)'(') {
-		lexer->eat_token();
-		left_op = parse_expression(scope, PRECEDENCE_0);
-		require_and_eat((Token_Type)')');
-	} else if (first->flags & TOKEN_FLAG_UNARY_OPERATOR) {
-		Token* tok = lexer->eat_token();
-		Operator_Unary uop = token_to_unary_op(tok);
-		Precedence unop_precedence = unary_op_precedence_level(uop, true);
-		Type_Instance* cast_type = 0;
-		if (uop == OP_UNARY_CAST) {
-			require_and_eat((Token_Type)'(');
-			cast_type = parse_type();
-			require_and_eat((Token_Type)')');
-		}
-		Ast* operand = parse_expression(scope, unop_precedence, true);
-		left_op = ast_create_expr_unary(scope, operand, uop, tok, cast_type, UNARY_EXPR_FLAG_PREFIXED);
-	}
-	else {
-		if (first->type == TOKEN_END_OF_STREAM) {
-			report_syntax_error(0, "unexpected end of stream at expression.\n", TOKEN_STR(first));
-		}
-		report_syntax_error(0, "expected expression but got '%.*s'.\n", TOKEN_STR(first));
-	}
-
-	Token* optor = lexer->eat_token();
-	if (optor->flags & TOKEN_FLAG_BINARY_OPERATOR) {
-		if (optor->type == '.' && lexer->peek_token_type() != TOKEN_IDENTIFIER) {
-			Token* t = lexer->peek_token();
-			report_syntax_error(0, "expected member variable, got '%.*s'.\n", TOKEN_STR(t));
-		}
-		Precedence bop_precedence = binary_op_precedence_level(token_to_binary_op(optor));
-		if (bop_precedence < caller_prec && quit_on_precedence) {
-			lexer->rewind();
-			return left_op;
-		}
-		Ast* right_op = parse_expression(scope, bop_precedence, quit_on_precedence);
-		Ast* binop = ast_create_expr_binary(scope, left_op, right_op, token_to_binary_op(optor), optor);
-		if (right_op->node_type == AST_EXPRESSION_BINARY) {
-			if (optor->type == '.') {
-				if (binary_op_precedence_level(token_to_binary_op(optor)) > binary_op_precedence_level(right_op->expr_binary.op)) {
-					binop->expr_binary.right = right_op->expr_binary.left;
-					right_op->expr_binary.left = binop;
-					return right_op;
-				}
-			} else {
-				if (binary_op_precedence_level(token_to_binary_op(optor)) >= binary_op_precedence_level(right_op->expr_binary.op)) {
-					binop->expr_binary.right = right_op->expr_binary.left;
-					right_op->expr_binary.left = binop;
-					return right_op;
-				}
-			}
-		}
-		return binop;
-	} else {
-		lexer->rewind();
-		return left_op;
-	}
-}
-*/
 
 Ast* Parser::parse_expr_literal(Scope* scope) {
 	Token* first = lexer->eat_token();

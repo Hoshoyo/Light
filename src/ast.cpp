@@ -499,6 +499,7 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 		fprintf(out, ")");
 	} break;
 	case AST_EXPRESSION_UNARY: {
+		fprintf(out, "(");
 		if (node->expr_unary.flags & UNARY_EXPR_FLAG_PREFIXED) {
 			switch (node->expr_unary.op) {
 			case OP_UNARY_CAST: {
@@ -517,6 +518,7 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 			fprintf(out, "<Unsupported Unary>");
 		}
 		DEBUG_print_expression(out, node->expr_unary.operand);
+		fprintf(out, ")");
 	}break;
 	case AST_EXPRESSION_VARIABLE: {
 		fprintf(out, "%.*s", TOKEN_STR(node->expr_variable.name));

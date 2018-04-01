@@ -90,7 +90,7 @@ enum Operator_Binary {
 };
 
 enum Precedence {
-	PRECEDENCE_0 = 0,	//	 assignments
+	PRECEDENCE_0 = 0,	//
 	PRECEDENCE_1 = 1,	//	 || &&
 	PRECEDENCE_2 = 2,	//	 == >= <= != > <
 	PRECEDENCE_3 = 3,	//	 ^ | & >> <<
@@ -98,8 +98,9 @@ enum Precedence {
 	PRECEDENCE_5 = 5,	//	 * / %
 	PRECEDENCE_6 = 6,	//	 &(addressof) ~ 
 	PRECEDENCE_7 = 7,	//	 *(dereference)	cast !
-	PRECEDENCE_8 = 8,	//	 .
-	PRECEDENCE_MAX,
+	PRECEDENCE_8 = 8,	//   []
+	PRECEDENCE_9 = 9,	//	 .
+	PRECEDENCE_MAX,		//   lit, variables, proc_calls
 };
 
 struct Symbol_Table;

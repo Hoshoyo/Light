@@ -403,6 +403,7 @@ static bool scope_inside_loop(Scope* scope, u64 level) {
 Decl_Error decl_check_inner(Scope* global_scope, Ast** ast_top_level);
 Decl_Error decl_check_inner_decl(Ast* node);
 Decl_Error decl_check_inner_expr(Ast* node);
+Decl_Error decl_check_inner_expr_lassign(Ast* node);
 Decl_Error decl_check_inner_command(Ast* node);
 
 Decl_Error decl_insert_into_symbol_table(Ast* node, Token* name, char* descriptor) {
@@ -426,8 +427,10 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 	switch (node->node_type) {
 		case AST_DECL_VARIABLE:{
 			Type_Instance* var_type = 0;
-			if(node->decl_variable.variable_type)
+			if (node->decl_variable.variable_type) {
 				var_type = resolve_type(node->scope, node->decl_variable.variable_type, true);
+				node->decl_variable.variable_type = var_type;
+			}
 			if (!var_type) {
 				if (node->decl_variable.assignment) {
 					// infer from expression
@@ -448,8 +451,10 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 		case AST_DECL_CONSTANT: {
 			// TODO(psv): could be type alias, not implemented yet
 			Type_Instance* const_type = 0;
-			if (node->decl_constant.type_info)
+			if (node->decl_constant.type_info) {
 				const_type = resolve_type(node->scope, node->decl_constant.type_info, true);
+				node->decl_constant.type_info = const_type;
+			}
 			if (!const_type) {
 				if (node->decl_constant.value) {
 					// infer from expression
@@ -544,12 +549,20 @@ Decl_Error decl_check_inner_command(Ast* node) {
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
 			// TODO(psv): lvalue not distinguished
 			if(node->comm_var_assign.lvalue)
-				error |= decl_check_inner_expr(node->comm_var_assign.lvalue);
+				error |= decl_check_inner_expr_lassign(node->comm_var_assign.lvalue);
 			error |= decl_check_inner_expr(node->comm_var_assign.rvalue);
 		}break;
 		default: assert(0); break;	// TODO(psv): report internal compiler error
 	}
 
+	return error;
+}
+
+Decl_Error decl_check_inner_expr_lassign(Ast* node) {
+	assert(node->flags & AST_FLAG_IS_EXPRESSION);
+	Decl_Error error = DECL_OK;
+	Type_Instance* t = infer_from_expression(node, &error, true, true);
+	node->type_return = t;
 	return error;
 }
 

@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
 
 	Parser parser(&lexer, &global_scope);
 	Ast** ast_top_level = parser.parse_top_level();
-	DEBUG_print_ast(stdout, ast_top_level);
+
 	Decl_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
 	if (decl_err & (~DECL_ERROR_WARNING)) {
 		return -1;
@@ -33,7 +33,6 @@ int main(int argc, char** argv) {
 	DEBUG_print_ast(stdout, ast_top_level);
 	//DEBUG_print_scope_decls(&global_scope);
 	DEBUG_print_type_table();
-
 
 	return 0;
 }

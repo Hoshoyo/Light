@@ -1,3 +1,14 @@
+PRECEDENCE_1 = 		//	 || &&
+PRECEDENCE_2 = 		//	 == >= <= != > <
+PRECEDENCE_3 = 		//	 ^ | & >> <<
+PRECEDENCE_4 = 		//	 + -
+PRECEDENCE_5 = 		//	 * / %
+PRECEDENCE_6 = 		//	 &(addressof) ~ 
+PRECEDENCE_7 = 		//	 *(dereference)	cast !
+PRECEDENCE_8 = 		//   []
+PRECEDENCE_9 = 		//	 .
+PRECEDENCE_MAX,		//   lit, variables, proc_calls
+
 EXPRESSION :=
 	'(' EXPRESSION ')'
 |	EXPRESSION_BINARY
