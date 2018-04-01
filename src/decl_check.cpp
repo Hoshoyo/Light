@@ -2,6 +2,7 @@
 #include "symbol_table.h"
 #include "type_table.h"
 #include "type_infer.h"
+#include "lexer.h"
 
 void report_error_location(Token* tok) {
 	fprintf(stderr, "%.*s (%d:%d) ", tok->filename.length, tok->filename.data, tok->line, tok->column);
@@ -22,11 +23,11 @@ void report_error_location(Ast* node) {
 	case AST_EXPRESSION_VARIABLE:		report_error_location(node->expr_variable.name); break;
 
 	case AST_COMMAND_BLOCK:					break;// TODO(psv): put token for block start in the ast
-	case AST_COMMAND_BREAK:					break;//report_error_location(node->comm_break); break;
-	case AST_COMMAND_CONTINUE:				break;//report_error_location(node->comm_cont); break;
+	case AST_COMMAND_BREAK:					report_error_location(node->comm_break.token_break); break;
+	case AST_COMMAND_CONTINUE:				report_error_location(node->comm_continue.token_continue); break;
 	case AST_COMMAND_FOR:					break;//report_error_location(node->comm_); break;
 	case AST_COMMAND_IF:					break;//report_error_location(node->comm_); break;
-	case AST_COMMAND_RETURN:				break;//report_error_location(node->comm_); break;
+	case AST_COMMAND_RETURN:				report_error_location(node->comm_return.token_return); break;
 	case AST_COMMAND_VARIABLE_ASSIGNMENT:	break;//report_error_location(node->comm_); break;
 	}
 }
@@ -348,6 +349,215 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 	return error;
 }
 
+static bool scope_inside_proc(Scope* scope) {
+	while (scope) {
+		if (scope->flags & SCOPE_PROCEDURE_BODY) return true;
+		if (scope->flags & SCOPE_ENUM) return false;
+		if (scope->flags & SCOPE_STRUCTURE) return false;
+		scope = scope->parent;
+	}
+	return false;
+}
+
+static bool scope_inside_loop(Scope* scope) {
+	while (scope) {
+		if (scope->flags & SCOPE_LOOP) return true;
+		if (scope->flags & SCOPE_PROCEDURE_BODY) return false;
+		if (scope->flags & SCOPE_ENUM) return false;
+		if (scope->flags & SCOPE_STRUCTURE) return false;
+		scope = scope->parent;
+	}
+	return false;
+}
+
+static bool scope_inside_loop(Scope* scope, u64 level) {
+	while (scope) {
+		if (scope->flags & SCOPE_LOOP) --level;
+		if (level <= 0) return true;
+		if (scope->flags & SCOPE_PROCEDURE_BODY) return false;
+		if (scope->flags & SCOPE_ENUM) return false;
+		if (scope->flags & SCOPE_STRUCTURE) return false;
+		scope = scope->parent;
+	}
+	return false;
+}
+
+Decl_Error decl_check_inner(Scope* global_scope, Ast** ast_top_level);
+Decl_Error decl_check_inner_decl(Ast* node);
+Decl_Error decl_check_inner_expr(Ast* node);
+Decl_Error decl_check_inner_command(Ast* node);
+
+Decl_Error decl_insert_into_symbol_table(Ast* node, Token* name, char* descriptor) {
+	Decl_Error error = DECL_OK;
+	if (node->scope->symb_table.entries_capacity == 0) {
+		symbol_table_init(&node->scope->symb_table, (node->scope->decl_count + 4) * 8);
+	}
+	s64 index = symbol_table_entry_exist(&node->scope->symb_table, name);
+	if (index != -1) {
+		error |= report_redeclaration(descriptor, name, symbol_table_get_entry(&node->scope->symb_table, index));
+	} else {
+		symbol_table_add(&node->scope->symb_table, name, node);
+	}
+	return error;
+}
+
+Decl_Error decl_check_inner_decl(Ast* node) {
+	assert(node->flags & AST_FLAG_IS_DECLARATION);
+	Decl_Error error = DECL_OK;
+
+	switch (node->node_type) {
+		case AST_DECL_VARIABLE:{
+			Type_Instance* var_type = 0;
+			if(node->decl_variable.variable_type)
+				var_type = resolve_type(node->scope, node->decl_variable.variable_type, true);
+			if (!var_type) {
+				if (node->decl_variable.assignment) {
+					// infer from expression
+					var_type = infer_from_expression(node->decl_variable.assignment, &error, true);
+					if (error & DECL_ERROR_FATAL) return error;
+					assert(var_type);
+					node->decl_variable.variable_type = internalize_type(&var_type, true);
+					node->decl_variable.assignment->type_return = var_type;
+				} else {
+					report_error_location(node);
+					error |= report_type_error(DECL_ERROR_FATAL, "variable declaration cannot be type inferred without an assignment expression\n");
+				}
+			}
+			if (node->scope->level > 0)
+				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
+		}break;
+		case AST_DECL_CONSTANT: {
+			// TODO(psv): could be type alias, not implemented yet
+			Type_Instance* const_type = 0;
+			if (node->decl_constant.type_info)
+				const_type = resolve_type(node->scope, node->decl_constant.type_info, true);
+			if (!const_type) {
+				if (node->decl_constant.value) {
+					// infer from expression
+					const_type = infer_from_expression(node->decl_constant.value, &error, true);
+					if (error & DECL_ERROR_FATAL) return error;
+					assert(const_type);
+					node->decl_constant.type_info = internalize_type(&const_type, true);
+					node->decl_constant.value->type_return = const_type;
+				} else {
+					report_error_location(node);
+					error |= report_type_error(DECL_ERROR_FATAL, "constant declaration cannot be type inferred without an assignment expression\n");
+				}
+			}
+			if (node->scope->level > 0)
+				error |= decl_insert_into_symbol_table(node, node->decl_constant.name, "constant");
+		}break;
+		case AST_DECL_PROCEDURE: {
+			error |= decl_check_inner_command(node->decl_procedure.body);
+			if (node->scope->level > 0)
+				error |= decl_insert_into_symbol_table(node, node->decl_procedure.name, "procedure");
+		}break;
+		case AST_DECL_STRUCT: assert(0); break; // should not have struct inner decl yet
+		case AST_DECL_ENUM: assert(0); break; // should not have enum inner decl yet
+		case AST_DECL_UNION: assert(0); break; // should not have union inner decl yet
+		default: assert(0); break; // TODO(psv): internal error
+	}
+
+	return error;
+}
+
+Decl_Error decl_check_inner_command(Ast* node) {
+	assert(node->flags & AST_FLAG_IS_COMMAND);
+	Decl_Error error = DECL_OK;
+
+	switch (node->node_type) {
+		case AST_COMMAND_BLOCK:		error |= decl_check_inner(node->comm_block.block_scope, node->comm_block.commands); break;
+		case AST_COMMAND_BREAK: {
+			if (!node->comm_break.level) {
+				node->comm_break.level = ast_create_expr_literal(node->scope, LITERAL_HEX_INT, 0, 0, type_primitive_get(TYPE_PRIMITIVE_U64));
+				node->comm_break.level->expr_literal.value_u64 = 1;
+			}
+			if (node->comm_break.level->node_type == AST_EXPRESSION_LITERAL) {
+				error |= decl_check_inner_expr(node->comm_break.level);
+				if (error & DECL_ERROR_FATAL) return error;
+				if (type_primitive_int(node->comm_break.level->type_return)) {
+					// check if it is inside a loop
+					u64 loop_level = node->comm_break.level->expr_literal.value_u64;
+					if (scope_inside_loop(node->scope, loop_level)) {
+						return error;
+					} else {
+						report_error_location(node);
+						error |= report_semantic_error(DECL_ERROR_FATAL, "break command is not inside an iterative loop nested '%llu' deep\n", loop_level);
+					}
+				} else {
+					report_error_location(node);
+					error |= report_type_error(DECL_ERROR_FATAL, "break command must have an integer as a target\n");
+				}
+			} else {
+				report_error_location(node);
+				error |= report_type_error(DECL_ERROR_FATAL, "break command must have an integer literal as a target\n");
+			}
+		} break;
+		case AST_COMMAND_CONTINUE: {
+			if (scope_inside_loop(node->scope)) {
+				return error;
+			} else {
+				report_error_location(node);
+				error |= report_semantic_error(DECL_ERROR_FATAL, "continue command is not inside an iterative loop\n");
+			}
+		}break;
+		case AST_COMMAND_RETURN: {
+			if (scope_inside_proc(node->scope)) {
+				return error;
+			} else {
+				report_error_location(node);
+				error |= report_semantic_error(DECL_ERROR_FATAL, "return command is not inside a procedure\n");
+			}
+			error |= decl_check_inner_expr(node->comm_return.expression);
+		}break;
+		case AST_COMMAND_FOR: {
+			assert(node->comm_for.body->scope->flags & SCOPE_LOOP);
+			error |= decl_check_inner_expr(node->comm_for.condition);
+			error |= decl_check_inner_command(node->comm_for.body);
+		}break;
+		case AST_COMMAND_IF: {
+			error |= decl_check_inner_expr(node->comm_if.condition);
+			error |= decl_check_inner_command(node->comm_if.body_true);
+			if (node->comm_if.body_false)
+				error |= decl_check_inner_command(node->comm_if.body_false);
+		}break;
+		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
+			// TODO(psv): lvalue not distinguished
+			error |= decl_check_inner_expr(node->comm_var_assign.lvalue);
+			error |= decl_check_inner_expr(node->comm_var_assign.rvalue);
+		}break;
+		default: assert(0); break;	// TODO(psv): report internal compiler error
+	}
+
+	return error;
+}
+
+Decl_Error decl_check_inner_expr(Ast* node) {
+	assert(node->flags & AST_FLAG_IS_EXPRESSION);
+	Decl_Error error = DECL_OK;
+	Type_Instance* t = infer_from_expression(node, &error, true);
+	node->type_return = t;
+	return error;
+}
+
+Decl_Error decl_check_inner(Scope* global_scope, Ast** ast_top_level) {
+	Decl_Error error = DECL_OK;
+	size_t ndecls = array_get_length(ast_top_level);
+
+	for (size_t i = 0; i < ndecls; ++i) {
+		Ast* node = ast_top_level[i];
+		if (node->flags & AST_FLAG_IS_DECLARATION) {
+			error |= decl_check_inner_decl(node);
+		} else if(node->flags & AST_FLAG_IS_COMMAND) {
+			error |= decl_check_inner_command(node);
+		} else if (node->flags & AST_FLAG_IS_EXPRESSION) {
+			error |= decl_check_inner_expr(node);
+		}
+	}
+
+	return error;
+}
+
 Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 	Decl_Error error = DECL_OK;
 
@@ -364,11 +574,12 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		if (error & DECL_ERROR_FATAL) continue;
 		error |= resolve_types_decls(global_scope, node, false);
 	}
-	
+
 	if (error & DECL_ERROR_FATAL) {
 		return DECL_ERROR_FATAL;
 	}
 
+	// infer queue of top level
 	size_t n = array_get_length(infer_queue);
 	while (error) {
 		error = DECL_OK;
@@ -383,6 +594,12 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 			return DECL_ERROR_FATAL;
 		}
 	}
+
+	if (error & DECL_ERROR_FATAL) {
+		return DECL_ERROR_FATAL;
+	}
+
+	error |= decl_check_inner(global_scope, ast_top_level);
 
 	return error;
 }
@@ -438,10 +655,10 @@ void DEBUG_print_scope_decls(Scope* scope) {
 	for (s32 i = 0; i < scope->symb_table.entries_capacity; ++i) {
 		if (scope->symb_table.entries[i].occupied) {
 			DEBUG_print_indent_level(indent_level);
-			printf("%.*s\n", TOKEN_STR(scope->symb_table.entries[i].identifier));
+			printf("%d: %.*s\n", i, TOKEN_STR(scope->symb_table.entries[i].identifier));
 			
+			/*
 			Ast* n = scope->symb_table.entries[i].decl_node;
-
 			switch (n->node_type) {
 				case AST_DECL_CONSTANT:
 				case AST_DECL_VARIABLE:
@@ -464,6 +681,7 @@ void DEBUG_print_scope_decls(Scope* scope) {
 				case AST_DECL_UNION: assert(0); break;
 				default:             assert(0); break;
 			}
+			*/
 		}
 	}
 }

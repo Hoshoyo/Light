@@ -232,10 +232,15 @@ struct Ast_Comm_For {
 	Ast* body;			// COMMAND
 };
 struct Ast_Comm_Break {
-	Ast* level;			// INT LITERAL [0, MAX_INT]
+	Ast*   level;			// INT LITERAL [0, MAX_INT]
+	Token* token_break;
+};
+struct Ast_Comm_Continue {
+	Token* token_continue;
 };
 struct Ast_Comm_Return {
-	Ast* expression;	// EXPRESSION
+	Ast*   expression;	// EXPRESSION
+	Token* token_return;
 };
 
 // ----------------------------------------
@@ -312,6 +317,7 @@ struct Ast {
 		Ast_Comm_If             comm_if;
 		Ast_Comm_For            comm_for;
 		Ast_Comm_Break          comm_break;
+		Ast_Comm_Continue		comm_continue;
 		Ast_Comm_Return         comm_return;
 
 		Ast_Expr_Binary         expr_binary;
@@ -339,9 +345,9 @@ Ast* ast_create_expr_unary(Scope* scope, Ast* operand, Operator_Unary op, Token*
 Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** commands, s32 command_count);
 Ast* ast_create_comm_if(Scope* scope, Ast* condition, Ast* command_true, Ast* command_false);
 Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body);
-Ast* ast_create_comm_break(Scope* scope, Ast* lit);
-Ast* ast_create_comm_continue(Scope* scope);
-Ast* ast_create_comm_return(Scope* scope, Ast* expr);
+Ast* ast_create_comm_break(Scope* scope, Ast* lit, Token* token);
+Ast* ast_create_comm_continue(Scope* scope, Token* token);
+Ast* ast_create_comm_return(Scope* scope, Ast* expr, Token* token);
 Ast* ast_create_comm_variable_assignment(Scope* scope, Ast* lvalue, Ast* rvalue);
 
 void DEBUG_print_node(FILE* out, Ast* node);

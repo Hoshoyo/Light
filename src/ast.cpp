@@ -219,9 +219,7 @@ Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Token* tok
 	el->infer_queue_index = -1;
 
 	el->expr_literal.flags = flags;
-
 	el->expr_literal.type = literal_type;
-
 	el->expr_literal.token = token;
 
 	return el;
@@ -290,7 +288,7 @@ Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body) {
 	return cf;
 }
 
-Ast* ast_create_comm_break(Scope* scope, Ast* lit) {
+Ast* ast_create_comm_break(Scope* scope, Ast* lit, Token* token) {
 	Ast* cb = ALLOC_AST();
 
 	cb->node_type = AST_COMMAND_BREAK;
@@ -300,11 +298,12 @@ Ast* ast_create_comm_break(Scope* scope, Ast* lit) {
 	cb->infer_queue_index = -1;
 
 	cb->comm_break.level = lit;
+	cb->comm_break.token_break = token;
 
 	return cb;
 }
 
-Ast* ast_create_comm_continue(Scope* scope) {
+Ast* ast_create_comm_continue(Scope* scope, Token* token) {
 	Ast* cc = ALLOC_AST();
 
 	cc->node_type = AST_COMMAND_CONTINUE;
@@ -313,10 +312,12 @@ Ast* ast_create_comm_continue(Scope* scope) {
 	cc->flags = AST_FLAG_IS_COMMAND;
 	cc->infer_queue_index = -1;
 
+	cc->comm_continue.token_continue = token;
+
 	return cc;
 }
 
-Ast* ast_create_comm_return(Scope* scope, Ast* expr) {
+Ast* ast_create_comm_return(Scope* scope, Ast* expr, Token* token) {
 	Ast* cr = ALLOC_AST();
 
 	cr->node_type = AST_COMMAND_RETURN;
@@ -326,6 +327,7 @@ Ast* ast_create_comm_return(Scope* scope, Ast* expr) {
 	cr->infer_queue_index = -1;
 
 	cr->comm_return.expression = expr;
+	cr->comm_return.token_return = token;
 
 	return cr;
 }

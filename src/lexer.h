@@ -165,9 +165,6 @@ struct Lexer
 	void lex_file();
 	bool read_token(char** at);
 
-	u64 literal_integer_to_u64(Token* t);
-	r64 literal_float_to_r64(Token* t);
-
 	static void init();
 };
 
@@ -184,3 +181,7 @@ enum Operator_Binary;
 
 Operator_Unary  token_to_unary_op(Token* t);
 Operator_Binary token_to_binary_op(Token* t);
+
+u64 literal_integer_to_u64(Token* t);
+r64 literal_float_to_r64(Token* t);
+bool literal_bool_to_bool(Token* t);

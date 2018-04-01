@@ -157,7 +157,8 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 
 	scope->decl_count += 1;
 	// TODO(psv): forward declared procs (foreign)
-	Ast* body = parse_comm_block(scope);
+	Ast* body = parse_comm_block(arguments_scope);
+	body->comm_block.block_scope->flags |= SCOPE_PROCEDURE_BODY;
 
 	Ast* node = ast_create_decl_proc(name, scope, arguments_scope, proc_type, arguments, body, return_type, 0, nargs);
 	if(arguments_scope)
@@ -419,11 +420,11 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 		} break;
 		case TOKEN_LITERAL_HEX_INT: {
 			node->expr_literal.type = LITERAL_HEX_INT;
-			node->expr_literal.value_u64 = lexer->literal_integer_to_u64(first);
+			node->expr_literal.value_u64 = literal_integer_to_u64(first);
 		} break;
 		case TOKEN_LITERAL_BIN_INT: {
 			node->expr_literal.type = LITERAL_BIN_INT;
-			node->expr_literal.value_u64 = lexer->literal_integer_to_u64(first);
+			node->expr_literal.value_u64 = literal_integer_to_u64(first);
 		} break;
 		case TOKEN_LITERAL_BOOL_FALSE: {
 			node->expr_literal.type = LITERAL_BOOL;
@@ -440,7 +441,7 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 			break;
 		case TOKEN_LITERAL_FLOAT:
 			node->expr_literal.type = LITERAL_FLOAT;
-			node->expr_literal.value_r64 = lexer->literal_float_to_r64(first);
+			node->expr_literal.value_r64 = literal_float_to_r64(first);
 		case TOKEN_LITERAL_STRING:
 			node->expr_literal.flags |= LITERAL_FLAG_STRING;
 			// TODO(psv): get type string here already
@@ -529,24 +530,24 @@ Ast* Parser::parse_comm_variable_assignment(Scope* scope) {
 }
 
 Ast* Parser::parse_comm_return(Scope* scope) {
-	require_and_eat(TOKEN_KEYWORD_RETURN);
+	Token* t = require_and_eat(TOKEN_KEYWORD_RETURN);
 	Ast* expr = 0;
 	if (lexer->peek_token_type() != ';')
 		expr = parse_expression(scope);
-	return ast_create_comm_return(scope, expr);
+	return ast_create_comm_return(scope, expr, t);
 }
 
 Ast* Parser::parse_comm_continue(Scope* scope) {
-	require_and_eat(TOKEN_KEYWORD_CONTINUE);
-	return ast_create_comm_continue(scope);
+	Token* t = require_and_eat(TOKEN_KEYWORD_CONTINUE);
+	return ast_create_comm_continue(scope, t);
 }
 
 Ast* Parser::parse_comm_break(Scope* scope) {
-	require_and_eat(TOKEN_KEYWORD_BREAK);
+	Token* t = require_and_eat(TOKEN_KEYWORD_BREAK);
 	Ast* lit = 0;
 	if(lexer->peek_token_type() != ';')
 		lit = parse_expr_literal(scope);
-	return ast_create_comm_break(scope, lit);
+	return ast_create_comm_break(scope, lit, t);
 }
 
 Ast* Parser::parse_comm_for(Scope* scope) {
@@ -687,7 +688,7 @@ Type_Instance* Parser::parse_type_array() {
 
 	if (dimension->flags & TOKEN_FLAG_NUMERIC_LITERAL) {
 		// numeric literal
-		t->array_desc.dimension = lexer->literal_integer_to_u64(dimension);
+		t->array_desc.dimension = literal_integer_to_u64(dimension);
 		t->array_desc.dimension_evaluated = true;
 	} else if (dimension->type == TOKEN_IDENTIFIER) {
 		// TODO: constant or enum constant

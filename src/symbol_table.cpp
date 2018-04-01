@@ -26,9 +26,13 @@ u64 symbol_table_add(Symbol_Table* table, Token* t, Ast* decl_node) {
 
 s64 symbol_table_entry_exist(Symbol_Table* table, Token* t) {
 	u64 index = (u64)t->value.data % table->entries_capacity;
-	if (table->entries[index].occupied &&
-		table->entries[index].identifier->value.data == t->value.data) {
-		return (s64)index;
+	u64 start = index;
+	while (table->entries[index].occupied) {
+		if (table->entries[index].identifier->value.data == t->value.data)
+			return (s64)index;
+		index++;
+		if (index == table->entries_capacity) index = 0;
+		if (index == start) return -1;
 	}
 	return -1;
 }

@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
 	Ast** ast_top_level = parser.parse_top_level();
 
 	Decl_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
-	if (decl_err) {
+	if (decl_err & (~DECL_ERROR_WARNING)) {
 		return -1;
 	}
 

@@ -565,7 +565,7 @@ static char* make_null_term_string(char* s)
 	return ptr;
 }
 
-u64 Lexer::literal_integer_to_u64(Token* t) {
+u64 literal_integer_to_u64(Token* t) {
 	assert(t->flags & TOKEN_FLAG_INTEGER_LITERAL);
 	switch (t->type) {
 	case TOKEN_LITERAL_BIN_INT: {
@@ -597,10 +597,16 @@ u64 Lexer::literal_integer_to_u64(Token* t) {
 	return 0;
 }
 
-r64 Lexer::literal_float_to_r64(Token* t) {
+r64 literal_float_to_r64(Token* t) {
 	assert(t->flags & TOKEN_FLAG_NUMERIC_LITERAL);
 	assert(t->type == TOKEN_LITERAL_FLOAT);
 	return str_to_r64((char*)t->value.data, t->value.length);
+}
+
+bool literal_bool_to_bool(Token* t) {
+	assert(t->flags & TOKEN_FLAG_RESERVED_WORD);
+	assert(t->type == TOKEN_LITERAL_BOOL_TRUE || t->type == TOKEN_LITERAL_BOOL_FALSE);
+	return(t->type == TOKEN_LITERAL_BOOL_TRUE);
 }
 
 char* Lexer::get_token_string(Token_Type t)
