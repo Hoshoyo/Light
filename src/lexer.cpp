@@ -597,6 +597,12 @@ u64 Lexer::literal_integer_to_u64(Token* t) {
 	return 0;
 }
 
+r64 Lexer::literal_float_to_r64(Token* t) {
+	assert(t->flags & TOKEN_FLAG_NUMERIC_LITERAL);
+	assert(t->type == TOKEN_LITERAL_FLOAT);
+	return str_to_r64((char*)t->value.data, t->value.length);
+}
+
 char* Lexer::get_token_string(Token_Type t)
 {
 	switch (t) {

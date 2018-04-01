@@ -66,6 +66,8 @@ const u32 TYPE_FLAG_SIZE_RESOLVED = FLAG(2);
 
 // Indicates if a type is lvalue, meaning it has an address linked to it
 const u32 TYPE_FLAG_LVALUE = FLAG(3);
+const u32 TYPE_FLAG_WEAK   = FLAG(4);
+const u32 TYPE_FLAG_STRONG = FLAG(5);
 struct Type_Instance {
 	Type_Kind kind;
 	u32 flags;
@@ -80,8 +82,48 @@ struct Type_Instance {
 	};
 };
 
+inline bool type_primitive_int_signed(Type_Primitive p) {
+	return (p >= TYPE_PRIMITIVE_S8 && p <= TYPE_PRIMITIVE_S64);
+}
 
-bool type_primitive_int_signed(Type_Primitive p);
-bool type_primitive_int_unsigned(Type_Primitive p);
-bool type_primitive_int(Type_Primitive p);
-bool type_primitive_float(Type_Primitive p);
+inline bool type_primitive_int_unsigned(Type_Primitive p) {
+	return (p >= TYPE_PRIMITIVE_U8 && p <= TYPE_PRIMITIVE_U64);
+}
+
+inline bool type_primitive_int(Type_Primitive p) {
+	return (p >= TYPE_PRIMITIVE_S8 && p <= TYPE_PRIMITIVE_U64);
+}
+
+inline bool type_primitive_float(Type_Primitive p) {
+	return (p == TYPE_PRIMITIVE_R32 || p == TYPE_PRIMITIVE_R64);
+}
+
+inline bool type_primitive_int_signed(Type_Instance* p) {
+	if (p->kind != KIND_PRIMITIVE)
+		return false;
+	return (p->primitive >= TYPE_PRIMITIVE_S8 && p->primitive <= TYPE_PRIMITIVE_S64);
+}
+
+inline bool type_primitive_int_unsigned(Type_Instance* p) {
+	if (p->kind != KIND_PRIMITIVE)
+		return false;
+	return (p->primitive >= TYPE_PRIMITIVE_U8 && p->primitive <= TYPE_PRIMITIVE_U64);
+}
+
+inline bool type_primitive_int(Type_Instance* p) {
+	if (p->kind != KIND_PRIMITIVE)
+		return false;
+	return (p->primitive >= TYPE_PRIMITIVE_S8 && p->primitive <= TYPE_PRIMITIVE_U64);
+}
+
+inline bool type_primitive_float(Type_Instance* p) {
+	if (p->kind != KIND_PRIMITIVE)
+		return false;
+	return (p->primitive == TYPE_PRIMITIVE_R32 || p->primitive == TYPE_PRIMITIVE_R64);
+}
+
+inline bool type_primitive_bool(Type_Instance* p) {
+	if (p->kind != KIND_PRIMITIVE)
+		return false;
+	return (p->primitive == TYPE_PRIMITIVE_BOOL);
+}

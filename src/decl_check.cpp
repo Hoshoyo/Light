@@ -1,12 +1,46 @@
 #include "decl_check.h"
 #include "symbol_table.h"
 #include "type_table.h"
+#include "type_infer.h"
 
-static void report_error_location(Token* tok) {
+void report_error_location(Token* tok) {
 	fprintf(stderr, "%.*s (%d:%d) ", tok->filename.length, tok->filename.data, tok->line, tok->column);
 }
+void report_error_location(Ast* node) {
+	switch (node->node_type) {
+	case AST_DECL_CONSTANT:				report_error_location(node->decl_constant.name); break;
+	case AST_DECL_VARIABLE:				report_error_location(node->decl_variable.name); break;
+	case AST_DECL_PROCEDURE:			report_error_location(node->decl_procedure.name); break;
+	case AST_DECL_ENUM:					report_error_location(node->decl_enum.name); break;
+	case AST_DECL_STRUCT:				report_error_location(node->decl_struct.name); break;
+	case AST_DECL_UNION:				report_error_location(node->decl_union.name); break;
 
-static Decl_Error report_semantic_error(Decl_Error e, char* fmt, ...) {
+	case AST_EXPRESSION_BINARY:			report_error_location(node->expr_binary.token_op); break;
+	case AST_EXPRESSION_LITERAL:		report_error_location(node->expr_literal.token); break;
+	case AST_EXPRESSION_PROCEDURE_CALL:	report_error_location(node->expr_proc_call.name); break;
+	case AST_EXPRESSION_UNARY:			report_error_location(node->expr_unary.token_op); break;
+	case AST_EXPRESSION_VARIABLE:		report_error_location(node->expr_variable.name); break;
+
+	case AST_COMMAND_BLOCK:					break;// TODO(psv): put token for block start in the ast
+	case AST_COMMAND_BREAK:					break;//report_error_location(node->comm_break); break;
+	case AST_COMMAND_CONTINUE:				break;//report_error_location(node->comm_cont); break;
+	case AST_COMMAND_FOR:					break;//report_error_location(node->comm_); break;
+	case AST_COMMAND_IF:					break;//report_error_location(node->comm_); break;
+	case AST_COMMAND_RETURN:				break;//report_error_location(node->comm_); break;
+	case AST_COMMAND_VARIABLE_ASSIGNMENT:	break;//report_error_location(node->comm_); break;
+	}
+}
+
+Decl_Error report_type_error(Decl_Error e, char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	fprintf(stderr, "Type Error: ");
+	vfprintf(stderr, fmt, args);
+	va_end(args);
+	return e;
+}
+
+Decl_Error report_semantic_error(Decl_Error e, char* fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
 	fprintf(stderr, "Semantic Error: ");
@@ -143,7 +177,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type) {
 			type->array_desc.array_of = resolve_type(scope, type->array_desc.array_of);
 			if (type->array_desc.array_of->flags & TYPE_FLAG_INTERNALIZED) {
 				type->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
-				type->array_desc.array_of->type_size_bits = type->array_desc.dimension * type->array_desc.array_of->type_size_bits;
+				type->type_size_bits = type->array_desc.dimension * type->array_desc.array_of->type_size_bits;
 				return internalize_type(&type, true);
 			} else {
 				return type;
@@ -183,7 +217,19 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node) {
 		case AST_DECL_VARIABLE:{
 			if (!node->decl_variable.variable_type) {
 				// infer from expr
-				assert(0);
+				if (!node->decl_variable.assignment) {
+					error |= report_semantic_error(DECL_ERROR_FATAL, "cannot infer variable type if no assignment expression is given\n");
+					return error;
+				}
+				Type_Instance* type = infer_from_expression(node->decl_variable.assignment, &error);
+				if (error & DECL_ERROR_FATAL) return error;
+				if (!type) {
+					infer_queue_push(node);
+					error |= DECL_QUEUED_TYPE;
+					return error;
+				}
+				type->flags |= TYPE_FLAG_RESOLVED;
+				node->decl_variable.variable_type = internalize_type(&type, true);
 				return error;
 			}
 			if (node->decl_variable.variable_type->flags & TYPE_FLAG_RESOLVED) {
@@ -261,6 +307,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node) {
 					}
 				}
 				node->decl_procedure.type_procedure->flags |= TYPE_FLAG_RESOLVED;
+				node->decl_procedure.type_procedure->function_desc.return_type = node->decl_procedure.type_return;
 				node->decl_procedure.type_procedure = internalize_type(&node->decl_procedure.type_procedure, true);
 				infer_queue_remove(node);
 			}
@@ -286,6 +333,7 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		assert(node->flags & AST_FLAG_IS_DECLARATION);
 
 		error |= decl_check_redefinition(global_scope, node);
+		if (error & DECL_ERROR_FATAL) continue;
 		error |= resolve_types_decls(global_scope, node);
 	}
 	
@@ -299,6 +347,7 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		for (size_t i = 0; i < n; ++i) {
 			error |= resolve_types_decls(global_scope, infer_queue[i]);
 		}
+		if (error & DECL_ERROR_FATAL) break;
 		size_t infer_queue_end_size = array_get_length(infer_queue);
 		if (infer_queue_end_size == n) {
 			report_dependencies_error();

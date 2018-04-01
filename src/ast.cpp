@@ -496,6 +496,11 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 	case AST_EXPRESSION_UNARY: {
 		if (node->expr_unary.flags & UNARY_EXPR_FLAG_PREFIXED) {
 			switch (node->expr_unary.op) {
+			case OP_UNARY_CAST: {
+				fprintf(out, "cast(");
+				DEBUG_print_type(out, node->expr_unary.type_to_cast, true);
+				fprintf(out, ")");
+			}break;
 			case OP_UNARY_ADDRESSOF:	fprintf(out, "&"); break;
 			case OP_UNARY_MINUS:		fprintf(out, "-"); break;
 			case OP_UNARY_DEREFERENCE:	fprintf(out, "*"); break;
@@ -620,8 +625,8 @@ void DEBUG_print_struct_decl(FILE* out, Ast* node)
 	fprintf(out, "%.*s :: struct{\n", TOKEN_STR(sd->name));
 	DEBUG_indent_level += 1;
 	for (int i = 0; i < sd->fields_count; ++i) {
+		DEBUG_print_indent_level();
 		DEBUG_print_var_decl(out, sd->fields[i]);
-		fprintf(out, ";\n");
 	}
 	DEBUG_indent_level -= 1;
 	fprintf(out, "}\n");
@@ -660,7 +665,6 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 		case AST_COMMAND_RETURN:				DEBUG_print_return_command(out, node); break;
 
 		// Expressions
-		case AST_EXPRESSION_CAST:				DEBUG_print_expr_cast(out, node); break;
 		case AST_EXPRESSION_BINARY:
 		case AST_EXPRESSION_UNARY:
 		case AST_EXPRESSION_LITERAL:

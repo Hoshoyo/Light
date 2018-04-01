@@ -28,7 +28,6 @@ enum Ast_NodeType {
 	// Expressions
 	AST_EXPRESSION_BINARY,
 	AST_EXPRESSION_UNARY,
-	AST_EXPRESSION_CAST,
 	AST_EXPRESSION_LITERAL,
 	AST_EXPRESSION_VARIABLE,
 	AST_EXPRESSION_PROCEDURE_CALL,
@@ -290,9 +289,7 @@ struct Ast_Expr_ProcCall {
 const u32 AST_FLAG_IS_DECLARATION = FLAG(0);
 const u32 AST_FLAG_IS_COMMAND     = FLAG(1);
 const u32 AST_FLAG_IS_EXPRESSION  = FLAG(2);
-const u32 AST_FLAG_WEAK_TYPE      = FLAG(3);
-const u32 AST_FLAG_STRONG_TYPE    = FLAG(4);
-const u32 AST_FLAG_QUEUED         = FLAG(5);
+const u32 AST_FLAG_QUEUED         = FLAG(3);
 
 struct Ast {
 	Ast_NodeType   node_type;
@@ -346,42 +343,6 @@ Ast* ast_create_comm_break(Scope* scope, Ast* lit);
 Ast* ast_create_comm_continue(Scope* scope);
 Ast* ast_create_comm_return(Scope* scope, Ast* expr);
 Ast* ast_create_comm_variable_assignment(Scope* scope, Ast* lvalue, Ast* rvalue);
-
-#if 0
-bool ast_is_expression(Ast* ast);
-Ast* create_proc(Memory_Arena* arena, Token* name, Token* extern_name, Type_Instance* return_type, Ast** arguments, int nargs, Ast* body, Scope* scope, Decl_Site* site);
-Ast* create_named_argument(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* default_val, int index, Scope* scope, Decl_Site* site);
-Ast* create_variable_decl(Memory_Arena* arena, Token* name, Type_Instance* type, Ast* assign_val, Scope* scope, Decl_Site* site);
-Ast* create_literal(Memory_Arena* arena, u32 flags, Token* lit_tok, u64 value = 0);
-Ast* create_variable(Memory_Arena* arena, Token* var_token, Scope* scope);
-Ast* create_block(Memory_Arena* arena, Scope* scope);
-Ast* create_proc_call(Memory_Arena* arena, Token* name, Ast** args, Scope* scope);
-Ast* create_if(Memory_Arena* arena, Ast* bool_exp, Ast* body, Ast* else_stmt, Scope* scope);
-Ast* create_while(Memory_Arena* arena, Ast* bool_exp, Ast* body, Scope* scope);
-Ast* create_return(Memory_Arena* arena, Ast* exp, Scope* scope, Token* token);
-Ast* create_unary_expression(Memory_Arena* arena, Ast* operand, UnaryOperation op, Token* op_tok, u32 flags, Type_Instance* cast_type, Precedence precedence, Scope* scope);
-Ast* create_binary_operation(Memory_Arena* arena, Ast* left_op, Ast *right_op, Token* op, Precedence precedence, Scope* scope);
-Ast* create_break(Memory_Arena* arena, Scope* scope, Token* token);
-Ast* create_continue(Memory_Arena* arena, Scope* scope, Token* token);
-Ast* create_struct_decl(Memory_Arena* arena, Token* name, Ast** fields, int num_fields, Scope* struct_scope, Decl_Site* site);
-Ast* create_enum_decl(Memory_Arena* arena, Token* name, Ast_EnumField* fields, int num_fields, Type_Instance* base_type, Scope* struct_scope, Decl_Site* site);
-Ast* create_directive(Memory_Arena* arena, Token* directive_token, Ast* literal_argument, Ast* declaration);
-Ast* create_constant(Memory_Arena* arena, Token* name, Ast* expression, Type_Instance* type, Scope* scope);
-
-UnaryOperation get_unary_op(Token* token);
-BinaryOperation get_binary_op(Token* token);
-
-void block_push_command(Ast* block, Ast* command);
-void push_ast_list(Ast*** list, Ast* arg);
-
-
-void DEBUG_print_node(FILE* out, Ast* node);
-void DEBUG_print_ast(FILE* out, Ast** ast);
-void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_ = true);
-
-void DEBUG_print_indent_level();
-
-#endif
 
 void DEBUG_print_node(FILE* out, Ast* node);
 void DEBUG_print_ast(FILE* out, Ast** ast);

@@ -166,6 +166,7 @@ struct Lexer
 	bool read_token(char** at);
 
 	u64 literal_integer_to_u64(Token* t);
+	r64 literal_float_to_r64(Token* t);
 
 	static void init();
 };

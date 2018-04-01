@@ -1,46 +1,26 @@
+/*
+var := 1.0 + 2.3;
+hey := wor;
+*/
+wor : [3][4]s32;
+
+/*
 vec4 :: struct {
 	x : r32;
 	y : r32;
 	z : r32;
-	value : foo;
+	value : hello;
+}
+
+hello :: struct {
+	h : foo;
 }
 
 foo :: struct {
-	name : foo;
+	name : s32;
 }
 
-/*
-hello :: () -> void {
-	a : [32]s32;
-	b := &a;
-	c := *a;
+main :: (s : s32) -> foo {
+	
 }
-
-x := &b;
-b := 3;
-
-myconst3 :: myconst2;
-myconst1 :: 3;
-myconst2 :: myconst1;
-myconst3 : r32 : myconst2;
-
-//float :: r32;
-//myconst4 : float : myconst2;
-
-
-vec4 :: struct {
-	x : r32;
-	y : r32;
-	z : r32;
-}
-
-var : vec4;
-v2 := var.x;	// vec4 . r32
-
-Person :: struct {
-	position : ^vec4;
-}
-
-person : Person;
-v3 := person.position.x;	// Person . ^vec4 . r32
 */

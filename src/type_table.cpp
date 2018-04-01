@@ -153,7 +153,8 @@ Type_Instance* internalize_type(Type_Instance** type, bool copy) {
 		}
 	}
 	*type = (Type_Instance*)type_table.entries[index].data;
-	(*type)->flags |= TYPE_FLAG_INTERNALIZED;
+	(*type)->flags |= TYPE_FLAG_INTERNALIZED | TYPE_FLAG_STRONG;
+
 	return *type;
 }
 
@@ -217,7 +218,7 @@ void DEBUG_print_type_table() {
 		if (type_table.entries[i].occupied) {
 			Type_Instance* t = (Type_Instance*)type_table.entries[i].data;
 			DEBUG_print_type(stdout, t, true);
-			fprintf(stdout, " -> size: %lld\n", t->type_size_bits);
+			fprintf(stdout, "\t\tsize: %lld\n", t->type_size_bits);
 		}
 	}
 }

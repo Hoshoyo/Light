@@ -271,7 +271,6 @@ Ast* Parser::parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint_type
 }
 
 Ast* Parser::parse_decl_constant(Token* name, Scope* scope, Type_Instance* type) {
-	require_and_eat(':');
 	// either literal or another constant
 	Ast* value = 0;
 
@@ -441,6 +440,7 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 			break;
 		case TOKEN_LITERAL_FLOAT:
 			node->expr_literal.type = LITERAL_FLOAT;
+			node->expr_literal.value_r64 = lexer->literal_float_to_r64(first);
 		case TOKEN_LITERAL_STRING:
 			node->expr_literal.flags |= LITERAL_FLAG_STRING;
 			// TODO(psv): get type string here already
