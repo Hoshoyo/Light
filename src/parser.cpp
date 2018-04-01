@@ -157,7 +157,11 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 
 	scope->decl_count += 1;
 	// TODO(psv): forward declared procs (foreign)
-	Ast* body = parse_comm_block(arguments_scope);
+	Ast* body = 0;
+	if (arguments_scope)
+		body = parse_comm_block(arguments_scope);
+	else
+		body = parse_comm_block(scope);
 	body->comm_block.block_scope->flags |= SCOPE_PROCEDURE_BODY;
 
 	Ast* node = ast_create_decl_proc(name, scope, arguments_scope, proc_type, arguments, body, return_type, 0, nargs);
@@ -316,6 +320,160 @@ Ast* Parser::parse_expr_proc_call(Scope* scope) {
 	return ast_create_expr_proc_call(scope, name, arguments, args_count);
 }
 
+/*
+PRECEDENCE_0 = 0,	//
+PRECEDENCE_1 = 1,	//	 || &&
+PRECEDENCE_2 = 2,	//	 == >= <= != > <
+PRECEDENCE_3 = 3,	//	 ^ | & >> <<
+PRECEDENCE_4 = 4,	//	 + -
+PRECEDENCE_5 = 5,	//	 * / %
+PRECEDENCE_6 = 6,	//	 ~ !
+PRECEDENCE_7 = 7,	//	 *(dereference)	cast &(addressof)
+PRECEDENCE_8 = 8,	//	 .
+PRECEDENCE_MAX,
+*/
+
+Ast* Parser::parse_expression_precedence10(Scope* scope) {
+	Token* t = lexer->peek_token();
+	if (t->flags & TOKEN_FLAG_LITERAL) {
+		return parse_expr_literal(scope);
+	} else if (t->type == TOKEN_IDENTIFIER) {
+		if (lexer->peek_token_type(1) == '(') {
+			return parse_expr_proc_call(scope);
+		} else {
+			lexer->eat_token();
+			return ast_create_expr_variable(t, scope, 0);
+		}
+	} else if(t->type == '(') {
+		lexer->eat_token();
+		return parse_expression(scope);
+		require_and_eat(')');
+	}
+	return 0;
+}
+
+Ast* Parser::parse_expression_precedence9(Scope* scope) {
+	Ast* expr = parse_expression_precedence10(scope);
+	Token_Type next = lexer->peek_token_type();
+	if (next == '.')
+	{
+		Token* op = lexer->eat_token();
+		Ast* right = parse_expression_precedence9(scope);
+		return ast_create_expr_binary(scope, right, expr, OP_BINARY_DOT, op);
+	}
+	return expr;
+}
+
+Ast* Parser::parse_expression_precedence8(Scope* scope) {
+	Ast* expr = parse_expression_precedence9(scope);
+	Token_Type next = lexer->peek_token_type();
+	if (next == '[')
+	{
+		Token* op  = lexer->eat_token();
+		Ast* index = parse_expression(scope);
+
+		Ast* e = ast_create_expr_binary(scope, expr, index, OP_BINARY_VECTOR_ACCESS, op);
+		require_and_eat(']');
+		return e;
+	}
+	return expr;
+}
+
+Ast* Parser::parse_expression_precedence7(Scope* scope) {
+	Token_Type next = lexer->peek_token_type();
+	if (next == '*') {
+		Token* op = lexer->eat_token();
+		Ast* operand = parse_expression_precedence7(scope);
+		return ast_create_expr_unary(scope, operand, token_to_unary_op(op), op, 0, UNARY_EXPR_FLAG_PREFIXED);
+	} else if (next == TOKEN_KEYWORD_CAST) {
+		// parse cast
+		Token* cast = lexer->eat_token();
+		require_and_eat('(');
+		Type_Instance* ttc = parse_type();
+		require_and_eat(')');
+		Ast* operand = parse_expression_precedence7(scope);
+		return ast_create_expr_unary(scope, operand, OP_UNARY_CAST, cast, ttc, UNARY_EXPR_FLAG_PREFIXED);
+	}
+	return parse_expression_precedence8(scope);
+}
+
+Ast* Parser::parse_expression_precedence6(Scope* scope) {
+	Token_Type next = lexer->peek_token_type();
+	if (next == '~' || next == '!') {
+		Token* op = lexer->eat_token();
+		Ast* operand = parse_expression_precedence6(scope);
+		return ast_create_expr_unary(scope, operand, token_to_unary_op(op), op, 0, UNARY_EXPR_FLAG_PREFIXED);
+	}
+	return parse_expression_precedence7(scope);
+}
+
+Ast* Parser::parse_expression_precedence5(Scope* scope) {
+	Ast* expr = parse_expression_precedence6(scope);
+	Token_Type next = lexer->peek_token_type();
+	if (next == '*' || next == '/' || next == '%')
+	{
+		Token* op = lexer->eat_token();
+		Ast* right = parse_expression_precedence5(scope);
+		return ast_create_expr_binary(scope, expr, right, token_to_binary_op(op), op);
+	}
+	return expr;
+}
+
+Ast* Parser::parse_expression_precedence4(Scope* scope) {
+	Ast* expr = parse_expression_precedence5(scope);
+	Token_Type next = lexer->peek_token_type();
+	if (next == '+' || next == '-')
+	{
+		Token* op = lexer->eat_token();
+		Ast* right = parse_expression_precedence4(scope);
+		return ast_create_expr_binary(scope, expr, right, token_to_binary_op(op), op);
+	}
+	return expr;
+}
+
+Ast* Parser::parse_expression_precedence3(Scope* scope) {
+	Ast* expr = parse_expression_precedence4(scope);
+	Token_Type next = lexer->peek_token_type();
+	if (next == '^' || next == '|' || next == '&' || next == TOKEN_BITSHIFT_LEFT || next == TOKEN_BITSHIFT_RIGHT)
+	{
+		Token* op = lexer->eat_token();
+		Ast* right = parse_expression_precedence3(scope);
+		return ast_create_expr_binary(scope, expr, right, token_to_binary_op(op), op);
+	}
+	return expr;
+}
+
+Ast* Parser::parse_expression_precedence2(Scope* scope) {
+	Ast* expr = parse_expression_precedence3(scope);
+	Token_Type next = lexer->peek_token_type();
+	if (next == TOKEN_EQUAL_COMPARISON || next == TOKEN_GREATER_EQUAL || next == TOKEN_NOT_EQUAL ||
+		next == TOKEN_LESS_EQUAL || next == '<' || next == '>') 
+	{
+		Token* op = lexer->eat_token();
+		Ast* right = parse_expression_precedence2(scope);
+		return ast_create_expr_binary(scope, expr, right, token_to_binary_op(op), op);
+	}
+	return expr;
+}
+
+Ast* Parser::parse_expression_precedence1(Scope* scope) {
+	Ast* expr = parse_expression_precedence2(scope);
+	Token_Type next = lexer->peek_token_type();
+	if (next == TOKEN_LOGIC_OR || next == TOKEN_LOGIC_OR) {
+		Token* op = lexer->eat_token();
+		Ast* right = parse_expression_precedence1(scope);
+		return ast_create_expr_binary(scope, expr, right, token_to_binary_op(op), op);
+	}
+	return expr;
+}
+
+Ast* Parser::parse_expression(Scope* scope) {
+	return parse_expression_precedence1(scope);
+}
+
+
+
+/*
 Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on_precedence)
 {
 	Ast* left_op = 0;
@@ -390,6 +548,7 @@ Ast* Parser::parse_expression(Scope* scope, Precedence caller_prec, bool quit_on
 		return left_op;
 	}
 }
+*/
 
 Ast* Parser::parse_expr_literal(Scope* scope) {
 	Token* first = lexer->eat_token();
@@ -485,8 +644,13 @@ Ast* Parser::parse_command(Scope* scope) {
 			require_and_eat(';');
 			break;
 		default: {
-			if (lexer->peek_token_type(1) == ':') {
+			Token_Type t = lexer->peek_token_type(1);
+			if (t == ':') {
 				command = parse_declaration(scope);
+			} else if (t == '(') {
+				// syntatic sugar void proc call
+				Ast* pcall = parse_expr_proc_call(scope);
+				command = ast_create_comm_variable_assignment(scope, 0, pcall);
 			} else {
 				command = parse_comm_variable_assignment(scope);
 			}

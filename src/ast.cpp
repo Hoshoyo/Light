@@ -491,8 +491,11 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 			case OP_BINARY_EQUAL:					fprintf(out, " == "); break;
 			case OP_BINARY_NOT_EQUAL:				fprintf(out, " != "); break;
 			case OP_BINARY_DOT:						fprintf(out, "."); break;
+			case OP_BINARY_VECTOR_ACCESS:			fprintf(out, "["); break;
 		}
 		DEBUG_print_expression(out, node->expr_binary.right);
+		if (node->expr_binary.op == OP_BINARY_VECTOR_ACCESS)
+			fprintf(out, "]");
 		fprintf(out, ")");
 	} break;
 	case AST_EXPRESSION_UNARY: {
@@ -510,10 +513,10 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 			case OP_UNARY_LOGIC_NOT:	fprintf(out, "!"); break;
 			case OP_UNARY_PLUS:			fprintf(out, "+"); break;
 			}
-			DEBUG_print_expression(out, node->expr_unary.operand);
 		} else {
-			fprintf(out, "<UNSUPPORTED POSTFIXED>");
+			fprintf(out, "<Unsupported Unary>");
 		}
+		DEBUG_print_expression(out, node->expr_unary.operand);
 	}break;
 	case AST_EXPRESSION_VARIABLE: {
 		fprintf(out, "%.*s", TOKEN_STR(node->expr_variable.name));
@@ -616,8 +619,10 @@ void DEBUG_print_continue_command(FILE* out, Ast* node)
 }
 
 void DEBUG_print_variable_assignment(FILE* out, Ast* node) {
-	DEBUG_print_expression(out, node->comm_var_assign.lvalue);
-	fprintf(out, " = ");
+	if (node->comm_var_assign.lvalue) {
+		DEBUG_print_expression(out, node->comm_var_assign.lvalue);
+		fprintf(out, " = ");
+	}
 	DEBUG_print_expression(out, node->comm_var_assign.rvalue);
 }
 

@@ -36,8 +36,21 @@ struct Parser {
 	Ast* parse_decl_constant(Token* name, Scope* scope, Type_Instance* type);
 
 	// Expression parsing
+	Ast* parse_expression(Scope* scope);
+	Ast* parse_expression_precedence1(Scope* scope);
+	Ast* parse_expression_precedence2(Scope* scope);
+	Ast* parse_expression_precedence3(Scope* scope);
+	Ast* parse_expression_precedence4(Scope* scope);
+	Ast* parse_expression_precedence5(Scope* scope);
+	Ast* parse_expression_precedence6(Scope* scope);
+	Ast* parse_expression_precedence7(Scope* scope);
+	Ast* parse_expression_precedence8(Scope* scope);
+	Ast* parse_expression_precedence9(Scope* scope);
+	Ast* parse_expression_precedence10(Scope* scope);
+
+
 	Ast* parse_expr_literal(Scope* scope);
-	Ast* parse_expression(Scope* scope, Precedence caller_prec = PRECEDENCE_0, bool quit_on_precedence = false);
+	//Ast* parse_expression(Scope* scope, Precedence caller_prec = PRECEDENCE_0, bool quit_on_precedence = false);
 	Ast* parse_expr_proc_call(Scope* scope);
 
 	// Expression auxiliary

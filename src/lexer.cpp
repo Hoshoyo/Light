@@ -705,7 +705,6 @@ Operator_Unary token_to_unary_op(Token* t) {
 		case '!': return OP_UNARY_LOGIC_NOT;
 		case '~': return OP_UNARY_BITWISE_NOT;
 		case TOKEN_KEYWORD_CAST: return OP_UNARY_CAST;
-		case '[': return OP_UNARY_VECTOR_ACCESSER;
 	}
 	return OP_UNARY_UNKNOWN;
 }
@@ -732,6 +731,7 @@ Operator_Binary token_to_binary_op(Token* t) {
 		case TOKEN_EQUAL_COMPARISON:return OP_BINARY_EQUAL;
 		case TOKEN_NOT_EQUAL:		return OP_BINARY_NOT_EQUAL;
 		case '.':					return OP_BINARY_DOT;
+		case '[':					return OP_BINARY_VECTOR_ACCESS;
 		default: {
 			assert(0);
 		}

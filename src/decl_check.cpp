@@ -129,22 +129,40 @@ Decl_Error decl_check_redefinition(Scope* scope, Ast* node) {
 
 	switch (node->node_type) {
 		// TODO(psv): check forward declarations, they must not raise an error
-		case AST_DECL_PROCEDURE:	decl_string_desc = "procedure"; decl_name = node->decl_procedure.name; break;
-		case AST_DECL_CONSTANT:		decl_string_desc = "constant";  decl_name = node->decl_constant.name; break;
-		case AST_DECL_ENUM:			decl_string_desc = "enum";      decl_name = node->decl_enum.name; break;
-		case AST_DECL_STRUCT:		decl_string_desc = "struct";    decl_name = node->decl_struct.name; break;
-		case AST_DECL_VARIABLE:		decl_string_desc = "variable";  decl_name = node->decl_variable.name; break;
+		case AST_DECL_PROCEDURE: {
+			error |= decl_insert_into_symbol_table(node, node->decl_procedure.name, "procedure");
+
+			for (size_t i = 0; i < node->decl_procedure.arguments_count; ++i) {
+				error |= decl_insert_into_symbol_table(node->decl_procedure.arguments[i],
+					node->decl_procedure.arguments[i]->decl_variable.name, "procedure argument");
+			}
+		}break;
+		case AST_DECL_ENUM: {
+			error |= decl_insert_into_symbol_table(node, node->decl_enum.name, "enum");
+
+			for (size_t i = 0; i < node->decl_enum.fields_count; ++i) {
+				error |= decl_insert_into_symbol_table(node->decl_enum.fields[i],
+					node->decl_enum.fields[i]->decl_constant.name, "enum field");
+			}
+		}break;
+		case AST_DECL_CONSTANT: {
+			error |= decl_insert_into_symbol_table(node, node->decl_constant.name, "constant");
+		}break;
+		case AST_DECL_STRUCT: {
+			error |= decl_insert_into_symbol_table(node, node->decl_struct.name, "struct");
+
+			for (size_t i = 0; i < node->decl_struct.fields_count; ++i) {
+				error |= decl_insert_into_symbol_table(node->decl_struct.fields[i],
+					node->decl_struct.fields[i]->decl_variable.name, "struct field");
+			}
+		}break;
+		case AST_DECL_VARIABLE: {
+			error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
+		}break;
 
 		// TODO(psv): unions
 		case AST_DECL_UNION: assert(0); break;
 		default:             assert(0); break;
-	}
-	// check for redefinition of the symbol
-	s64 index = symbol_table_entry_exist(&scope->symb_table, node->decl_constant.name);
-	if (index != -1) {
-		error |= report_redeclaration(decl_string_desc, node->decl_constant.name, symbol_table_get_entry(&scope->symb_table, index));
-	} else {
-		symbol_table_add(&scope->symb_table, node->decl_constant.name, node);
 	}
 	return error;
 }
@@ -525,7 +543,8 @@ Decl_Error decl_check_inner_command(Ast* node) {
 		}break;
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
 			// TODO(psv): lvalue not distinguished
-			error |= decl_check_inner_expr(node->comm_var_assign.lvalue);
+			if(node->comm_var_assign.lvalue)
+				error |= decl_check_inner_expr(node->comm_var_assign.lvalue);
 			error |= decl_check_inner_expr(node->comm_var_assign.rvalue);
 		}break;
 		default: assert(0); break;	// TODO(psv): report internal compiler error
@@ -634,8 +653,6 @@ void DEBUG_print_indent_level(s32 il) {
 }
 
 void DEBUG_print_scope_decls(Scope* scope) {
-	static s32 indent_level = 1;
-
 	if (!scope) return;
 	
 	char* description = 0;
@@ -652,12 +669,35 @@ void DEBUG_print_scope_decls(Scope* scope) {
 	else if (scope->id == 0)
 		description = "global";
 
+	DEBUG_print_indent_level(scope->level);
 	printf("(id:%d) %s scope [%d]:\n", scope->id, description, scope->level);
 
 	for (s32 i = 0; i < scope->symb_table.entries_capacity; ++i) {
 		if (scope->symb_table.entries[i].occupied) {
-			DEBUG_print_indent_level(indent_level);
+			DEBUG_print_indent_level(scope->level + 1);
 			printf("%d: %.*s\n", i, TOKEN_STR(scope->symb_table.entries[i].identifier));
+		}
+	}
+}
+
+void DEBUG_print_scope_decls(Ast** top) {
+	for (size_t i = 0; i < array_get_length(top); ++i) {
+		Ast* node = top[i];
+		switch (node->node_type) {
+			case AST_DECL_PROCEDURE: {
+				DEBUG_print_scope_decls(node->decl_procedure.arguments_scope);
+				DEBUG_print_scope_decls(node->decl_procedure.body->comm_block.block_scope);
+				DEBUG_print_scope_decls(node->decl_procedure.body->comm_block.commands);
+			}break;
+			case AST_COMMAND_BLOCK: {
+				DEBUG_print_scope_decls(node->comm_block.block_scope);
+				DEBUG_print_scope_decls(node->comm_block.commands);
+			}break;
+			case AST_COMMAND_FOR: {
+			}break;
+			case AST_COMMAND_IF: {
+
+			}break;
 		}
 	}
 }

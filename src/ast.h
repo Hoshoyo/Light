@@ -56,7 +56,6 @@ enum Operator_Unary {
 	OP_UNARY_DEREFERENCE,
 	OP_UNARY_ADDRESSOF,
 	OP_UNARY_BITWISE_NOT,
-	OP_UNARY_VECTOR_ACCESSER,
 	OP_UNARY_CAST,
 
 	OP_UNARY_LOGIC_NOT,
@@ -87,6 +86,7 @@ enum Operator_Binary {
 	OP_BINARY_LOGIC_OR,		// ||
 
 	OP_BINARY_DOT,			// .
+	OP_BINARY_VECTOR_ACCESS, // []
 };
 
 enum Precedence {

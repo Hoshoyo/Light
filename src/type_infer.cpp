@@ -121,6 +121,26 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 				}
 			}
 		}break;
+		case OP_BINARY_VECTOR_ACCESS: {
+			// right is index
+			Type_Instance* index_type = infer_from_expression(expr->expr_binary.right, error, rep_undeclared);
+			if (*error & DECL_ERROR_FATAL) return 0;
+			expr->expr_binary.right->type_return = index_type;
+
+			// left is indexed
+			Type_Instance* operand_type = infer_from_expression(expr->expr_binary.left, error, rep_undeclared);
+			if (*error & DECL_ERROR_FATAL) return 0;
+			if (operand_type->kind != KIND_POINTER) {
+				report_error_location(expr);
+				*error |= report_type_error(DECL_ERROR_FATAL, "cannot dereference a non pointer type '");
+				DEBUG_print_type(stderr, operand_type, true);
+				fprintf(stderr, "'\n");
+			}
+			Type_Instance* res = operand_type->pointer_to;
+			assert(res->flags & TYPE_FLAG_INTERNALIZED);
+			return res;
+		}break;
+
 		case OP_BINARY_DOT: {
 			// TODO(psv): implement
 			assert(0);
@@ -159,7 +179,6 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_unde
 			}
 			return newtype;
 		}break;
-		case OP_UNARY_VECTOR_ACCESSER:
 		case OP_UNARY_DEREFERENCE: {
 			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared);
 			if (*error & DECL_ERROR_FATAL) return 0;
@@ -312,7 +331,6 @@ Decl_Error type_update_weak(Ast* expr, Type_Instance* strong) {
 				error |= type_update_weak(expr->expr_unary.operand, strong);
 			}break;
 
-			case OP_UNARY_VECTOR_ACCESSER:	// cannot be weak, because a vector operand has strong type
 			case OP_UNARY_ADDRESSOF:		// cannot be weak, because a variable operand has strong type
 			case OP_UNARY_CAST:				// cannot be weak by definition
 			case OP_UNARY_DEREFERENCE:		// cannot be weak, because a variable operand has strong type
