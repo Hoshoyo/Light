@@ -1,10 +1,10 @@
 /*
 var := 1.0 + 2.3;
 hey := wor;
-*/
-wor : [3][4]s32;
 
-/*
+wor : [3][4]s32;
+*/
+
 vec4 :: struct {
 	x : r32;
 	y : r32;
@@ -17,10 +17,7 @@ hello :: struct {
 }
 
 foo :: struct {
-	name : s32;
+	hello := xxx;
 }
 
-main :: (s : s32) -> foo {
-	
-}
-*/
+xxx := 3.3;

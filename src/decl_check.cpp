@@ -359,14 +359,14 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 }
 
 Ast* decl_from_name(Scope* scope, Token* name) {
-	if (scope && scope->symb_table.entries_count > 0) {
-		while (scope) {
+	while (scope) {
+		if (scope->symb_table.entries_count > 0) {
 			s64 index = symbol_table_entry_exist(&scope->symb_table, name);
 			if (index != -1) {
 				return scope->symb_table.entries[index].decl_node;
 			}
-			scope = scope->parent;
 		}
+		scope = scope->parent;
 	}
 	return 0;
 }
