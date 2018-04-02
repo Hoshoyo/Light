@@ -17,8 +17,8 @@ Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error, bool rep_u
 Type_Instance* infer_from_proc_call_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval = false);
 
 Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval) {
-	Type_Instance* left  = infer_from_expression(expr->expr_binary.left, error, rep_undeclared);
-	Type_Instance* right = infer_from_expression(expr->expr_binary.right, error, rep_undeclared);
+	Type_Instance* left  = infer_from_expression(expr->expr_binary.left, error, rep_undeclared, lval);
+	Type_Instance* right = infer_from_expression(expr->expr_binary.right, error, rep_undeclared, lval);
 
 	if (!left || !right)
 		return 0;
@@ -138,15 +138,20 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 			Type_Instance* operand_type = infer_from_expression(expr->expr_binary.left, error, rep_undeclared, lval);
 			// left is indexed
 			if (*error & DECL_ERROR_FATAL) return 0;
-			if (operand_type->kind != KIND_POINTER) {
+			if (operand_type->kind == KIND_POINTER) {
+				Type_Instance* res = operand_type->pointer_to;
+				assert(res->flags & TYPE_FLAG_INTERNALIZED);
+				if (res->kind == KIND_ARRAY) {
+					res = res->array_desc.array_of;
+				}
+				return res;
+			} else {
 				report_error_location(expr);
 				*error |= report_type_error(DECL_ERROR_FATAL, "cannot dereference a non pointer type '");
 				DEBUG_print_type(stderr, operand_type, true);
 				fprintf(stderr, "'\n");
+				return 0;
 			}
-			Type_Instance* res = operand_type->pointer_to;
-			assert(res->flags & TYPE_FLAG_INTERNALIZED);
-			return res;
 		}break;
 
 		case OP_BINARY_DOT: {

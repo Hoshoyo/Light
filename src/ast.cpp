@@ -246,7 +246,7 @@ Ast* ast_create_comm_variable_assignment(Scope* scope, Ast* lvalue, Ast* rvalue)
 	Ast* cva = ALLOC_AST();
 
 	cva->node_type = AST_COMMAND_VARIABLE_ASSIGNMENT;
-	cva->type_return = 0;
+	cva->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
 	cva->scope = scope;
 	cva->flags = AST_FLAG_IS_COMMAND;
 	cva->infer_queue_index = -1;
@@ -351,6 +351,8 @@ Ast* ast_create_comm_return(Scope* scope, Ast* expr, Token* token) {
 				DEBUG
 
 ****************************************/
+static bool print_types = true;
+
 static int DEBUG_indent_level = 0;
 void DEBUG_print_indent_level() {
 	for (int i = 0; i < DEBUG_indent_level; ++i) {
@@ -617,12 +619,22 @@ void DEBUG_print_break_command(FILE* out, Ast* node)
 
 void DEBUG_print_continue_command(FILE* out, Ast* node)
 {
+	if (print_types) {
+		fprintf(out, "<");
+		DEBUG_print_type(out, node->type_return, true);
+		fprintf(out, ">");
+	}
 	fprintf(out, "continue");
 }
 
 void DEBUG_print_variable_assignment(FILE* out, Ast* node) {
 	if (node->comm_var_assign.lvalue) {
 		DEBUG_print_expression(out, node->comm_var_assign.lvalue);
+		if (print_types) {
+			fprintf(out, "<");
+			DEBUG_print_type(out, node->comm_var_assign.lvalue->type_return);
+			fprintf(out, ">");
+		}
 		fprintf(out, " = ");
 	}
 	DEBUG_print_expression(out, node->comm_var_assign.rvalue);
