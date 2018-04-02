@@ -296,7 +296,7 @@ Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error, bool rep_u
 		// transform this in the pointer type
 		Type_Instance* ptrtype = type_new_temporary();
 		ptrtype->kind = KIND_POINTER;
-		ptrtype->type_size_bits = type_pointer_size();
+		ptrtype->type_size_bits = type_pointer_size() * 8;
 		ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED;
 		ptrtype->pointer_to = type;
 		return internalize_type(&ptrtype, true);

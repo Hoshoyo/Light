@@ -458,17 +458,30 @@ void DEBUG_print_proc_decl(FILE* out, Ast* proc_node) {
 void DEBUG_print_expression(FILE* out, Ast* node) {
 	switch (node->node_type) {
 	case AST_EXPRESSION_LITERAL: {
-		switch (node->expr_literal.type) {
-		case LITERAL_SINT:		fprintf(out, "%lld", node->expr_literal.value_s64); break;
-		case LITERAL_UINT:		fprintf(out, "%llu", node->expr_literal.value_u64); break;
-		case LITERAL_HEX_INT:	fprintf(out, "0x%llx", node->expr_literal.value_u64); break;
-		case LITERAL_BIN_INT:	fprintf(out, "0x%llx", node->expr_literal.value_u64); break;
-		case LITERAL_BOOL:		(node->expr_literal.value_bool) ? fprintf(out, "true") : fprintf(out, "false"); break;
-		case LITERAL_FLOAT:		fprintf(out, "%f", node->expr_literal.value_r64); break;
-		case LITERAL_ARRAY:		fprintf(out, "<UNSUPPORTED array literal>"); break;
-		case LITERAL_STRUCT:	fprintf(out, "<UNSUPPORTED struct literal>"); break;
-		default:				fprintf(out, "<UNSUPPORTED literal>"); break;
+		if(node->type_return->kind == KIND_PRIMITIVE){
+			switch(node->type_return->primitive){
+				case TYPE_PRIMITIVE_BOOL:	(node->expr_literal.value_bool) ? fprintf(out, "true") : fprintf(out, "false"); break;
+				case TYPE_PRIMITIVE_R32:
+				case TYPE_PRIMITIVE_R64:	fprintf(out, "%f", node->expr_literal.value_r64); break;
+				case TYPE_PRIMITIVE_S8:		fprintf(out, "%lld", (s8)node->expr_literal.value_s64); break;
+				case TYPE_PRIMITIVE_S16:	fprintf(out, "%lld", (s16)node->expr_literal.value_s64); break;
+				case TYPE_PRIMITIVE_S32:	fprintf(out, "%lld", (s32)node->expr_literal.value_s64); break;
+				case TYPE_PRIMITIVE_S64:	fprintf(out, "%lld", (s64)node->expr_literal.value_s64); break;
+
+				case TYPE_PRIMITIVE_U8:		fprintf(out, "%llu", (u8)node->expr_literal.value_u64); break;
+				case TYPE_PRIMITIVE_U16:	fprintf(out, "%llu", (u16)node->expr_literal.value_u64); break;
+				case TYPE_PRIMITIVE_U32:	fprintf(out, "%llu", (u32)node->expr_literal.value_u64); break;
+				case TYPE_PRIMITIVE_U64:	fprintf(out, "%llu", (u64)node->expr_literal.value_u64); break;
+				default:					fprintf(out, "<UNSUPPORTED literal>"); break;
+			}
+		} else {
+			switch(node->expr_literal.type){
+				case LITERAL_ARRAY:		fprintf(out, "<UNSUPPORTED array literal>"); break;
+				case LITERAL_STRUCT:	fprintf(out, "<UNSUPPORTED struct literal>"); break;
+				default:				fprintf(out, "<UNSUPPORTED literal>"); break;
+			}
 		}
+		
 	} break;
 	case AST_EXPRESSION_BINARY: {
 		fprintf(out, "(");

@@ -1,3 +1,23 @@
+hash : u64 = 14695981039346656037;
+
+factorial :: (v : s32) -> s32 {
+	if v == 1 return 1;
+	return v * factorial(v - 1);
+}
+
+fnv1_hash :: (str : ^u8, length : u64) -> u64 {
+	hash : u64 = 14695981039346656037;
+	fnv_prime : u64 = 1099511628211;
+
+	i : u64 = 0;
+	for (i < length) {
+		hash = hash * fnv_prime;
+		hash = hash ^ cast(u64)str[i];
+		i += 1;
+	}
+
+	return hash;
+}
 
 main :: () -> s32{
 	v : [3]s32;

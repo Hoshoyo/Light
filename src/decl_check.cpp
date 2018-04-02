@@ -431,6 +431,15 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 			if (node->decl_variable.variable_type) {
 				var_type = resolve_type(node->scope, node->decl_variable.variable_type, true);
 				node->decl_variable.variable_type = var_type;
+				if(node->decl_variable.assignment){
+					Type_Instance* rtype = infer_from_expression(node->decl_variable.assignment, &error, true);
+					if(error & DECL_ERROR_FATAL) return error;
+					if(rtype->flags & TYPE_FLAG_WEAK){
+						rtype = type_strength_resolve(rtype, var_type, node->decl_variable.assignment, node, &error);
+						if(error & DECL_ERROR_FATAL) return error;
+						node->decl_variable.assignment->type_return = rtype;
+					}
+				}
 			}
 			if (!var_type) {
 				if (node->decl_variable.assignment) {
@@ -528,13 +537,12 @@ Decl_Error decl_check_inner_command(Ast* node) {
 			}
 		}break;
 		case AST_COMMAND_RETURN: {
-			if (scope_inside_proc(node->scope)) {
-				return error;
-			} else {
+			if (!scope_inside_proc(node->scope)) {
 				report_error_location(node);
 				error |= report_semantic_error(DECL_ERROR_FATAL, "return command is not inside a procedure\n");
 			}
-			error |= decl_check_inner_expr(node->comm_return.expression);
+			if(node->comm_return.expression)
+				error |= decl_check_inner_expr(node->comm_return.expression);
 		}break;
 		case AST_COMMAND_FOR: {
 			assert(node->comm_for.body->scope->flags & SCOPE_LOOP);
@@ -564,6 +572,7 @@ Decl_Error decl_check_inner_expr_lassign(Ast* node) {
 	Decl_Error error = DECL_OK;
 	Type_Instance* t = infer_from_expression(node, &error, true, true);
 	node->type_return = t;
+
 	return error;
 }
 
@@ -572,6 +581,25 @@ Decl_Error decl_check_inner_expr(Ast* node) {
 	Decl_Error error = DECL_OK;
 	Type_Instance* t = infer_from_expression(node, &error, true);
 	node->type_return = t;
+
+	switch(node->node_type){
+		case AST_EXPRESSION_BINARY:{
+			error |= decl_check_inner_expr(node->expr_binary.left);
+			error |= decl_check_inner_expr(node->expr_binary.right);
+		}break;
+		case AST_EXPRESSION_PROCEDURE_CALL:{
+			for(s32 i = 0; i < node->expr_proc_call.args_count; ++i){
+				error |= decl_check_inner_expr(node->expr_proc_call.args[i]);
+			}
+		}break;
+		case AST_EXPRESSION_UNARY:{
+			error |= decl_check_inner_expr(node->expr_unary.operand);
+		}break;
+		case AST_EXPRESSION_LITERAL:
+		case AST_EXPRESSION_VARIABLE:
+		break;
+	}
+
 	return error;
 }
 
