@@ -1,4 +1,4 @@
-hash : u64 = 14695981039346656037;
+/*hash : u64 = 14695981039346656037;
 
 factorial :: (v : s32) -> s32 {
 	if v == 1 return 1;
@@ -17,13 +17,13 @@ fnv1_hash :: (str : ^u8, length : u64) -> u64 {
 	}
 
 	return hash;
-}
+}*/
 
 main :: () -> s32{
 	v : [3]s32;
 	v[1] = 1;
 	for(true) {
-		continue;
 	}
+	continue;
 	return 0;
 }

@@ -501,7 +501,10 @@ Decl_Error decl_check_inner_command(Ast* node) {
 	Decl_Error error = DECL_OK;
 
 	switch (node->node_type) {
-		case AST_COMMAND_BLOCK:		error |= decl_check_inner(node->comm_block.block_scope, node->comm_block.commands); break;
+		case AST_COMMAND_BLOCK:	{
+			if(node->comm_block.commands)
+				error |= decl_check_inner(node->comm_block.block_scope, node->comm_block.commands); 
+		}break;
 		case AST_COMMAND_BREAK: {
 			if (!node->comm_break.level) {
 				node->comm_break.level = ast_create_expr_literal(node->scope, LITERAL_HEX_INT, 0, 0, type_primitive_get(TYPE_PRIMITIVE_U64));

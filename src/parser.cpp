@@ -625,10 +625,20 @@ Ast* Parser::parse_comm_for(Scope* scope) {
 	Ast* condition = parse_expression(scope);
 
 	Ast* body = parse_command(scope);
-	if (body->scope)
-		body->scope->flags |= SCOPE_LOOP;
-
-	return ast_create_comm_for(scope, condition, body);
+	if(body->node_type == AST_COMMAND_BLOCK) {
+		if(body->comm_block.block_scope)
+			body->comm_block.block_scope->flags |= SCOPE_LOOP;
+		return ast_create_comm_for(scope, condition, body);
+	} else {
+		Ast** commands = array_create(Ast*, 1);
+		array_push(commands, &body);
+		Ast* inner = ast_create_comm_block(scope, scope_create(0, scope, SCOPE_LOOP), commands, 1);
+		
+		Ast* for_cmd = ast_create_comm_for(scope, condition, inner);
+		inner->comm_block.block_scope->creator_node = for_cmd;
+		inner->comm_block.block_scope->decl_count = 1;
+		return inner;
+	}
 }
 
 Ast* Parser::parse_comm_if(Scope* scope) {
