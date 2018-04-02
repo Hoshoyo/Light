@@ -1,6 +1,7 @@
 #pragma once
 #include "util.h"
 #include "ast.h"
+#include "lexer.h"
 #include "memory.h"
 
 enum Parser_Error {

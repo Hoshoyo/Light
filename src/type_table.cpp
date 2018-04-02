@@ -22,57 +22,63 @@ static Type_Instance* type_void;
 
 inline Type_Instance* type_setup_primitive(Type_Primitive p);
 
-constexpr u64 type_primitive_hash(Type_Primitive p) {
+#if defined(_WIN32) || defined(_WIN64)
+constexpr 
+#endif
+u64 type_primitive_hash(Type_Primitive p) {
+	u64 hash = 0;
 	switch (p) {
 		case TYPE_PRIMITIVE_S64:
-			return fnv_1_hash((const u8*)"s64", sizeof("s64") - 1);
+			hash = fnv_1_hash((const u8*)"s64", sizeof("s64") - 1); break;
 		case TYPE_PRIMITIVE_S32:
-			return fnv_1_hash((const u8*)"s32", sizeof("s32") - 1);
+			hash = fnv_1_hash((const u8*)"s32", sizeof("s32") - 1); break;
 		case TYPE_PRIMITIVE_S16:
-			return fnv_1_hash((const u8*)"s16", sizeof("s16") - 1);
+			hash = fnv_1_hash((const u8*)"s16", sizeof("s16") - 1); break;
 		case TYPE_PRIMITIVE_S8:
-			return fnv_1_hash((const u8*)"s8", sizeof("s8") - 1);
+			hash = fnv_1_hash((const u8*)"s8", sizeof("s8") - 1); break;
 		case TYPE_PRIMITIVE_U64:
-			return fnv_1_hash((const u8*)"u64", sizeof("u64") - 1);
+			hash = fnv_1_hash((const u8*)"u64", sizeof("u64") - 1); break;
 		case TYPE_PRIMITIVE_U32:
-			return fnv_1_hash((const u8*)"u32", sizeof("u32") - 1);
+			hash = fnv_1_hash((const u8*)"u32", sizeof("u32") - 1); break;
 		case TYPE_PRIMITIVE_U16:
-			return fnv_1_hash((const u8*)"u16", sizeof("u16") - 1);
+			hash = fnv_1_hash((const u8*)"u16", sizeof("u16") - 1); break;
 		case TYPE_PRIMITIVE_U8:
-			return fnv_1_hash((const u8*)"u8", sizeof("u8") - 1);
+			hash = fnv_1_hash((const u8*)"u8", sizeof("u8") - 1); break;
 		case TYPE_PRIMITIVE_R32:
-			return fnv_1_hash((const u8*)"r32", sizeof("r32") - 1);
+			hash = fnv_1_hash((const u8*)"r32", sizeof("r32") - 1); break;
 		case TYPE_PRIMITIVE_R64:
-			return fnv_1_hash((const u8*)"r64", sizeof("r64") - 1);
+			hash = fnv_1_hash((const u8*)"r64", sizeof("r64") - 1); break;
 		case TYPE_PRIMITIVE_BOOL:
-			return fnv_1_hash((const u8*)"bool", sizeof("bool") - 1);
+			hash = fnv_1_hash((const u8*)"bool", sizeof("bool") - 1); break;
 		case TYPE_PRIMITIVE_VOID:
-			return fnv_1_hash((const u8*)"void", sizeof("void") - 1);
+			hash = fnv_1_hash((const u8*)"void", sizeof("void") - 1); break;
 	}
+	return hash;
 }
 
 u64 type_hash(Type_Instance* type) {
+	u64 hash = 0;
 	switch (type->kind) {
 		case KIND_PRIMITIVE:
-			return type_primitive_hash(type->primitive);
+			hash = type_primitive_hash(type->primitive); break;
 		case KIND_POINTER:
-			return fnv_1_hash_from_start(type_hash(type->pointer_to), (const u8*)"pointer", sizeof("pointer") - 1);
+			hash = fnv_1_hash_from_start(type_hash(type->pointer_to), (const u8*)"pointer", sizeof("pointer") - 1); break;
 		case KIND_STRUCT:
-			return fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length);
+			hash = fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length); break;
 		case KIND_FUNCTION: {
 			u64 return_type_hash = type_hash(type->function_desc.return_type);
 			size_t n_args = array_get_length(type->function_desc.arguments_type);
 			for (size_t i = 0; i < n_args; ++i) {
 				return_type_hash = fnv_1_hash_combine(return_type_hash, type_hash(type->function_desc.arguments_type[i]));
 			}
-			return return_type_hash;
+			hash = return_type_hash;
 		} break;
 		case KIND_ARRAY:
-			return fnv_1_hash_combine(type_hash(type->array_desc.array_of), type->array_desc.dimension);
+			hash = fnv_1_hash_combine(type_hash(type->array_desc.array_of), type->array_desc.dimension); break;
 		default:
 			assert(0);
 	}
-	return 0;
+	return hash;
 }
 
 static Hash_Table type_table;

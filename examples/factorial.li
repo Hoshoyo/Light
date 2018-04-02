@@ -2,7 +2,7 @@
 main :: () -> s32{
 	v : [3]s32;
 	v[1] = 1;
-	for(true){
+	for(true) {
 		continue;
 	}
 	return 0;

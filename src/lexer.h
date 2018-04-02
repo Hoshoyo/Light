@@ -1,6 +1,7 @@
 #pragma once
 #include "util.h"
 #include "hash_table.h"
+#include "ast.h"
 
 #define TOKEN_STR(T) (T)->value.length, (T)->value.data
 
@@ -175,9 +176,6 @@ struct Keyword {
 };
 
 void internalize_identifier(string* str);
-
-enum Operator_Unary;
-enum Operator_Binary;
 
 Operator_Unary  token_to_unary_op(Token* t);
 Operator_Binary token_to_binary_op(Token* t);

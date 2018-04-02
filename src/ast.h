@@ -1,6 +1,4 @@
 #pragma once
-#include "type.h"
-#include "lexer.h"
 #include "symbol_table.h"
 
 #define SITE_FROM_TOKEN(T) {(T)->filename, (T)->line, (T)->column }
@@ -105,6 +103,8 @@ enum Precedence {
 
 struct Symbol_Table;
 struct Ast;
+struct Token;
+struct Type_Instance;
 
 const u32 SCOPE_PROCEDURE_ARGUMENTS = FLAG(0);
 const u32 SCOPE_PROCEDURE_BODY      = FLAG(1);

@@ -1,5 +1,6 @@
 #include "util.h"
 #include "string.h"
+#include <stdarg.h>
 
 string string_make(const char* v) {
 	string result;

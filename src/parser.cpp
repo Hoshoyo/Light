@@ -1,8 +1,8 @@
 #include "parser.h"
-#include "ast.h"
 #include "util.h"
 #include "type.h"
 #include "type_table.h"
+#include <stdarg.h>
 #include <ho_system.h>
 
 void Parser::report_error_location(Token* tok) {
@@ -333,8 +333,9 @@ Ast* Parser::parse_expression_precedence10(Scope* scope) {
 		}
 	} else if(t->type == '(') {
 		lexer->eat_token();
-		return parse_expression(scope);
+		Ast* expr = parse_expression(scope);
 		require_and_eat(')');
+		return expr;
 	}
 	return 0;
 }

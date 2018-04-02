@@ -3,6 +3,7 @@
 #include "type_table.h"
 #include "type_infer.h"
 #include "lexer.h"
+#include <stdarg.h>
 
 void report_error_location(Token* tok) {
 	fprintf(stderr, "%.*s (%d:%d) ", tok->filename.length, tok->filename.data, tok->line, tok->column);
