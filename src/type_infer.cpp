@@ -387,7 +387,7 @@ Decl_Error type_update_weak(Ast* expr, Type_Instance* strong) {
 
 Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Decl_Error* error) {
 	assert(weak->flags & TYPE_FLAG_WEAK);
-	assert(type_hash(weak) != type_hash(strong));
+	//assert(type_hash(weak) != type_hash(strong));
 
 	switch (weak->kind) {
 		case KIND_PRIMITIVE: {

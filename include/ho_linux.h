@@ -5,7 +5,8 @@
 //#define assert(x) if(!(x)) { __debugbreak(); }
 #define assert(X) do{ if(!(X)) { fprintf(stderr, "assertion failed %s:%d\n", __FILE__, __LINE__); exit(-1); }} while(0)
 #else
-#define assert(X) do{ if(!(X)) { fprintf(stderr, "assertion failed %s:%d\n", __FILE__, __LINE__); exit(-1); }} while(0)
+#define assert(X)
+//#define assert(X) do{ if(!(X)) { fprintf(stderr, "assertion failed %s:%d\n", __FILE__, __LINE__); exit(-1); }} while(0)
 #define assert_msg(X, MSG) do{ if(!(X)) { fprintf(stderr, "assertion failed %s:%d '%s'\n", __FILE__, __LINE__, MSG); exit(-1); }} while(0)
 #endif
 
