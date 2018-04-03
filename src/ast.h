@@ -217,6 +217,7 @@ struct Ast_Decl_Constant {
 struct Ast_Comm_Block {
 	Ast**  commands;	// COMMANDS
 	Scope* block_scope;
+	Ast*   creator;
 	s32    command_count;
 };
 struct Ast_Comm_VariableAssign {
@@ -343,7 +344,7 @@ Ast* ast_create_expr_binary(Scope* scope, Ast* left, Ast* right, Operator_Binary
 Ast* ast_create_expr_proc_call(Scope* scope, Token* name, Ast** arguments, s32 args_count);
 Ast* ast_create_expr_unary(Scope* scope, Ast* operand, Operator_Unary op, Token* token_op, Type_Instance* type_to_cast, u32 flags);
 
-Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** commands, s32 command_count);
+Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** commands, Ast* creator, s32 command_count);
 Ast* ast_create_comm_if(Scope* scope, Ast* condition, Ast* command_true, Ast* command_false);
 Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body);
 Ast* ast_create_comm_break(Scope* scope, Ast* lit, Token* token);

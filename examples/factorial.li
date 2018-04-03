@@ -20,10 +20,6 @@ fnv1_hash :: (str : ^u8, length : u64) -> u64 {
 }*/
 
 main :: () -> s32{
-	v : [3]s32;
-	v[1] = 1;
-	for(true) {
-	}
-	continue;
-	return 0;
+
+	return cast(u32)0;
 }

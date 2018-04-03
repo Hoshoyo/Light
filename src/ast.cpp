@@ -226,7 +226,7 @@ Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Token* tok
 }
 
 // Commands
-Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** commands, s32 command_count) {
+Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** commands, Ast* creator, s32 command_count) {
 	Ast* cb = ALLOC_AST();
 
 	cb->node_type = AST_COMMAND_BLOCK;
@@ -238,6 +238,7 @@ Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** comman
 	cb->comm_block.block_scope = block_scope;
 	cb->comm_block.commands = commands;
 	cb->comm_block.command_count = command_count;
+	cb->comm_block.creator = creator;
 
 	return cb;
 }

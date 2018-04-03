@@ -1,5 +1,6 @@
 #include "type_infer.h"
 #include "decl_check.h"
+#include <stdarg.h>
 
 Decl_Error report_type_mismatch(Type_Instance* t1, Type_Instance* t2) {
 	report_semantic_error(DECL_ERROR_FATAL, "type mismatch ");
@@ -113,15 +114,18 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 		case OP_BINARY_GT:
 		case OP_BINARY_LE:
 		case OP_BINARY_LT: {
+			Type_Instance* booltype = type_primitive_get(TYPE_PRIMITIVE_BOOL);
 			if ((type_primitive_int(left) && type_primitive_int(right)) ||
 				(type_primitive_float(left) && type_primitive_float(right))) 
 			{
 				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
 				if (*error & DECL_ERROR_FATAL) return 0;
-				return inferred;
+				expr->type_return = booltype;
+				return booltype;
 			} else {
 				if (type_hash(left) == type_hash(right)) {
-					return left;
+					expr->type_return = booltype;
+					return booltype;
 				} else {
 					report_error_location(expr);
 					*error = report_type_mismatch(left, right);
@@ -449,4 +453,159 @@ Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* 
 		fprintf(stderr, "\n");
 		return 0;
 	}
+}
+
+
+/*	-------------------------------------------------------------
+	---------------------- Type checking ------------------------
+	------------------------------------------------------------- */
+
+Type_Error report_type_check_error(Type_Error e, char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	fprintf(stderr, "Type Error: ");
+	vfprintf(stderr, fmt, args);
+	va_end(args);
+	return e;
+}
+
+Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2) {
+	report_error_location(node);
+	Type_Error err = report_type_error(TYPE_ERROR_MISMATCH, "type mismatch '");
+	DEBUG_print_type(stderr, t1, true);
+	fprintf(stderr, "' vs '");
+	DEBUG_print_type(stderr, t2, true);
+	fprintf(stderr, "'\n");
+	return err;
+}
+
+Type_Instance* scope_get_function_type(Scope* scope) {
+	while (scope) {
+		if (scope->flags & SCOPE_PROCEDURE_BODY) {
+			assert(scope->creator_node->node_type == AST_COMMAND_BLOCK);
+			Ast* decl = scope->creator_node->comm_block.creator;
+			assert(decl);
+			return decl->decl_procedure.type_return;
+		}
+		scope = scope->parent;
+	}
+	return 0;
+}
+
+Type_Error type_check(Ast* node) {
+	Type_Error error = TYPE_OK;
+
+	switch (node->node_type) {
+		// Declarations
+		case AST_DECL_CONSTANT:{
+			if (node->decl_constant.type_info != node->decl_constant.value->type_return) {
+				error |= type_check(node->decl_constant.value);
+				error |= report_type_mismatch(node, node->decl_constant.type_info, node->decl_constant.value->type_return);
+			}
+		} break;
+		case AST_DECL_VARIABLE: {
+			if (node->decl_variable.assignment && (node->decl_variable.variable_type != node->decl_variable.assignment->type_return)) {
+				error |= type_check(node->decl_variable.assignment);
+				error |= report_type_mismatch(node, node->decl_variable.variable_type, node->decl_variable.assignment->type_return);
+			}
+		}break;
+		case AST_DECL_ENUM: {
+			for (size_t i = 0; i < node->decl_enum.fields_count; ++i) {
+				error |= type_check(node->decl_enum.fields[i]);
+			}
+		}break;
+		case AST_DECL_PROCEDURE: {
+			for (size_t i = 0; i < node->decl_procedure.arguments_count; ++i) {
+				error |= type_check(node->decl_procedure.arguments[i]);
+			}
+			error |= type_check(node->decl_procedure.body);
+		}break;
+		case AST_DECL_STRUCT: {
+			for (size_t i = 0; i < node->decl_struct.fields_count; ++i) {
+				error |= type_check(node->decl_struct.fields[i]);
+			}
+		}break;
+		case AST_DECL_UNION: {
+			for (size_t i = 0; i < node->decl_union.fields_count; ++i) {
+				error |= type_check(node->decl_union.fields[i]);
+			}
+		}break;
+
+		// Commands
+		case AST_COMMAND_BLOCK: {
+			for (size_t i = 0; i < node->comm_block.command_count; ++i) {
+				error |= type_check(node->comm_block.commands[i]);
+			}
+		}break;
+		case AST_COMMAND_FOR: {
+			if (node->comm_for.condition->type_return != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
+				report_error_location(node->comm_for.condition);
+				error |= report_type_check_error(TYPE_ERROR_FATAL, "for condition must have boolean type\n");
+			}
+			error |= type_check(node->comm_for.condition);
+			error |= type_check(node->comm_for.body);
+		}break;
+		case AST_COMMAND_IF: {
+			if (node->comm_if.condition->type_return != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
+				assert(node->comm_if.condition->type_return);
+				report_error_location(node->comm_if.condition);
+				error |= report_type_check_error(TYPE_ERROR_FATAL, "if condition must have boolean type but expression type is '");
+				DEBUG_print_type(stderr, node->comm_if.condition->type_return, true);
+				fprintf(stderr, "'\n");
+			}
+			error |= type_check(node->comm_if.body_true);
+			if (node->comm_if.body_false) {
+				error |= type_check(node->comm_if.body_false);
+			}
+		}break;
+		case AST_COMMAND_RETURN: {
+			Type_Instance* rettype = scope_get_function_type(node->scope);
+			if (!rettype) {
+				report_error_location(node);
+				error |= report_type_check_error(TYPE_ERROR_FATAL, "command return is not inside a procedure body\n");
+			} else {
+				if (rettype == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					if (node->comm_return.expression) {
+						report_error_location(node);
+						error |= report_type_check_error(TYPE_ERROR_FATAL, "non-void return statement of procedure returning void\n");
+					}
+				} else if (rettype != node->comm_return.expression->type_return) {
+					if (node->comm_return.expression->type_return->flags & TYPE_FLAG_WEAK) {
+						Type_Instance* t = type_transform_weak_to_strong(node->comm_return.expression->type_return, rettype, node->comm_return.expression, &error);
+						if (error & TYPE_ERROR_FATAL) return error;
+						assert(t);
+						node->comm_return.expression->type_return = t;
+					} else {
+						error |= report_type_mismatch(node->comm_return.expression, rettype, node->comm_return.expression->type_return);
+					}
+				}
+			}
+			error |= type_check(node->comm_return.expression);
+		}break;
+		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
+
+		}break;
+		case AST_COMMAND_BREAK:
+		case AST_COMMAND_CONTINUE:
+
+		case AST_EXPRESSION_BINARY:
+		case AST_EXPRESSION_LITERAL:
+		case AST_EXPRESSION_PROCEDURE_CALL:
+		case AST_EXPRESSION_UNARY:
+		case AST_EXPRESSION_VARIABLE:
+			break;
+	}
+
+	return error;
+}
+
+Type_Error type_check(Scope* scope, Ast** ast) {
+	size_t ndecl = array_get_length(ast);
+	Type_Error error = TYPE_OK;
+
+	for (size_t i = 0; i < ndecl; ++i) {
+		Ast* node = ast[i];
+		error |= type_check(node);
+	}
+	return error;
 }

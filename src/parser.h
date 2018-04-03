@@ -60,7 +60,7 @@ struct Parser {
 
 	// Command parsing
 	Ast* parse_command(Scope* scope);
-	Ast* parse_comm_block(Scope* scope);
+	Ast* parse_comm_block(Scope* scope, Ast* creator);
 	Ast* parse_comm_if(Scope* scope);
 	Ast* parse_comm_for(Scope* scope);
 	Ast* parse_comm_break(Scope* scope);
