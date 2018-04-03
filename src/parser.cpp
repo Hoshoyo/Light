@@ -159,12 +159,14 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 	// TODO(psv): forward declared procs (foreign)
 	Ast* body = 0;
 	if (arguments_scope)
-		body = parse_comm_block(arguments_scope);
+		body = parse_comm_block(arguments_scope, 0);
 	else
-		body = parse_comm_block(scope);
+		body = parse_comm_block(scope, 0);
 	body->comm_block.block_scope->flags |= SCOPE_PROCEDURE_BODY;
 
 	Ast* node = ast_create_decl_proc(name, scope, arguments_scope, proc_type, arguments, body, return_type, 0, nargs);
+	body->comm_block.creator = node;
+
 	if(arguments_scope)
 		arguments_scope->creator_node = node;
 	return node;
@@ -528,7 +530,7 @@ Ast* Parser::parse_command(Scope* scope) {
 	Ast* command = 0;
 	switch (next->type) {
 		case '{':
-			command = parse_comm_block(scope);
+			command = parse_comm_block(scope, 0);
 			break;
 		case TOKEN_KEYWORD_IF:
 			command = parse_comm_if(scope); 
@@ -643,12 +645,12 @@ Ast* Parser::parse_comm_if(Scope* scope) {
 	return ast_create_comm_if(scope, condition, command_true, command_false);
 }
 
-Ast* Parser::parse_comm_block(Scope* scope) {
+Ast* Parser::parse_comm_block(Scope* scope, Ast* creator) {
 	require_and_eat('{');
 	
 	if (lexer->peek_token_type() == '}') {
 		lexer->eat_token();
-		return ast_create_comm_block(scope, 0, 0, 0);
+		return ast_create_comm_block(scope, 0, 0, creator, 0);
 	}
 
 	Ast** commands = array_create(Ast*, 4);
@@ -665,7 +667,7 @@ Ast* Parser::parse_comm_block(Scope* scope) {
 
 	require_and_eat('}');
 
-	Ast* node = ast_create_comm_block(scope, block_scope, commands, command_count);
+	Ast* node = ast_create_comm_block(scope, block_scope, commands, creator, command_count);
 	node->comm_block.block_scope->creator_node = node;
 	return node;
 }

@@ -25,5 +25,5 @@ main :: () -> s32{
 	for(true) {
 		continue;
 	}
-	return 0;
+	return cast(u32)0;
 }
