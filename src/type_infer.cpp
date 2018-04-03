@@ -32,7 +32,7 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 				return inferred;
 			}
 			report_error_location(expr);
-			*error |= report_type_error(DECL_ERROR_FATAL, "binary '%' operator is not defined for the type '");
+			*error |= report_type_error(DECL_ERROR_FATAL, "binary '%%' operator is not defined for the type '");
 			DEBUG_print_type(stderr, left, true);
 			fprintf(stderr, "'\n");
 		}break;
@@ -402,14 +402,16 @@ Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance*
 			if (type_primitive_float(weak) && type_primitive_float(strong)) {
 				return strong;
 			}
-			report_error_location(expr);
-			*error |= report_type_mismatch(weak, strong);
+			// types are not compatible, strenghten weak type and let the type check error out
+			weak->flags |= TYPE_FLAG_RESOLVED;
+			return internalize_type(&weak, true);
 		}break;
 		case KIND_STRUCT:
 		case KIND_ARRAY:
 		case KIND_POINTER: {
-			report_error_location(expr);
-			*error |= report_type_mismatch(weak, strong);
+			return weak;
+			//report_error_location(expr);
+			//*error |= report_type_mismatch(weak, strong);
 		}break;
 		case KIND_FUNCTION: assert(0); break; // internal compiler error
 	}
@@ -678,6 +680,17 @@ Type_Error type_check(Ast* node) {
 							assert(node->type_return == left_type);
 						} else {
 							error |= report_type_check_error(TYPE_ERROR_FATAL, "binary operators '*' and '/' can only be used on numeric types\n");
+						}
+					}
+				}break;
+				case OP_BINARY_MOD:{
+					if(left_type != right_type) {
+						error |= report_type_mismatch(node, left_type, right_type);
+					} else {
+						if(type_primitive_int(left_type)){
+							// INT % INT |-> INT
+						} else {
+							error |= report_type_check_error(node, "binary operator '%%' requires integer types\n");
 						}
 					}
 				}break;
