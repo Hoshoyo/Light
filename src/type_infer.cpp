@@ -625,7 +625,14 @@ Type_Error type_check(Ast* node) {
 
 			Type_Instance* left_type = node->expr_binary.left->type_return;
 			Type_Instance* right_type = node->expr_binary.right->type_return;
-
+			if(left_type->flags & TYPE_FLAG_WEAK){
+				left_type->flags |= TYPE_FLAG_RESOLVED;
+				left_type = internalize_type(&left_type);
+			}
+			if(right_type->flags & TYPE_FLAG_WEAK){
+				right_type->flags |= TYPE_FLAG_RESOLVED;
+				right_type = internalize_type(&right_type);
+			}
 			switch(node->expr_binary.op){
 				case OP_BINARY_PLUS:
 				case OP_BINARY_MINUS:{
