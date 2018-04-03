@@ -160,7 +160,7 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 
 		case OP_BINARY_DOT: {
 			// TODO(psv): implement
-			assert(0);
+			assert_msg(0, "OP_BINARY_DOT not implemented yet");
 		}break;
 	}
 	return 0;

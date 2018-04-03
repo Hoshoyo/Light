@@ -19,6 +19,7 @@
 #ifdef HO_USE_ASSERT
 #include <assert.h>
 #else
+#include <stdio.h>
 #define assert(X)
 #endif
 
