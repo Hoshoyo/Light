@@ -450,6 +450,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 					var_type->flags |= TYPE_FLAG_RESOLVED;	// if inferred and is weak, keep it as strong
 					node->decl_variable.variable_type = internalize_type(&var_type, true);
 					node->decl_variable.assignment->type_return = var_type;
+					error |= type_update_weak(node->decl_variable.assignment, var_type);
 				} else {
 					report_error_location(node);
 					error |= report_type_error(DECL_ERROR_FATAL, "variable declaration cannot be type inferred without an assignment expression\n");

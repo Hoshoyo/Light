@@ -45,8 +45,8 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 			
 			if ((left->kind == KIND_POINTER) && (right->kind == KIND_POINTER) && (left == right)) {
 				if (expr->expr_binary.op == OP_BINARY_MINUS) {
-					// difference of pointers gives an u64
-					return type_primitive_get(TYPE_PRIMITIVE_U64);
+					// difference of pointers gives an s64
+					return type_primitive_get(TYPE_PRIMITIVE_S64);
 				} else {
 					report_error_location(expr);
 					*error |= report_type_error(DECL_ERROR_FATAL, "cannot add two pointer types\n");
@@ -355,7 +355,7 @@ Decl_Error type_update_weak(Ast* expr, Type_Instance* strong) {
 			// and so both sides of a binary expression must be of the same type
 			//														- PSV 1 Apr 2018
 			error |= type_update_weak(expr->expr_binary.left, strong);
-			error |= type_update_weak(expr->expr_binary.left, strong);
+			error |= type_update_weak(expr->expr_binary.right, strong);
 		}break;
 		case AST_EXPRESSION_LITERAL: {
 			expr->type_return = type_transform_weak_to_strong(expr->type_return, strong, expr, &error);
@@ -391,8 +391,17 @@ Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance*
 
 	switch (weak->kind) {
 		case KIND_PRIMITIVE: {
-			if (type_primitive_int(weak) || type_primitive_float(weak))
+			if(strong->kind != KIND_PRIMITIVE){
+				// cannot infer from expression the type of this weak node, so strengthen it
+				weak->flags |= TYPE_FLAG_RESOLVED;
+				return internalize_type(&weak, true);
+			}
+			if (type_primitive_int(weak) && type_primitive_int(strong)) {
 				return strong;
+			}
+			if (type_primitive_float(weak) && type_primitive_float(strong)) {
+				return strong;
+			}
 			report_error_location(expr);
 			*error |= report_type_mismatch(weak, strong);
 		}break;
@@ -460,6 +469,16 @@ Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* 
 	---------------------- Type checking ------------------------
 	------------------------------------------------------------- */
 
+Type_Error report_type_check_error(Ast* location, Type_Error e, char* fmt, ...) {
+	report_error_location(location);
+	va_list args;
+	va_start(args, fmt);
+	fprintf(stderr, "Type Error: ");
+	vfprintf(stderr, fmt, args);
+	va_end(args);
+	return e;
+}
+
 Type_Error report_type_check_error(Type_Error e, char* fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
@@ -504,8 +523,10 @@ Type_Error type_check(Ast* node) {
 			}
 		} break;
 		case AST_DECL_VARIABLE: {
-			if (node->decl_variable.assignment && (node->decl_variable.variable_type != node->decl_variable.assignment->type_return)) {
+			if(node->decl_variable.assignment){
 				error |= type_check(node->decl_variable.assignment);
+			}
+			if (node->decl_variable.assignment && (node->decl_variable.variable_type != node->decl_variable.assignment->type_return)) {
 				error |= report_type_mismatch(node, node->decl_variable.variable_type, node->decl_variable.assignment->type_return);
 			}
 		}break;
@@ -585,12 +606,141 @@ Type_Error type_check(Ast* node) {
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
 
 		}break;
-		case AST_COMMAND_BREAK:
-		case AST_COMMAND_CONTINUE:
+		case AST_COMMAND_BREAK:{
+			Type_Instance* break_lvl_type = node->comm_break.level->type_return;
+			if(!type_primitive_int(break_lvl_type)){
+				report_error_location(node->comm_break.level);
+				error |= report_type_check_error(TYPE_ERROR_FATAL, "break statement argument must be an integer literal > 0\n");
+			}
+		}break;
+		case AST_COMMAND_CONTINUE: break;
 
-		case AST_EXPRESSION_BINARY:
-		case AST_EXPRESSION_LITERAL:
-		case AST_EXPRESSION_PROCEDURE_CALL:
+		case AST_EXPRESSION_BINARY: {
+			error |= type_check(node->expr_binary.left);
+			error |= type_check(node->expr_binary.right);
+
+			if(error & TYPE_ERROR_FATAL) return error;
+
+			Type_Instance* left_type = node->expr_binary.left->type_return;
+			Type_Instance* right_type = node->expr_binary.right->type_return;
+
+			switch(node->expr_binary.op){
+				case OP_BINARY_PLUS:
+				case OP_BINARY_MINUS:{
+					if(left_type->kind == KIND_POINTER) {
+						if(right_type->kind == KIND_POINTER){
+							if(node->expr_binary.op == OP_BINARY_PLUS){
+								// ^T + ^T |-> error
+								error |= report_type_check_error(node->expr_binary.op, TYPE_ERROR_FATAL, "pointer type cannot be added to another pointer type\n");
+							} else {
+								// ^T - ^T |-> s64
+								assert(node->type_return == type_primitive_get(TYPE_PRIMITIVE_S64));
+								if(left_type != right_type) {
+									error |= report_type_check_error(node->expr_binary.op, TYPE_ERROR_FATAL, "type mismatch in pointer arithmetic '-', '");
+									DEBUG_print_type(stderr, left_type, true);
+									fprintf(stderr, "' vs '");
+									DEBUG_print_type(stderr, right_type, true);
+									fprintf(stderr, "\n");
+								}
+							}
+						} else if(type_primitive_int(right_type)) {
+							// ^T + INT |-> ^T
+							assert(node->type_return == left_type);
+						} else {
+							if(node->expr_binary.op == OP_BINARY_PLUS){
+								error |= report_type_check_error(TYPE_ERROR_FATAL, "pointer arithmetic type mismatch, trying to add '");
+								DEBUG_print_type(stderr, left_type, true);
+								fprintf(stderr, "' to ");
+								DEBUG_print_type(stderr, right_type, true);
+							} else {
+								error |= report_type_check_error(TYPE_ERROR_FATAL, "pointer arithmetic type mismatch, trying to subtract '");
+								DEBUG_print_type(stderr, right_type, true);
+								fprintf(stderr, "' from ");
+								DEBUG_print_type(stderr, left_type, true);
+							}
+							fprintf(stderr, "\n");
+						}
+					} else {
+						// TODO(psv): add coercions of integer and floating point types to bigger versions of themselves
+						if(left_type != right_type) {
+							error |= report_type_mismatch(node, left_type, right_type);
+						}
+					}
+				}break;
+				case OP_BINARY_MULT:
+				case OP_BINARY_DIV:{
+					// TODO(psv): add coercions of integer and floating point types to bigger versions of themselves
+					if(left_type != right_type) {
+						error |= report_type_mismatch(node, left_type, right_type);
+					} else {
+						if(type_primitive_int(left_type) || type_primitive_float(left_type)){
+							// NUMERIC * NUMERIC |-> NUMERIC
+							assert(node->type_return == left_type);
+						} else {
+							error |= report_type_check_error(TYPE_ERROR_FATAL, "binary operators '*' and '/' can only be used on numeric types\n");
+						}
+					}
+				}break;
+				case OP_BINARY_AND:
+				case OP_BINARY_OR: {
+					if(left_type != right_type) {
+						error |= report_type_mismatch(node, left_type, right_type);
+					} else {
+						// TODO(psv): allow only unsigned here? maybe signed?
+						if(type_primitive_int_unsigned(left_type)){
+							error |= report_type_check_error(node, "binary operators '&' and '|' require unsigned integer types\n");
+						}
+					}
+				}break;
+				case OP_BINARY_XOR: {
+					if(left_type != right_type) {
+						error |= report_type_mismatch(node, left_type, right_type);
+					} else {
+						if(type_primitive_int_unsigned(left_type) || type_primitive_bool(left_type)){
+							// UINT ^ UINT |-> UINT
+							// BOOL ^ BOOL |-> BOOL
+						} else {
+							error |= report_type_check_error(TYPE_ERROR_FATAL, "binary operator 'xor' can only be used on boolean or unsigned integer types\n");
+						}
+					}
+				}break;
+				case OP_BINARY_EQUAL:
+				case OP_BINARY_NOT_EQUAL:
+				case OP_BINARY_LE:
+				case OP_BINARY_LT:
+				case OP_BINARY_GE:
+				case OP_BINARY_GT:{
+					if(left_type != right_type) {
+						error |= report_type_mismatch(node, left_type, right_type);
+					} else {
+						if(type_primitive_int(left_type) || type_primitive_float(left_type)){
+							// INT compare INT     |-> BOOL
+							// FLOAT compare FLOAT |-> BOOL
+							assert(node->type_return == type_primitive_get(TYPE_PRIMITIVE_BOOL));
+						} else {
+							error |= report_type_check_error(TYPE_ERROR_FATAL, "binary comparison operators can only be used on numeric types\n");
+						}
+					}
+				}break;
+				case OP_BINARY_LOGIC_AND:
+				case OP_BINARY_LOGIC_OR: {
+					if((left_type != right_type) || left_type != type_primitive_get(TYPE_PRIMITIVE_BOOL)){
+						error |= report_type_check_error(TYPE_ERROR_FATAL, "binary logic operators '&&' and '||' can only be used on boolean type\n");
+					}
+				}break;
+				case OP_BINARY_DOT:{
+					// TODO(psv): implement
+				}break;
+				case OP_BINARY_VECTOR_ACCESS: {
+					// TODO(psv): implement
+				}break;
+			}
+		}break;
+		case AST_EXPRESSION_LITERAL: break;
+
+		case AST_EXPRESSION_PROCEDURE_CALL:{
+		
+		}break;
 		case AST_EXPRESSION_UNARY:
 		case AST_EXPRESSION_VARIABLE:
 			break;
