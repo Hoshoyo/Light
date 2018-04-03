@@ -551,7 +551,7 @@ Decl_Error decl_check_inner_command(Ast* node) {
 				error |= decl_check_inner_expr(node->comm_return.expression);
 		}break;
 		case AST_COMMAND_FOR: {
-			assert(node->comm_for.body->scope->flags & SCOPE_LOOP);
+			assert(node->comm_for.body->comm_block.block_scope->flags & SCOPE_LOOP);
 			error |= decl_check_inner_expr(node->comm_for.condition);
 			error |= decl_check_inner_command(node->comm_for.body);
 		}break;

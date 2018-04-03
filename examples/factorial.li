@@ -17,8 +17,8 @@ fnv1_hash :: (str : ^u8, length : u64) -> u64 {
 	}
 
 	return hash;
-}*/
-
+}
+*/
 main :: () -> s32{
 	//t1 := 2.0 * 2.0;
 	//t2 := 2.0 / 2.0;
@@ -30,12 +30,17 @@ main :: () -> s32{
 	//t8 := 2.0 >= 2.0;
 	//t9 := 2.0 == 2.0;
 	//ta := 2.0 != 2.0;
-
+/*
 	ptr  : ^s32;
 	ptr2 : ^s64;
 	val : s32;
 
 	x := ptr - &val;
+	*/
+	for(true){
+		x := 1;
+		break;
+	}
 
 	return 0;
 }
