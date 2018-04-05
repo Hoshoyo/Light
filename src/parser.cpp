@@ -445,7 +445,7 @@ Ast* Parser::parse_expression_precedence2(Scope* scope) {
 Ast* Parser::parse_expression_precedence1(Scope* scope) {
 	Ast* expr = parse_expression_precedence2(scope);
 	Token_Type next = lexer->peek_token_type();
-	if (next == TOKEN_LOGIC_OR || next == TOKEN_LOGIC_OR) {
+	if (next == TOKEN_LOGIC_OR || next == TOKEN_LOGIC_AND) {
 		Token* op = lexer->eat_token();
 		Ast* right = parse_expression_precedence1(scope);
 		return ast_create_expr_binary(scope, expr, right, token_to_binary_op(op), op);

@@ -640,12 +640,12 @@ Type_Error type_check(Ast* node) {
 						if(right_type->kind == KIND_POINTER){
 							if(node->expr_binary.op == OP_BINARY_PLUS){
 								// ^T + ^T |-> error
-								error |= report_type_check_error(node->expr_binary.op, TYPE_ERROR_FATAL, "pointer type cannot be added to another pointer type\n");
+								error |= report_type_check_error(node, TYPE_ERROR_FATAL, "pointer type cannot be added to another pointer type\n");
 							} else {
 								// ^T - ^T |-> s64
 								assert(node->type_return == type_primitive_get(TYPE_PRIMITIVE_S64));
 								if(left_type != right_type) {
-									error |= report_type_check_error(node->expr_binary.op, TYPE_ERROR_FATAL, "type mismatch in pointer arithmetic '-', '");
+									error |= report_type_check_error(node, TYPE_ERROR_FATAL, "type mismatch in pointer arithmetic '-', '");
 									DEBUG_print_type(stderr, left_type, true);
 									fprintf(stderr, "' vs '");
 									DEBUG_print_type(stderr, right_type, true);
@@ -697,7 +697,7 @@ Type_Error type_check(Ast* node) {
 						if(type_primitive_int(left_type)){
 							// INT % INT |-> INT
 						} else {
-							error |= report_type_check_error(node, "binary operator '%%' requires integer types\n");
+							error |= report_type_check_error(node, TYPE_ERROR_FATAL, "binary operator '%%' requires integer types\n");
 						}
 					}
 				}break;
@@ -708,7 +708,7 @@ Type_Error type_check(Ast* node) {
 					} else {
 						// TODO(psv): allow only unsigned here? maybe signed?
 						if(type_primitive_int_unsigned(left_type)){
-							error |= report_type_check_error(node, "binary operators '&' and '|' require unsigned integer types\n");
+							error |= report_type_check_error(node, TYPE_ERROR_FATAL, "binary operators '&' and '|' require unsigned integer types\n");
 						}
 					}
 				}break;
