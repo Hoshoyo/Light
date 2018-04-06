@@ -450,6 +450,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 					if(var_type->flags & TYPE_FLAG_WEAK){
 						var_type->flags |= TYPE_FLAG_RESOLVED;	// if inferred and is weak, keep it as strong
 						error |= type_update_weak(node->decl_variable.assignment, var_type);
+						if (error & DECL_ERROR_FATAL) return error;
 					}
 					node->decl_variable.variable_type = internalize_type(&var_type, true);
 					node->decl_variable.assignment->type_return = var_type;

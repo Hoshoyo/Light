@@ -173,6 +173,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_unde
 		case OP_UNARY_CAST:{
 			Type_Instance* res = resolve_type(expr->scope, expr->expr_unary.type_to_cast, rep_undeclared);
 			if (!res) {
+				report_error_location(expr);
 				*error |= report_type_error(DECL_ERROR_FATAL, "could not infer type of cast, type '");
 				DEBUG_print_type(stderr, expr->expr_unary.type_to_cast, true);
 				fprintf(stderr, "' is invalid\n");
@@ -208,10 +209,12 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_unde
 				*error |= report_type_error(DECL_ERROR_FATAL, "cannot dereference a non pointer type '");
 				DEBUG_print_type(stderr, operand_type, true);
 				fprintf(stderr, "'\n");
+				return 0;
+			} else {
+				Type_Instance* res = operand_type->pointer_to;
+				assert(res->flags & TYPE_FLAG_INTERNALIZED);
+				return res;
 			}
-			Type_Instance* res = operand_type->pointer_to;
-			assert(res->flags & TYPE_FLAG_INTERNALIZED);
-			return res;
 		}break;
 		case OP_UNARY_LOGIC_NOT: {
 			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared, lval);
@@ -222,6 +225,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_unde
 				assert(operand_type->flags & TYPE_FLAG_INTERNALIZED);
 				return operand_type;
 			} else {
+				report_error_location(expr);
 				*error |= report_type_error(DECL_ERROR_FATAL, "unary operator '!' can only be used in a boolean type\n");
 				return 0;
 			}
@@ -234,6 +238,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_unde
 			if (type_primitive_int(operand_type)) {
 				return operand_type;
 			} else {
+				report_error_location(expr);
 				*error |= report_type_error(DECL_ERROR_FATAL, "unary operator not '~' can only be used in integer types\n");
 				return 0;
 			}
@@ -368,11 +373,21 @@ Decl_Error type_update_weak(Ast* expr, Type_Instance* strong) {
 				error |= type_update_weak(expr->expr_unary.operand, strong);
 			}break;
 
-			case OP_UNARY_ADDRESSOF:		// cannot be weak, because a variable operand has strong type
+			case OP_UNARY_ADDRESSOF: {			// cannot be weak, because a variable operand has strong type
+				report_error_location(expr);
+				error |= report_type_error(DECL_ERROR_FATAL, "type infer failed, tried to address an rvalue\n");
+			}break;
+			case OP_UNARY_DEREFERENCE: {		// cannot be weak, because a variable operand has strong type
+				report_error_location(expr);
+				error |= report_type_error(DECL_ERROR_FATAL, "type infer failed, tried to dereference an rvalue\n");
+			}break;
+			case OP_UNARY_LOGIC_NOT: {		// cannot be weak, because bool is always strong
+				report_error_location(expr);
+				error |= report_type_error(DECL_ERROR_FATAL, "type infer failed, logic '!' operator can only be used on booleans\n");
+			}break;
 			case OP_UNARY_CAST:				// cannot be weak by definition
-			case OP_UNARY_DEREFERENCE:		// cannot be weak, because a variable operand has strong type
-			case OP_UNARY_LOGIC_NOT:		// cannot be weak, because bool is always strong
-				assert(0); break;
+				break;
+			default: assert(0); break;
 			}
 		}break;
 
