@@ -1,13 +1,14 @@
 #include "type_infer.h"
 #include "decl_check.h"
-#include <stdarg.h>
 
-Decl_Error report_type_mismatch(Type_Instance* t1, Type_Instance* t2) {
-	report_semantic_error(DECL_ERROR_FATAL, "type mismatch ");
+Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2) {
+	report_error_location(node);
+	Type_Error err = report_type_error(TYPE_ERROR_MISMATCH, "type mismatch '");
 	DEBUG_print_type(stderr, t1, true);
-	fprintf(stderr, " vs ");
+	fprintf(stderr, "' vs '");
 	DEBUG_print_type(stderr, t2, true);
-	return DECL_ERROR_FATAL;
+	fprintf(stderr, "'\n");
+	return err;
 }
 
 Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Decl_Error* error);
@@ -17,7 +18,7 @@ Type_Instance* infer_from_literal_expr(Ast* expr, Decl_Error* error, bool rep_un
 Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval = false);
 Type_Instance* infer_from_proc_call_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval = false);
 
-Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval) {
+Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
 	Type_Instance* left  = infer_from_expression(expr->expr_binary.left, error, rep_undeclared, lval);
 	Type_Instance* right = infer_from_expression(expr->expr_binary.right, error, rep_undeclared, lval);
 
@@ -31,8 +32,7 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 				if (*error & DECL_ERROR_FATAL) return 0;
 				return inferred;
 			}
-			report_error_location(expr);
-			*error |= report_type_error(DECL_ERROR_FATAL, "binary '%%' operator is not defined for the type '");
+			*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary '%%' operator is not defined for the type '");
 			DEBUG_print_type(stderr, left, true);
 			fprintf(stderr, "'\n");
 		}break;
@@ -48,8 +48,7 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 					// difference of pointers gives an s64
 					return type_primitive_get(TYPE_PRIMITIVE_S64);
 				} else {
-					report_error_location(expr);
-					*error |= report_type_error(DECL_ERROR_FATAL, "cannot add two pointer types\n");
+					*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot add two pointer types\n");
 					return 0;
 				}
 			}
@@ -63,21 +62,21 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 				if (*error & DECL_ERROR_FATAL) return 0;
 				return inferred;
 			}
-			report_error_location(expr);
 			if (type_hash(left) == type_hash(right)) {
-				*error |= report_type_error(DECL_ERROR_FATAL, "binary arithmetic expressions are not defined for the type '");
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary arithmetic expressions are not defined for the type '");
 				DEBUG_print_type(stderr, left, true);
 				fprintf(stderr, "'\n");
 			} else {
-				*error |= report_type_mismatch(left, right);
+				*error |= report_type_mismatch(expr, left, right);
 				fprintf(stderr, "\n");
 			}
 		}break;
 		case OP_BINARY_XOR: {
 			if (type_primitive_bool(left) && type_primitive_bool(right)) {
 				return left;
+			} else {
 			}
-		}
+		} break;
 		case OP_BINARY_AND:
 		case OP_BINARY_OR:
 		case OP_BINARY_SHL:
@@ -88,13 +87,12 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 				if (*error & DECL_ERROR_FATAL) return 0;
 				return inferred;
 			}
-			report_error_location(expr);
 			if (type_hash(left) == type_hash(right)) {
-				*error |= report_type_error(DECL_ERROR_FATAL, "binary bitwise expressions are not defined for the type '");
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary bitwise expressions are not defined for the type '");
 				DEBUG_print_type(stderr, left, true);
 				fprintf(stderr, "'\n");
 			} else {
-				*error |= report_type_mismatch(left, right);
+				*error |= report_type_mismatch(expr, left, right);
 				fprintf(stderr, "\n");
 			}
 		}break;
@@ -127,8 +125,7 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 					expr->type_return = booltype;
 					return booltype;
 				} else {
-					report_error_location(expr);
-					*error = report_type_mismatch(left, right);
+					*error = report_type_mismatch(expr, left, right);
 					fprintf(stderr, "\n");
 				}
 			}
@@ -150,8 +147,7 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 				}
 				return res;
 			} else {
-				report_error_location(expr);
-				*error |= report_type_error(DECL_ERROR_FATAL, "cannot dereference a non pointer type '");
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot dereference a non pointer type '");
 				DEBUG_print_type(stderr, operand_type, true);
 				fprintf(stderr, "'\n");
 				return 0;
@@ -166,15 +162,14 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_und
 	return 0;
 }
 
-Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval) {
+Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
 	assert(expr->node_type == AST_EXPRESSION_UNARY);
 
 	switch (expr->expr_unary.op) {
 		case OP_UNARY_CAST:{
 			Type_Instance* res = resolve_type(expr->scope, expr->expr_unary.type_to_cast, rep_undeclared);
 			if (!res) {
-				report_error_location(expr);
-				*error |= report_type_error(DECL_ERROR_FATAL, "could not infer type of cast, type '");
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "could not infer type of cast, type '");
 				DEBUG_print_type(stderr, expr->expr_unary.type_to_cast, true);
 				fprintf(stderr, "' is invalid\n");
 			}
@@ -183,7 +178,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_unde
 		case OP_UNARY_ADDRESSOF: {
 			// TODO(psv): check if it can only ask for address of lvalue (strong type)
 			Type_Instance* res = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared, lval);
-			if (*error & DECL_ERROR_FATAL) return 0;
+			if (*error & TYPE_ERROR_FATAL) return 0;
 			if (!res) return 0;
 
 			Type_Instance* newtype = type_new_temporary();
@@ -201,12 +196,11 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_unde
 		}break;
 		case OP_UNARY_DEREFERENCE: {
 			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared, lval);
-			if (*error & DECL_ERROR_FATAL) return 0;
+			if (*error & TYPE_ERROR_FATAL) return 0;
 			if (!operand_type) return 0;
 
 			if (operand_type->kind != KIND_POINTER) {
-				report_error_location(expr);
-				*error |= report_type_error(DECL_ERROR_FATAL, "cannot dereference a non pointer type '");
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot dereference a non pointer type '");
 				DEBUG_print_type(stderr, operand_type, true);
 				fprintf(stderr, "'\n");
 				return 0;
@@ -218,41 +212,39 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_unde
 		}break;
 		case OP_UNARY_LOGIC_NOT: {
 			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared, lval);
-			if (*error & DECL_ERROR_FATAL) return 0;
+			if (*error & TYPE_ERROR_FATAL) return 0;
 			if (!operand_type) return 0;
 
 			if (type_primitive_bool(operand_type)) {
 				assert(operand_type->flags & TYPE_FLAG_INTERNALIZED);
 				return operand_type;
 			} else {
-				report_error_location(expr);
-				*error |= report_type_error(DECL_ERROR_FATAL, "unary operator '!' can only be used in a boolean type\n");
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "unary operator '!' can only be used in a boolean type\n");
 				return 0;
 			}
 		}break;
 		case OP_UNARY_BITWISE_NOT: {
 			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared, lval);
-			if (*error & DECL_ERROR_FATAL) return 0;
+			if (*error & TYPE_ERROR_FATAL) return 0;
 			if (!operand_type) return 0;
 
 			if (type_primitive_int(operand_type)) {
 				return operand_type;
 			} else {
-				report_error_location(expr);
-				*error |= report_type_error(DECL_ERROR_FATAL, "unary operator not '~' can only be used in integer types\n");
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "unary operator not '~' can only be used in integer types\n");
 				return 0;
 			}
 		}break;
 		case OP_UNARY_PLUS:
 		case OP_UNARY_MINUS: {
 			Type_Instance* operand_type = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared, lval);
-			if (*error & DECL_ERROR_FATAL) return 0;
+			if (*error & TYPE_ERROR_FATAL) return 0;
 			if (!operand_type) return 0;
 
 			if (type_primitive_int(operand_type) || type_primitive_float(operand_type)) {
 				return operand_type;
 			} else {
-				*error |= report_type_error(DECL_ERROR_FATAL, "unary operators '+' or '-' can only be used in numeric types\n");
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "unary operators '+' or '-' can only be used in numeric types\n");
 				return 0;
 			}
 		}break;
@@ -260,7 +252,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_unde
 	return 0;
 }
 
-Type_Instance* infer_from_literal_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval) {
+Type_Instance* infer_from_literal_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
 	Type_Instance* result = type_new_temporary();
 	result->flags = 0 | TYPE_FLAG_WEAK;
 	switch (expr->expr_literal.type) {
@@ -286,7 +278,7 @@ Type_Instance* infer_from_literal_expr(Ast* expr, Decl_Error* error, bool rep_un
 	return result;
 }
 
-Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval) {
+Type_Instance* infer_from_variable_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
 	assert(expr->node_type == AST_EXPRESSION_VARIABLE);
 
 	Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
@@ -296,7 +288,7 @@ Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error, bool rep_u
 		return 0;
 	}
 	if (decl->node_type != AST_DECL_VARIABLE && decl->node_type != AST_DECL_CONSTANT) {
-		*error |= report_semantic_error(DECL_ERROR_FATAL, 
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr->expr_variable.name, 
 			"could not infer type from name '%.*s', it is not a variable nor constant\n", TOKEN_STR(expr->expr_variable.name));
 		return 0;
 	}
@@ -314,14 +306,14 @@ Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error, bool rep_u
 	return type;
 }
 
-Type_Instance* infer_from_proc_call_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval) {
+Type_Instance* infer_from_proc_call_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
 	Ast* decl = decl_from_name(expr->scope, expr->expr_proc_call.name);
 	if (!decl) {
 		*error |= report_undeclared(expr->expr_proc_call.name);
 		return 0;
 	}
 	if (decl->node_type != AST_DECL_PROCEDURE) {
-		*error |= report_semantic_error(DECL_ERROR_FATAL, 
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr,
 			"'%.*s' used in a procedure call, but is not a procedure\n", TOKEN_STR(expr->expr_proc_call.name));
 		return 0;
 	}
@@ -330,7 +322,7 @@ Type_Instance* infer_from_proc_call_expr(Ast* expr, Decl_Error* error, bool rep_
 	return type;
 }
 
-Type_Instance* infer_from_expression(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval) {
+Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 	
 	Type_Instance* type = 0;
@@ -346,7 +338,7 @@ Type_Instance* infer_from_expression(Ast* expr, Decl_Error* error, bool rep_unde
 	return type;
 }
 
-Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Decl_Error* error);
+Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Type_Error* error);
 
 Decl_Error type_update_weak(Ast* expr, Type_Instance* strong) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
@@ -374,16 +366,13 @@ Decl_Error type_update_weak(Ast* expr, Type_Instance* strong) {
 			}break;
 
 			case OP_UNARY_ADDRESSOF: {			// cannot be weak, because a variable operand has strong type
-				report_error_location(expr);
-				error |= report_type_error(DECL_ERROR_FATAL, "type infer failed, tried to address an rvalue\n");
+				error |= report_type_error(TYPE_ERROR_FATAL, expr, "type infer failed, tried to address an rvalue\n");
 			}break;
 			case OP_UNARY_DEREFERENCE: {		// cannot be weak, because a variable operand has strong type
-				report_error_location(expr);
-				error |= report_type_error(DECL_ERROR_FATAL, "type infer failed, tried to dereference an rvalue\n");
+				error |= report_type_error(TYPE_ERROR_FATAL, expr, "type infer failed, tried to dereference an rvalue\n");
 			}break;
 			case OP_UNARY_LOGIC_NOT: {		// cannot be weak, because bool is always strong
-				report_error_location(expr);
-				error |= report_type_error(DECL_ERROR_FATAL, "type infer failed, logic '!' operator can only be used on booleans\n");
+				error |= report_type_error(TYPE_ERROR_FATAL, expr, "type infer failed, logic '!' operator can only be used on booleans\n");
 			}break;
 			case OP_UNARY_CAST:				// cannot be weak by definition
 				break;
@@ -400,7 +389,7 @@ Decl_Error type_update_weak(Ast* expr, Type_Instance* strong) {
 	return error;
 }
 
-Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Decl_Error* error) {
+Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Type_Error* error) {
 	assert(weak->flags & TYPE_FLAG_WEAK);
 	//assert(type_hash(weak) != type_hash(strong));
 
@@ -435,13 +424,12 @@ Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance*
 
 // Resolve the strength of a type TODO(psv): "and updated its children when necessary."
 // the returned type is always the correct type, unless an error occurred, then this function returns 0
-Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Decl_Error* error) {
+Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Type_Error* error) {
 	if (t1->flags & TYPE_FLAG_WEAK && t2->flags & TYPE_FLAG_WEAK) {
 		if (type_hash(t1) == type_hash(t2)) {
 			return t1;
 		} else {
-			report_error_location(expr1);
-			*error |= report_semantic_error(DECL_ERROR_FATAL, "could not infer type from two different weak types: ");
+			*error |= report_type_error(TYPE_ERROR_FATAL, expr1, "could not infer type from two different weak types: ");
 			DEBUG_print_type(stderr, t1, true);
 			fprintf(stderr, " and ");
 			DEBUG_print_type(stderr, t2, true);
@@ -471,8 +459,7 @@ Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* 
 	if (t1->flags & TYPE_FLAG_STRONG && t2->flags & TYPE_FLAG_STRONG) {
 		if (t1 == t2) return t1;
 
-		report_error_location(expr1);
-		*error |= report_semantic_error(DECL_ERROR_FATAL, "type mismatch ");
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr1, "type mismatch ");
 		DEBUG_print_type(stderr, t1, true);
 		fprintf(stderr, " vs ");
 		DEBUG_print_type(stderr, t2, true);
@@ -485,35 +472,6 @@ Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* 
 /*	-------------------------------------------------------------
 	---------------------- Type checking ------------------------
 	------------------------------------------------------------- */
-
-Type_Error report_type_check_error(Ast* location, Type_Error e, char* fmt, ...) {
-	report_error_location(location);
-	va_list args;
-	va_start(args, fmt);
-	fprintf(stderr, "Type Error: ");
-	vfprintf(stderr, fmt, args);
-	va_end(args);
-	return e;
-}
-
-Type_Error report_type_check_error(Type_Error e, char* fmt, ...) {
-	va_list args;
-	va_start(args, fmt);
-	fprintf(stderr, "Type Error: ");
-	vfprintf(stderr, fmt, args);
-	va_end(args);
-	return e;
-}
-
-Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2) {
-	report_error_location(node);
-	Type_Error err = report_type_error(TYPE_ERROR_MISMATCH, "type mismatch '");
-	DEBUG_print_type(stderr, t1, true);
-	fprintf(stderr, "' vs '");
-	DEBUG_print_type(stderr, t2, true);
-	fprintf(stderr, "'\n");
-	return err;
-}
 
 Type_Instance* scope_get_function_type(Scope* scope) {
 	while (scope) {
@@ -577,8 +535,7 @@ Type_Error type_check(Ast* node) {
 		}break;
 		case AST_COMMAND_FOR: {
 			if (node->comm_for.condition->type_return != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
-				report_error_location(node->comm_for.condition);
-				error |= report_type_check_error(TYPE_ERROR_FATAL, "for condition must have boolean type\n");
+				error |= report_type_error(TYPE_ERROR_FATAL, node->comm_for.condition, "for condition must have boolean type\n");
 			}
 			error |= type_check(node->comm_for.condition);
 			error |= type_check(node->comm_for.body);
@@ -586,8 +543,7 @@ Type_Error type_check(Ast* node) {
 		case AST_COMMAND_IF: {
 			if (node->comm_if.condition->type_return != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
 				assert(node->comm_if.condition->type_return);
-				report_error_location(node->comm_if.condition);
-				error |= report_type_check_error(TYPE_ERROR_FATAL, "if condition must have boolean type but expression type is '");
+				error |= report_type_error(TYPE_ERROR_FATAL, node->comm_if.condition, "if condition must have boolean type but expression type is '");
 				DEBUG_print_type(stderr, node->comm_if.condition->type_return, true);
 				fprintf(stderr, "'\n");
 			}
@@ -599,13 +555,11 @@ Type_Error type_check(Ast* node) {
 		case AST_COMMAND_RETURN: {
 			Type_Instance* rettype = scope_get_function_type(node->scope);
 			if (!rettype) {
-				report_error_location(node);
-				error |= report_type_check_error(TYPE_ERROR_FATAL, "command return is not inside a procedure body\n");
+				error |= report_type_error(TYPE_ERROR_FATAL, node, "command return is not inside a procedure body\n");
 			} else {
 				if (rettype == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
 					if (node->comm_return.expression) {
-						report_error_location(node);
-						error |= report_type_check_error(TYPE_ERROR_FATAL, "non-void return statement of procedure returning void\n");
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "non-void return statement of procedure returning void\n");
 					}
 				} else if (rettype != node->comm_return.expression->type_return) {
 					if (node->comm_return.expression->type_return->flags & TYPE_FLAG_WEAK) {
@@ -628,7 +582,7 @@ Type_Error type_check(Ast* node) {
 			Type_Instance* break_lvl_type = node->comm_break.level->type_return;
 			if(!type_primitive_int(break_lvl_type)){
 				report_error_location(node->comm_break.level);
-				error |= report_type_check_error(TYPE_ERROR_FATAL, "break statement argument must be an integer literal > 0\n");
+				error |= report_type_error(TYPE_ERROR_FATAL, node->comm_break.level, "break statement argument must be an integer literal > 0\n");
 			}
 		}break;
 		case AST_COMMAND_CONTINUE: break;
@@ -656,12 +610,12 @@ Type_Error type_check(Ast* node) {
 						if(right_type->kind == KIND_POINTER){
 							if(node->expr_binary.op == OP_BINARY_PLUS){
 								// ^T + ^T |-> error
-								error |= report_type_check_error(node, TYPE_ERROR_FATAL, "pointer type cannot be added to another pointer type\n");
+								error |= report_type_error(TYPE_ERROR_FATAL, node, "pointer type cannot be added to another pointer type\n");
 							} else {
 								// ^T - ^T |-> s64
 								assert(node->type_return == type_primitive_get(TYPE_PRIMITIVE_S64));
 								if(left_type != right_type) {
-									error |= report_type_check_error(node, TYPE_ERROR_FATAL, "type mismatch in pointer arithmetic '-', '");
+									error |= report_type_error(TYPE_ERROR_FATAL, node, "type mismatch in pointer arithmetic '-', '");
 									DEBUG_print_type(stderr, left_type, true);
 									fprintf(stderr, "' vs '");
 									DEBUG_print_type(stderr, right_type, true);
@@ -673,12 +627,12 @@ Type_Error type_check(Ast* node) {
 							assert(node->type_return == left_type);
 						} else {
 							if(node->expr_binary.op == OP_BINARY_PLUS){
-								error |= report_type_check_error(TYPE_ERROR_FATAL, "pointer arithmetic type mismatch, trying to add '");
+								error |= report_type_error(TYPE_ERROR_FATAL, node, "pointer arithmetic type mismatch, trying to add '");
 								DEBUG_print_type(stderr, left_type, true);
 								fprintf(stderr, "' to ");
 								DEBUG_print_type(stderr, right_type, true);
 							} else {
-								error |= report_type_check_error(TYPE_ERROR_FATAL, "pointer arithmetic type mismatch, trying to subtract '");
+								error |= report_type_error(TYPE_ERROR_FATAL, node, "pointer arithmetic type mismatch, trying to subtract '");
 								DEBUG_print_type(stderr, right_type, true);
 								fprintf(stderr, "' from ");
 								DEBUG_print_type(stderr, left_type, true);
@@ -702,7 +656,7 @@ Type_Error type_check(Ast* node) {
 							// NUMERIC * NUMERIC |-> NUMERIC
 							assert(node->type_return == left_type);
 						} else {
-							error |= report_type_check_error(TYPE_ERROR_FATAL, "binary operators '*' and '/' can only be used on numeric types\n");
+							error |= report_type_error(TYPE_ERROR_FATAL, node, "binary operators '*' and '/' can only be used on numeric types\n");
 						}
 					}
 				}break;
@@ -713,7 +667,7 @@ Type_Error type_check(Ast* node) {
 						if(type_primitive_int(left_type)){
 							// INT % INT |-> INT
 						} else {
-							error |= report_type_check_error(node, TYPE_ERROR_FATAL, "binary operator '%%' requires integer types\n");
+							error |= report_type_error(TYPE_ERROR_FATAL, node, "binary operator '%%' requires integer types\n");
 						}
 					}
 				}break;
@@ -724,7 +678,7 @@ Type_Error type_check(Ast* node) {
 					} else {
 						// TODO(psv): allow only unsigned here? maybe signed?
 						if(type_primitive_int_unsigned(left_type)){
-							error |= report_type_check_error(node, TYPE_ERROR_FATAL, "binary operators '&' and '|' require unsigned integer types\n");
+							error |= report_type_error(TYPE_ERROR_FATAL, node, "binary operators '&' and '|' require unsigned integer types\n");
 						}
 					}
 				}break;
@@ -736,7 +690,7 @@ Type_Error type_check(Ast* node) {
 							// UINT ^ UINT |-> UINT
 							// BOOL ^ BOOL |-> BOOL
 						} else {
-							error |= report_type_check_error(TYPE_ERROR_FATAL, "binary operator 'xor' can only be used on boolean or unsigned integer types\n");
+							error |= report_type_error(TYPE_ERROR_FATAL, node, "binary operator 'xor' can only be used on boolean or unsigned integer types\n");
 						}
 					}
 				}break;
@@ -754,14 +708,14 @@ Type_Error type_check(Ast* node) {
 							// FLOAT compare FLOAT |-> BOOL
 							assert(node->type_return == type_primitive_get(TYPE_PRIMITIVE_BOOL));
 						} else {
-							error |= report_type_check_error(TYPE_ERROR_FATAL, "binary comparison operators can only be used on numeric types\n");
+							error |= report_type_error(TYPE_ERROR_FATAL, node, "binary comparison operators can only be used on numeric types\n");
 						}
 					}
 				}break;
 				case OP_BINARY_LOGIC_AND:
 				case OP_BINARY_LOGIC_OR: {
 					if((left_type != right_type) || left_type != type_primitive_get(TYPE_PRIMITIVE_BOOL)){
-						error |= report_type_check_error(TYPE_ERROR_FATAL, "binary logic operators '&&' and '||' can only be used on boolean type\n");
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "binary logic operators '&&' and '||' can only be used on boolean type\n");
 					}
 				}break;
 				case OP_BINARY_DOT:{
