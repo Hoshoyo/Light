@@ -618,7 +618,8 @@ Type_Error type_check(Ast* node) {
 					}
 				}
 			}
-			error |= type_check(node->comm_return.expression);
+			if(node->comm_return.expression)
+				error |= type_check(node->comm_return.expression);
 		}break;
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
 
