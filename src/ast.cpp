@@ -459,6 +459,10 @@ void DEBUG_print_proc_decl(FILE* out, Ast* proc_node) {
 void DEBUG_print_expression(FILE* out, Ast* node) {
 	switch (node->node_type) {
 	case AST_EXPRESSION_LITERAL: {
+		if(!node->type_return) {
+			fprintf(out, "<nil>");
+			break;
+		}
 		if(node->type_return->kind == KIND_PRIMITIVE){
 			switch(node->type_return->primitive){
 				case TYPE_PRIMITIVE_BOOL:	(node->expr_literal.value_bool) ? fprintf(out, "true") : fprintf(out, "false"); break;

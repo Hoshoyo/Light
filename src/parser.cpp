@@ -162,7 +162,9 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 		body = parse_comm_block(arguments_scope, 0);
 	else
 		body = parse_comm_block(scope, 0);
-	body->comm_block.block_scope->flags |= SCOPE_PROCEDURE_BODY;
+	if(body->comm_block.block_scope){
+		body->comm_block.block_scope->flags |= SCOPE_PROCEDURE_BODY;
+	}
 
 	Ast* node = ast_create_decl_proc(name, scope, arguments_scope, proc_type, arguments, body, return_type, 0, nargs);
 	body->comm_block.creator = node;
@@ -385,7 +387,7 @@ Ast* Parser::parse_expression_precedence7(Scope* scope) {
 
 Ast* Parser::parse_expression_precedence6(Scope* scope) {
 	Token_Type next = lexer->peek_token_type();
-	if (next == '~' || next == '!' || next == '&' || next == '*') {
+	if (next == '~' || next == '!' || next == '&' || next == '*' || next == '-' || next == '+') {
 		Token* op = lexer->eat_token();
 		Ast* operand = parse_expression_precedence6(scope);
 		return ast_create_expr_unary(scope, operand, token_to_unary_op(op), op, 0, UNARY_EXPR_FLAG_PREFIXED);
