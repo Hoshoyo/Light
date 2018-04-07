@@ -1,9 +1,10 @@
 #include "type_infer.h"
 #include "decl_check.h"
+#include "ast.h"
 
 Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2) {
 	report_error_location(node);
-	Type_Error err = report_type_error(TYPE_ERROR_MISMATCH, "type mismatch '");
+	Type_Error err = report_type_error(TYPE_ERROR_FATAL, "type mismatch '");
 	DEBUG_print_type(stderr, t1, true);
 	fprintf(stderr, "' vs '");
 	DEBUG_print_type(stderr, t2, true);
@@ -11,12 +12,12 @@ Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2)
 	return err;
 }
 
-Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Decl_Error* error);
-Type_Instance* infer_from_binary_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval = false);
-Type_Instance* infer_from_unary_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval = false);
-Type_Instance* infer_from_literal_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval = false);
-Type_Instance* infer_from_variable_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval = false);
-Type_Instance* infer_from_proc_call_expr(Ast* expr, Decl_Error* error, bool rep_undeclared, bool lval = false);
+Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Type_Error* error);
+Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
+Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
+Type_Instance* infer_from_literal_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
+Type_Instance* infer_from_variable_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
+Type_Instance* infer_from_proc_call_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
 
 Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
 	Type_Instance* left  = infer_from_expression(expr->expr_binary.left, error, rep_undeclared, lval);
@@ -29,7 +30,7 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_und
 		case OP_BINARY_MOD:{
 			if (type_primitive_int(left) && type_primitive_int(right)) {
 				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (*error & DECL_ERROR_FATAL) return 0;
+				if (*error & TYPE_ERROR_FATAL) return 0;
 				return inferred;
 			}
 			*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary '%%' operator is not defined for the type '");
@@ -59,7 +60,7 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_und
 				(type_primitive_float(left) && type_primitive_float(right))) 
 			{
 				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (*error & DECL_ERROR_FATAL) return 0;
+				if (*error & TYPE_ERROR_FATAL) return 0;
 				return inferred;
 			}
 			if (type_hash(left) == type_hash(right)) {
@@ -74,7 +75,10 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_und
 		case OP_BINARY_XOR: {
 			if (type_primitive_bool(left) && type_primitive_bool(right)) {
 				return left;
+			} else if(type_primitive_int(left) && type_primitive_int(right)) {
+				return type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
 			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary 'xor' operator is only defined for integer types\n");
 			}
 		} break;
 		case OP_BINARY_AND:
@@ -84,13 +88,12 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_und
 			if (type_primitive_int(left) && type_primitive_int(right)) 
 			{
 				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (*error & DECL_ERROR_FATAL) return 0;
+				if (*error & TYPE_ERROR_FATAL) return 0;
 				return inferred;
 			}
 			if (type_hash(left) == type_hash(right)) {
-				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary bitwise expressions are not defined for the type '");
-				DEBUG_print_type(stderr, left, true);
-				fprintf(stderr, "'\n");
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary '%s' operator is only defined for integer types\n",
+					binop_op_to_string(expr->expr_binary.op));
 			} else {
 				*error |= report_type_mismatch(expr, left, right);
 				fprintf(stderr, "\n");
@@ -117,7 +120,7 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_und
 				(type_primitive_float(left) && type_primitive_float(right))) 
 			{
 				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (*error & DECL_ERROR_FATAL) return 0;
+				if (*error & TYPE_ERROR_FATAL) return 0;
 				expr->type_return = booltype;
 				return booltype;
 			} else {
@@ -133,12 +136,12 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_und
 		case OP_BINARY_VECTOR_ACCESS: {
 			// right is index
 			Type_Instance* index_type = infer_from_expression(expr->expr_binary.right, error, rep_undeclared);
-			if (*error & DECL_ERROR_FATAL) return 0;
+			if (*error & TYPE_ERROR_FATAL) return 0;
 			expr->expr_binary.right->type_return = index_type;
 
 			Type_Instance* operand_type = infer_from_expression(expr->expr_binary.left, error, rep_undeclared, lval);
 			// left is indexed
-			if (*error & DECL_ERROR_FATAL) return 0;
+			if (*error & TYPE_ERROR_FATAL) return 0;
 			if (operand_type->kind == KIND_POINTER) {
 				Type_Instance* res = operand_type->pointer_to;
 				assert(res->flags & TYPE_FLAG_INTERNALIZED);
@@ -173,6 +176,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_unde
 				DEBUG_print_type(stderr, expr->expr_unary.type_to_cast, true);
 				fprintf(stderr, "' is invalid\n");
 			}
+			expr->expr_unary.operand->type_return = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared, lval);
 			return res;
 		}break;
 		case OP_UNARY_ADDRESSOF: {
@@ -340,9 +344,9 @@ Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, bool rep_unde
 
 Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Type_Error* error);
 
-Decl_Error type_update_weak(Ast* expr, Type_Instance* strong) {
+Type_Error type_update_weak(Ast* expr, Type_Instance* strong) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
-	Decl_Error error = DECL_OK;
+	Type_Error error = TYPE_OK;
 	
 	switch (expr->node_type) {
 		case AST_EXPRESSION_BINARY:{
@@ -686,11 +690,11 @@ Type_Error type_check(Ast* node) {
 					if(left_type != right_type) {
 						error |= report_type_mismatch(node, left_type, right_type);
 					} else {
-						if(type_primitive_int_unsigned(left_type) || type_primitive_bool(left_type)){
+						if(type_primitive_int(left_type) || type_primitive_bool(left_type)){
 							// UINT ^ UINT |-> UINT
 							// BOOL ^ BOOL |-> BOOL
 						} else {
-							error |= report_type_error(TYPE_ERROR_FATAL, node, "binary operator 'xor' can only be used on boolean or unsigned integer types\n");
+							error |= report_type_error(TYPE_ERROR_FATAL, node, "binary operator 'xor' can only be used on boolean or integer types\n");
 						}
 					}
 				}break;

@@ -9,7 +9,6 @@ typedef u32 Type_Error;
 typedef u32 Decl_Error;
 
 const u32 TYPE_OK              = 0;
-const u32 TYPE_ERROR_MISMATCH  = FLAG(0);
 const u32 TYPE_ERROR_FATAL     = FLAG(1);
 
 const u32 DECL_OK		       = 0;

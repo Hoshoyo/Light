@@ -344,6 +344,34 @@ Ast* ast_create_comm_return(Scope* scope, Ast* expr, Token* token) {
 
 
 
+char* binop_op_to_string(Operator_Binary binop) {
+	char* str = 0;
+	switch (binop) {
+		case OP_BINARY_AND:				str = "&"; break;
+		case OP_BINARY_OR:				str = "|"; break;
+		case OP_BINARY_PLUS:			str = "+"; break;
+		case OP_BINARY_MINUS:			str = "-"; break;
+		case OP_BINARY_DIV:				str = "/"; break;
+		case OP_BINARY_MULT:			str = "*"; break;
+		case OP_BINARY_MOD:				str = "%"; break;
+		case OP_BINARY_EQUAL:			str = "="; break;
+		case OP_BINARY_NOT_EQUAL:		str = "!="; break;
+		case OP_BINARY_GE:				str = ">="; break;
+		case OP_BINARY_GT:				str = ">"; break;
+		case OP_BINARY_LE:				str = "<="; break;
+		case OP_BINARY_LT:				str = "<"; break;
+		case OP_BINARY_LOGIC_AND:		str = "&&"; break;
+		case OP_BINARY_LOGIC_OR:		str = "||"; break;
+		case OP_BINARY_SHL:				str = "<<"; break;
+		case OP_BINARY_SHR:				str = ">>"; break;
+		case OP_BINARY_XOR:				str = "^"; break;
+		case OP_BINARY_VECTOR_ACCESS:	str = "[]"; break;
+		case OP_BINARY_DOT:				str = "."; break;
+		default: str = ""; break;
+	}
+	return str;
+}
+
 
 #if 1
 

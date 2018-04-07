@@ -136,6 +136,7 @@
   <ItemGroup>
     <ClCompile Include="src\ast.cpp" />
     <ClCompile Include="src\decl_check.cpp" />
+    <ClCompile Include="src\error.cpp" />
     <ClCompile Include="src\hash_table.cpp" />
     <ClCompile Include="src\lexer.cpp" />
     <ClCompile Include="src\main.cpp" />
@@ -150,6 +151,7 @@
   <ItemGroup>
     <ClInclude Include="src\ast.h" />
     <ClInclude Include="src\decl_check.h" />
+    <ClInclude Include="src\error.h" />
     <ClInclude Include="src\hash_table.h" />
     <ClInclude Include="src\lexer.h" />
     <ClInclude Include="src\memory.h" />

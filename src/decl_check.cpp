@@ -24,8 +24,8 @@ inline void infer_queue_remove(Ast* node) {
 // ---------------------------------------------
 
 Decl_Error report_redeclaration(char* node_type, Token* redeclared, Token* existing) {
-	report_decl_error(DECL_ERROR_FATAL, redeclared, "Declaration Error: redeclaration of %s %.*s \n", node_type, TOKEN_STR(redeclared));
-	fprintf(stderr, " - previously defined at\n");
+	report_decl_error(DECL_ERROR_FATAL, redeclared, "redeclaration of %s %.*s \n", node_type, TOKEN_STR(redeclared));
+	fprintf(stderr, " - previously defined at: ");
 	report_error_location(existing);
 	fprintf(stderr, "\n");
 	return DECL_ERROR_FATAL;
@@ -358,7 +358,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				if (node->decl_variable.assignment) {
 					// infer from expression
 					var_type = infer_from_expression(node->decl_variable.assignment, &error, true);
-					if (error & DECL_ERROR_FATAL) return error;
+					if (error & TYPE_ERROR_FATAL) return error;
 					assert(var_type);
 					if(var_type->flags & TYPE_FLAG_WEAK){
 						var_type->flags |= TYPE_FLAG_RESOLVED;	// if inferred and is weak, keep it as strong
@@ -400,13 +400,17 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				error |= decl_insert_into_symbol_table(node, node->decl_constant.name, "constant");
 		}break;
 		case AST_DECL_PROCEDURE: {
+			//for (size_t i = 0; i < node->decl_procedure.arguments_count; ++i) {
+			//	Ast* arg = node->decl_procedure.arguments[i];
+			//	error |= decl_check_inner_decl(arg);
+			//}
 			error |= decl_check_inner_command(node->decl_procedure.body);
 			if (node->scope->level > 0)
 				error |= decl_insert_into_symbol_table(node, node->decl_procedure.name, "procedure");
 		}break;
-		case AST_DECL_STRUCT: assert(0); break; // should not have struct inner decl yet
-		case AST_DECL_ENUM: assert(0); break; // should not have enum inner decl yet
-		case AST_DECL_UNION: assert(0); break; // should not have union inner decl yet
+		case AST_DECL_STRUCT: break; // should not have struct inner decl yet
+		case AST_DECL_ENUM: break; // should not have enum inner decl yet
+		case AST_DECL_UNION: break; // should not have union inner decl yet
 		default: assert(0); break; // TODO(psv): internal error
 	}
 

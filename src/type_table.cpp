@@ -109,7 +109,8 @@ Type_Instance* type_copy_internal(Type_Instance* type) {
 	switch (type->kind) {
 	case KIND_PRIMITIVE: break;
 	case KIND_POINTER:
-		result->pointer_to = type_copy_internal(type->pointer_to);
+		internalize_type(&type->pointer_to, true);
+		//result->pointer_to = type_copy_internal(type->pointer_to);
 		break;
 	case KIND_STRUCT: {
 		size_t num_args = array_get_length(type->struct_desc.fields_types);
@@ -135,7 +136,8 @@ Type_Instance* type_copy_internal(Type_Instance* type) {
 		}
 	}break;
 	case KIND_ARRAY:
-		result->array_desc.array_of = type_copy_internal(type->array_desc.array_of);
+		internalize_type(&type->array_desc.array_of, true);
+		//result->array_desc.array_of = type_copy_internal(type->array_desc.array_of);
 		break;
 	default:
 		assert(0);
