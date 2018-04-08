@@ -9,10 +9,10 @@ typedef u32 Type_Error;
 typedef u32 Decl_Error;
 
 const u32 TYPE_OK              = 0;
-const u32 TYPE_ERROR_FATAL     = FLAG(1);
+const u32 TYPE_ERROR_FATAL     = FLAG(1);	// has to be equal to DECL_ERROR_FATAL
 
 const u32 DECL_OK		       = 0;
-const u32 DECL_ERROR_FATAL	   = FLAG(1);
+const u32 DECL_ERROR_FATAL	   = FLAG(1);	// has to be equal to TYPE_ERROR_FATAL
 const u32 DECL_ERROR_WARNING   = FLAG(2);
 const u32 DECL_QUEUED_TYPE     = FLAG(3);
 

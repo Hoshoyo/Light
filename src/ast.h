@@ -136,6 +136,7 @@ struct Site {
 // ------------ Declarations --------------
 // ----------------------------------------
 
+const u32 DECL_PROC_FLAG_FOREIGN = FLAG(0);
 struct Ast_Decl_Procedure {
 	Token*         name;
 	Ast**          arguments;		// DECL_VARIABLE
@@ -280,8 +281,11 @@ struct Ast_Expr_Literal {
 
 		bool value_bool;
 
-		Ast*  value_struct;		// LITERALS
-		void* value_array;		// DATA IN MEMORY
+		Ast*  value_struct;			// LITERALS
+		struct {
+			void* value_array;		// DATA IN MEMORY
+			u32   llvm_index;
+		};
 	};
 };
 struct Ast_Expr_Variable {

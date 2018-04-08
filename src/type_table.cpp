@@ -2,6 +2,8 @@
 #include "util.h"
 #include "memory.h"
 
+Type_Instance** g_type_table = 0;
+
 #define ALLOC_TYPE(ARENA) (Type_Instance*)(ARENA).allocate(sizeof(Type_Instance))
 
 static Memory_Arena types_internal(65536);
@@ -86,6 +88,7 @@ static Hash_Table type_table;
 void type_table_init() {
 	// TODO(psv): no compare function between types yet
 	hash_table_init(&type_table, 1024 * 1024 * 4, (hash_function_type*)type_hash, (hash_entries_equal_type*)0);
+	g_type_table = array_create(Type_Instance*, 1024);
 
 	type_s64 = type_setup_primitive(TYPE_PRIMITIVE_S64);
 	type_s32 = type_setup_primitive(TYPE_PRIMITIVE_S32);
@@ -120,11 +123,11 @@ Type_Instance* type_copy_internal(Type_Instance* type) {
 		array_set_length(result->struct_desc.fields_types, num_args);
 		array_set_element_size(result->struct_desc.fields_types, sizeof(Type_Instance*));
 		for (size_t i = 0; i < num_args; ++i) {
-			result->struct_desc.fields_types[i] = type_copy_internal(type->struct_desc.fields_types[i]);
+			result->struct_desc.fields_types[i] = internalize_type(&type->struct_desc.fields_types[i]);//type_copy_internal(type->struct_desc.fields_types[i]);
 		}
 	}break;
 	case KIND_FUNCTION: {
-		result->function_desc.return_type = type_copy_internal(type->function_desc.return_type);
+		result->function_desc.return_type = internalize_type(&type->function_desc.return_type);//type_copy_internal(type->function_desc.return_type);
 		size_t num_args = type->function_desc.num_arguments;
 		result->function_desc.arguments_type = (Type_Instance**)types_internal.allocate(array_get_header_size() + num_args * sizeof(Type_Instance*));
 		result->function_desc.arguments_type = (Type_Instance**)((u8*)result->function_desc.arguments_type + array_get_header_size());
@@ -132,7 +135,7 @@ Type_Instance* type_copy_internal(Type_Instance* type) {
 		array_set_length(result->function_desc.arguments_type, num_args);
 		array_set_element_size(result->function_desc.arguments_type, sizeof(Type_Instance*));
 		for (size_t i = 0; i < num_args; ++i) {
-			result->function_desc.arguments_type[i] = type_copy_internal(type->function_desc.arguments_type[i]);
+			result->function_desc.arguments_type[i] = internalize_type(&type->function_desc.arguments_type[i]);//type_copy_internal(type->function_desc.arguments_type[i]);
 		}
 	}break;
 	case KIND_ARRAY:
@@ -159,6 +162,7 @@ Type_Instance* internalize_type(Type_Instance** type, bool copy) {
 		} else {
 			index = hash_table_add(&type_table, *type, sizeof(*type), hash);
 		}
+		array_push(g_type_table, type);
 	}
 	*type = (Type_Instance*)type_table.entries[index].data;
 	(*type)->flags |= TYPE_FLAG_INTERNALIZED | TYPE_FLAG_STRONG;
@@ -222,11 +226,10 @@ s64 type_pointer_size() {
 
 #include "ast.h"
 void DEBUG_print_type_table() {
-	for (size_t i = 0; i < type_table.entries_capacity; ++i) {
-		if (type_table.entries[i].occupied) {
-			Type_Instance* t = (Type_Instance*)type_table.entries[i].data;
-			DEBUG_print_type(stdout, t, true);
-			fprintf(stdout, "\t\tsize: %lld\n", t->type_size_bits);
-		}
+	size_t len = array_get_length(g_type_table);
+	for (size_t i = 0; i < len; ++i) {
+		Type_Instance* t = g_type_table[i];
+		DEBUG_print_type(stdout, t, true);
+		fprintf(stdout, "\t\tsize: %lld\n", t->type_size_bits);
 	}
 }

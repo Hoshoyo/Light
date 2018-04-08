@@ -175,6 +175,11 @@ struct Keyword {
 	u32 flags;
 };
 
+enum Compiler_Tags {
+	COMPILER_TAG_FOREIGN = 0,
+};
+extern string compiler_tags[];
+
 void internalize_identifier(string* str);
 
 Operator_Unary  token_to_unary_op(Token* t);

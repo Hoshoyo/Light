@@ -1,6 +1,7 @@
 #pragma once
 #include "ast.h"
 #include "type.h"
+#include "type_table.h"
 
 struct LLVM_Code_Generator {
 	char* in_filename;
@@ -24,10 +25,10 @@ struct LLVM_Code_Generator {
 	u32 string_literal_temp;
 	Ast** deferred_string_literals;
 
-	void llvm_emit_type_decls(Type_Table* type_table);
+	void llvm_emit_type_decls(Type_Instance** type_table);
 
 	// literal strings
-	s32  llvm_define_string_literal(Ast_Literal* lit);
+	s32  llvm_define_string_literal(Ast_Expr_Literal* lit);
 
 	// expressions
 	s32  llvm_emit_expression(Ast* expr);
@@ -41,7 +42,8 @@ struct LLVM_Code_Generator {
 	void llvm_generate_temporary_code();
 };
 
-void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename);
+void llvm_generate_ir(Ast** toplevel, Type_Instance** type_table, char* filename);
 
 // helper functions
 bool ast_node_is_embeded_literal(Ast* node);
+bool ast_node_is_embeded_variable(Ast* node);

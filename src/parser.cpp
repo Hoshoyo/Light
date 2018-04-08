@@ -156,18 +156,43 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 	}
 
 	scope->decl_count += 1;
-	// TODO(psv): forward declared procs (foreign)
 	Ast* body = 0;
-	if (arguments_scope)
-		body = parse_comm_block(arguments_scope, 0);
-	else
-		body = parse_comm_block(scope, 0);
-	if(body->comm_block.block_scope){
-		body->comm_block.block_scope->flags |= SCOPE_PROCEDURE_BODY;
+	u32  flags = 0;
+	Token* extern_library_name = 0;
+
+	// TODO(psv): forward declared procs (foreign)
+	if (lexer->peek_token_type() == '#') {
+		lexer->eat_token();
+		Token* tag = lexer->eat_token();
+		if (compiler_tags[COMPILER_TAG_FOREIGN].data == tag->value.data) {
+			require_and_eat('(');
+			Ast* libname = parse_expr_literal(scope);
+			if (libname->expr_literal.flags & LITERAL_FLAG_STRING) {
+				extern_library_name = libname->expr_literal.token;
+			} else {
+				report_syntax_error(tag, "foreign compiler tag requires string literal as library path\n");
+			}
+			require_and_eat(')');
+		} else {
+			report_syntax_error(tag, "expected compiler tag but got '%.*s'\n", TOKEN_STR(tag));
+		}
+		require_and_eat(';');
+		flags |= DECL_PROC_FLAG_FOREIGN;
+	} else {
+		if (arguments_scope)
+			body = parse_comm_block(arguments_scope, 0);
+		else
+			body = parse_comm_block(scope, 0);
+		if(body->comm_block.block_scope){
+			body->comm_block.block_scope->flags |= SCOPE_PROCEDURE_BODY;
+		}
 	}
 
-	Ast* node = ast_create_decl_proc(name, scope, arguments_scope, proc_type, arguments, body, return_type, 0, nargs);
-	body->comm_block.creator = node;
+	Ast* node = ast_create_decl_proc(name, scope, arguments_scope, proc_type, arguments, body, return_type, flags, nargs);
+	node->decl_procedure.extern_library_name = extern_library_name;
+	if (body) {
+		body->comm_block.creator = node;
+	}
 
 	if(arguments_scope)
 		arguments_scope->creator_node = node;
@@ -511,6 +536,7 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 			node->expr_literal.type = LITERAL_FLOAT;
 			node->expr_literal.value_r64 = literal_float_to_r64(first);
 		case TOKEN_LITERAL_STRING:
+			node->expr_literal.type = LITERAL_STRUCT;
 			node->expr_literal.flags |= LITERAL_FLAG_STRING;
 			// TODO(psv): get type string here already
 		default: {

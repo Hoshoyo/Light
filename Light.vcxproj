@@ -139,6 +139,7 @@
     <ClCompile Include="src\error.cpp" />
     <ClCompile Include="src\hash_table.cpp" />
     <ClCompile Include="src\lexer.cpp" />
+    <ClCompile Include="src\llvm_backend.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\memory.cpp" />
     <ClCompile Include="src\parser.cpp" />
@@ -154,6 +155,7 @@
     <ClInclude Include="src\error.h" />
     <ClInclude Include="src\hash_table.h" />
     <ClInclude Include="src\lexer.h" />
+    <ClInclude Include="src\llvm_backend.h" />
     <ClInclude Include="src\memory.h" />
     <ClInclude Include="src\parser.h" />
     <ClInclude Include="src\symbol_table.h" />

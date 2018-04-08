@@ -13,3 +13,131 @@ main :: () -> s32 {
 	count(10);
 	return 0;
 }
+/*hash : u64 = 14695981039346656037;
+
+factorial :: (v : s32) -> s32 {
+	if v == 1 return 1;
+	return v * factorial(v - 1);
+}
+
+fnv1_hash :: (str : ^u8, length : u64) -> u64 {
+	hash : u64 = 14695981039346656037;
+	fnv_prime : u64 = 1099511628211;
+
+	i : u64 = 0;
+	for (i < length) {
+		hash = hash * fnv_prime;
+		hash = hash ^ cast(u64)str[i];
+		i += 1;
+	}
+
+	return hash;
+}
+*/
+/*
+quicksort :: (a : ^s32, left : s32, right : s32) -> void {
+	i : s32;
+	j : s32;
+	x : s32;
+	y : s32;
+	
+	i = left;
+	j = right;
+	x = a[(left + right) / 2];
+	
+	for i <= j {
+		for a[i] < x && i < right {
+			i += 1;
+		}
+		for a[j] > x && j > left {
+			j += 1;
+		}
+		if i <= j {
+			y = a[i];
+			a[i] = a[j];
+			a[j] = y;
+			i += 1;
+			j -= 1;
+		}
+	}
+	if j > left {
+		quicksort(a, left, j);
+	}
+	if i < right {
+		quicksort(a, i, right);
+	}
+}*/
+
+/*
+float_invalid :: () {
+	//t1 := 2.0 || 2.0;
+	//t2 := 2.0 && 2.0;
+	//t3 := 2.0 ^ 2.0;
+	//t4 := 2.0 | 2.0;
+	//t5 := 2.0 & 2.0;
+	//t6 := 2.0 >> 2.0;
+	//t7 := 2.0 << 2.0;
+	//t8 := &(1.0 + &2.0);
+	//t9 := *2.0;
+	//ta := 2.0 % 2.0;
+	//tb := !2.0;
+	//tc := ~2.0;
+	//td := 2.0[1];
+	//te := 2.0 . 2.0;
+}
+*/
+
+/*
+int_valid :: () {
+	//t1 := 2 * 2;
+	//t2 := 2 / 2;
+	//t3 := 2 + 2;
+	//t4 := 2 - 2;
+	//t5 := 2 > 2;
+	//t6 := 2 < 2;
+	//t7 := 2 <= 2;
+	//t8 := 2 >= 2;
+	//t9 := 2 == 2;
+	//ta := 2 != 2;
+	//tb := 2 ^ 2;
+	//tc := 2 | 2;
+	//td := 2 & 2;
+	//te := 2 >> 2;
+	//tf := 2 << 2;
+	//tg := 2 % 2;
+	//th := -2;
+	//ti := +2;
+	//tj := ~2;
+	tk := cast(^vec3)2;
+}
+*/
+/*
+vec3 :: struct {
+	x: r32;
+	y: r32;
+	z: r32;
+}
+*/
+
+/*
+int_invalid :: () {
+	t1 := !2;
+	t2 := *2;
+	t3 := &2;
+	t4 := 2[2];
+}
+*/
+/*
+float_valid :: () {
+	t1 := 2.0 * 2.0;
+	t2 := 2.0 / 2.0;
+	t3 := 2.0 + 2.0;
+	t4 := 2.0 - 2.0;
+	t5 := 2.0 > 2.0;
+	t6 := 2.0 < 2.0;
+	t7 := 2.0 <= 2.0;
+	t8 := 2.0 >= 2.0;
+	t9 := 2.0 == 2.0;
+	ta := 2.0 != 2.0;
+}
+*/

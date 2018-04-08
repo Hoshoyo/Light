@@ -5,7 +5,7 @@
 #include <string.h>
 
 #ifdef _DEBUG
-#define assert_msg(x) do { if(!(x)) { fprintf(stderr, "assertion failed %s:%d", __FILE__, __LINE__); DebugBreak(); } }while(0)
+#define assert_msg(x, MSG) do { if(!(x)) { fprintf(stderr, "assertion failed %s:%d '%s'", __FILE__, __LINE__, MSG); DebugBreak(); } }while(0)
 #define assert(x) do { if(!(x)) { DebugBreak(); }}while(0)
 #else
 #define assert(x)

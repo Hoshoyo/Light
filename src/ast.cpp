@@ -36,7 +36,7 @@ Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Typ
 	dp->decl_procedure.arguments = arguments;
 	dp->decl_procedure.body = body;
 	dp->decl_procedure.type_return = type_return;
-	dp->decl_procedure.flags = 0;
+	dp->decl_procedure.flags = flags;
 	dp->decl_procedure.arguments_count = arguments_count;
 	dp->decl_procedure.extern_library_name = 0;
 	dp->decl_procedure.type_procedure = ptype;
@@ -64,6 +64,7 @@ Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_I
 	dv->decl_variable.temporary_register = 0;
 	dv->decl_variable.variable_type = var_type;
 	dv->decl_variable.assignment = assignment;
+	dv->decl_variable.alignment = 8;		// @TEMPORARY
 
 	dv->decl_variable.site.filename = name->filename;
 	dv->decl_variable.site.line = name->line;
@@ -86,7 +87,7 @@ Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Type
 	ds->decl_struct.fields_count = field_count;
 	ds->decl_struct.flags = flags;
 	ds->decl_struct.size_bytes = 0;
-	ds->decl_struct.alignment = 0;
+	ds->decl_struct.alignment = 8;		// @TEMPORARY
 	ds->decl_struct.type_info = stype;
 	ds->decl_struct.struct_scope = struct_scope;
 
@@ -389,6 +390,13 @@ void DEBUG_print_indent_level() {
 	}
 }
 
+void quick_type(FILE* out, Type_Instance* type) {
+	if (!print_types)  return;
+	fprintf(out, "<");
+	DEBUG_print_type(out, type, true);
+	fprintf(out, ">");
+}
+
 void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
 	if (!type) {
 		fprintf(out, "(TYPE_IS_NULL)");
@@ -446,7 +454,8 @@ void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
 
 void DEBUG_print_block(FILE* out, Ast* block)
 {
-	size_t num_commands = block->comm_block.command_count;//array_get_length(block->comm_block.commands);
+	size_t num_commands = block->comm_block.command_count;
+	quick_type(out, block->type_return);
 	fprintf(out, "{\n");
 	DEBUG_indent_level += 1;
 	for (size_t i = 0; i < num_commands; ++i) {
@@ -467,6 +476,8 @@ void DEBUG_print_block(FILE* out, Ast* block)
 }
 
 void DEBUG_print_proc_decl(FILE* out, Ast* proc_node) {
+	quick_type(out, proc_node->type_return);
+	quick_type(out, proc_node->decl_procedure.type_procedure);
 	fprintf(out, "%.*s :: (", TOKEN_STR(proc_node->decl_procedure.name));
 	for (int i = 0; i < proc_node->decl_procedure.arguments_count; ++i) {
 		if(i != 0)
@@ -485,6 +496,7 @@ void DEBUG_print_proc_decl(FILE* out, Ast* proc_node) {
 }
 
 void DEBUG_print_expression(FILE* out, Ast* node) {
+	quick_type(out, node->type_return);
 	switch (node->node_type) {
 	case AST_EXPRESSION_LITERAL: {
 		if(!node->type_return) {
@@ -591,6 +603,7 @@ void DEBUG_print_expr_cast(FILE* out, Ast* node) {
 }
 
 void DEBUG_print_constant_decl(FILE* out, Ast* node) {
+	quick_type(out, node->type_return);
 	fprintf(out, "%.*s : ", TOKEN_STR(node->decl_constant.name));
 	DEBUG_print_type(out, node->decl_constant.type_info);
 	if (node->decl_constant.value) {
@@ -601,6 +614,7 @@ void DEBUG_print_constant_decl(FILE* out, Ast* node) {
 }
 
 void DEBUG_print_var_decl(FILE* out, Ast* node) {
+	quick_type(out, node->type_return);
 	fprintf(out, "%.*s : ", TOKEN_STR(node->decl_variable.name));
 	DEBUG_print_type(out, node->decl_variable.variable_type);
 	if (node->decl_variable.assignment) {
@@ -676,11 +690,6 @@ void DEBUG_print_continue_command(FILE* out, Ast* node)
 void DEBUG_print_variable_assignment(FILE* out, Ast* node) {
 	if (node->comm_var_assign.lvalue) {
 		DEBUG_print_expression(out, node->comm_var_assign.lvalue);
-		if (print_types) {
-			fprintf(out, "<");
-			DEBUG_print_type(out, node->comm_var_assign.lvalue->type_return);
-			fprintf(out, ">");
-		}
 		fprintf(out, " = ");
 	}
 	DEBUG_print_expression(out, node->comm_var_assign.rvalue);

@@ -38,6 +38,10 @@ Keyword keywords_info[] = {
 	{ MAKE_STRING("false"),  TOKEN_LITERAL_BOOL_FALSE,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
 };
 
+string compiler_tags[] = {
+	{sizeof("foreign") - 1, (u8*)"foreign"},
+};
+
 s32 Lexer::report_lexer_error(char* msg, ...)
 {
 	va_list args;
@@ -73,6 +77,9 @@ void Lexer::init() {
 
 		// 32 Mega bytes of hash for identifiers
 		hash_table_init(&identifiers, 1024 * 1024 * 32);
+		for (s32 i = 0; i < ARRAY_COUNT(compiler_tags); ++i) {
+			internalize_identifier(&compiler_tags[i]);
+		}
 	}
 }
 

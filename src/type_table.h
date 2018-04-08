@@ -10,4 +10,6 @@ s64            type_pointer_size();
 
 Type_Instance* internalize_type(Type_Instance** type, bool copy = true);
 
+extern Type_Instance** g_type_table;
+
 void DEBUG_print_type_table();

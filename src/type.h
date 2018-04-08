@@ -127,3 +127,11 @@ inline bool type_primitive_bool(Type_Instance* p) {
 		return false;
 	return (p->primitive == TYPE_PRIMITIVE_BOOL);
 }
+
+inline bool type_primitive_numeric(Type_Instance* p) {
+	return (type_primitive_int(p) || type_primitive_float(p));
+}
+
+inline bool type_primitive_numeric(Type_Primitive p) {
+	return (type_primitive_int(p) || type_primitive_float(p));
+}

@@ -404,9 +404,11 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 			//	Ast* arg = node->decl_procedure.arguments[i];
 			//	error |= decl_check_inner_decl(arg);
 			//}
-			error |= decl_check_inner_command(node->decl_procedure.body);
-			if (node->scope->level > 0)
-				error |= decl_insert_into_symbol_table(node, node->decl_procedure.name, "procedure");
+			if (!(node->decl_procedure.flags & DECL_PROC_FLAG_FOREIGN)) {
+				error |= decl_check_inner_command(node->decl_procedure.body);
+				if (node->scope->level > 0)
+					error |= decl_insert_into_symbol_table(node, node->decl_procedure.name, "procedure");
+			}
 		}break;
 		case AST_DECL_STRUCT: break; // should not have struct inner decl yet
 		case AST_DECL_ENUM: break; // should not have enum inner decl yet
@@ -483,7 +485,17 @@ Decl_Error decl_check_inner_command(Ast* node) {
 			// TODO(psv): lvalue not distinguished
 			if(node->comm_var_assign.lvalue)
 				error |= decl_check_inner_expr_lassign(node->comm_var_assign.lvalue);
+			else if (node->comm_var_assign.lvalue && node->comm_var_assign.lvalue->type_return != type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+				error |= report_type_error(TYPE_ERROR_FATAL, "left side of assignment is not an addressable value\n");
+			}
 			error |= decl_check_inner_expr(node->comm_var_assign.rvalue);
+
+			if (node->comm_var_assign.lvalue) {
+				// if the rvalue is weak, transform it
+				if (node->comm_var_assign.rvalue->type_return->flags & TYPE_FLAG_WEAK) {
+					error |= type_update_weak(node->comm_var_assign.rvalue, node->comm_var_assign.lvalue->type_return->pointer_to);
+				}
+			}
 		}break;
 		default: assert(0); break;	// TODO(psv): report internal compiler error
 	}

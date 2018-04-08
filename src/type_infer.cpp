@@ -518,7 +518,9 @@ Type_Error type_check(Ast* node) {
 			for (size_t i = 0; i < node->decl_procedure.arguments_count; ++i) {
 				error |= type_check(node->decl_procedure.arguments[i]);
 			}
-			error |= type_check(node->decl_procedure.body);
+			if (node->decl_procedure.body) {
+				error |= type_check(node->decl_procedure.body);
+			}
 		}break;
 		case AST_DECL_STRUCT: {
 			for (size_t i = 0; i < node->decl_struct.fields_count; ++i) {
@@ -580,6 +582,31 @@ Type_Error type_check(Ast* node) {
 				error |= type_check(node->comm_return.expression);
 		}break;
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
+			Type_Instance* lvalue_type = 0;
+			if (node->comm_var_assign.lvalue) {
+				lvalue_type = node->comm_var_assign.lvalue->type_return;
+				Type_Instance* rvalue_type = node->comm_var_assign.rvalue->type_return;
+
+				if (lvalue_type->kind != KIND_POINTER || (lvalue_type->flags & TYPE_FLAG_WEAK)) {
+					error |= report_type_error(TYPE_ERROR_FATAL, "left side of assignment is not an addressable value\n");
+				} else {
+					if (lvalue_type->pointer_to != rvalue_type) {
+						error |= report_type_mismatch(node, lvalue_type->pointer_to, rvalue_type);
+					}
+				}
+				error |= type_check(node->comm_var_assign.rvalue);
+				if (error & TYPE_ERROR_FATAL) break;
+				if (node->comm_var_assign.rvalue->type_return != lvalue_type->pointer_to) {
+					error |= report_type_mismatch(node, lvalue_type->pointer_to, node->comm_var_assign.rvalue->type_return);
+				}
+			} else {
+				lvalue_type = type_primitive_get(TYPE_PRIMITIVE_VOID);
+				error |= type_check(node->comm_var_assign.rvalue);
+				if (error & TYPE_ERROR_FATAL) break;
+				if (node->comm_var_assign.rvalue->type_return != lvalue_type) {
+					error |= report_type_error(TYPE_ERROR_FATAL, node, "expected void type in rvalue expression\n");
+				}
+			}
 
 		}break;
 		case AST_COMMAND_BREAK:{
@@ -733,10 +760,40 @@ Type_Error type_check(Ast* node) {
 		case AST_EXPRESSION_LITERAL: break;
 
 		case AST_EXPRESSION_PROCEDURE_CALL:{
-		
+			Ast* decl = decl_from_name(node->scope, node->expr_proc_call.name);
+			size_t nargs = node->expr_proc_call.args_count;
+			size_t nargs_expected = decl->decl_procedure.arguments_count;
+
+			if (nargs < nargs_expected) {
+				error |= report_type_error(TYPE_ERROR_FATAL, "procedure call missing arguments, expected '%lld' got '%lld'\n",
+					nargs_expected, nargs);
+			} else if (nargs > nargs_expected) {
+				error |= report_type_error(TYPE_ERROR_FATAL, "too many arguments for procedure call, expected '%lld' got '%lld'\n",
+					nargs_expected, nargs);
+			} else {
+				// Type check each argument
+				for (size_t i = 0; i < nargs; ++i) {
+					Ast* expr = node->expr_proc_call.args[i];
+					if (expr->type_return->flags & TYPE_FLAG_WEAK) {
+						error |= type_update_weak(expr, decl->decl_procedure.type_procedure->function_desc.arguments_type[i]);
+						if (error & TYPE_ERROR_FATAL) continue;
+					}
+					if (expr->type_return != decl->decl_procedure.type_procedure->function_desc.arguments_type[i]) {
+						error |= report_type_error(TYPE_ERROR_FATAL, "type mismatch in argument #%lld of '%.*s' procedure call. '",
+							i + 1, TOKEN_STR(node->expr_proc_call.name));
+						DEBUG_print_type(stderr, expr->type_return);
+						fprintf(stderr, "' vs '");
+						DEBUG_print_type(stderr, decl->decl_procedure.type_procedure->function_desc.arguments_type[i]);
+						fprintf(stderr, "'\n");
+					}
+				}
+			}
 		}break;
-		case AST_EXPRESSION_UNARY:
+		case AST_EXPRESSION_UNARY: {
+			assert_msg(0, "unary expression type check not implemented");
+		}break;
 		case AST_EXPRESSION_VARIABLE:
+			//assert_msg(0, "expression variable type check not implemented");
 			break;
 	}
 
