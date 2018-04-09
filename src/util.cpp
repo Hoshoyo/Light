@@ -1,12 +1,43 @@
 #include "util.h"
 #include "string.h"
 #include <stdarg.h>
+#include <stdlib.h>
+
+string string_new(const char* v, s64 length){
+	string result = {0};
+	if(length <= 0) return result;
+
+	result.data     = (u8*)calloc(1, length * 2);
+	result.length   = length;
+	result.capacity = length * 2;
+	memcpy(result.data, v, length);
+}
+
+void string_free(string* s) {
+	free(s->data);
+	s->data = 0;
+	s->length = 0;
+	s->capacity = -1;
+}
+
+void string_append(string* s1, const char* s2){
+	s64 s2_length  = str_length(s2);
+	s64 res_length = s2_length + s1->length;
+
+	if(res_length > s1->capacity){
+		s1->capacity *= 2;
+		s1->data = (u8*)realloc(s1->data, s1->capacity);
+	}
+	memcpy(s1->data + s1->length, s2, s2_length);
+	s1->length    = res_length;
+}
 
 string string_make(const char* v) {
 	string result;
 	s64 len = str_length(v);
 	result.data   = (const u8*)v;
 	result.length = len;
+	result.capacity = -1;
 	return result;
 }
 
@@ -14,6 +45,7 @@ string string_make(const char* v, s64 length) {
 	string result;
 	result.data = (const u8*)v;
 	result.length = length;
+	result.capacity = -1;
 	return result;
 }
 

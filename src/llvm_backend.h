@@ -33,6 +33,7 @@ struct LLVM_Code_Generator {
 	// expressions
 	s32  llvm_emit_expression(Ast* expr);
 	s32  llvm_emit_binary_expression(Ast* expr);
+	s32  llvm_emit_unary_expression(Ast* expr);
 	s32  llvm_emit_assignment(Ast* expr);
 
 	// general

@@ -395,8 +395,68 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 		case AST_EXPRESSION_BINARY: {
 			result = llvm_emit_binary_expression(expr);
 		} break;
+		case AST_EXPRESSION_UNARY:{
+			result = llvm_emit_unary_expression(expr);
+		}break;
+		default: assert_msg(0, "node type llvm_emit not implemented\n"); break;
 	}
 
+	return result;
+}
+
+s32 LLVM_Code_Generator::llvm_emit_unary_expression(Ast* expr) {
+	Operator_Unary op = expr->expr_unary.op;
+	Ast* operand = expr->expr_unary.operand;
+
+	s32 result = -1;
+	s32 operand_result = -1;
+	bool embeded_operand = ast_node_is_embeded_literal(operand);
+	if(!embeded_operand){
+		operand_result = llvm_emit_expression(operand);
+		sprint("\n");
+	}
+
+	switch(op){
+		case OP_UNARY_ADDRESSOF:
+		case OP_UNARY_BITWISE_NOT:
+		case OP_UNARY_CAST:
+		case OP_UNARY_DEREFERENCE:
+		case OP_UNARY_LOGIC_NOT:{
+
+		}break;
+		case OP_UNARY_MINUS:{
+			if(type_primitive_int(operand->type_return)){
+				result = alloc_temp_register();
+				sprint("%%%d = mul ", result);
+				llvm_emit_type(operand->type_return);
+				sprint(" -1, ");
+				if(embeded_operand){
+					llvm_emit_expression(operand);
+				} else {
+					assert(operand_result != -1);
+					sprint(" %%%d", operand_result);
+				}
+				sprint("\n");
+			} else if(type_primitive_float(operand->type_return)) {
+				result = alloc_temp_register();
+				sprint("%%%d = fmul ", result);
+				llvm_emit_type(operand->type_return);
+				sprint(" -1.0, ");
+				if(embeded_operand){
+					llvm_emit_expression(operand);
+				} else {
+					assert(operand_result != -1);
+					sprint(" %%%d", operand_result);
+				}
+				sprint("\n");
+			} else {
+				// internal compiler error, how did this pass type check?
+				assert(0);
+			}
+		}break;
+		case OP_UNARY_PLUS: break;
+		default: assert(0); break; // internal compiler error here
+	}
 	return result;
 }
 
@@ -652,7 +712,7 @@ void llvm_generate_ir(Ast** toplevel, Type_Instance** type_table, char* filename
 	system(cmdbuffer);
 }
 #elif defined(__linux__)
-void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
+void llvm_generate_ir(Ast** toplevel, Type_Instance** type_table, char* filename) {
 	LLVM_Code_Generator code_generator = {};
 	code_generator.in_filename = filename;
 
@@ -670,8 +730,9 @@ void llvm_generate_ir(Ast** toplevel, Type_Table* type_table, char* filename) {
 	code_generator.sprint("attributes #1 = { nounwind uwtable }\n");
 
 	size_t fname_len = filename_length_strip_extension(filename);
-	string out_obj(fname_len + sizeof(".ll"), fname_len, filename);
-	out_obj.cat(".ll", sizeof(".ll"));
+	//string out_obj(fname_len + sizeof(".ll"), fname_len, filename);
+	string out_obj = string_new(filename, fname_len);
+	string_append(&out_obj, ".ll");
 	
 	HANDLE out = ho_createfile(out_obj.data, FILE_WRITE, CREATE_ALWAYS);
 	if(out == INVALID_HANDLE_VALUE){

@@ -13,7 +13,12 @@
 struct string {
 	s64 length;
 	const u8* data;
+	s64 capacity;
 };
+
+string string_new(const char* v, s64 length);
+void   string_free(string* s);
+void   string_append(string* s1, const char* s2);
 
 string string_make(const char* v);
 string string_make(const char* v, s64 length);

@@ -1,6 +1,5 @@
 target triple = "x86_64-linux-gnu"
 
-%string = type { i64, i8* }
 
 define i32 @gcd(i32 %a,i32 %b) #1 {
 decls-0:

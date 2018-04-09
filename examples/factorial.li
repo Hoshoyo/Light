@@ -1,15 +1,14 @@
-ExitProcess :: (r : u32) -> u32 #foreign("kernel32.lib");
+//ExitProcess :: (r : u32) -> u32 #foreign("kernel32.lib");
 malloc :: (size : u64) -> ^void #foreign("msvcrt.lib");
 
-factorial :: (v : u32) -> u32 {
+factorial :: (v : s32) -> s32 {
 	if v == 1 return 1;
 	return v * factorial(v - 1);
 }
 
 main :: () -> s32 {
-	b := malloc(4);
-	c := cast(^u8)b;
 	a := factorial(6);
-	a = ExitProcess(a);
-	return 0;
+	a = -a;
+	//a = ExitProcess(a);
+	return a;
 }
