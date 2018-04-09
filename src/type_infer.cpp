@@ -12,6 +12,10 @@ Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2)
 	return err;
 }
 
+/* --------------------------------------------------------------
+   -------------------- Type Inference --------------------------
+   -------------------------------------------------------------- */
+
 Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Type_Error* error);
 Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
 Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
@@ -302,7 +306,7 @@ Type_Instance* infer_from_variable_expr(Ast* expr, Type_Error* error, bool rep_u
 		Type_Instance* ptrtype = type_new_temporary();
 		ptrtype->kind = KIND_POINTER;
 		ptrtype->type_size_bits = type_pointer_size() * 8;
-		ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED;
+		ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED | TYPE_FLAG_LVALUE;
 		ptrtype->pointer_to = type;
 		return internalize_type(&ptrtype, true);
 	}
@@ -323,6 +327,13 @@ Type_Instance* infer_from_proc_call_expr(Ast* expr, Type_Error* error, bool rep_
 	}
 	Type_Instance* type = decl->decl_procedure.type_return;
 	assert(type->flags & TYPE_FLAG_INTERNALIZED);
+	size_t nargs = expr->expr_proc_call.args_count;
+	for (size_t i = 0; i < nargs; ++i) {
+		// lval is always false in case of procedure arguments.
+		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, rep_undeclared, false);
+		expr->expr_proc_call.args[i]->type_return = type;
+	}
+
 	return type;
 }
 
@@ -790,7 +801,106 @@ Type_Error type_check(Ast* node) {
 			}
 		}break;
 		case AST_EXPRESSION_UNARY: {
-			assert_msg(0, "unary expression type check not implemented");
+			//assert_msg(0, "unary expression type check not implemented");
+			assert(!(node->type_return->flags & TYPE_FLAG_WEAK));
+			Ast* operand = node->expr_unary.operand;
+
+			switch (node->expr_unary.op) {
+				case OP_UNARY_ADDRESSOF:{
+					assert(!(node->type_return->flags & TYPE_FLAG_WEAK));
+					assert(node->type_return->kind == KIND_POINTER);
+					assert(operand->type_return == node->type_return->pointer_to);
+					// check addressable operand
+					if (!(operand->type_return->flags & TYPE_FLAG_LVALUE)) {
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot address an rvalue\n");
+					}
+				}break;
+
+				case OP_UNARY_DEREFERENCE: {
+					assert(!(node->type_return->flags & TYPE_FLAG_WEAK));
+					assert(node->type_return == operand->type_return->pointer_to);
+					if (operand->type_return->kind != KIND_POINTER) {
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "dereference operator requires a pointer type\n");
+					}
+				}break;
+
+				case OP_UNARY_LOGIC_NOT: {
+					assert(!(node->type_return->flags & TYPE_FLAG_WEAK));
+					if (operand->type_return != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "unary operator '!' is only defined for the boolean type\n");
+					}
+				}break;
+
+				case OP_UNARY_BITWISE_NOT: {
+					if (!type_primitive_int(operand->type_return)) {
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "unary operator '~' is only defined for integer types\n");
+					}
+				}break;
+
+				case OP_UNARY_MINUS:
+				case OP_UNARY_PLUS: {
+					if (!type_primitive_numeric(operand->type_return)) {
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "unary operators '+' and '-' are only defined for numeric types\n");
+					}
+				}break;
+				case OP_UNARY_CAST: {
+					Type_Instance* ttc = node->expr_unary.type_to_cast;
+					Type_Instance* opt = operand->type_return;
+					if (ttc->kind == KIND_POINTER) {
+						// cast(^T) ^V
+						// cast(^T) INT
+						if (!(opt->kind == KIND_POINTER || type_primitive_int(opt))) {
+							error |= report_type_error(TYPE_ERROR_FATAL, node, "unary cast to pointer type can only cast pointer or integer types\n");
+						}
+					} else if (ttc->kind == KIND_PRIMITIVE) {
+						if (ttc->primitive == TYPE_PRIMITIVE_VOID) {
+							// cast(void) T
+							error |= report_type_error(TYPE_ERROR_FATAL, node, "unary cast operator does not allow casting to type void\n");
+						} else if (operand->type_return->kind == KIND_POINTER) {
+							if (!type_primitive_int(ttc)) {
+								// cast(!INT) ^T
+								error |= report_type_error(TYPE_ERROR_FATAL, node, "unary cast of pointer types to '");
+								DEBUG_print_type(stderr, ttc, true);
+								fprintf(stderr, "' is undefined\n");
+							} else {
+								// cast(INT) ^T
+							}
+						} else if (operand->type_return->kind == KIND_PRIMITIVE) {
+							// cast(PRIM) PRIM
+							switch (operand->type_return->primitive) {
+								case TYPE_PRIMITIVE_BOOL: {// cast(INT) bool
+								}break;
+								case TYPE_PRIMITIVE_R32:
+								case TYPE_PRIMITIVE_R64: {
+									if (!type_primitive_numeric(ttc)) {
+										error |= report_type_error(TYPE_ERROR_FATAL, node, "unary cast of floating point can only cast to numeric types\n");
+									}
+								}break;
+								case TYPE_PRIMITIVE_S8:
+								case TYPE_PRIMITIVE_S16:
+								case TYPE_PRIMITIVE_S32:
+								case TYPE_PRIMITIVE_S64:
+								case TYPE_PRIMITIVE_U8:
+								case TYPE_PRIMITIVE_U16:
+								case TYPE_PRIMITIVE_U32:
+								case TYPE_PRIMITIVE_U64: {
+									if (!type_primitive_numeric(ttc)) {
+										error |= report_type_error(TYPE_ERROR_FATAL, node, "unary cast of integer types can only cast to numeric types\n");
+									}
+								}break;
+								case TYPE_PRIMITIVE_VOID: {
+									error |= report_type_error(TYPE_ERROR_FATAL, node, "unary cast of void primitive is undefined\n");
+								}break;
+							}
+						} else {
+							error |= report_type_error(TYPE_ERROR_FATAL, node, "unary cast operator cannot cast composite types to primitive\n");
+						}
+					} else {
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "unary cast operator cannot cast to type '");
+						DEBUG_print_type(stderr, ttc, true);
+					}
+				}break;
+			}
 		}break;
 		case AST_EXPRESSION_VARIABLE:
 			//assert_msg(0, "expression variable type check not implemented");
