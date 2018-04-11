@@ -381,7 +381,7 @@ char* binop_op_to_string(Operator_Binary binop) {
 				DEBUG
 
 ****************************************/
-static bool print_types = false;
+static bool print_types = true;
 
 static int DEBUG_indent_level = 0;
 void DEBUG_print_indent_level() {
@@ -752,7 +752,8 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 	}
 }
 
-void DEBUG_print_ast(FILE* out, Ast** ast) {
+void DEBUG_print_ast(FILE* out, Ast** ast, bool print_ts) {
+	print_types = print_ts;
 	int l = array_get_length(ast);
 	for (int i = 0; i < array_get_length(ast); ++i) {
 		DEBUG_print_node(out, ast[i]);

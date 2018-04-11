@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	DEBUG_print_ast(stdout, ast_top_level);
+	DEBUG_print_ast(stdout, ast_top_level, true);
 	//DEBUG_print_scope_decls(&global_scope);
 	DEBUG_print_type_table();
 

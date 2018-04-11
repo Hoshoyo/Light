@@ -7,9 +7,8 @@ define i32 @main() #1 {
 decls-0:
 %0 = alloca i32, align 8
 %1 = alloca i32, align 8
-%2 = trunc i642 to i32
 
-store i32 %2, i32* %1
+store i32 %-1, i32* %1
 ret i32 0
 
 }
