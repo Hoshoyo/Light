@@ -39,8 +39,8 @@ r64  str_to_r64(char* text, int length);
 r32  str_to_r32(char* text, int length);
 u8   str_to_u8(char* text, int length);
 
-void s32_to_str(s32 val, char* buffer);
-void s64_to_str(s64 val, char* buffer);
+int s32_to_str(s32 val, char* buffer);
+int s64_to_str(s64 val, char* buffer);
 
 u32 djb2_hash(u8 *str, int size);
 u32 djb2_hash(u32 starting_hash, u8 *str, int size);

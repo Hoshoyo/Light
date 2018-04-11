@@ -180,7 +180,18 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_unde
 				DEBUG_print_type(stderr, expr->expr_unary.type_to_cast, true);
 				fprintf(stderr, "' is invalid\n");
 			}
+			// @IMPORTANT instead of resolving types here, make them collapse to something, give preference to the type being cast to!
 			expr->expr_unary.operand->type_return = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared, lval);
+			if(expr->expr_unary.operand->type_return->flags & TYPE_FLAG_WEAK){
+				Type_Instance* opt = resolve_type(expr->scope, expr->expr_unary.operand->type_return, report_undeclared);
+				if(!opt){
+					*error |= report_type_error(TYPE_ERROR_FATAL, expr, "could not infer type of cast operand\n");
+				} else {
+					opt->flags |= TYPE_FLAG_RESOLVED;
+					opt = internalize_type(&opt, true);
+					*error |= type_update_weak(expr->expr_unary.operand, opt);
+				}
+			}
 			return res;
 		}break;
 		case OP_UNARY_ADDRESSOF: {
@@ -192,7 +203,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_unde
 			Type_Instance* newtype = type_new_temporary();
 			newtype->kind = KIND_POINTER;
 			newtype->pointer_to = res;
-			newtype->type_size_bits = type_pointer_size() * 8;
+			newtype->type_size_bits = type_pointer_size_bits();
 			newtype->flags = TYPE_FLAG_SIZE_RESOLVED;
 			if (res->flags & TYPE_FLAG_INTERNALIZED) {
 				newtype->flags |= TYPE_FLAG_RESOLVED;
@@ -305,7 +316,7 @@ Type_Instance* infer_from_variable_expr(Ast* expr, Type_Error* error, bool rep_u
 		// transform this in the pointer type
 		Type_Instance* ptrtype = type_new_temporary();
 		ptrtype->kind = KIND_POINTER;
-		ptrtype->type_size_bits = type_pointer_size() * 8;
+		ptrtype->type_size_bits = type_pointer_size_bits();
 		ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED | TYPE_FLAG_LVALUE;
 		ptrtype->pointer_to = type;
 		return internalize_type(&ptrtype, true);
@@ -397,7 +408,7 @@ Type_Error type_update_weak(Ast* expr, Type_Instance* strong) {
 
 		case AST_EXPRESSION_VARIABLE:
 		case AST_EXPRESSION_PROCEDURE_CALL: {
-			assert(0); break; // a procedure call or variable can never be weak, and so it should not get here.
+			// a type cast got here most likely, so do nothing, in case of error, type_check will catch
 		}break;
 	}
 
@@ -846,6 +857,11 @@ Type_Error type_check(Ast* node) {
 				case OP_UNARY_CAST: {
 					Type_Instance* ttc = node->expr_unary.type_to_cast;
 					Type_Instance* opt = operand->type_return;
+
+					if(opt->flags & TYPE_FLAG_WEAK){
+						
+					}
+
 					if (ttc->kind == KIND_POINTER) {
 						// cast(^T) ^V
 						// cast(^T) INT

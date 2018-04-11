@@ -223,6 +223,9 @@ Type_Instance* type_new_temporary() {
 s64 type_pointer_size() {
 	return 8;
 }
+s64 type_pointer_size_bits() {
+	return 64;
+}
 
 #include "ast.h"
 void DEBUG_print_type_table() {

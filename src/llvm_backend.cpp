@@ -78,7 +78,7 @@ void LLVM_Code_Generator::llvm_emit_type(Type_Instance* type, u32 flags) {
 			}
 		}break;
 		case KIND_POINTER: {
-			llvm_emit_type(type->pointer_to, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+			llvm_emit_type(type->pointer_to, flags | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
 			sprint("*");
 		}break;
 		case KIND_FUNCTION: {
@@ -407,6 +407,7 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 s32 LLVM_Code_Generator::llvm_emit_unary_expression(Ast* expr) {
 	Operator_Unary op = expr->expr_unary.op;
 	Ast* operand = expr->expr_unary.operand;
+	Type_Instance* optype = operand->type_return;
 
 	s32 result = -1;
 	s32 operand_result = -1;
@@ -419,11 +420,112 @@ s32 LLVM_Code_Generator::llvm_emit_unary_expression(Ast* expr) {
 	switch(op){
 		case OP_UNARY_ADDRESSOF:
 		case OP_UNARY_BITWISE_NOT:
-		case OP_UNARY_CAST:
+			assert_msg(0, "emit '&' and '!' not implemented yet\n");
+			break;
+
+		// Unary Cast
+		case OP_UNARY_CAST:{
+			Type_Instance* ttc = expr->expr_unary.type_to_cast;
+			if(ttc->kind == KIND_POINTER) {
+				if(optype->kind == KIND_POINTER){
+					// cast(^T)^V
+					result = alloc_temp_register();
+					sprint("%%%d = bitcast ", result);
+					llvm_emit_type(optype, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+					sprint(" ");
+					if(embeded_operand){
+						llvm_emit_expression(operand);
+					} else {
+						sprint("%%%d", operand_result);
+					}
+					sprint(" to ");
+					llvm_emit_type(ttc, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+					sprint("\n");
+				} else if(type_primitive_int(optype)) {
+					// cast(^T)INT
+					s32 r = -1;
+					if(optype->type_size_bits < type_pointer_size_bits()){
+						// extend
+						r = alloc_temp_register();
+						if(type_primitive_int_signed(optype)){
+							sprint("%%%d = sext ", r);
+						} else if(type_primitive_int_unsigned(optype)){
+							sprint("%%%d = zext ", r);
+						} else {
+							assert_msg(0, "unknown integer type");
+						}
+						llvm_emit_type(optype, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+						sprint(" ");
+						if(embeded_operand){
+							llvm_emit_expression(operand);
+						} else {
+							sprint("%%%d", operand_result);
+						}
+						sprint(" to i64\n");	// @HARDCODE pointer type is always 64 bits
+					}
+					result = alloc_temp_register();
+					sprint("%%%d = inttoptr i64 ", result);
+					if(r != -1){
+						sprint("%%%d", r);
+					} else if(embeded_operand) {
+						llvm_emit_expression(operand);
+					} else {
+						sprint("%%%d", operand_result);
+					}
+					sprint(" to ");					
+					llvm_emit_type(ttc, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+				}
+			} else if(type_primitive_int(ttc) && operand->type_return->kind == KIND_POINTER){
+				// cast(INT)^T
+				result = alloc_temp_register();
+				sprint("%%%d = ptrtoint ", result);
+				llvm_emit_type(operand->type_return, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+				if(embeded_operand){
+					llvm_emit_expression(operand);
+				} else {
+					sprint(" %%%d", operand_result);
+				}
+				sprint(" to ");
+				llvm_emit_type(ttc, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+				sprint("\n");
+			} else if(type_primitive_int(ttc) && type_primitive_int(operand->type_return)) {
+				if(ttc != operand->type_return){
+					result = alloc_temp_register();
+					if(ttc->type_size_bits < operand->type_return->type_size_bits) {
+						sprint("%%%d = trunc ", result);
+					} else {
+						if(type_primitive_int_signed(operand->type_return)) {
+							sprint("%%%d = sext ", result);
+						} else if(type_primitive_int_unsigned(operand->type_return)) {
+							sprint("%%%d = zext ", result);
+						} else {
+							assert_msg(0, "undefined integer type");
+						}
+					}
+					llvm_emit_type(operand->type_return, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+					if(embeded_operand){
+						llvm_emit_expression(operand);
+					} else {
+						sprint(" %%%d", operand_result);
+					}
+					sprint(" to ");
+					llvm_emit_type(ttc, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+					sprint("\n");
+				} else {
+					result = operand_result;
+				}
+			}
+		}break;
+
+
 		case OP_UNARY_DEREFERENCE:
+
+
 		case OP_UNARY_LOGIC_NOT:{
 
 		}break;
+
+
 		case OP_UNARY_MINUS:{
 			if(type_primitive_int(operand->type_return)){
 				result = alloc_temp_register();

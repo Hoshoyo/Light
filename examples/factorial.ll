@@ -1,35 +1,16 @@
 target triple = "x86_64-linux-gnu"
 
+%vec2 = type { float, float }
 
 declare cc 64 i8* @malloc(i64 %size) #0
-define i32 @factorial(i32 %v) #1 {
-decls-0:
-%0 = icmp eq i32 %v, 1
-br i1 %0, label %if-stmt-0, label %if-end-0
-if-stmt-0:
-ret i32 1
-br label %if-end-0
-if-end-0:
-
-%2 = sub i32 %v, 1
-%3 = call i32 @factorial(i32  %2)
-
-%4 = mul i32 %v, %3
-ret i32 %4
-
-}
 define i32 @main() #1 {
 decls-0:
 %0 = alloca i32, align 8
+%1 = alloca i32, align 8
+%2 = trunc i642 to i32
 
-%1 = call i32 @factorial(i32 6)
-
-store i32 %1, i32* %0
-%2 = load i32, i32* %0
-%3 = mul i32 -1,  %2
-store i32 %3, i32* %0
-%4 = load i32, i32* %0
-ret i32 %4
+store i32 %2, i32* %1
+ret i32 0
 
 }
 

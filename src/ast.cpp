@@ -381,7 +381,7 @@ char* binop_op_to_string(Operator_Binary binop) {
 				DEBUG
 
 ****************************************/
-static bool print_types = true;
+static bool print_types = false;
 
 static int DEBUG_indent_level = 0;
 void DEBUG_print_indent_level() {

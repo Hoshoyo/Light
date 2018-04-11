@@ -88,11 +88,14 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 		return type;
 
 	switch (type->kind) {
-		case KIND_PRIMITIVE:
+		case KIND_PRIMITIVE:{
+			type->flags |= TYPE_FLAG_SIZE_RESOLVED;
+			type->type_size_bits = type_size_primitive(type->primitive);
 			return type;
+		}
 		case KIND_POINTER: {
 			type->flags |= TYPE_FLAG_SIZE_RESOLVED;
-			type->type_size_bits = type_pointer_size() * 8;
+			type->type_size_bits = type_pointer_size_bits();
 			type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared);
 			if (!type->pointer_to) return 0;
 			if (type->pointer_to->flags & TYPE_FLAG_INTERNALIZED) {
@@ -357,7 +360,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 			if (!var_type) {
 				if (node->decl_variable.assignment) {
 					// infer from expression
-					var_type = infer_from_expression(node->decl_variable.assignment, &error, true);
+ 					var_type = infer_from_expression(node->decl_variable.assignment, &error, true);
 					if (error & TYPE_ERROR_FATAL) return error;
 					assert(var_type);
 					if(var_type->flags & TYPE_FLAG_WEAK){

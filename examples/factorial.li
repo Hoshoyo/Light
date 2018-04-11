@@ -1,14 +1,16 @@
 //ExitProcess :: (r : u32) -> u32 #foreign("kernel32.lib");
 malloc :: (size : u64) -> ^void #foreign("msvcrt.lib");
 
-factorial :: (v : s32) -> s32 {
-	if v == 1 return 1;
-	return v * factorial(v - 1);
+vec2 :: struct {
+	x : r32;
+	y : r32;
 }
 
 main :: () -> s32 {
-	a := factorial(6);
-	a = -a;
-	//a = ExitProcess(a);
-	return a;
+	//a := cast(^u32)malloc(100);
+	x : s32;
+	//a2 := cast(^u8)123;
+	a := cast(s32)2;
+
+	return 0;
 }

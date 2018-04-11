@@ -135,3 +135,20 @@ inline bool type_primitive_numeric(Type_Instance* p) {
 inline bool type_primitive_numeric(Type_Primitive p) {
 	return (type_primitive_int(p) || type_primitive_float(p));
 }
+
+inline s64 type_size_primitive(Type_Primitive primitive) {
+	switch (primitive) {
+	case TYPE_PRIMITIVE_S64:	return 8;
+	case TYPE_PRIMITIVE_S32:	return 4;
+	case TYPE_PRIMITIVE_S16:	return 2;
+	case TYPE_PRIMITIVE_S8:		return 1;
+	case TYPE_PRIMITIVE_U64:	return 8;
+	case TYPE_PRIMITIVE_U32:	return 4;
+	case TYPE_PRIMITIVE_U16:	return 2;
+	case TYPE_PRIMITIVE_U8:		return 1;
+	case TYPE_PRIMITIVE_BOOL:	return 1;
+	case TYPE_PRIMITIVE_R64:	return 8;
+	case TYPE_PRIMITIVE_R32:	return 4;
+	case TYPE_PRIMITIVE_VOID:	return 0;
+	}
+}
