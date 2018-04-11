@@ -201,28 +201,46 @@ u8 str_to_u8(char* text, int length)
 	return 0;
 }
 
-void s32_to_str(s32 val, char* buffer)
-{
-	s32 aux = val;
-	s32 divisor = 10;
-	while (aux) {
-		s32 v = aux % divisor;
-		*buffer++ = v + 0x30;
-		aux -= v;
-		divisor *= 10;
+int s32_to_str(s32 val, char* buffer) {
+	char b[16] = {0};
+	int sum = 0;
+	if(val < 0) {
+		val = -val;
+		buffer[0] = '-';
+		sum = 1;
 	}
+    char* auxbuffer = b + 16;
+    char* start = auxbuffer;
+    do {
+        int rem = val % 10;
+        val = val / 10;
+        *auxbuffer-- = '0' + rem;
+    } while(val != 0);
+
+    int size = start - auxbuffer;
+	memcpy(buffer + sum, auxbuffer + 1, size);
+	return size;
 }
 
-void s64_to_str(s64 val, char* buffer)
-{
-	s64 aux = val;
-	s64 divisor = 10;
-	while (aux) {
-		s64 v = aux % divisor;
-		*buffer++ = v + 0x30;
-		aux -= v;
-		divisor *= 10;
+int s64_to_str(s64 val, char* buffer) {
+    char b[32] = {0};
+	int sum = 0;
+	if(val < 0) {
+		val = -val;
+		buffer[0] = '-';
+		sum = 1;
 	}
+    char* auxbuffer = b + 32;
+    char* start = auxbuffer;
+    do {
+        int rem = val % 10;
+        val = val / 10;
+        *auxbuffer-- = '0' + rem;
+    } while(val != 0);
+
+    int size = start - auxbuffer;
+	memcpy(buffer + sum, auxbuffer + 1, size);
+	return size;
 }
 
 u32 djb2_hash(u8 *str, int size)
