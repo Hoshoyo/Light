@@ -580,7 +580,7 @@ Ast* Parser::parse_command(Scope* scope) {
 			command = parse_comm_return(scope);
 			require_and_eat(';');
 			break;
-		default: {
+		case TOKEN_IDENTIFIER:{
 			Token_Type t = lexer->peek_token_type(1);
 			if (t == ':') {
 				command = parse_declaration(scope);
@@ -588,11 +588,13 @@ Ast* Parser::parse_command(Scope* scope) {
 				// syntatic sugar void proc call
 				Ast* pcall = parse_expr_proc_call(scope);
 				command = ast_create_comm_variable_assignment(scope, 0, pcall);
-			} else {
-				command = parse_comm_variable_assignment(scope);
 			}
 			require_and_eat(';');
-		}
+		}break;
+		default: {
+			command = parse_comm_variable_assignment(scope);
+			require_and_eat(';');
+		}break;
 	}
 	return command;
 }
