@@ -1,14 +1,19 @@
-target triple = "x86_64-linux-gnu"
+target triple = "x86_64-pc-windows-msvc"
 
 %vec2 = type { float, float }
 
 declare cc 64 i8* @malloc(i64 %size) #0
 define i32 @main() #1 {
 decls-0:
-%0 = alloca i32, align 8
-%1 = alloca i32, align 8
+%0 = alloca i32*, align 8
+%1 = alloca i32*, align 8
+%2 = load i32*, i32** %0
+%3 = add i32 2, 0
 
-store i32 %-1, i32* %1
+%4 = zext i32 %3 to i64
+%5 = getelementptr i32, i32* %2, i64 %4
+
+store i32* %5, i32** %1
 ret i32 0
 
 }

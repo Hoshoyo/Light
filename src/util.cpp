@@ -10,11 +10,11 @@ string string_new(const char* v, s64 length){
 	result.data     = (u8*)calloc(1, length * 2);
 	result.length   = length;
 	result.capacity = length * 2;
-	memcpy(result.data, v, length);
+	memcpy((void*)result.data, v, length);
 }
 
 void string_free(string* s) {
-	free(s->data);
+	free((void*)s->data);
 	s->data = 0;
 	s->length = 0;
 	s->capacity = -1;
@@ -26,9 +26,9 @@ void string_append(string* s1, const char* s2){
 
 	if(res_length > s1->capacity){
 		s1->capacity *= 2;
-		s1->data = (u8*)realloc(s1->data, s1->capacity);
+		s1->data = (u8*)realloc((void*)s1->data, s1->capacity);
 	}
-	memcpy(s1->data + s1->length, s2, s2_length);
+	memcpy((char*)s1->data + s1->length, s2, s2_length);
 	s1->length    = res_length;
 }
 

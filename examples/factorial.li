@@ -8,9 +8,8 @@ vec2 :: struct {
 
 main :: () -> s32 {
 	//a := cast(^u32)malloc(100);
-	x : s32;
-	//a2 := cast(^u8)123;
-	a := cast(s32)2;
-
+	b : ^s32;
+	a := b + cast(u32)2;
+	
 	return 0;
 }

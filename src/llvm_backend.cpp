@@ -417,11 +417,31 @@ s32 LLVM_Code_Generator::llvm_emit_unary_expression(Ast* expr) {
 		sprint("\n");
 	}
 
-	switch(op){
-		case OP_UNARY_ADDRESSOF:
-		case OP_UNARY_BITWISE_NOT:
-			assert_msg(0, "emit '&' and '!' not implemented yet\n");
-			break;
+	switch(op)
+	{
+		case OP_UNARY_ADDRESSOF:{
+			if (operand->node_type == AST_EXPRESSION_VARIABLE) {
+				Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
+				result = decl->decl_variable.temporary_register;
+				assert(result != -1);
+			} else {
+				assert_msg(0, "emit '&' for non-variables not implemented yet\n");
+			}
+		}break;
+
+		// Unary bitwise not
+		case OP_UNARY_BITWISE_NOT: {
+			result = alloc_temp_register();
+			sprint("%%%d = xor ", result);
+			llvm_emit_type(expr->type_return, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+			sprint(" ");
+			if (embeded_operand) {
+				llvm_emit_expression(operand);
+			} else {
+				sprint("%%%d", operand_result);
+			}
+			sprint(", -1\n");
+		}break;
 
 		// Unary Cast
 		case OP_UNARY_CAST:{
@@ -512,26 +532,62 @@ s32 LLVM_Code_Generator::llvm_emit_unary_expression(Ast* expr) {
 					llvm_emit_type(ttc, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
 					sprint("\n");
 				} else {
-					result = operand_result;
+					result = alloc_temp_register();
+					if (embeded_operand) {
+						sprint("%%%d = add ", result);
+						llvm_emit_type(ttc, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+						sprint(" ");
+						llvm_emit_expression(operand);
+						sprint(", 0\n");
+					} else {
+						result = operand_result;
+					}
 				}
+			} else if (type_primitive_float(ttc) && type_primitive_float(optype)) {
+				// TODO(psv):
+			} else if(type_primitive_float(ttc) && type_primitive_int(optype)) {
+				// TODO(psv):
+			} else if (type_primitive_int(ttc) && type_primitive_float(optype)) {
+				// TODO(psv):
 			}
 		}break;
 
 
-		case OP_UNARY_DEREFERENCE:
+		case OP_UNARY_DEREFERENCE: {
+			result = alloc_temp_register();
+			sprint("%%%d = load ", result);
+			llvm_emit_type(expr->type_return, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+			sprint(", ");
+			llvm_emit_type(optype, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+			sprint(" ");
+			if (embeded_operand) {
+				llvm_emit_expression(operand);
+			} else {
+				sprint("%%%d", operand_result);
+			}
+			sprint("\n");
+		}break;
 
 
 		case OP_UNARY_LOGIC_NOT:{
-
+			result = alloc_temp_register();
+			sprint("%%%d = xor i1 ", result);
+			if (embeded_operand) {
+				llvm_emit_expression(operand);
+			} else {
+				sprint("%%%d", operand_result);
+			}
+			sprint(", true\n");
 		}break;
 
 
 		case OP_UNARY_MINUS:{
+			// sub 0, val
 			if(type_primitive_int(operand->type_return)){
 				result = alloc_temp_register();
-				sprint("%%%d = mul ", result);
+				sprint("%%%d = sub ", result);
 				llvm_emit_type(operand->type_return);
-				sprint(" -1, ");
+				sprint(" 0, ");
 				if(embeded_operand){
 					llvm_emit_expression(operand);
 				} else {
@@ -541,9 +597,9 @@ s32 LLVM_Code_Generator::llvm_emit_unary_expression(Ast* expr) {
 				sprint("\n");
 			} else if(type_primitive_float(operand->type_return)) {
 				result = alloc_temp_register();
-				sprint("%%%d = fmul ", result);
+				sprint("%%%d = fsub ", result);
 				llvm_emit_type(operand->type_return);
-				sprint(" -1.0, ");
+				sprint(" 0.0, ");
 				if(embeded_operand){
 					llvm_emit_expression(operand);
 				} else {
@@ -577,8 +633,8 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 		t_right = llvm_emit_expression(expr->expr_binary.right);
 		sprint("\n");
 	}
-	s32 temp_reg = alloc_temp_register();
-	sprint("%%%d = ", temp_reg);
+
+	s32 temp_reg = -1;
 
 	if(op == OP_BINARY_DOT){
 		// Struct accessing
@@ -588,6 +644,8 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 	// If it is a floating point type llvm offers operations like
 	// fcmp, fadd, fsub, ...
 	if (type_primitive_float(left_type) && type_primitive_float(right_type)) {
+		temp_reg = alloc_temp_register();
+		sprint("%%%d = ", temp_reg);
 		switch (op) {
 			case OP_BINARY_PLUS:		sprint("fadd "); break;
 			case OP_BINARY_MINUS:		sprint("fsub "); break;
@@ -602,7 +660,86 @@ s32 LLVM_Code_Generator::llvm_emit_binary_expression(Ast* expr) {
 			case OP_BINARY_LT:			sprint("fcmp olt "); break;
 		}
 		// float or double always
+	} else if (left_type->kind == KIND_POINTER) {
+		// pointer arithmetic
+		if (type_primitive_int(right_type) && right_type->type_size_bits < type_pointer_size_bits()) {
+			// extend
+			s32 extended = alloc_temp_register();
+			sprint("%%%d = ", extended);
+			if (type_primitive_int_signed(right_type)) {
+				sprint("sext ");
+			} else if (type_primitive_int_unsigned(right_type)) {
+				sprint("zext ");
+			}
+			llvm_emit_type(right_type, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+			sprint(" ");
+			if (t_right == -1) {
+				llvm_emit_expression(expr->expr_binary.right);
+			} else {
+				sprint("%%%d", t_right);
+			}
+			sprint(" to i64\n");
+			t_right = extended;
+		}
+
+		switch (op) {
+			case OP_BINARY_PLUS: {
+				assert(type_primitive_int(right_type));
+				temp_reg = alloc_temp_register();
+				sprint("%%%d = getelementptr ", temp_reg);
+				llvm_emit_type(left_type->pointer_to, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+				sprint(", ");
+				llvm_emit_type(left_type, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+				sprint(" ");
+				if (t_left == -1) {
+					llvm_emit_expression(expr->expr_binary.left);
+				} else {
+					sprint("%%%d", t_left);
+				}
+				sprint(", i64 ");
+				if (t_right == -1) {
+					llvm_emit_expression(expr->expr_binary.right);
+				} else {
+					sprint("%%%d", t_right);
+				}
+				sprint("\n");
+			}break;
+			case OP_BINARY_MINUS: {
+				s32 negative = alloc_temp_register();
+				sprint("%%%d = sub ", negative);
+				llvm_emit_type(right_type, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+				sprint(" 0, ");
+				if (t_right == -1) {
+					llvm_emit_expression(expr->expr_binary.right);
+				} else {
+					sprint("%%%d", t_right);
+					sprint("\n");
+				}
+				temp_reg = alloc_temp_register();
+				sprint("%%%d = getelementptr ", temp_reg);
+				llvm_emit_type(left_type->pointer_to, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+				sprint(", ");
+				llvm_emit_type(left_type, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
+				sprint(" ");
+				if (t_left == -1) {
+					llvm_emit_expression(expr->expr_binary.left);
+				} else {
+					sprint("%%%d", t_left);
+				}
+				sprint(", i64 ");
+				if (t_right == -1) {
+					llvm_emit_expression(expr->expr_binary.right);
+				} else {
+					sprint("%%%d", t_right);
+				}
+				sprint("\n");
+			}break;
+			default: assert_msg(0, "invalid pointer arithmetic operator\n"); break;
+		}
+		return temp_reg;
 	} else {
+		temp_reg = alloc_temp_register();
+		sprint("%%%d = ", temp_reg);
 		bool is_signed = type_primitive_int_signed(left_type) && type_primitive_int_signed(right_type);
 		// is integer type or pointer arithmetic
 		if(type_primitive_int(left_type) && type_primitive_int(right_type)){
@@ -751,7 +888,7 @@ bool ast_node_is_embeded_literal(Ast* node) {
 			return true;
 	}
 	if (node->type_return->kind != KIND_PRIMITIVE) return false;
-	return (node->node_type == AST_EXPRESSION_LITERAL && type_primitive_numeric(node->type_return));
+	return (node->node_type == AST_EXPRESSION_LITERAL && (type_primitive_numeric(node->type_return)||type_primitive_bool(node->type_return)));
 }
 
 bool ast_node_is_embeded_variable(Ast* node) {
@@ -762,9 +899,6 @@ bool ast_node_is_embeded_variable(Ast* node) {
 	}
 	return false;
 }
-
-
-
 
 
 

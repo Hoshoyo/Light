@@ -90,7 +90,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 	switch (type->kind) {
 		case KIND_PRIMITIVE:{
 			type->flags |= TYPE_FLAG_SIZE_RESOLVED;
-			type->type_size_bits = type_size_primitive(type->primitive);
+			type->type_size_bits = type_size_primitive(type->primitive) * 8;
 			return type;
 		}
 		case KIND_POINTER: {

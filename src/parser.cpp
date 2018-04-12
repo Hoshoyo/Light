@@ -535,10 +535,12 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 		case TOKEN_LITERAL_FLOAT:
 			node->expr_literal.type = LITERAL_FLOAT;
 			node->expr_literal.value_r64 = literal_float_to_r64(first);
+			break;
 		case TOKEN_LITERAL_STRING:
 			node->expr_literal.type = LITERAL_STRUCT;
 			node->expr_literal.flags |= LITERAL_FLAG_STRING;
 			// TODO(psv): get type string here already
+			break;
 		default: {
 			// TODO(psv):
 			// struct literal
