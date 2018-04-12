@@ -9,13 +9,17 @@
 
 int LLVM_Code_Generator::sprint(char* msg, ...)
 {
+	#define DEBUG 0
 	va_list args;
 	va_start(args, msg);
+#if DEBUG
+	int num_written = vfprintf(stdout, msg, args);
+	fflush(stdout);
+#else
 	int num_written = vsprintf(buffer + ptr, msg, args);
-	//int num_written = vfprintf(stdout, msg, args);
-	//fflush(stdout);
-	va_end(args);
 	ptr += num_written;
+#endif
+	va_end(args);
 	return num_written;
 }
 

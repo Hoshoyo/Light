@@ -16,12 +16,26 @@ store i8* %2, i8** %0
 %3 = load i8*, i8** %0
 
 store i8 48, i8* %3
-%4 = sext i64 1 to i64
-%5 = getelementptr i8*, i8** %0, i64 %4
+%4 = alloca i64, align 8
+%5 = load i8*, i8** %0
+%6 = load i8, i8* %5
 
-%6 = load i8*, i8** %5
+%7 = zext i8 %6 to i64
 
-store i8 49, i8* %6
+%8 = call i64 @print_s64(i64  %7)
+
+store i64 %8, i64* %4
+%9 = alloca i64, align 8
+%10 = load i8*, i8** %0
+%11 = getelementptr i8, i8* %10, i64 1
+
+%12 = load i8, i8* %11
+
+%13 = zext i8 %12 to i64
+
+%14 = call i64 @print_s64(i64  %13)
+
+store i64 %14, i64* %9
 ret i32 0
 
 }

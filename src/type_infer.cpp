@@ -45,6 +45,8 @@ Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_und
 		case OP_BINARY_MINUS: {
 			if (left->kind == KIND_POINTER && type_primitive_int(right)) {
 				assert(left->flags & TYPE_FLAG_INTERNALIZED);
+				right->flags |= TYPE_FLAG_RESOLVED |TYPE_FLAG_SIZE_RESOLVED;
+				expr->expr_binary.right->type_return = internalize_type(&right, true);
 				return left;
 			}
 			
@@ -618,6 +620,8 @@ Type_Error type_check(Ast* node) {
 						error |= report_type_mismatch(node, lvalue_type->pointer_to, rvalue_type);
 					}
 				}
+				error |= type_check(node->comm_var_assign.lvalue);
+
 				error |= type_check(node->comm_var_assign.rvalue);
 				if (error & TYPE_ERROR_FATAL) break;
 				if (node->comm_var_assign.rvalue->type_return != lvalue_type->pointer_to) {
@@ -819,6 +823,8 @@ Type_Error type_check(Ast* node) {
 			//assert_msg(0, "unary expression type check not implemented");
 			assert(!(node->type_return->flags & TYPE_FLAG_WEAK));
 			Ast* operand = node->expr_unary.operand;
+			error |= type_check(operand);
+			if(error & TYPE_ERROR_FATAL) return error;
 
 			switch (node->expr_unary.op) {
 				case OP_UNARY_ADDRESSOF:{
@@ -863,8 +869,12 @@ Type_Error type_check(Ast* node) {
 					Type_Instance* opt = operand->type_return;
 
 					if(opt->flags & TYPE_FLAG_WEAK){
-						
+						opt->flags |= TYPE_FLAG_RESOLVED;
+						opt = resolve_type(node->scope, opt, false);
+						operand->type_return = internalize_type(&opt);
+						error |= type_update_weak(operand, opt);
 					}
+					error |= type_check(operand);
 
 					if (ttc->kind == KIND_POINTER) {
 						// cast(^T) ^V
