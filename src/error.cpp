@@ -24,7 +24,7 @@ void report_error_location(Ast* node) {
 	case AST_COMMAND_FOR:					break;//report_error_location(node->comm_); break;
 	case AST_COMMAND_IF:					break;//report_error_location(node->comm_); break;
 	case AST_COMMAND_RETURN:				report_error_location(node->comm_return.token_return); break;
-	case AST_COMMAND_VARIABLE_ASSIGNMENT:	break;//report_error_location(node->comm_); break;
+	case AST_COMMAND_VARIABLE_ASSIGNMENT:	report_error_location(node->comm_var_assign.rvalue); break;
 	}
 }
 

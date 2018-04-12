@@ -12,6 +12,8 @@ int LLVM_Code_Generator::sprint(char* msg, ...)
 	va_list args;
 	va_start(args, msg);
 	int num_written = vsprintf(buffer + ptr, msg, args);
+	//int num_written = vfprintf(stdout, msg, args);
+	//fflush(stdout);
 	va_end(args);
 	ptr += num_written;
 	return num_written;
@@ -263,7 +265,7 @@ void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 				}
 				else {
 					s32 res_temp = llvm_emit_expression(node->comm_var_assign.rvalue);
-					sprint("store ");
+					sprint("\nstore ");
 					llvm_emit_type(node->comm_var_assign.rvalue->type_return, EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8 | EMIT_TYPE_FLAG_STRUCT_NAMED);
 					sprint(" %%%d", res_temp);
 				}
@@ -372,7 +374,11 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 		case AST_EXPRESSION_VARIABLE: {
 			Ast* var_decl = decl_from_name(expr->scope, expr->expr_variable.name);
 			if(ast_node_is_embeded_literal(expr)){
-				sprint("%%%.*s", TOKEN_STR(expr->expr_variable.name));
+				if(var_decl->decl_variable.temporary_register == -1){
+					sprint("%%%.*s", TOKEN_STR(expr->expr_variable.name));
+				} else {
+					sprint("%%%d", var_decl->decl_variable.temporary_register);
+				}
 				return -1;
 			}
 			assert(var_decl->node_type == AST_DECL_VARIABLE);
@@ -882,6 +888,7 @@ s32 LLVM_Code_Generator::llvm_define_string_literal(Ast_Expr_Literal* lit) {
 }
 
 bool ast_node_is_embeded_literal(Ast* node) {
+	if(node->node_type == AST_EXPRESSION_VARIABLE && node->expr_variable.flags & EXPR_VARIABLE_LVALUE) return true;
 	if(node->node_type == AST_EXPRESSION_VARIABLE && node->type_return->kind == KIND_PRIMITIVE) {
 		Ast* decl = decl_from_name(node->scope, node->expr_variable.name);
 		if(decl->node_type == AST_DECL_VARIABLE && decl->scope->flags & SCOPE_PROCEDURE_ARGUMENTS)

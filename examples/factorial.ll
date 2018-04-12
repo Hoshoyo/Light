@@ -1,4 +1,4 @@
-target triple = "x86_64-pc-windows-msvc"
+target triple = "x86_64-linux-gnu"
 
 %vec2 = type { float, float }
 

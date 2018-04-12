@@ -320,6 +320,7 @@ Type_Instance* infer_from_variable_expr(Ast* expr, Type_Error* error, bool rep_u
 		ptrtype->type_size_bits = type_pointer_size_bits();
 		ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED | TYPE_FLAG_LVALUE;
 		ptrtype->pointer_to = type;
+		expr->expr_variable.flags |= EXPR_VARIABLE_LVALUE;
 		return internalize_type(&ptrtype, true);
 	}
 

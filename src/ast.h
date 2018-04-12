@@ -288,8 +288,10 @@ struct Ast_Expr_Literal {
 		};
 	};
 };
+const u32 EXPR_VARIABLE_LVALUE = FLAG(0);
 struct Ast_Expr_Variable {
 	Token* name;
+	u32    flags;
 };
 struct Ast_Expr_ProcCall {
 	Token* name;
