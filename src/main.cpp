@@ -7,6 +7,7 @@
 #include "decl_check.h"
 #include "type_table.h"
 #include "type_infer.h"
+#include "type_check.h"
 #include "llvm_backend.h"
 
 void initialize() {
@@ -47,6 +48,5 @@ int main(int argc, char** argv) {
 	DEBUG_print_type_table();
 
 	llvm_generate_ir(ast_top_level, g_type_table, argv[1]);
-
 	return 0;
 }

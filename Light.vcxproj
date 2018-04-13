@@ -145,6 +145,7 @@
     <ClCompile Include="src\parser.cpp" />
     <ClCompile Include="src\symbol_table.cpp" />
     <ClCompile Include="src\type.cpp" />
+    <ClCompile Include="src\type_check.cpp" />
     <ClCompile Include="src\type_infer.cpp" />
     <ClCompile Include="src\type_table.cpp" />
     <ClCompile Include="src\util.cpp" />
@@ -160,6 +161,7 @@
     <ClInclude Include="src\parser.h" />
     <ClInclude Include="src\symbol_table.h" />
     <ClInclude Include="src\type.h" />
+    <ClInclude Include="src\type_check.h" />
     <ClInclude Include="src\type_infer.h" />
     <ClInclude Include="src\type_table.h" />
     <ClInclude Include="src\util.h" />

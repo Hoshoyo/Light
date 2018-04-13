@@ -345,58 +345,52 @@ s32 LLVM_Code_Generator::llvm_emit_expression(Ast* expr) {
 		}break;
 
 		case AST_EXPRESSION_LITERAL: {
-			Ast_Expr_Literal* l = &expr->expr_literal;
-			//if(expr->expression.literal_exp.flags)
-			switch (l->token->type) {
-				case TOKEN_LITERAL_HEX_INT:
-				case TOKEN_LITERAL_BIN_INT:{
-					sprint("%llx", l->value_u64);
-				}break;
-				case TOKEN_LITERAL_INT: {
-					// @TODO: convert it properly
-					sprint("%.*s", TOKEN_STR(l->token));
-				}break;
-				case TOKEN_LITERAL_FLOAT: {
-					// @TODO: convert it properly
-					sprint("%.*s", TOKEN_STR(l->token));
-				}break;
-				case TOKEN_LITERAL_BOOL_FALSE: {
-					sprint("false");
-				}break;
-				case TOKEN_LITERAL_BOOL_TRUE: {
-					sprint("true");
-				}break;
-				case TOKEN_LITERAL_STRING: {
-					result = alloc_temp_register();
-					s32 index = llvm_define_string_literal(l);
-					size_t len = l->token->value.length + 1; // \0
-					sprint("%%%d = getelementptr [%d x i8], [%d x i8]* @__str$%d, i64 0, i64 0\n", result, len, len, index);
-				}break;
-			}
+				switch (expr->type_return->primitive) {
+					case TYPE_PRIMITIVE_S8:		sprint("%d", (s8)expr->expr_literal.value_s64); break;
+					case TYPE_PRIMITIVE_S16:	sprint("%d", expr->expr_literal.value_s64); break;
+					case TYPE_PRIMITIVE_S32:	sprint("%d", expr->expr_literal.value_s64); break;
+					case TYPE_PRIMITIVE_S64:	sprint("%lld", expr->expr_literal.value_s64); break;
+					case TYPE_PRIMITIVE_U8:		sprint("%u", expr->expr_literal.value_u64); break;
+					case TYPE_PRIMITIVE_U16:	sprint("%u", expr->expr_literal.value_u64); break;
+					case TYPE_PRIMITIVE_U32:	sprint("%u", expr->expr_literal.value_u64); break;
+					case TYPE_PRIMITIVE_U64:	sprint("%llu", expr->expr_literal.value_u64); break;
+					case TYPE_PRIMITIVE_R32:	sprint("%f", expr->expr_literal.value_r32); break;
+					case TYPE_PRIMITIVE_R64:	sprint("%f", expr->expr_literal.value_r64); break;
+					case TYPE_PRIMITIVE_BOOL: {
+						if (expr->expr_literal.value_bool)
+							sprint("true");
+						else
+							sprint("false");
+					}break;
+					default: assert_msg(0, "invalid type primitive"); break;
+				}
 		} break;
 
 		case AST_EXPRESSION_VARIABLE: {
-			Ast* var_decl = decl_from_name(expr->scope, expr->expr_variable.name);
-			if(ast_node_is_embeded_literal(expr)){
-				if(var_decl->decl_variable.temporary_register == -1){
-					sprint("%%%.*s", TOKEN_STR(expr->expr_variable.name));
-				} else {
-					sprint("%%%d", var_decl->decl_variable.temporary_register);
+			Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
+			if (decl->node_type == AST_DECL_VARIABLE) {
+				if (ast_node_is_embeded_literal(expr)) {
+					if (decl->decl_variable.temporary_register == -1) {
+						sprint("%%%.*s", TOKEN_STR(expr->expr_variable.name));
+					}
+					else {
+						sprint("%%%d", decl->decl_variable.temporary_register);
+					}
+					return -1;
 				}
-				return -1;
+				// get temporary register containing the variable address
+				s32 var_temp_reg = decl->decl_variable.temporary_register;
+
+				result = alloc_temp_register();
+
+				sprint("%%%d = load ", result);
+				llvm_emit_type(expr->type_return, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+				sprint(", ");
+				llvm_emit_type(expr->type_return, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
+				sprint("* %%%d", var_temp_reg);
+			} else if (decl->node_type == AST_DECL_CONSTANT) {
+				result = llvm_emit_expression(decl->decl_constant.value);
 			}
-			assert(var_decl->node_type == AST_DECL_VARIABLE);
-
-			// get temporary register containing the variable address
-			s32 var_temp_reg = var_decl->decl_variable.temporary_register;
-			
-			result = alloc_temp_register();
-
-			sprint("%%%d = load ", result);
-			llvm_emit_type(expr->type_return, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
-			sprint(", ");
-			llvm_emit_type(expr->type_return, EMIT_TYPE_FLAG_STRUCT_NAMED | EMIT_TYPE_FLAG_CONVERT_VOID_TO_I8);
-			sprint("* %%%d", var_temp_reg);
 		} break;
 
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
@@ -431,7 +425,7 @@ s32 LLVM_Code_Generator::llvm_emit_unary_expression(Ast* expr) {
 	{
 		case OP_UNARY_ADDRESSOF:{
 			if (operand->node_type == AST_EXPRESSION_VARIABLE) {
-				Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
+				Ast* decl = decl_from_name(operand->scope, operand->expr_variable.name);
 				result = decl->decl_variable.temporary_register;
 				assert(result != -1);
 			} else {
@@ -893,10 +887,15 @@ s32 LLVM_Code_Generator::llvm_define_string_literal(Ast_Expr_Literal* lit) {
 
 bool ast_node_is_embeded_literal(Ast* node) {
 	if(node->node_type == AST_EXPRESSION_VARIABLE && node->expr_variable.flags & EXPR_VARIABLE_LVALUE) return true;
-	if(node->node_type == AST_EXPRESSION_VARIABLE && node->type_return->kind == KIND_PRIMITIVE) {
+	if (node->node_type == AST_EXPRESSION_VARIABLE) {
 		Ast* decl = decl_from_name(node->scope, node->expr_variable.name);
-		if(decl->node_type == AST_DECL_VARIABLE && decl->scope->flags & SCOPE_PROCEDURE_ARGUMENTS)
-			return true;
+
+		if (decl->node_type == AST_DECL_CONSTANT) return true;
+
+		if(node->type_return->kind == KIND_PRIMITIVE) {
+			if(decl->node_type == AST_DECL_VARIABLE && decl->scope->flags & SCOPE_PROCEDURE_ARGUMENTS)
+				return true;
+		}
 	}
 	if (node->type_return->kind != KIND_PRIMITIVE) return false;
 	return (node->node_type == AST_EXPRESSION_LITERAL && (type_primitive_numeric(node->type_return)||type_primitive_bool(node->type_return)));
@@ -944,7 +943,9 @@ void llvm_generate_ir(Ast** toplevel, Type_Instance** type_table, char* filename
 	code_generator.sprint("attributes #0 = { nounwind uwtable }\n");
 	code_generator.sprint("attributes #1 = { nounwind uwtable }\n");
 
-	string out_obj = string_make("examples/factorial.ll", sizeof("examples/factorial.ll") - 1);
+	size_t fname_len = filename_length_strip_extension(filename);
+	string out_obj = string_new(filename, fname_len);
+	string_append(&out_obj, ".ll");
 	
 	HANDLE out = ho_createfile((const char*)out_obj.data, FILE_WRITE, CREATE_ALWAYS);
 	ho_writefile(out, code_generator.ptr, (u8*)code_generator.buffer);
@@ -952,10 +953,10 @@ void llvm_generate_ir(Ast** toplevel, Type_Instance** type_table, char* filename
 	ho_closefile(out);
 
 	char cmdbuffer[1024];
-	sprintf(cmdbuffer, "llc -filetype=obj -march=x86-64 %s -o %.*s.obj", out_obj.data, sizeof("examples/factorial.ll") - 1, out_obj.data);
+	sprintf(cmdbuffer, "llc -filetype=obj -march=x86-64 %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -emain -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib", 
-		sizeof("examples/factorial.ll") - 1, out_obj.data, sizeof("examples/factorial.ll") - 1, out_obj.data);
+		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 }
 #elif defined(__linux__)

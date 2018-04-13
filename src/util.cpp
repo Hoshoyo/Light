@@ -11,6 +11,7 @@ string string_new(const char* v, s64 length){
 	result.length   = length;
 	result.capacity = length * 2;
 	memcpy((void*)result.data, v, length);
+	return result;
 }
 
 void string_free(string* s) {

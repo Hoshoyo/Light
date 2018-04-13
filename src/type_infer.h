@@ -9,5 +9,3 @@ Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, bool report_u
 Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Type_Error* error);
 Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Type_Error* error);
 Type_Error type_update_weak(Ast* expr, Type_Instance* strong);
-
-Type_Error type_check(Scope* scope, Ast** ast);

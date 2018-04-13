@@ -505,8 +505,8 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 			node->expr_literal.value_s64 = -node->expr_literal.value_s64;
 	} else if (prefixed) {
 		report_syntax_error(first, "expected integer literal after %c operator but got '%.*s'\n", (char)first->type, TOKEN_STR(first));
-	}
-	switch(first->type) {
+	} else {
+		switch (first->type) {
 		case TOKEN_LITERAL_INT: {
 			node->expr_literal.type = LITERAL_SINT;
 			node->expr_literal.value_s64 = str_to_s64((char*)first->value.data, first->value.length);
@@ -546,6 +546,7 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 			// struct literal
 			// array literal
 		}break;
+		}
 	}
 
 	return node;
@@ -588,6 +589,8 @@ Ast* Parser::parse_command(Scope* scope) {
 				// syntatic sugar void proc call
 				Ast* pcall = parse_expr_proc_call(scope);
 				command = ast_create_comm_variable_assignment(scope, 0, pcall);
+			} else {
+				command = parse_comm_variable_assignment(scope);
 			}
 			require_and_eat(';');
 		}break;

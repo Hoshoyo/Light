@@ -382,8 +382,19 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 			// TODO(psv): could be type alias, not implemented yet
 			Type_Instance* const_type = 0;
 			if (node->decl_constant.type_info) {
+				//const_type = resolve_type(node->scope, node->decl_constant.type_info, true);
+				//node->decl_constant.type_info = const_type;
 				const_type = resolve_type(node->scope, node->decl_constant.type_info, true);
 				node->decl_constant.type_info = const_type;
+				if (node->decl_constant.value) {
+					Type_Instance* rtype = infer_from_expression(node->decl_constant.value, &error, true);
+					if (error & DECL_ERROR_FATAL) return error;
+					if (rtype->flags & TYPE_FLAG_WEAK) {
+						rtype = type_strength_resolve(rtype, const_type, node->decl_constant.value, node, &error);
+						if (error & DECL_ERROR_FATAL) return error;
+						node->decl_constant.value->type_return = rtype;
+					}
+				}
 			}
 			if (!const_type) {
 				if (node->decl_constant.value) {
