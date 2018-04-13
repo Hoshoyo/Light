@@ -17,15 +17,15 @@ main :: () -> u32 {
 	*int_vector + 1 = 1;
 	
 	*int_vector + *(*int_vector + 1) = 5;
-	//buffer := malloc(10);
-	//aux := cast(^u8)buffer;
+	buffer := malloc(10);
+	aux := cast(^u8)buffer;
 
-	//i : s32 = 0;
-	//for i < cast(s32)10 {
-	//	*aux = cast(u8)48 + cast(u8)i;
-	//	aux = aux + 1;
-	//	i = i + cast(s32)1;
-	//}
+	i : s32 = 0;
+	for i < cast(s32)10 {
+		*aux = cast(u8)48 + cast(u8)i;
+		aux = aux + 1;
+		i = i + cast(s32)1;
+	}
 	
 	//written : u32;
 	//stdhandle := GetStdHandle(STD_OUTPUT_HANDLE);

@@ -503,10 +503,9 @@ Decl_Error decl_check_inner_command(Ast* node) {
 				error |= report_type_error(TYPE_ERROR_FATAL, "left side of assignment is not an addressable value\n");
 			}
 			error |= decl_check_inner_expr(node->comm_var_assign.rvalue);
-
-			if (node->comm_var_assign.lvalue) {
+			if (node->comm_var_assign.rvalue) {
 				// if the rvalue is weak, transform it
-				if (node->comm_var_assign.rvalue->type_return->flags & TYPE_FLAG_WEAK) {
+				if (node->comm_var_assign.rvalue->type_return && node->comm_var_assign.rvalue->type_return->flags & TYPE_FLAG_WEAK) {
 					error |= type_update_weak(node->comm_var_assign.rvalue, node->comm_var_assign.lvalue->type_return->pointer_to);
 				}
 			}

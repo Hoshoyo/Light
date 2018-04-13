@@ -184,7 +184,7 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_unde
 			}
 			// @IMPORTANT instead of resolving types here, make them collapse to something, give preference to the type being cast to!
 			expr->expr_unary.operand->type_return = infer_from_expression(expr->expr_unary.operand, error, rep_undeclared, lval);
-			if(expr->expr_unary.operand->type_return->flags & TYPE_FLAG_WEAK){
+			if(expr->expr_unary.operand->type_return && expr->expr_unary.operand->type_return->flags & TYPE_FLAG_WEAK){
 				expr->expr_unary.operand->type_return = type_transform_weak_to_strong(expr->expr_unary.operand->type_return, res, expr->expr_unary.operand, error);
 				//Type_Instance* opt = resolve_type(expr->scope, expr->expr_unary.operand->type_return, report_undeclared);
 				//if(!opt){
