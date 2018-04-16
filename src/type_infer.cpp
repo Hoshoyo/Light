@@ -16,6 +16,180 @@ Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2)
    -------------------- Type Inference --------------------------
    -------------------------------------------------------------- */
 
+Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
+	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
+
+	Type_Instance* type_infered = 0;
+
+	switch (expr->node_type) {
+		case AST_EXPRESSION_BINARY:				type_infered = infer_from_binary_expression(expr, error, flags); break;
+		case AST_EXPRESSION_LITERAL:			type_infered = infer_from_literal_expression(expr, error, flags); break;
+		case AST_EXPRESSION_PROCEDURE_CALL:		type_infered = infer_from_procedure_call(expr, error, flags); break;
+		case AST_EXPRESSION_UNARY:				type_infered = infer_from_unary_expression(expr, error, flags); break;
+		case AST_EXPRESSION_VARIABLE:			type_infered = infer_from_variable_expression(expr, error, flags); break;
+	}
+}
+
+Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 flags) {
+	Type_Instance* left  = infer_from_expression(expr->expr_binary.left, error, flags);
+	Type_Instance* right = infer_from_expression(expr->expr_binary.right, error, flags);
+	if (*error & TYPE_ERROR_FATAL) return 0;
+
+	switch (expr->expr_binary.op) {
+		case OP_BINARY_MOD: {
+			expr->type_return = type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+			if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
+				expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+		}break;
+		case OP_BINARY_PLUS:
+		case OP_BINARY_MINUS: {
+			if (left->kind == KIND_POINTER && type_primitive_int(right)) {
+				expr->expr_binary.right->type_return = type_strength_resolve(right, expr->expr_binary.right, error);
+				if (expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
+					expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+				return left;
+			}
+
+			if ((left->kind == KIND_POINTER) && (right->kind == KIND_POINTER)) {
+				expr->type_return = type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+				assert(!(expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP));
+				if (expr->expr_binary.op == OP_BINARY_MINUS) {
+					// difference of pointers gives an s64
+					return type_primitive_get(TYPE_PRIMITIVE_S64);
+				} else {
+					return 0;
+				}
+			}
+		}
+		case OP_BINARY_MULT:
+		case OP_BINARY_DIV: {
+			if ((type_primitive_int(left) && type_primitive_int(right)) ||
+				(type_primitive_float(left) && type_primitive_float(right)))
+			{
+				expr->type_return = type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+				if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
+					expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+				return expr->type_return;
+			} else {
+				return 0;
+			}
+		}break;
+		case OP_BINARY_XOR: {
+			expr->type_return = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+
+			if (type_primitive_bool(left) && type_primitive_bool(right)) {
+				if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
+					expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+				return left;
+			} else if (type_primitive_int(left) && type_primitive_int(right)) {
+				
+				if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
+					expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+				return expr->type_return;
+			} else {
+				return 0;
+			}
+		} break;
+		case OP_BINARY_AND:
+		case OP_BINARY_OR:
+		case OP_BINARY_SHL:
+		case OP_BINARY_SHR: {
+			if (type_primitive_int(left) && type_primitive_int(right)) {
+				expr->type_return = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+				if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
+					expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+				return expr->type_return;
+			} else {
+				return 0;
+			}
+		}break;
+
+		case OP_BINARY_LOGIC_AND:
+		case OP_BINARY_LOGIC_OR: {
+			if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
+				expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+			return type_primitive_get(TYPE_PRIMITIVE_BOOL);
+		}break;
+
+		case OP_BINARY_EQUAL:
+		case OP_BINARY_NOT_EQUAL: {
+			if (type_primitive_bool(left) && type_primitive_bool(right)) {
+				return left;
+			}
+		}
+		case OP_BINARY_GE:
+		case OP_BINARY_GT:
+		case OP_BINARY_LE:
+		case OP_BINARY_LT: {
+			Type_Instance* booltype = type_primitive_get(TYPE_PRIMITIVE_BOOL);
+			if ((type_primitive_int(left) && type_primitive_int(right)) ||
+				(type_primitive_float(left) && type_primitive_float(right)))
+			{
+				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+				if (*error & TYPE_ERROR_FATAL) return 0;
+				expr->type_return = booltype;
+				return booltype;
+			}
+			else {
+				if (type_hash(left) == type_hash(right)) {
+					expr->type_return = booltype;
+					return booltype;
+				}
+				else {
+					*error = report_type_mismatch(expr, left, right);
+					fprintf(stderr, "\n");
+				}
+			}
+		}break;
+		case OP_BINARY_VECTOR_ACCESS: {
+			// right is index
+			Type_Instance* index_type = infer_from_expression(expr->expr_binary.right, error, rep_undeclared);
+			if (*error & TYPE_ERROR_FATAL) return 0;
+			expr->expr_binary.right->type_return = index_type;
+
+			Type_Instance* operand_type = infer_from_expression(expr->expr_binary.left, error, rep_undeclared, lval);
+			// left is indexed
+			if (*error & TYPE_ERROR_FATAL) return 0;
+			if (operand_type->kind == KIND_POINTER) {
+				Type_Instance* res = operand_type->pointer_to;
+				assert(res->flags & TYPE_FLAG_INTERNALIZED);
+				if (res->kind == KIND_ARRAY) {
+					res = res->array_desc.array_of;
+				}
+				return res;
+			}
+			else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot dereference a non pointer type '");
+				DEBUG_print_type(stderr, operand_type, true);
+				fprintf(stderr, "'\n");
+				return 0;
+			}
+		}break;
+
+		case OP_BINARY_DOT: {
+			// TODO(psv): implement
+			assert_msg(0, "OP_BINARY_DOT not implemented yet");
+		}break;
+	}
+}
+
+Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 flags) {
+
+}
+
+Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags) {
+
+}
+
+Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 flags) {
+
+}
+
+Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 flags) {
+
+}
+
+#if 0
 Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Type_Error* error);
 Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
 Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
@@ -498,3 +672,5 @@ Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* 
 		return 0;
 	}
 }
+
+#endif
