@@ -217,6 +217,10 @@ void LLVM_Code_Generator::llvm_emit_node(Ast* node) {
 			sprint("\n");
 		} break;
 
+		case AST_COMMAND_FOR: {
+			
+		} break;
+
 		case AST_COMMAND_IF: {
 			s32 true_label  = gen_branch_label();
 			s32 false_label = (node->comm_if.body_false) ? gen_branch_label() : -1;

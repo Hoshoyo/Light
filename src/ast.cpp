@@ -61,7 +61,7 @@ Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_I
 	dv->decl_variable.name = name;
 	dv->decl_variable.flags = flags;
 	dv->decl_variable.size_bytes = 0;
-	dv->decl_variable.temporary_register = 0;
+	dv->decl_variable.temporary_register = -1;
 	dv->decl_variable.variable_type = var_type;
 	dv->decl_variable.assignment = assignment;
 	dv->decl_variable.alignment = 8;		// @TEMPORARY
