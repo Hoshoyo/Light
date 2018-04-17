@@ -328,11 +328,11 @@ Type_Error type_check(Ast* node) {
 		size_t nargs_expected = decl->decl_procedure.arguments_count;
 
 		if (nargs < nargs_expected) {
-			error |= report_type_error(TYPE_ERROR_FATAL, "procedure call missing arguments, expected '%lld' got '%lld'\n",
+			error |= report_type_error(TYPE_ERROR_FATAL, node, "procedure call missing arguments, expected '%lld' got '%lld'\n",
 				nargs_expected, nargs);
 		}
 		else if (nargs > nargs_expected) {
-			error |= report_type_error(TYPE_ERROR_FATAL, "too many arguments for procedure call, expected '%lld' got '%lld'\n",
+			error |= report_type_error(TYPE_ERROR_FATAL, node, "too many arguments for procedure call, expected '%lld' got '%lld'\n",
 				nargs_expected, nargs);
 		}
 		else {
