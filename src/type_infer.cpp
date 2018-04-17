@@ -12,6 +12,11 @@ Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2)
 	return err;
 }
 
+Type_Instance* type_strength_resolve_binary(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Type_Error* error);
+Type_Error     type_update_weak(Ast* expr, Type_Instance* strong);
+Type_Error     type_update_weak(Ast* expr);
+Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Type_Error* error);
+
 /* --------------------------------------------------------------
    -------------------- Type Inference --------------------------
    -------------------------------------------------------------- */
@@ -28,9 +33,17 @@ Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
 		case AST_EXPRESSION_UNARY:				type_infered = infer_from_unary_expression(expr, error, flags); break;
 		case AST_EXPRESSION_VARIABLE:			type_infered = infer_from_variable_expression(expr, error, flags); break;
 	}
+	return type_infered;
 }
 
-Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 flags) {
+Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 flags) 
+{
+	auto strength_dependency = [](Ast* expr) -> u32 {
+		if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
+			return AST_FLAG_TYPE_STRENGTH_DEP;
+		return 0;
+	};
+
 	Type_Instance* left  = infer_from_expression(expr->expr_binary.left, error, flags);
 	Type_Instance* right = infer_from_expression(expr->expr_binary.right, error, flags);
 	if (*error & TYPE_ERROR_FATAL) return 0;
@@ -38,25 +51,26 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 	switch (expr->expr_binary.op) {
 		case OP_BINARY_MOD: {
 			expr->type_return = type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-			if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
-				expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+			expr->flags |= strength_dependency(expr);
+			return expr->type_return;
 		}break;
 		case OP_BINARY_PLUS:
 		case OP_BINARY_MINUS: {
 			if (left->kind == KIND_POINTER && type_primitive_int(right)) {
-				expr->expr_binary.right->type_return = type_strength_resolve(right, expr->expr_binary.right, error);
-				if (expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
-					expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+				*error |= type_update_weak(expr->expr_binary.left);
+				*error |= type_update_weak(expr->expr_binary.right);
+				expr->flags |= strength_dependency(expr);
 				return left;
 			}
 
 			if ((left->kind == KIND_POINTER) && (right->kind == KIND_POINTER)) {
 				expr->type_return = type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				assert(!(expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP));
+				expr->flags |= strength_dependency(expr);
 				if (expr->expr_binary.op == OP_BINARY_MINUS) {
 					// difference of pointers gives an s64
 					return type_primitive_get(TYPE_PRIMITIVE_S64);
 				} else {
+					*error |= report_type_error(TYPE_ERROR_FATAL, expr, "pointer arithmetic between pointers is only defined for the unary operator '-'\n");
 					return 0;
 				}
 			}
@@ -67,26 +81,23 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 				(type_primitive_float(left) && type_primitive_float(right)))
 			{
 				expr->type_return = type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
-					expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+				expr->flags |= strength_dependency(expr);
 				return expr->type_return;
 			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' requires numeric type\n", binop_op_to_string(expr->expr_binary.op));
 				return 0;
 			}
 		}break;
 		case OP_BINARY_XOR: {
-			expr->type_return = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+			expr->type_return = type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+			expr->flags |= strength_dependency(expr);
 
 			if (type_primitive_bool(left) && type_primitive_bool(right)) {
-				if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
-					expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
 				return left;
 			} else if (type_primitive_int(left) && type_primitive_int(right)) {
-				
-				if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
-					expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
 				return expr->type_return;
 			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' requires boolean or integer type\n", binop_op_to_string(expr->expr_binary.op));
 				return 0;
 			}
 		} break;
@@ -95,259 +106,136 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 		case OP_BINARY_SHL:
 		case OP_BINARY_SHR: {
 			if (type_primitive_int(left) && type_primitive_int(right)) {
-				expr->type_return = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
-					expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+				expr->type_return = type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+				expr->flags |= strength_dependency(expr);
 				return expr->type_return;
 			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' requires boolean or integer type\n", binop_op_to_string(expr->expr_binary.op));
 				return 0;
 			}
 		}break;
 
 		case OP_BINARY_LOGIC_AND:
 		case OP_BINARY_LOGIC_OR: {
-			if (expr->expr_binary.left->flags & AST_FLAG_TYPE_STRENGTH_DEP || expr->expr_binary.right->flags & AST_FLAG_TYPE_STRENGTH_DEP)
-				expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
-			return type_primitive_get(TYPE_PRIMITIVE_BOOL);
-		}break;
-
-		case OP_BINARY_EQUAL:
-		case OP_BINARY_NOT_EQUAL: {
-			if (type_primitive_bool(left) && type_primitive_bool(right)) {
-				return left;
-			}
-		}
-		case OP_BINARY_GE:
-		case OP_BINARY_GT:
-		case OP_BINARY_LE:
-		case OP_BINARY_LT: {
-			Type_Instance* booltype = type_primitive_get(TYPE_PRIMITIVE_BOOL);
-			if ((type_primitive_int(left) && type_primitive_int(right)) ||
-				(type_primitive_float(left) && type_primitive_float(right)))
-			{
-				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (*error & TYPE_ERROR_FATAL) return 0;
-				expr->type_return = booltype;
-				return booltype;
-			}
-			else {
-				if (type_hash(left) == type_hash(right)) {
-					expr->type_return = booltype;
-					return booltype;
-				}
-				else {
-					*error = report_type_mismatch(expr, left, right);
-					fprintf(stderr, "\n");
-				}
-			}
-		}break;
-		case OP_BINARY_VECTOR_ACCESS: {
-			// right is index
-			Type_Instance* index_type = infer_from_expression(expr->expr_binary.right, error, rep_undeclared);
-			if (*error & TYPE_ERROR_FATAL) return 0;
-			expr->expr_binary.right->type_return = index_type;
-
-			Type_Instance* operand_type = infer_from_expression(expr->expr_binary.left, error, rep_undeclared, lval);
-			// left is indexed
-			if (*error & TYPE_ERROR_FATAL) return 0;
-			if (operand_type->kind == KIND_POINTER) {
-				Type_Instance* res = operand_type->pointer_to;
-				assert(res->flags & TYPE_FLAG_INTERNALIZED);
-				if (res->kind == KIND_ARRAY) {
-					res = res->array_desc.array_of;
-				}
-				return res;
-			}
-			else {
-				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot dereference a non pointer type '");
-				DEBUG_print_type(stderr, operand_type, true);
-				fprintf(stderr, "'\n");
+			if(type_primitive_bool(left) && type_primitive_bool(right)){
+				type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+				expr->flags |= strength_dependency(expr);
+				expr->type_return = type_primitive_get(TYPE_PRIMITIVE_BOOL);
+				return expr->type_return;
+			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' requires boolean type\n", binop_op_to_string(expr->expr_binary.op));
 				return 0;
 			}
 		}break;
 
+		case OP_BINARY_EQUAL:
+		case OP_BINARY_NOT_EQUAL: {
+			type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+			expr->flags |= strength_dependency(expr);
+			expr->type_return = type_primitive_get(TYPE_PRIMITIVE_BOOL);
+			return expr->type_return;
+		}
+		case OP_BINARY_GE:
+		case OP_BINARY_GT:
+		case OP_BINARY_LE:
+		case OP_BINARY_LT: 
+		{
+			if ((type_primitive_int(left) && type_primitive_int(right)) ||
+				(type_primitive_float(left) && type_primitive_float(right)))
+			{
+				type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+				expr->flags |= strength_dependency(expr);
+				expr->type_return = type_primitive_get(TYPE_PRIMITIVE_BOOL);
+				return expr->type_return;
+			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' requires numeric type\n", binop_op_to_string(expr->expr_binary.op));
+				return 0;
+			}
+		}break;
+		case OP_BINARY_VECTOR_ACCESS: {
+			// right is index
+			// left  is indexed
+			if (expr->expr_binary.right->type_return->kind == KIND_POINTER) {
+				Type_Instance* index_type   = type_update_weak(expr->expr_binary.right);
+				Type_Instance* indexed_type = type_update_weak(expr->expr_binary.left);
+				expr->flags |= strength_dependency(expr);
+				if(indexed_type->kind == KIND_POINTER){
+					return indexed_type->pointer_to;
+				}
+			}
+			*error |= report_type_error(TYPE_ERROR_FATAL, expr, "vector accessing requires an lvalue type\n");
+			return 0;
+		}break;
+
 		case OP_BINARY_DOT: {
-			// TODO(psv): implement
-			assert_msg(0, "OP_BINARY_DOT not implemented yet");
+			// TODO: incomplete
+			type_strength_resolve_binary(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
+			expr->flags |= strength_dependency(expr);
+			expr->type_return = right;
+			return right;
+			//assert_msg(0, "OP_BINARY_DOT not implemented yet");
 		}break;
 	}
 }
 
 Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 flags) {
+	Type_Instance* result = type_new_temporary();
+	result->flags = TYPE_FLAG_WEAK;
 
+	switch (expr->expr_literal.type) {
+		case LITERAL_BIN_INT:
+		case LITERAL_HEX_INT: {
+			expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+			result->kind = KIND_PRIMITIVE;
+			result->primitive = TYPE_PRIMITIVE_U64;
+		}break;
+		case LITERAL_SINT: {
+			expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+			result->kind = KIND_PRIMITIVE;
+			result->primitive = TYPE_PRIMITIVE_S64;
+		}break;
+		case LITERAL_BOOL: {
+			return type_primitive_get(TYPE_PRIMITIVE_BOOL);
+		}break;
+		case LITERAL_FLOAT: {
+			expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+			result->kind = KIND_PRIMITIVE;
+			result->primitive = TYPE_PRIMITIVE_R64;
+		}break;
+		case LITERAL_STRUCT:
+		case LITERAL_ARRAY: assert(0); break;	// TODO(psv): not implemented yet
+	}
+	return result;
 }
 
 Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags) {
+	Ast* decl = decl_from_name(expr->scope, expr->expr_proc_call.name);
+	if (!decl) {
+		return 0;
+	}
+	if (decl->node_type != AST_DECL_PROCEDURE) {
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "'%.*s' is not a procedure\n", TOKEN_STR(expr->expr_proc_call.name));
+		return 0;
+	}
+	Type_Instance* type = decl->decl_procedure.type_return;
+	assert(type->flags & TYPE_FLAG_INTERNALIZED);
+	size_t nargs = expr->expr_proc_call.args_count;
+	for (size_t i = 0; i < nargs; ++i) {
+		// lval is always false in case of procedure arguments.
+		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, false);
+		if(expr->expr_proc_call.args[i]->flags & AST_FLAG_TYPE_STRENGTH_DEP){
+			expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+			expr->expr_proc_call.args[i]->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
+		}
+		expr->expr_proc_call.args[i]->type_return = type;
+	}
 
+	return type;
 }
 
 Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 flags) {
-
-}
-
-Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 flags) {
-
-}
-
-#if 0
-Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Type_Error* error);
-Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
-Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
-Type_Instance* infer_from_literal_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
-Type_Instance* infer_from_variable_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
-Type_Instance* infer_from_proc_call_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval = false);
-
-Type_Instance* infer_from_binary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
-	Type_Instance* left  = infer_from_expression(expr->expr_binary.left, error, rep_undeclared, lval);
-	Type_Instance* right = infer_from_expression(expr->expr_binary.right, error, rep_undeclared, lval);
-
-	if (!left || !right)
-		return 0;
-
-	switch (expr->expr_binary.op) {
-		case OP_BINARY_MOD:{
-			if (type_primitive_int(left) && type_primitive_int(right)) {
-				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (*error & TYPE_ERROR_FATAL) return 0;
-				return inferred;
-			}
-			*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary '%%' operator is not defined for the type '");
-			DEBUG_print_type(stderr, left, true);
-			fprintf(stderr, "'\n");
-		}break;
-		case OP_BINARY_PLUS:
-		case OP_BINARY_MINUS: {
-			if (left->kind == KIND_POINTER && type_primitive_int(right)) {
-				assert(left->flags & TYPE_FLAG_INTERNALIZED);
-				right->flags |= TYPE_FLAG_RESOLVED |TYPE_FLAG_SIZE_RESOLVED;
-				expr->expr_binary.right->type_return = internalize_type(&right, true);
-				return left;
-			}
-			
-			if ((left->kind == KIND_POINTER) && (right->kind == KIND_POINTER) && (left == right)) {
-				if (expr->expr_binary.op == OP_BINARY_MINUS) {
-					// difference of pointers gives an s64
-					return type_primitive_get(TYPE_PRIMITIVE_S64);
-				} else {
-					*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot add two pointer types\n");
-					return 0;
-				}
-			}
-		}
-		case OP_BINARY_MULT:
-		case OP_BINARY_DIV: {
-			if ((type_primitive_int(left) && type_primitive_int(right)) ||
-				(type_primitive_float(left) && type_primitive_float(right))) 
-			{
-				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (*error & TYPE_ERROR_FATAL) return 0;
-				return inferred;
-			}
-			if (type_hash(left) == type_hash(right)) {
-				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary arithmetic expressions are not defined for the type '");
-				DEBUG_print_type(stderr, left, true);
-				fprintf(stderr, "'\n");
-			} else {
-				*error |= report_type_mismatch(expr, left, right);
-				fprintf(stderr, "\n");
-			}
-		}break;
-		case OP_BINARY_XOR: {
-			if (type_primitive_bool(left) && type_primitive_bool(right)) {
-				return left;
-			} else if(type_primitive_int(left) && type_primitive_int(right)) {
-				return type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-			} else {
-				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary 'xor' operator is only defined for integer types\n");
-			}
-		} break;
-		case OP_BINARY_AND:
-		case OP_BINARY_OR:
-		case OP_BINARY_SHL:
-		case OP_BINARY_SHR: {
-			if (type_primitive_int(left) && type_primitive_int(right)) 
-			{
-				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (*error & TYPE_ERROR_FATAL) return 0;
-				return inferred;
-			}
-			if (type_hash(left) == type_hash(right)) {
-				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary '%s' operator is only defined for integer types\n",
-					binop_op_to_string(expr->expr_binary.op));
-			} else {
-				*error |= report_type_mismatch(expr, left, right);
-				fprintf(stderr, "\n");
-			}
-		}break;
-
-		case OP_BINARY_LOGIC_AND:
-		case OP_BINARY_LOGIC_OR: {
-			return type_primitive_get(TYPE_PRIMITIVE_BOOL);
-		}break;
-
-		case OP_BINARY_EQUAL:
-		case OP_BINARY_NOT_EQUAL: {
-			if (type_primitive_bool(left) && type_primitive_bool(right)) {
-				return left;
-			}
-		}
-		case OP_BINARY_GE:
-		case OP_BINARY_GT:
-		case OP_BINARY_LE:
-		case OP_BINARY_LT: {
-			Type_Instance* booltype = type_primitive_get(TYPE_PRIMITIVE_BOOL);
-			if ((type_primitive_int(left) && type_primitive_int(right)) ||
-				(type_primitive_float(left) && type_primitive_float(right))) 
-			{
-				Type_Instance* inferred = type_strength_resolve(left, right, expr->expr_binary.left, expr->expr_binary.right, error);
-				if (*error & TYPE_ERROR_FATAL) return 0;
-				expr->type_return = booltype;
-				return booltype;
-			} else {
-				if (type_hash(left) == type_hash(right)) {
-					expr->type_return = booltype;
-					return booltype;
-				} else {
-					*error = report_type_mismatch(expr, left, right);
-					fprintf(stderr, "\n");
-				}
-			}
-		}break;
-		case OP_BINARY_VECTOR_ACCESS: {
-			// right is index
-			Type_Instance* index_type = infer_from_expression(expr->expr_binary.right, error, rep_undeclared);
-			if (*error & TYPE_ERROR_FATAL) return 0;
-			expr->expr_binary.right->type_return = index_type;
-
-			Type_Instance* operand_type = infer_from_expression(expr->expr_binary.left, error, rep_undeclared, lval);
-			// left is indexed
-			if (*error & TYPE_ERROR_FATAL) return 0;
-			if (operand_type->kind == KIND_POINTER) {
-				Type_Instance* res = operand_type->pointer_to;
-				assert(res->flags & TYPE_FLAG_INTERNALIZED);
-				if (res->kind == KIND_ARRAY) {
-					res = res->array_desc.array_of;
-				}
-				return res;
-			} else {
-				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot dereference a non pointer type '");
-				DEBUG_print_type(stderr, operand_type, true);
-				fprintf(stderr, "'\n");
-				return 0;
-			}
-		}break;
-
-		case OP_BINARY_DOT: {
-			// TODO(psv): implement
-			assert_msg(0, "OP_BINARY_DOT not implemented yet");
-		}break;
-	}
-	return 0;
-}
-
-Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
 	assert(expr->node_type == AST_EXPRESSION_UNARY);
-
+	/*
 	switch (expr->expr_unary.op) {
 		case OP_UNARY_CAST:{
 			Type_Instance* res = resolve_type(expr->scope, expr->expr_unary.type_to_cast, rep_undeclared);
@@ -445,104 +333,96 @@ Type_Instance* infer_from_unary_expr(Ast* expr, Type_Error* error, bool rep_unde
 			}
 		}break;
 	}
+	*/
 	return 0;
 }
 
-Type_Instance* infer_from_literal_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
-	Type_Instance* result = type_new_temporary();
-	result->flags = 0 | TYPE_FLAG_WEAK;
-	switch (expr->expr_literal.type) {
-		case LITERAL_BIN_INT:
-		case LITERAL_HEX_INT: {
-			result->kind = KIND_PRIMITIVE;
-			result->primitive = TYPE_PRIMITIVE_U64;
-		}break;
-		case LITERAL_SINT: {
-			result->kind = KIND_PRIMITIVE;
-			result->primitive = TYPE_PRIMITIVE_S64;
-		}break;
-		case LITERAL_BOOL: {
-			return type_primitive_get(TYPE_PRIMITIVE_BOOL);
-		}break;
-		case LITERAL_FLOAT: {
-			result->kind = KIND_PRIMITIVE;
-			result->primitive = TYPE_PRIMITIVE_R64;
-		}break;
-		case LITERAL_STRUCT:
-		case LITERAL_ARRAY: assert(0); break;	// TODO(psv): not implemented yet
-	}
-	return result;
-}
-
-Type_Instance* infer_from_variable_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
+Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 flags) {
 	assert(expr->node_type == AST_EXPRESSION_VARIABLE);
 
 	Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
 	if (!decl) {
-		if(rep_undeclared)
-			*error |= report_undeclared(expr->expr_variable.name);
 		return 0;
 	}
-	if (decl->node_type != AST_DECL_VARIABLE && decl->node_type != AST_DECL_CONSTANT) {
-		*error |= report_type_error(TYPE_ERROR_FATAL, expr->expr_variable.name, 
-			"could not infer type from name '%.*s', it is not a variable nor constant\n", TOKEN_STR(expr->expr_variable.name));
-		return 0;
-	}
-	Type_Instance* type = decl->decl_variable.variable_type;
-	if (lval) {
-		// transform this in the pointer type
-		Type_Instance* ptrtype = type_new_temporary();
-		ptrtype->kind = KIND_POINTER;
-		ptrtype->type_size_bits = type_pointer_size_bits();
-		ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED | TYPE_FLAG_LVALUE;
-		ptrtype->pointer_to = type;
-		expr->expr_variable.flags |= EXPR_VARIABLE_LVALUE;
-		return internalize_type(&ptrtype, true);
-	}
-
-	return type;
-}
-
-Type_Instance* infer_from_proc_call_expr(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
-	Ast* decl = decl_from_name(expr->scope, expr->expr_proc_call.name);
-	if (!decl) {
-		*error |= report_undeclared(expr->expr_proc_call.name);
-		return 0;
-	}
-	if (decl->node_type != AST_DECL_PROCEDURE) {
-		*error |= report_type_error(TYPE_ERROR_FATAL, expr,
-			"'%.*s' used in a procedure call, but is not a procedure\n", TOKEN_STR(expr->expr_proc_call.name));
-		return 0;
-	}
-	Type_Instance* type = decl->decl_procedure.type_return;
-	assert(type->flags & TYPE_FLAG_INTERNALIZED);
-	size_t nargs = expr->expr_proc_call.args_count;
-	for (size_t i = 0; i < nargs; ++i) {
-		// lval is always false in case of procedure arguments.
-		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, rep_undeclared, false);
-		expr->expr_proc_call.args[i]->type_return = type;
-	}
-
-	return type;
-}
-
-Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, bool rep_undeclared, bool lval) {
-	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
-	
+	expr->expr_variable.decl = decl;
 	Type_Instance* type = 0;
-	
-	switch (expr->node_type) {
-		case AST_EXPRESSION_BINARY:				type = infer_from_binary_expr(expr, error, rep_undeclared, lval); break;
-		case AST_EXPRESSION_UNARY:				type = infer_from_unary_expr(expr, error, rep_undeclared, lval); break;
-		case AST_EXPRESSION_LITERAL:			type = infer_from_literal_expr(expr, error, rep_undeclared, lval); break;
-		case AST_EXPRESSION_VARIABLE:			type = infer_from_variable_expr(expr, error, rep_undeclared, lval); break;
-		case AST_EXPRESSION_PROCEDURE_CALL:		type = infer_from_proc_call_expr(expr, error, rep_undeclared, lval); break;
+
+	if (decl->node_type != AST_DECL_VARIABLE && decl->node_type != AST_DECL_CONSTANT) {
+		assert(0); // implement function ptr
+	} else if(decl->node_type == AST_DECL_VARIABLE){
+		type = decl->decl_variable.variable_type;
+		if (flags & TYPE_INFER_LVALUE) {
+			// transform this in the pointer type
+			Type_Instance* ptrtype = type_new_temporary();
+			ptrtype->kind = KIND_POINTER;
+			ptrtype->type_size_bits = type_pointer_size_bits();
+			ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED | TYPE_FLAG_LVALUE;
+			ptrtype->pointer_to = type;
+			expr->expr_variable.flags |= EXPR_VARIABLE_LVALUE;
+			return internalize_type(&ptrtype, true);
+		}
+	} else if(decl->node_type == AST_DECL_CONSTANT) {
+		type = decl->decl_constant.type_info;
 	}
-	expr->type_return = type;
+
 	return type;
 }
 
-Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance* strong, Ast* expr, Type_Error* error);
+
+// Resolve the strength of a type TODO(psv): "and updated its children when necessary."
+// the returned type is always the correct type, unless an error occurred, then this function returns 0
+Type_Instance* type_strength_resolve_binary(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Type_Error* error) {
+	if (t1->flags & TYPE_FLAG_WEAK && t2->flags & TYPE_FLAG_WEAK) {
+		if (type_hash(t1) == type_hash(t2)) {
+			return t1;
+		} else {
+			*error |= report_type_error(TYPE_ERROR_FATAL, expr1, "could not infer type from two different weak types: ");
+			DEBUG_print_type(stderr, t1, true);
+			fprintf(stderr, " and ");
+			DEBUG_print_type(stderr, t2, true);
+			fprintf(stderr, "\n");
+			return 0;
+		}
+	}
+
+	if (t1->flags & TYPE_FLAG_WEAK && t2->flags & TYPE_FLAG_STRONG) {
+		if (type_hash(t1) == type_hash(t2)) return t2;
+		// transform t1 into t2 and update expr1
+		Type_Instance* transformed = type_transform_weak_to_strong(t1, t2, expr1, error);
+		if (transformed)
+			*error |= type_update_weak(expr1, transformed);
+		return transformed;
+	}
+	if (t1->flags & TYPE_FLAG_STRONG && t2->flags & TYPE_FLAG_WEAK) {
+		if (type_hash(t1) == type_hash(t2)) return t1;
+
+		// transform t2 into t1 and update expr2
+		Type_Instance* transformed = type_transform_weak_to_strong(t2, t1, expr2, error);
+		if(transformed)
+			*error |= type_update_weak(expr2, transformed);
+		return transformed;
+	}
+
+	if (t1->flags & TYPE_FLAG_STRONG && t2->flags & TYPE_FLAG_STRONG) {
+		if (t1 == t2) return t1;
+
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr1, "type mismatch ");
+		DEBUG_print_type(stderr, t1, true);
+		fprintf(stderr, " vs ");
+		DEBUG_print_type(stderr, t2, true);
+		fprintf(stderr, "\n");
+		return 0;
+	}
+}
+
+Type_Error type_update_weak(Ast* expr) {
+	Type_Error error = TYPE_OK;
+	Type_Instance* type = resolve_type(expr->scope, expr->type_return, true);
+	if(!type) {
+		return (error |= TYPE_ERROR_FATAL);
+	}
+	return type_update_weak(expr, type);
+}
 
 Type_Error type_update_weak(Ast* expr, Type_Instance* strong) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
@@ -626,51 +506,3 @@ Type_Instance* type_transform_weak_to_strong(Type_Instance* weak, Type_Instance*
 	}
 	return 0;
 }
-
-// Resolve the strength of a type TODO(psv): "and updated its children when necessary."
-// the returned type is always the correct type, unless an error occurred, then this function returns 0
-Type_Instance* type_strength_resolve(Type_Instance* t1, Type_Instance* t2, Ast* expr1, Ast* expr2, Type_Error* error) {
-	if (t1->flags & TYPE_FLAG_WEAK && t2->flags & TYPE_FLAG_WEAK) {
-		if (type_hash(t1) == type_hash(t2)) {
-			return t1;
-		} else {
-			*error |= report_type_error(TYPE_ERROR_FATAL, expr1, "could not infer type from two different weak types: ");
-			DEBUG_print_type(stderr, t1, true);
-			fprintf(stderr, " and ");
-			DEBUG_print_type(stderr, t2, true);
-			fprintf(stderr, "\n");
-			return 0;
-		}
-	}
-
-	if (t1->flags & TYPE_FLAG_WEAK && t2->flags & TYPE_FLAG_STRONG) {
-		if (type_hash(t1) == type_hash(t2)) return t2;
-		// transform t1 into t2 and update expr1
-		Type_Instance* transformed = type_transform_weak_to_strong(t1, t2, expr1, error);
-		if (transformed)
-			*error |= type_update_weak(expr1, transformed);
-		return transformed;
-	}
-	if (t1->flags & TYPE_FLAG_STRONG && t2->flags & TYPE_FLAG_WEAK) {
-		if (type_hash(t1) == type_hash(t2)) return t1;
-
-		// transform t2 into t1 and update expr2
-		Type_Instance* transformed = type_transform_weak_to_strong(t2, t1, expr2, error);
-		if(transformed)
-			*error |= type_update_weak(expr2, transformed);
-		return transformed;
-	}
-
-	if (t1->flags & TYPE_FLAG_STRONG && t2->flags & TYPE_FLAG_STRONG) {
-		if (t1 == t2) return t1;
-
-		*error |= report_type_error(TYPE_ERROR_FATAL, expr1, "type mismatch ");
-		DEBUG_print_type(stderr, t1, true);
-		fprintf(stderr, " vs ");
-		DEBUG_print_type(stderr, t2, true);
-		fprintf(stderr, "\n");
-		return 0;
-	}
-}
-
-#endif

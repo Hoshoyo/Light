@@ -348,12 +348,13 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				var_type = resolve_type(node->scope, node->decl_variable.variable_type, true);
 				node->decl_variable.variable_type = var_type;
 				if(node->decl_variable.assignment){
-					Type_Instance* rtype = infer_from_expression(node->decl_variable.assignment, &error, true);
+					var_type = infer_from_expression(node->decl_variable.assignment, &error, true);
+					var_type = resolve_type(node->scope, var_type, true);
 					if(error & DECL_ERROR_FATAL) return error;
-					if(rtype->flags & TYPE_FLAG_WEAK){
-						rtype = type_strength_resolve(rtype, var_type, node->decl_variable.assignment, node, &error);
+					if(node->decl_variable.assignment->flags & AST_FLAG_TYPE_STRENGTH_DEP){
+						error |= type_update_weak(node->decl_variable.assignment, var_type);
 						if(error & DECL_ERROR_FATAL) return error;
-						node->decl_variable.assignment->type_return = rtype;
+						node->decl_variable.assignment->type_return = var_type;
 					}
 				}
 			}
@@ -362,19 +363,22 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 					// infer from expression
  					var_type = infer_from_expression(node->decl_variable.assignment, &error, true);
 					if (error & TYPE_ERROR_FATAL) return error;
-					assert(var_type);
-					if(var_type->flags & TYPE_FLAG_WEAK){
-						var_type->flags |= TYPE_FLAG_RESOLVED;	// if inferred and is weak, keep it as strong
+					if(!var_type) return;
+
+					if(node->decl_variable.assignment->flags & AST_FLAG_TYPE_STRENGTH_DEP){
 						error |= type_update_weak(node->decl_variable.assignment, var_type);
-						if (error & DECL_ERROR_FATAL) return error;
+						if(error & DECL_ERROR_FATAL) return error;
+						node->decl_variable.assignment->type_return = var_type;
 					}
-					node->decl_variable.variable_type = internalize_type(&var_type, true);
-					node->decl_variable.assignment->type_return = var_type;
+					
 				} else {
 					report_error_location(node);
 					error |= report_type_error(DECL_ERROR_FATAL, "variable declaration cannot be type inferred without an assignment expression\n");
 				}
 			}
+			node->decl_variable.variable_type = internalize_type(&var_type, true);
+			node->decl_variable.assignment->type_return = var_type;
+			
 			if (node->scope->level > 0)
 				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
 		}break;
@@ -382,36 +386,41 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 			// TODO(psv): could be type alias, not implemented yet
 			Type_Instance* const_type = 0;
 			if (node->decl_constant.type_info) {
-				//const_type = resolve_type(node->scope, node->decl_constant.type_info, true);
-				//node->decl_constant.type_info = const_type;
 				const_type = resolve_type(node->scope, node->decl_constant.type_info, true);
 				node->decl_constant.type_info = const_type;
-				if (node->decl_constant.value) {
-					Type_Instance* rtype = infer_from_expression(node->decl_constant.value, &error, true);
-					if (error & DECL_ERROR_FATAL) return error;
-					if (rtype->flags & TYPE_FLAG_WEAK) {
-						rtype = type_strength_resolve(rtype, const_type, node->decl_constant.value, node, &error);
-						if (error & DECL_ERROR_FATAL) return error;
-						node->decl_constant.value->type_return = rtype;
+				if(node->decl_constant.value){
+					const_type = infer_from_expression(node->decl_constant.value, &error, true);
+					const_type = resolve_type(node->scope, const_type, true);
+					if(error & DECL_ERROR_FATAL) return error;
+					if(node->decl_constant.value->flags & AST_FLAG_TYPE_STRENGTH_DEP){
+						error |= type_update_weak(node->decl_constant.value, const_type);
+						if(error & DECL_ERROR_FATAL) return error;
+						node->decl_constant.value->type_return = const_type;
 					}
 				}
 			}
 			if (!const_type) {
 				if (node->decl_constant.value) {
 					// infer from expression
-					const_type = infer_from_expression(node->decl_constant.value, &error, true);
-					if (error & DECL_ERROR_FATAL) return error;
-					assert(const_type);
-					const_type->flags |= TYPE_FLAG_RESOLVED;	// if inferred and is weak, keep it as strong
-					node->decl_constant.type_info = internalize_type(&const_type, true);
-					node->decl_constant.value->type_return = const_type;
+ 					const_type = infer_from_expression(node->decl_constant.value, &error, true);
+					if (error & TYPE_ERROR_FATAL) return error;
+					if(!const_type) return;
+
+					if(node->decl_constant.value->flags & AST_FLAG_TYPE_STRENGTH_DEP){
+						error |= type_update_weak(node->decl_constant.value, const_type);
+						if(error & DECL_ERROR_FATAL) return error;
+						node->decl_constant.value->type_return = const_type;
+					}
 				} else {
 					report_error_location(node);
-					error |= report_type_error(DECL_ERROR_FATAL, "constant declaration cannot be type inferred without an assignment expression\n");
+					error |= report_type_error(DECL_ERROR_FATAL, "constant declaration cannot be type inferred without a value\n");
 				}
 			}
+			node->decl_variable.variable_type = internalize_type(&const_type, true);
+			node->decl_variable.assignment->type_return = const_type;
+			
 			if (node->scope->level > 0)
-				error |= decl_insert_into_symbol_table(node, node->decl_constant.name, "constant");
+				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "constant");
 		}break;
 		case AST_DECL_PROCEDURE: {
 			//for (size_t i = 0; i < node->decl_procedure.arguments_count; ++i) {
@@ -519,7 +528,7 @@ Decl_Error decl_check_inner_command(Ast* node) {
 Decl_Error decl_check_inner_expr_lassign(Ast* node) {
 	assert(node->flags & AST_FLAG_IS_EXPRESSION);
 	Decl_Error error = DECL_OK;
-	Type_Instance* t = infer_from_expression(node, &error, true, true);
+	Type_Instance* t = infer_from_expression(node, &error, true);
 	node->type_return = t;
 
 	return error;

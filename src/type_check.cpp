@@ -111,7 +111,7 @@ Type_Error type_check(Ast* node) {
 			}
 			else if (rettype != node->comm_return.expression->type_return) {
 				if (node->comm_return.expression->type_return->flags & TYPE_FLAG_WEAK) {
-					Type_Instance* t = type_transform_weak_to_strong(node->comm_return.expression->type_return, rettype, node->comm_return.expression, &error);
+					Type_Instance* t = 0;//type_transform_weak_to_strong(node->comm_return.expression->type_return, rettype, node->comm_return.expression, &error);
 					if (error & TYPE_ERROR_FATAL) return error;
 					assert(t);
 					node->comm_return.expression->type_return = t;
