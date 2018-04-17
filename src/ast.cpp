@@ -207,6 +207,7 @@ Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type) {
 
 	ev->expr_variable.flags = 0;
 	ev->expr_variable.name = name;
+	ev->expr_variable.decl = 0;
 
 	return ev;
 }
