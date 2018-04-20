@@ -1,0 +1,52 @@
+BINARY -> null
+
+UNARY  -> null
+
+LITERAL -> weak
+
+VARIABLE -> strong
+
+PROC_CALL -> strong
+
+
+TOP_COMMAND
+	-> weak or null -> newtype = strengthen(weak) -> type_propagate(new_type) -> type_check
+	-> strong -> type_check
+
+
+infer_from_expr()
+	- BINARY  => infer both sides -> if one of them is strong, type check and strengthen weak, otherwise leave it null and dont typecheck
+	- UNARY   => infer operand    -> if operand is strong -> set type of unary, otherwise leave it null
+	- LITERAL => infer literal    -> always weak
+	- PROC_CALL => type of return -> always strong and type checked 
+		when gobally, can queue
+	- VARIABLE  => type of var    -> always strong
+		when globally can queue
+
+type_propagate(T, expr)
+	if expr(type) == strong -> return
+
+	- BINARY =>
+		strong_l = type_propagate(T, left)
+		strong_r = type_propagate(T, right)
+		type = type_check_expr(T, BINARY)
+		BINARY(type) = type
+	
+	- UNARY =>
+		strong_operand_type = type_propagate(Transform(T), operand)
+		type = type_check_expr(T, UNARY)
+		UNARY(type) = type
+
+	- LITERAL =>
+		try to transform weak type to T
+		type error if could not
+
+	- PROC_CALL =>
+		type_check_expr(T, PROC_CALL)
+	
+	- VARIABLE =>
+		type_check_expr(T, VARIABLE)
+		
+
+ASSUMES ALWAYS STRONG TYPES
+type_check_expr(T, expr)	-> if T == null then ignores the check against T
