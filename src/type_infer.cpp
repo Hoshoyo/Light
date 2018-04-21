@@ -153,11 +153,23 @@ Type_Instance* type_propagate(Type_Instance* strong, Ast* expr) {
 	if (expr->flags & TYPE_FLAG_STRONG)
 		return expr->type_return;
 
+	switch(expr->node_type){
+		case AST_EXPRESSION_BINARY:{
+			Type_Instance* left_type  = type_propagate(strong, expr->expr_binary.left->type_return);
+			Type_Instance* right_type = type_propagate(strong, expr->expr_binary.right->type_return);
+
+			expr->type_return = type_check_expr(strong, expr, error);
+		}break;
+	}
+}
+
+Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Error* error){
 	switch (expr->node_type) {
 		case AST_EXPRESSION_BINARY:{
 			switch (expr->expr_binary.op) {
 				case OP_BINARY_PLUS:
-				case OP_BINARY_MINUS:
+				case OP_BINARY_MINUS:{
+				} break;
 
 				case OP_BINARY_AND:
 				case OP_BINARY_OR:
