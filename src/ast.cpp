@@ -205,7 +205,6 @@ Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type) {
 	ev->flags = AST_FLAG_IS_EXPRESSION;
 	ev->infer_queue_index = -1;
 
-	ev->expr_variable.flags = 0;
 	ev->expr_variable.name = name;
 	ev->expr_variable.decl = 0;
 

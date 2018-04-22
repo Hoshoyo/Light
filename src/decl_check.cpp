@@ -223,9 +223,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 					error |= DECL_QUEUED_TYPE;
 				} else {
 					node->decl_struct.type_info->type_size_bits = type_size_bits;
-					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED;
-					node->decl_struct.type_info->flags |= TYPE_FLAG_SIZE_RESOLVED;
-					node->decl_struct.type_info->flags |= TYPE_FLAG_LVALUE;
+					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
 					node->decl_struct.type_info = internalize_type(&tinfo, true);
 					infer_queue_remove(node);
 				}
@@ -367,42 +365,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
 		}break;
 		case AST_DECL_CONSTANT: {
-			// TODO(psv): could be type alias, not implemented yet
-			Type_Instance* const_type = 0;
-			if (node->decl_constant.type_info) {
-				const_type = resolve_type(node->scope, node->decl_constant.type_info, true);
-				node->decl_constant.type_info = const_type;
-				if(node->decl_constant.value){
-					const_type = infer_from_expression(node->decl_constant.value, &error, true);
-					const_type = resolve_type(node->scope, const_type, true);
-					if(error & DECL_ERROR_FATAL) return error;
-					if(node->decl_constant.value->flags & AST_FLAG_TYPE_STRENGTH_DEP){
-						error |= type_update_weak(node->decl_constant.value, const_type);
-						if(error & DECL_ERROR_FATAL) return error;
-						node->decl_constant.value->type_return = const_type;
-					}
-				}
-			}
-			if (!const_type) {
-				if (node->decl_constant.value) {
-					// infer from expression
- 					const_type = infer_from_expression(node->decl_constant.value, &error, true);
-					if (error & TYPE_ERROR_FATAL) return error;
-					if(!const_type) return error;
-
-					if(node->decl_constant.value->flags & AST_FLAG_TYPE_STRENGTH_DEP){
-						error |= type_update_weak(node->decl_constant.value, const_type);
-						if(error & DECL_ERROR_FATAL) return error;
-						node->decl_constant.value->type_return = const_type;
-					}
-				} else {
-					report_error_location(node);
-					error |= report_type_error(DECL_ERROR_FATAL, "constant declaration cannot be type inferred without a value\n");
-				}
-			}
-			node->decl_variable.variable_type = internalize_type(&const_type, true);
-			node->decl_variable.assignment->type_return = const_type;
-			
+					
 			if (node->scope->level > 0)
 				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "constant");
 		}break;

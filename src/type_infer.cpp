@@ -65,10 +65,93 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 flags) {
 	assert(expr->node_type == AST_EXPRESSION_UNARY);
 	Type_Instance* infered = infer_from_expression(expr->expr_unary.operand, error, flags);
-	if (infered->flags & TYPE_FLAG_STRONG) {
-		expr->type_return = infered;
-		return infered;
+	
+	switch (expr->expr_unary.op) {
+		// @INFER ADDRESSOF
+		case OP_UNARY_ADDRESSOF:{
+			if (expr->expr_unary.operand->flags & AST_FLAG_LVALUE) {
+				// that means right side is strong because it is lvalue
+				assert(type_strong(infered));
+				Type_Instance* ptrtype = type_new_temporary();
+				ptrtype->kind = KIND_POINTER;
+				ptrtype->type_size_bits = type_pointer_size_bits();
+				ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED;
+				ptrtype->pointer_to = infered;
+				expr->type_return = internalize_type(&ptrtype, true);
+				return expr->type_return;
+			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "unary address of operator requires lvalue\n");
+			}
+		}break;
+
+		// @INFER DEREFERENCE
+		case OP_UNARY_DEREFERENCE: {
+			if (infered->kind == KIND_POINTER || infered->kind == KIND_ARRAY) {
+				assert(type_strong(infered));
+				expr->flags |= AST_FLAG_LVALUE;
+			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "operator dereference requires pointer or array type\n");
+			}
+		}break;
+
+		// @INFER BITWISE NOT
+		case OP_UNARY_BITWISE_NOT: {
+			if (type_primitive_int(infered)) {
+				expr->type_return = infered;
+				return infered;
+			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "unary operator '~' requires integer type\n");
+			}
+		}break;
+
+		// @INFER CAST
+		case OP_UNARY_CAST: {
+			Type_Instance* cast_to = resolve_type(expr->scope, expr->expr_unary.type_to_cast, false);
+			if (type_primitive_numeric(infered) || infered->kind == KIND_POINTER) {
+				type_propagate(0, expr->expr_unary.operand);
+				assert(type_strong(cast_to));
+				expr->type_return = cast_to;
+				return cast_to;
+			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot cast from type '\n");
+				DEBUG_print_type(stderr, infered, true);
+				fprintf(stderr, "' to '");
+				DEBUG_print_type(stderr, cast_to, true);
+				fprintf(stderr, "\n");
+			}
+		}break;
+
+		// @INFER LOGIC NOT
+		case OP_UNARY_LOGIC_NOT: {
+			if (type_primitive_bool(infered)) {
+				expr->type_return = infered;
+				return infered;
+			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "unary operator '!' requires boolean type\n");
+			}
+		} break;
+
+		// @INFER MINUS
+		case OP_UNARY_MINUS: {
+			if (type_primitive_numeric(infered)) {
+				expr->type_return = infered;
+				return infered;
+			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "unary operator '-' requires numeric type\n");
+			}
+		}break;
+
+		// @INFER PLUS
+		case OP_UNARY_PLUS: {
+			if (type_primitive_numeric(infered)) {
+				expr->type_return = infered;
+				return infered;
+			} else {
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "unary operator '+' requires numeric type\n");
+			}
+		}break;
 	}
+
 	return 0;
 }
 
@@ -111,15 +194,19 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 	}
 	Type_Instance* type = decl->decl_procedure.type_return;
 	assert(type->flags & TYPE_FLAG_INTERNALIZED);
+
 	size_t nargs = expr->expr_proc_call.args_count;
 	for (size_t i = 0; i < nargs; ++i) {
-		// lval is always false in case of procedure arguments.
 		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, false);
-		if(expr->expr_proc_call.args[i]->flags & AST_FLAG_TYPE_STRENGTH_DEP){
-			expr->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
-			expr->expr_proc_call.args[i]->flags |= AST_FLAG_TYPE_STRENGTH_DEP;
-		}
-		expr->expr_proc_call.args[i]->type_return = type;
+		
+		Ast* arg_decl = decl->decl_procedure.arguments[i];
+		assert(arg_decl->node_type == AST_DECL_VARIABLE);
+		assert(arg_decl->decl_variable.variable_type->flags & TYPE_FLAG_INTERNALIZED);
+		
+		type_propagate(arg_decl->decl_variable.variable_type, expr->expr_proc_call.args[i]);
+		Type_Instance* arg_type = type_check_expr(arg_decl->decl_variable.variable_type, expr->expr_proc_call.args[i], error);
+
+		expr->expr_proc_call.args[i]->type_return = arg_type;
 	}
 
 	return type;
@@ -139,16 +226,9 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 		assert(0); // implement function ptr
 	} else if(decl->node_type == AST_DECL_VARIABLE){
 		type = decl->decl_variable.variable_type;
-		if (flags & TYPE_INFER_LVALUE) {
-			// transform this in the pointer type
-			Type_Instance* ptrtype = type_new_temporary();
-			ptrtype->kind = KIND_POINTER;
-			ptrtype->type_size_bits = type_pointer_size_bits();
-			ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED | TYPE_FLAG_LVALUE;
-			ptrtype->pointer_to = type;
-			expr->expr_variable.flags |= EXPR_VARIABLE_LVALUE;
-			return internalize_type(&ptrtype, true);
-		}
+		assert(type_strong(type));
+		expr->flags |= AST_FLAG_LVALUE;
+		expr->type_return = type;
 	} else if(decl->node_type == AST_DECL_CONSTANT) {
 		type = decl->decl_constant.type_info;
 	}
@@ -750,7 +830,5 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 			}
 		} break;
 	}
-	//*error |= TYPE_ERROR_FATAL;
-	//report_internal_compiler_error(__FILE__, __LINE__, "type check of expressions returned unexpectedly\n");
 	return 0;
 }

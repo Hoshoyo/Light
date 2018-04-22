@@ -365,9 +365,9 @@ Type_Error type_check(Ast* node) {
 			assert(node->type_return->kind == KIND_POINTER);
 			assert(operand->type_return == node->type_return->pointer_to);
 			// check addressable operand
-			if (!(operand->type_return->flags & TYPE_FLAG_LVALUE)) {
-				error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot address an rvalue\n");
-			}
+			//if (!(node->flags & )) {
+			//	error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot address an rvalue\n");
+			//}
 		}break;
 
 		case OP_UNARY_DEREFERENCE: {

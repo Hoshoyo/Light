@@ -65,7 +65,7 @@ const u32 TYPE_FLAG_INTERNALIZED = FLAG(1);
 const u32 TYPE_FLAG_SIZE_RESOLVED = FLAG(2);
 
 // Indicates if a type is lvalue, meaning it has an address linked to it
-const u32 TYPE_FLAG_LVALUE = FLAG(3);
+//const u32 TYPE_FLAG_LVALUE = FLAG(3);
 const u32 TYPE_FLAG_WEAK   = FLAG(4);
 const u32 TYPE_FLAG_STRONG = FLAG(5);
 struct Type_Instance {

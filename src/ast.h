@@ -288,11 +288,10 @@ struct Ast_Expr_Literal {
 		};
 	};
 };
-const u32 EXPR_VARIABLE_LVALUE = FLAG(0);
+
 struct Ast_Expr_Variable {
 	Token* name;
 	Ast*   decl;
-	u32    flags;
 };
 struct Ast_Expr_ProcCall {
 	Token* name;
@@ -304,7 +303,7 @@ const u32 AST_FLAG_IS_DECLARATION = FLAG(0);
 const u32 AST_FLAG_IS_COMMAND     = FLAG(1);
 const u32 AST_FLAG_IS_EXPRESSION  = FLAG(2);
 const u32 AST_FLAG_QUEUED         = FLAG(3);
-const u32 AST_FLAG_TYPE_STRENGTH_DEP = FLAG(4);
+const u32 AST_FLAG_LVALUE         = FLAG(4);
 
 struct Ast {
 	Ast_NodeType   node_type;

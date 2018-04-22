@@ -5,7 +5,6 @@
 #include "decl_check.h"
 #include "error.h"
 
-//const u32 TYPE_INFER_REPORT_UNDECLARED = FLAG(0);
 const u32 TYPE_INFER_LVALUE = FLAG(1);
 Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags);
 

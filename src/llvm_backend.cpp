@@ -890,7 +890,7 @@ s32 LLVM_Code_Generator::llvm_define_string_literal(Ast_Expr_Literal* lit) {
 }
 
 bool ast_node_is_embeded_literal(Ast* node) {
-	if(node->node_type == AST_EXPRESSION_VARIABLE && node->expr_variable.flags & EXPR_VARIABLE_LVALUE) return true;
+	if(node->node_type == AST_EXPRESSION_VARIABLE && node->flags & AST_FLAG_LVALUE) return true;
 	if (node->node_type == AST_EXPRESSION_VARIABLE) {
 		Ast* decl = decl_from_name(node->scope, node->expr_variable.name);
 
