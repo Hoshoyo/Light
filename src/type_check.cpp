@@ -236,13 +236,11 @@ Type_Error type_check(Ast* node) {
 			// TODO(psv): add coercions of integer and floating point types to bigger versions of themselves
 			if (left_type != right_type) {
 				error |= report_type_mismatch(node, left_type, right_type);
-			}
-			else {
+			} else {
 				if (type_primitive_int(left_type) || type_primitive_float(left_type)) {
 					// NUMERIC * NUMERIC |-> NUMERIC
 					assert(node->type_return == left_type);
-				}
-				else {
+				} else {
 					error |= report_type_error(TYPE_ERROR_FATAL, node, "binary operators '*' and '/' can only be used on numeric types\n");
 				}
 			}

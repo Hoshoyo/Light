@@ -11,13 +11,30 @@ Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2)
 	fprintf(stderr, "'\n");
 	return err;
 }
+Type_Error report_type_not_defined_for_binop(Type_Instance* left, Type_Instance* right, Ast* expr) {
+	Type_Error error = TYPE_OK;
+	error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '");
+	DEBUG_print_type(stderr, left, true);
+	fprintf(stderr, "' %s '", binop_op_to_string(expr->expr_binary.op));
+	DEBUG_print_type(stderr, right, true);
+	fprintf(stderr, "' is undefined\n");
 
-Type_Instance* type_propagate(Type_Instance* strong, Ast* expr);
-Type_Instance* type_check_expr(Ast* expr);
+	return error;
+}
+
+Type_Error type_update_weak(Ast* expr, Type_Instance* strong) { return 0; }
+void       type_propagate(Type_Instance* strong, Ast* expr);
 
 /* --------------------------------------------------------------
    -------------------- Type Inference --------------------------
    -------------------------------------------------------------- */
+
+inline bool type_weak(Type_Instance* type) {
+	return (type->flags & TYPE_FLAG_WEAK);
+}
+inline bool type_strong(Type_Instance* type) {
+	return (type->flags & TYPE_FLAG_STRONG);
+}
 
 Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
@@ -37,22 +54,12 @@ Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
 Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 flags)  {
 	assert(expr->node_type == AST_EXPRESSION_BINARY);
 
-	Type_Instance* left  = infer_from_expression(expr->expr_binary.left, error, flags);
-	Type_Instance* right = infer_from_expression(expr->expr_binary.right, error, flags);
+	expr->expr_binary.left->type_return = infer_from_expression(expr->expr_binary.left, error, flags);
+	expr->expr_binary.right->type_return = infer_from_expression(expr->expr_binary.right, error, flags);
 	
-	if (left->flags & TYPE_FLAG_STRONG || right->flags & TYPE_FLAG_STRONG) {
-		if (left->flags & TYPE_FLAG_WEAK && right->flags & TYPE_FLAG_STRONG)
-			left = type_propagate(right, expr->expr_binary.left);
-		else if (left->flags & TYPE_FLAG_STRONG && right->flags & TYPE_FLAG_WEAK)
-			right = type_propagate(left, expr->expr_binary.right);
-		else if (left->flags & TYPE_FLAG_STRONG && right->flags & TYPE_FLAG_STRONG) {
-			assert(left == right);
-			expr->type_return = left;
-		}
-		return type_check_expr(expr);
-	}
+	expr->type_return = type_check_expr(0, expr, error);
 
-	return 0;
+	return expr->type_return;
 }
 
 Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 flags) {
@@ -89,6 +96,7 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 		case LITERAL_STRUCT:
 		case LITERAL_ARRAY: assert(0); break;	// TODO(psv): not implemented yet
 	}
+	expr->type_return = result;
 	return result;
 }
 
@@ -147,52 +155,602 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 	return type;
 }
 
-Type_Instance* type_propagate(Type_Instance* strong, Ast* expr) {
+void type_propagate(Type_Instance* strong, Ast* expr) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 
 	if (expr->flags & TYPE_FLAG_STRONG)
-		return expr->type_return;
+		return;
 
 	switch(expr->node_type){
-		case AST_EXPRESSION_BINARY:{
-			Type_Instance* left_type  = type_propagate(strong, expr->expr_binary.left->type_return);
-			Type_Instance* right_type = type_propagate(strong, expr->expr_binary.right->type_return);
-
-			expr->type_return = type_check_expr(strong, expr, error);
+		// @PROPAGATE LITERAL
+		case AST_EXPRESSION_LITERAL: {
+			if (strong) {
+				expr->type_return = strong;
+			} else {
+				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+				expr->type_return = internalize_type(&expr->type_return, true);
+			}
 		}break;
-	}
-}
 
-Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Error* error){
-	switch (expr->node_type) {
+		// @PROPAGATE BINARY
 		case AST_EXPRESSION_BINARY:{
 			switch (expr->expr_binary.op) {
 				case OP_BINARY_PLUS:
-				case OP_BINARY_MINUS:{
-				} break;
-
+				case OP_BINARY_MINUS: {
+					// pointer can never be weak
+					assert(expr->expr_binary.left->type_return->kind != KIND_POINTER);
+				} //fallthrough
 				case OP_BINARY_AND:
 				case OP_BINARY_OR:
 				case OP_BINARY_XOR:
-				case OP_BINARY_DIV:
-				case OP_BINARY_MULT:
 				case OP_BINARY_MOD:
-				case OP_BINARY_SHL:
-				case OP_BINARY_SHR:
+				case OP_BINARY_MULT:
+				case OP_BINARY_DIV:
 				case OP_BINARY_LOGIC_AND:
 				case OP_BINARY_LOGIC_OR:
+				case OP_BINARY_SHL:
+				case OP_BINARY_SHR: {
+					type_propagate(strong, expr->expr_binary.left);
+					type_propagate(strong, expr->expr_binary.right);
+					expr->type_return = expr->expr_binary.left->type_return;
+				}break;
 
 				case OP_BINARY_EQUAL:
 				case OP_BINARY_NOT_EQUAL:
 				case OP_BINARY_GE:
 				case OP_BINARY_GT:
 				case OP_BINARY_LE:
-				case OP_BINARY_LT:
-
-				case OP_BINARY_VECTOR_ACCESS:
+				case OP_BINARY_LT: {
+					type_propagate(0, expr->expr_binary.left);
+					type_propagate(0, expr->expr_binary.right);
+					expr->type_return = type_primitive_get(TYPE_PRIMITIVE_BOOL);
+				}
 
 				case OP_BINARY_DOT:
+					assert(0);
+					break;
+				case OP_BINARY_VECTOR_ACCESS:
+					// index should be strong aswell as indexed
+					assert(type_strong(expr->expr_binary.right->type_return));
+					assert(type_strong(expr->expr_binary.left->type_return));
+					break;
+
+			}
+		}break;
+
+		// @PROPAGATE UNARY
+		case AST_EXPRESSION_UNARY: {
+			switch (expr->expr_unary.op) {
+				case OP_UNARY_ADDRESSOF:
+				case OP_UNARY_DEREFERENCE:
+				case OP_UNARY_CAST:
+					// cast, addressof and dereference should already be strong
+					assert(type_strong(expr->type_return));
+					break;
+
+				case OP_UNARY_BITWISE_NOT:
+				case OP_UNARY_LOGIC_NOT:
+				case OP_UNARY_MINUS:
+				case OP_UNARY_PLUS: {
+					type_propagate(strong, expr->expr_unary.operand);
+				}break;
+			}
+		}break;
+
+		case AST_EXPRESSION_VARIABLE:
+		case AST_EXPRESSION_PROCEDURE_CALL: {
+			// should be strong already
+			assert(type_strong(expr->type_return));
+		}break;
+	}
+}
+
+static Type_Instance* defer_check_against(Ast* expr, Type_Instance* check_against, Type_Instance* type, Type_Error* error) {
+	if (!check_against)
+		return type;
+	if (check_against == type) {
+		return type;
+	} else {
+		*error |= report_type_mismatch(expr, check_against, type);
+	}
+	return type;
+}
+
+Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Error* error){
+	switch (expr->node_type) {
+		case AST_EXPRESSION_BINARY:{
+			Type_Instance* lt = expr->expr_binary.left->type_return;
+			Type_Instance* rt = expr->expr_binary.right->type_return;
+			Operator_Binary binop = expr->expr_binary.op;
+			switch (binop) {
+				// @TYPECHECK PLUS
+				case OP_BINARY_PLUS:{
+					if (type_strong(lt) && type_strong(rt)) {
+						// pointer arithmetic ^T(strong) + INT(strong) |-> ^T(strong)
+						if (lt->kind == KIND_POINTER && type_primitive_int(rt)) {
+							return defer_check_against(expr, check_against, lt, error);
+						} 
+						// NUMTYPE(strong) + NUMTYPE(strong) |-> NUMTYPE(strong)
+						else if (type_primitive_numeric(lt) && type_primitive_numeric(rt)) {
+							// TODO: type coercions
+							if (lt != rt) {
+								*error |= report_type_mismatch(expr, lt, rt);
+							}
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '+' requires numeric type\n");
+						}
+					} else if (type_strong(lt) && type_weak(rt)) {
+						// pointer arithmetic ^T(strong) + INT(weak) |-> ^T(strong) , propagate(INT(weak))
+						if (lt->kind == KIND_POINTER && type_primitive_int(rt)) {
+							rt = resolve_type(expr->scope, rt, false);
+							assert(rt->flags & TYPE_FLAG_INTERNALIZED);
+							type_propagate(rt, expr->expr_binary.right);
+							return defer_check_against(expr, check_against, lt, error);
+						} 
+						// INT(strong) + INT(weak) |-> INT(strong) , propagete(INT(strong) -> INT(weak))
+						// or
+						// FLOAT(strong) + FLOAT(weak) |-> FLOAT(strong) , propagate(FLOAT(strong) -> FLOAT(weak))
+						else if((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))){
+							type_propagate(lt, expr->expr_binary.right);
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_strong(rt)) {
+						// INT(weak) + INT(strong) |-> INT(strong) , propagate(INT(strong) -> INT(weak))
+						// or
+						// FLOAT(weak) + FLOAT(strong) |-> FLOAT(strong) , propagate(FLOAT(strong) -> FLOAT(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							type_propagate(rt, expr->expr_binary.left);
+							return defer_check_against(expr, check_against, rt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_weak(rt)) {
+						if (type_primitive_int(lt) && type_primitive_int(rt)) {
+							// TODO: can types here be different?
+							return defer_check_against(expr, check_against, lt, error);
+						} else if (type_primitive_float(lt) && type_primitive_float(rt)) {
+							// TODO: can types here be different?
+							return defer_check_against(expr, check_against, rt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					}
+				}break;
+
+				// @TYPECHECK MINUS
+				case OP_BINARY_MINUS:{
+					if (type_strong(lt) && type_strong(rt)) {
+						if (lt->kind == KIND_POINTER && rt->kind == KIND_POINTER) {
+							if (lt != rt) {
+								*error |= report_type_mismatch(expr, lt, rt);
+							} else {
+								return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_S64), error);
+							}
+						}
+						// pointer arithmetic ^T(strong) - INT(strong) |-> ^T(strong)
+						else if (lt->kind == KIND_POINTER && type_primitive_int(rt)) {
+							return defer_check_against(expr, check_against, lt, error);
+						}
+						// NUMTYPE(strong) - NUMTYPE(strong) |-> NUMTYPE(strong)
+						else if (type_primitive_numeric(lt) && type_primitive_numeric(rt)) {
+							// TODO: type coercions
+							if (lt != rt) {
+								*error |= report_type_mismatch(expr, lt, rt);
+							}
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '-' requires numeric type\n");
+						}
+					} else if (type_strong(lt) && type_weak(rt)) {
+						// pointer arithmetic ^T(strong) - INT(weak) |-> ^T(strong) , propagate(INT(weak))
+						if (lt->kind == KIND_POINTER && type_primitive_int(rt)) {
+							rt = resolve_type(expr->scope, rt, false);
+							assert(rt->flags & TYPE_FLAG_INTERNALIZED);
+							type_propagate(rt, expr->expr_binary.right);
+							return defer_check_against(expr, check_against, lt, error);;
+						}
+						// INT(strong) - INT(weak) |-> INT(strong) , propagete(INT(strong) -> INT(weak))
+						// or
+						// FLOAT(strong) - FLOAT(weak) |-> FLOAT(strong) , propagate(FLOAT(strong) -> FLOAT(weak))
+						else if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							type_propagate(lt, expr->expr_binary.right);
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_strong(rt)) {
+						// INT(weak) - INT(strong) |-> INT(strong) , propagate(INT(strong) -> INT(weak))
+						// or
+						// FLOAT(weak) - FLOAT(strong) |-> FLOAT(strong) , propagate(FLOAT(strong) -> FLOAT(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							type_propagate(rt, expr->expr_binary.left);
+							return defer_check_against(expr, check_against, rt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_weak(rt)) {
+						if (type_primitive_int(lt) && type_primitive_int(rt)) {
+							// TODO: can types here be different?
+							return defer_check_against(expr, check_against, lt, error);
+						} else if (type_primitive_float(lt) && type_primitive_float(rt)) {
+							// TODO: can types here be different?
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					}
+				} break;
+
+				// @TYPECHECK MULT
+				// @TYPECHECK DIV
+				case OP_BINARY_DIV:
+				case OP_BINARY_MULT: {
+					if (type_strong(lt) && type_strong(rt)) {
+						// NUMTYPE(strong) */ NUMTYPE(strong) |-> NUMTYPE(strong)
+						if (type_primitive_numeric(lt) && type_primitive_numeric(rt)) {
+							// TODO: type coercions
+							if (lt != rt) {
+								*error |= report_type_mismatch(expr, lt, rt);
+							}
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' requires numeric type\n", binop_op_to_string(binop));
+						}
+					} else if (type_strong(lt) && type_weak(rt)) {
+						// INT(strong) */ INT(weak) |-> INT(strong) , propagete(INT(strong) -> INT(weak))
+						// or
+						// FLOAT(strong) */ FLOAT(weak) |-> FLOAT(strong) , propagate(FLOAT(strong) -> FLOAT(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							type_propagate(lt, expr->expr_binary.right);
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_strong(rt)) {
+						// INT(weak) */ INT(strong) |-> INT(strong) , propagate(INT(strong) -> INT(weak))
+						// or
+						// FLOAT(weak) */ FLOAT(strong) |-> FLOAT(strong) , propagate(FLOAT(strong) -> FLOAT(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							type_propagate(rt, expr->expr_binary.left);
+							return defer_check_against(expr, check_against, rt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_weak(rt)) {
+						if (type_primitive_int(lt) && type_primitive_int(rt)) {
+							// TODO: can types here be different?
+							return defer_check_against(expr, check_against, lt, error);
+						} else if (type_primitive_float(lt) && type_primitive_float(rt)) {
+							// TODO: can types here be different?
+							return defer_check_against(expr, check_against, rt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					}
+				}break;
+
+				// @TYPECHECK MOD
+				case OP_BINARY_SHL:
+				case OP_BINARY_SHR:
+				case OP_BINARY_MOD: {
+					if (type_strong(lt) && type_strong(rt)) {
+						// INT(strong) % INT(strong) |-> INT(strong)
+						if (type_primitive_int(lt) && type_primitive_int(rt)) {
+							// TODO: type coercions
+							if (lt != rt) {
+								*error |= report_type_mismatch(expr, lt, rt);
+							}
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' requires integer type\n", binop_op_to_string(binop));
+						}
+					} else if (type_strong(lt) && type_weak(rt)) {
+						// INT(strong) % INT(weak) |-> INT(strong) , propagate(INT(strong) -> INT(weak))
+						if (type_primitive_float(lt) && type_primitive_float(rt)) {
+							type_propagate(lt, expr->expr_binary.right);
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_strong(rt)) {
+						// INT(weak) % INT(strong) |-> INT(strong) , propagate(INT(strong) -> INT(weak))
+						if (type_primitive_int(lt) && type_primitive_int(rt)) {
+							type_propagate(rt, expr->expr_binary.left);
+							return defer_check_against(expr, check_against, rt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_weak(rt)) {
+						if (type_primitive_int(lt) && type_primitive_int(rt)) {
+							// TODO: can types here be different?
+							return defer_check_against(expr, check_against, rt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					}
+				}break;
+
+				// @TYPECHECK AND
+				// @TYPECHECK OR
+				// @TYPECHECK XOR
+				case OP_BINARY_AND:
+				case OP_BINARY_OR:
+				case OP_BINARY_XOR: {
+					if (type_strong(lt) && type_strong(rt)) {
+						// INT(strong) &|^ INT(strong) |-> INT(strong)
+						// or
+						// BOOL(strong) &|^ BOOL(strong) |-> BOOL(strong)
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || type_primitive_bool(lt) && type_primitive_bool(rt)) {
+							// TODO: type coercions
+							if (lt != rt) {
+								*error |= report_type_mismatch(expr, lt, rt);
+							}
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' requires numeric or boolean type\n", binop_op_to_string(binop));
+						}
+					} else if (type_strong(lt) && type_weak(rt)) {
+						// INT(strong) &|^ INT(weak) |-> INT(strong) , propagete(INT(strong) -> INT(weak))
+						// or
+						// BOOL(strong) &|^ BOOL(weak) |-> BOOL(strong) , propagate(BOOL(strong) -> BOOL(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_bool(lt) && type_primitive_bool(rt))) {
+							type_propagate(lt, expr->expr_binary.right);
+							return defer_check_against(expr, check_against, lt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_strong(rt)) {
+						// INT(weak) &|^ INT(strong) |-> INT(strong) , propagate(INT(strong) -> INT(weak))
+						// or
+						// BOOL(weak) &|^ BOOL(strong) |-> BOOL(strong) , propagate(BOOL(strong) -> BOOL(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							type_propagate(rt, expr->expr_binary.left);
+							return defer_check_against(expr, check_against, rt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_weak(rt)) {
+						if (type_primitive_int(lt) && type_primitive_int(rt)) {
+							// TODO: can types here be different?
+							return defer_check_against(expr, check_against, lt, error);
+						} else if (type_primitive_bool(lt) && type_primitive_bool(rt)) {
+							// TODO: can types here be different?
+							return defer_check_against(expr, check_against, rt, error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					}
+				}break;
+			
+				// @TYPECHECK LOGIC_AND
+				// @TYPECHECK LOGIC_OR
+				case OP_BINARY_LOGIC_AND:
+				case OP_BINARY_LOGIC_OR: {
+					Type_Instance* lt = expr->expr_binary.left->type_return;
+					Type_Instance* rt = expr->expr_binary.right->type_return;
+					expr->type_return = type_primitive_get(TYPE_PRIMITIVE_BOOL);
+
+					if (!(type_primitive_bool(lt) && type_primitive_bool(rt))) {
+						assert(lt == rt && lt == expr->type_return);
+						*error |= report_type_not_defined_for_binop(lt, rt, expr);
+					} else if (rt != lt) {
+						*error |= report_type_mismatch(expr, lt, rt);
+					}
+					return defer_check_against(expr, check_against, expr->type_return, error);
+				}break;
+
+				// @TYPECHECK EQUAL
+				// @TYPECHECK NOT_EQUAL
+				case OP_BINARY_EQUAL:
+				case OP_BINARY_NOT_EQUAL: {
+					if (type_strong(lt) && type_strong(rt)) {
+						// NUMTYPE(strong) == != NUMTYPE(strong) |-> BOOL(strong)
+						// or
+						// BOOL(strong) == != BOOL(strong) |-> BOOL(strong)
+						// or
+						// ^T(strong) == != ^T(strong) |-> BOOL(strong)
+						if ((type_primitive_numeric(lt) && type_primitive_numeric(rt)) || type_primitive_bool(lt) && type_primitive_bool(rt) ||
+							(lt->kind == KIND_POINTER && rt->kind == KIND_POINTER)) {
+							// TODO: type coercions
+							if (lt != rt) {
+								*error |= report_type_mismatch(expr, lt, rt);
+							}
+							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
+						} else {
+							// TODO: other comparisons
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' is not defined for this type\n", binop_op_to_string(binop));
+						}
+					} else if (type_strong(lt) && type_weak(rt)) {
+						// pointer and bool types should not be weak
+						assert(rt->kind != KIND_POINTER);
+						// NUMTYPE(strong) == != NUMTYPE(weak) |-> BOOL(strong) , propagete(NUMTYPE(strong) -> NUMTYPE(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							type_propagate(lt, expr->expr_binary.right);
+							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					}
+					else if (type_weak(lt) && type_strong(rt)) {
+						// pointer and bool types should not be weak
+						assert(lt->kind != KIND_POINTER);
+						// NUMTYPE(weak) == != NUMTYPE(strong) |-> BOOL(strong) , propagate(NUMTYPE(strong) -> NUMTYPE(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							type_propagate(rt, expr->expr_binary.left);
+							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_weak(rt)) {
+						// NUMTYP(weak) == != NUMTYPE(weak) |-> BOOL(strong) , 2 * propagate(0 -> NUMTYPE(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							// TODO: can types here be different?
+							type_propagate(0, expr->expr_binary.left);
+							type_propagate(0, expr->expr_binary.right);
+							// this assumes the default is equal for both
+							assert(expr->expr_binary.left->type_return == expr->expr_binary.right->type_return);
+							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
+						} else if (type_primitive_bool(lt) && type_primitive_bool(rt)) {
+							// TODO: can types here be different?
+							assert(lt == rt && type_strong(lt));
+							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					}
+				}break;
+
+				// @TYPECHECK GE
+				// @TYPECHECK GT
+				// @TYPECHECK LE
+				// @TYPECHECK LT
+				case OP_BINARY_GE:
+				case OP_BINARY_GT:
+				case OP_BINARY_LE:
+				case OP_BINARY_LT: {
+					if (type_strong(lt) && type_strong(rt)) {
+						// NUMTYPE(strong) > NUMTYPE(strong) |-> BOOL(strong)
+						// or
+						// ^T(strong) > ^T(strong) |-> BOOL(strong)
+						if ((type_primitive_numeric(lt) && type_primitive_numeric(rt)) || (lt->kind == KIND_POINTER && rt->kind == KIND_POINTER)) {
+							// TODO: type coercions
+							if (lt != rt) {
+								*error |= report_type_mismatch(expr, lt, rt);
+							}
+							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
+						} else {
+							// TODO: other comparisons
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' requires numeric or pointer types\n", binop_op_to_string(binop));
+						}
+					} else if (type_strong(lt) && type_weak(rt)) {
+						// pointer types should not be weak
+						assert(rt->kind != KIND_POINTER);
+						// NUMTYPE(strong) > NUMTYPE(weak) |-> BOOL(strong) , propagete(NUMTYPE(strong) -> NUMTYPE(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							type_propagate(lt, expr->expr_binary.right);
+							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_strong(rt)) {
+						// pointer types should not be weak
+						assert(lt->kind != KIND_POINTER);
+						// NUMTYPE(weak) > NUMTYPE(strong) |-> BOOL(strong) , propagate(NUMTYPE(strong) -> NUMTYPE(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							type_propagate(rt, expr->expr_binary.left);
+							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					} else if (type_weak(lt) && type_weak(rt)) {
+						// pointer types should not be weak
+						assert(lt->kind != KIND_POINTER && rt->kind != KIND_POINTER);
+						// NUMTYP(weak) > NUMTYPE(weak) |-> BOOL(strong) , 2 * propagate(0 -> NUMTYPE(weak))
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+							// TODO: can types here be different?
+							type_propagate(0, expr->expr_binary.left);
+							type_propagate(0, expr->expr_binary.right);
+							// this assumes the default is equal for both
+							assert(expr->expr_binary.left->type_return == expr->expr_binary.right->type_return);
+							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
+						} else {
+							if (type_hash(lt) != type_hash(rt))
+								*error |= report_type_mismatch(expr, lt, rt);
+							else
+								*error |= report_type_not_defined_for_binop(lt, rt, expr);
+						}
+					}
+				}break;
+
+				case OP_BINARY_VECTOR_ACCESS: {
+					Type_Instance* index_type = expr->expr_binary.right->type_return;
+					Type_Instance* indexed_type = expr->expr_binary.left->type_return;
+					if (type_primitive_int(index_type)) {
+						if (type_weak(index_type)) {
+							type_propagate(0, expr->expr_binary.right);
+						}
+						// operand should be an addressable pointer or array
+						if (indexed_type->kind == KIND_POINTER) {
+							assert(type_strong(indexed_type));
+							return defer_check_against(expr, check_against, indexed_type->pointer_to, error);
+						} else if (indexed_type->kind == KIND_ARRAY) {
+							assert(type_strong(indexed_type));
+							return defer_check_against(expr, check_against, indexed_type->array_desc.array_of, error);
+						}
+					} else {
+						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "vector accessing operator requires integer index\n");
+					}
+				} break;
+				case OP_BINARY_DOT:
+					assert(0);
+					break;
 			}
 		} break;
 	}
+	//*error |= TYPE_ERROR_FATAL;
+	//report_internal_compiler_error(__FILE__, __LINE__, "type check of expressions returned unexpectedly\n");
+	return 0;
 }

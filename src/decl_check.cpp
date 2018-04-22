@@ -89,9 +89,9 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 
 	switch (type->kind) {
 		case KIND_PRIMITIVE:{
-			type->flags |= TYPE_FLAG_SIZE_RESOLVED;
+			type->flags |= TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED;
 			type->type_size_bits = type_size_primitive(type->primitive) * 8;
-			return type;
+			return internalize_type(&type, true);
 		}
 		case KIND_POINTER: {
 			type->flags |= TYPE_FLAG_SIZE_RESOLVED;
@@ -342,42 +342,26 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 	Decl_Error error = DECL_OK;
 
 	switch (node->node_type) {
-		case AST_DECL_VARIABLE:{
-			Type_Instance* var_type = 0;
-			if (node->decl_variable.variable_type) {
-				var_type = resolve_type(node->scope, node->decl_variable.variable_type, true);
-				node->decl_variable.variable_type = var_type;
-				if(node->decl_variable.assignment){
-					var_type = infer_from_expression(node->decl_variable.assignment, &error, true);
-					var_type = resolve_type(node->scope, var_type, true);
-					if(error & DECL_ERROR_FATAL) return error;
-					if(node->decl_variable.assignment->flags & AST_FLAG_TYPE_STRENGTH_DEP){
-						error |= type_update_weak(node->decl_variable.assignment, var_type);
-						if(error & DECL_ERROR_FATAL) return error;
-						node->decl_variable.assignment->type_return = var_type;
-					}
-				}
-			}
-			if (!var_type) {
-				if (node->decl_variable.assignment) {
-					// infer from expression
- 					var_type = infer_from_expression(node->decl_variable.assignment, &error, true);
-					if (error & TYPE_ERROR_FATAL) return error;
-					if(!var_type) return;
 
-					if(node->decl_variable.assignment->flags & AST_FLAG_TYPE_STRENGTH_DEP){
-						error |= type_update_weak(node->decl_variable.assignment, var_type);
-						if(error & DECL_ERROR_FATAL) return error;
-						node->decl_variable.assignment->type_return = var_type;
-					}
-					
-				} else {
-					report_error_location(node);
-					error |= report_type_error(DECL_ERROR_FATAL, "variable declaration cannot be type inferred without an assignment expression\n");
+		// @INNER AST_DECL_VARIABLE
+		case AST_DECL_VARIABLE:{
+			if (node->decl_variable.variable_type) {
+				node->decl_variable.variable_type = resolve_type(node->scope, node->decl_variable.variable_type, false);
+				if (!node->decl_variable.variable_type) {
+					return report_type_error(TYPE_ERROR_FATAL, node, "variable declaration type could not be resolved to a type\n");
 				}
 			}
-			node->decl_variable.variable_type = internalize_type(&var_type, true);
-			node->decl_variable.assignment->type_return = var_type;
+
+			if (node->decl_variable.assignment) {
+				Type_Error type_error = TYPE_OK;
+				Type_Instance* infered = infer_from_expression(node->decl_variable.assignment, &type_error, 0);
+				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
+				if (infered->flags & TYPE_FLAG_WEAK) {
+					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
+				}
+				node->decl_variable.variable_type = node->decl_variable.assignment->type_return;
+				node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);
+			}
 			
 			if (node->scope->level > 0)
 				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
@@ -404,7 +388,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 					// infer from expression
  					const_type = infer_from_expression(node->decl_constant.value, &error, true);
 					if (error & TYPE_ERROR_FATAL) return error;
-					if(!const_type) return;
+					if(!const_type) return error;
 
 					if(node->decl_constant.value->flags & AST_FLAG_TYPE_STRENGTH_DEP){
 						error |= type_update_weak(node->decl_constant.value, const_type);
