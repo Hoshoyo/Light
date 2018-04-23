@@ -1,6 +1,10 @@
 main :: () {
-	b : [3]u32;
-	a := 1 + cast(s8)b[3];
+	x : vec4 = 1;
 }
 
-x := 2;
+vec4 :: struct {
+	x : r32;
+	y : r32;
+	z : r32;
+	w : r32;
+}

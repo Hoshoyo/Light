@@ -344,10 +344,8 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 		// @INNER AST_DECL_VARIABLE
 		case AST_DECL_VARIABLE:{
 			if (node->decl_variable.variable_type) {
-				node->decl_variable.variable_type = resolve_type(node->scope, node->decl_variable.variable_type, false);
-				if (!node->decl_variable.variable_type) {
-					return report_type_error(TYPE_ERROR_FATAL, node, "variable declaration type could not be resolved to a type\n");
-				}
+				node->decl_variable.variable_type = resolve_type(node->scope, node->decl_variable.variable_type, true);
+				if (error & DECL_ERROR_FATAL) return error;
 			}
 
 			if (node->decl_variable.assignment) {
@@ -365,9 +363,24 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
 		}break;
 		case AST_DECL_CONSTANT: {
-					
+			if (node->decl_constant.type_info) {
+				node->decl_constant.type_info= resolve_type(node->scope, node->decl_constant.type_info, true);
+				if (error & DECL_ERROR_FATAL) return error;
+			}
+
+			if (node->decl_variable.assignment) {
+				Type_Error type_error = TYPE_OK;
+				Type_Instance* infered = infer_from_expression(node->decl_variable.assignment, &type_error, 0);
+				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
+				if (infered->flags & TYPE_FLAG_WEAK) {
+					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
+				}
+				node->decl_variable.variable_type = node->decl_variable.assignment->type_return;
+				node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);
+			}
+
 			if (node->scope->level > 0)
-				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "constant");
+				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
 		}break;
 		case AST_DECL_PROCEDURE: {
 			//for (size_t i = 0; i < node->decl_procedure.arguments_count; ++i) {

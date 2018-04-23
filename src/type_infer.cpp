@@ -245,6 +245,8 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 		// @PROPAGATE LITERAL
 		case AST_EXPRESSION_LITERAL: {
 			if (strong) {
+				Type_Error error = TYPE_OK;
+				type_check_expr(strong, expr, &error);
 				expr->type_return = strong;
 			} else {
 				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
@@ -829,6 +831,14 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					break;
 			}
 		} break;
+		case AST_EXPRESSION_UNARY: {
+
+		}break;
+		case AST_EXPRESSION_LITERAL: {
+			if (type_primitive_int(expr->type_return)) {
+
+			}
+		}break;
 	}
 	return 0;
 }
