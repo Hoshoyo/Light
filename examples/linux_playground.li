@@ -1,23 +1,13 @@
-malloc :: (size : s64) -> ^void #foreign("libc");
-write  :: (fd : s32, buffer : ^void, size : s64) -> s64 #foreign("libc");
-print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
+//malloc :: (size : s64) -> ^void #foreign("libc");
+//write  :: (fd : s32, buffer : ^void, size : s64) -> s64 #foreign("libc");
+//print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
 
-repeat :: (n : s64) -> void {
-    if n == 0 return; 
-    a := cast(^u8)malloc(512);
-    *a = 72;
-    *a + 1 = 101;
-    *a + 2 = 108;
-    *a + 3 = 108;
-    *a + 4 = 111;
-    *a + 5 = 10;
-    x := write(1, cast(^void)a, 6);
-    repeat(n - 1);
-    return;
+factorial :: (v : s32) -> s32 {
+    if v == 1 return 1;
+    return v * factorial(v - 1);
 }
 
 main :: () -> s64 {
-    repeat(10);
     
     return 0;
 }

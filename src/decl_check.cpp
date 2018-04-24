@@ -350,13 +350,17 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 
 			if (node->decl_variable.assignment) {
 				Type_Error type_error = TYPE_OK;
-				Type_Instance* infered = infer_from_expression(node->decl_variable.assignment, &type_error, 0);
+				Type_Instance* infered = infer_from_expression(node->decl_variable.assignment, &type_error, TYPE_INFER_REPORT_UNDECLARED);
 				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
 				if (infered->flags & TYPE_FLAG_WEAK) {
 					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
 				}
-				node->decl_variable.variable_type = node->decl_variable.assignment->type_return;
-				node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);
+				if(!node->decl_variable.variable_type){
+					node->decl_variable.variable_type = infered;
+				} else {
+					node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);
+				}
+				error |= type_error;
 			}
 			
 			if (node->scope->level > 0)
@@ -364,23 +368,27 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 		}break;
 		case AST_DECL_CONSTANT: {
 			if (node->decl_constant.type_info) {
-				node->decl_constant.type_info= resolve_type(node->scope, node->decl_constant.type_info, true);
+				node->decl_constant.type_info = resolve_type(node->scope, node->decl_constant.type_info, true);
 				if (error & DECL_ERROR_FATAL) return error;
 			}
 
-			if (node->decl_variable.assignment) {
+			if (node->decl_constant.value) {
 				Type_Error type_error = TYPE_OK;
-				Type_Instance* infered = infer_from_expression(node->decl_variable.assignment, &type_error, 0);
+				Type_Instance* infered = infer_from_expression(node->decl_constant.value, &type_error, TYPE_INFER_REPORT_UNDECLARED);
 				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
 				if (infered->flags & TYPE_FLAG_WEAK) {
-					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
+					type_propagate(node->decl_constant.type_info, node->decl_constant.value);
 				}
-				node->decl_variable.variable_type = node->decl_variable.assignment->type_return;
-				node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);
+				if(!node->decl_constant.type_info){
+					node->decl_constant.type_info = infered;
+				} else {
+					node->decl_constant.value->type_return = type_check_expr(node->decl_constant.type_info, node->decl_constant.value, &type_error);
+				}
+				error |= type_error;
 			}
-
+			
 			if (node->scope->level > 0)
-				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
+				error |= decl_insert_into_symbol_table(node, node->decl_constant.name, "constant");
 		}break;
 		case AST_DECL_PROCEDURE: {
 			//for (size_t i = 0; i < node->decl_procedure.arguments_count; ++i) {
@@ -417,8 +425,12 @@ Decl_Error decl_check_inner_command(Ast* node) {
 				node->comm_break.level->expr_literal.value_u64 = 1;
 			}
 			if (node->comm_break.level->node_type == AST_EXPRESSION_LITERAL) {
-				error |= decl_check_inner_expr(node->comm_break.level);
+				node->comm_break.level->type_return = infer_from_expression(node->comm_break.level, error, TYPE_INFER_REPORT_UNDECLARED);
 				if (error & DECL_ERROR_FATAL) return error;
+				if(node->comm_break.level->type_return->flags & TYPE_FLAG_WEAK){
+					type_propagate(0, node->comm_break.level);
+				}
+
 				if (type_primitive_int(node->comm_break.level->type_return)) {
 					// check if it is inside a loop
 					u64 loop_level = node->comm_break.level->expr_literal.value_u64;
@@ -450,32 +462,48 @@ Decl_Error decl_check_inner_command(Ast* node) {
 				report_error_location(node);
 				error |= report_semantic_error(DECL_ERROR_FATAL, "return command is not inside a procedure\n");
 			}
-			if(node->comm_return.expression)
-				error |= decl_check_inner_expr(node->comm_return.expression);
+			if(node->comm_return.expression){
+				//decl_check_inner_expr(node->comm_return.expression);
+				node->comm_return.expression->type_return = infer_from_expression(node->comm_return.expression, &error, TYPE_INFER_REPORT_UNDECLARED);
+			}
 		}break;
 		case AST_COMMAND_FOR: {
 			assert(node->comm_for.body->comm_block.block_scope->flags & SCOPE_LOOP);
-			error |= decl_check_inner_expr(node->comm_for.condition);
+			//error |= decl_check_inner_expr(node->comm_for.condition);
+			node->comm_for.condition->type_return = infer_from_expression(node->comm_for.condition, &error, TYPE_INFER_REPORT_UNDECLARED);
 			error |= decl_check_inner_command(node->comm_for.body);
 		}break;
 		case AST_COMMAND_IF: {
-			error |= decl_check_inner_expr(node->comm_if.condition);
+			//error |= decl_check_inner_expr(node->comm_if.condition);
+			node->comm_if.condition->type_return = infer_from_expression(node->comm_if.condition, &error, TYPE_INFER_REPORT_UNDECLARED);
 			error |= decl_check_inner_command(node->comm_if.body_true);
 			if (node->comm_if.body_false)
 				error |= decl_check_inner_command(node->comm_if.body_false);
 		}break;
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
 			// TODO(psv): lvalue not distinguished
-			if(node->comm_var_assign.lvalue)
-				error |= decl_check_inner_expr_lassign(node->comm_var_assign.lvalue);
-			else if (node->comm_var_assign.lvalue && node->comm_var_assign.lvalue->type_return != type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+			Type_Instance* ltype = 0;
+			if(node->comm_var_assign.lvalue){
+				//error |= decl_check_inner_expr_lassign(node->comm_var_assign.lvalue);
+				ltype = infer_from_expression(node->comm_var_assign.lvalue, &error, TYPE_INFER_REPORT_UNDECLARED | TYPE_INFER_LVALUE);
+				if(error & TYPE_ERROR_FATAL) return error;
+				assert(ltype->flags & TYPE_FLAG_STRONG);
+			} else if (node->comm_var_assign.lvalue && node->comm_var_assign.lvalue->type_return != type_primitive_get(TYPE_PRIMITIVE_VOID)) {
 				error |= report_type_error(TYPE_ERROR_FATAL, "left side of assignment is not an addressable value\n");
 			}
-			error |= decl_check_inner_expr(node->comm_var_assign.rvalue);
-			if (node->comm_var_assign.rvalue) {
+			//error |= decl_check_inner_expr(node->comm_var_assign.rvalue);
+			Type_Instance* rtype = infer_from_expression(node->comm_var_assign.rvalue, &error, TYPE_INFER_REPORT_UNDECLARED);
+			if(rtype->flags & TYPE_FLAG_WEAK){
+				type_propagate(ltype, node->comm_var_assign.rvalue);
+			}
+			node->comm_var_assign.rvalue->type_return = type_check_expr(ltype, node->comm_var_assign.rvalue, &error);
+
+			if (node->comm_var_assign.rvalue->type_return) {
 				// if the rvalue is weak, transform it
 				if (node->comm_var_assign.rvalue->type_return && node->comm_var_assign.rvalue->type_return->flags & TYPE_FLAG_WEAK) {
-					error |= type_update_weak(node->comm_var_assign.rvalue, node->comm_var_assign.lvalue->type_return->pointer_to);
+					//error |= type_update_weak(node->comm_var_assign.rvalue, node->comm_var_assign.lvalue->type_return->pointer_to);
+					type_propagate(node->comm_var_assign.lvalue->type_return, node->comm_var_assign.rvalue);
+					node->comm_var_assign.rvalue->type_return = type_check_expr(node->comm_var_assign.lvalue->type_return, node->comm_var_assign.rvalue, error);
 				}
 			}
 		}break;
@@ -484,7 +512,7 @@ Decl_Error decl_check_inner_command(Ast* node) {
 
 	return error;
 }
-
+/*
 Decl_Error decl_check_inner_expr_lassign(Ast* node) {
 	assert(node->flags & AST_FLAG_IS_EXPRESSION);
 	Decl_Error error = DECL_OK;
@@ -519,7 +547,7 @@ Decl_Error decl_check_inner_expr(Ast* node) {
 	}
 
 	return error;
-}
+}*/
 
 Decl_Error decl_check_inner(Scope* global_scope, Ast** ast_top_level) {
 	Decl_Error error = DECL_OK;
@@ -532,7 +560,8 @@ Decl_Error decl_check_inner(Scope* global_scope, Ast** ast_top_level) {
 		} else if(node->flags & AST_FLAG_IS_COMMAND) {
 			error |= decl_check_inner_command(node);
 		} else if (node->flags & AST_FLAG_IS_EXPRESSION) {
-			error |= decl_check_inner_expr(node);
+			assert(0); // @DEPRECATED
+			//error |= decl_check_inner_expr(node);
 		}
 	}
 

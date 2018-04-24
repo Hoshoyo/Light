@@ -56,6 +56,7 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 
 	expr->expr_binary.left->type_return = infer_from_expression(expr->expr_binary.left, error, flags);
 	expr->expr_binary.right->type_return = infer_from_expression(expr->expr_binary.right, error, flags);
+	if(*error & TYPE_ERROR_FATAL) return 0;
 	
 	expr->type_return = type_check_expr(0, expr, error);
 
@@ -217,6 +218,9 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 
 	Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
 	if (!decl) {
+		if(flags & TYPE_INFER_REPORT_UNDECLARED) {
+			*error |= report_undeclared(expr->expr_variable.name);
+		}
 		return 0;
 	}
 	expr->expr_variable.decl = decl;
@@ -226,6 +230,13 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 		assert(0); // implement function ptr
 	} else if(decl->node_type == AST_DECL_VARIABLE){
 		type = decl->decl_variable.variable_type;
+
+		// type of variable tried to resolve already, but could not
+		if(!type) {
+			*error |= TYPE_ERROR_FATAL;
+			return 0;
+		}
+
 		assert(type_strong(type));
 		expr->flags |= AST_FLAG_LVALUE;
 		expr->type_return = type;
@@ -246,8 +257,14 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 		case AST_EXPRESSION_LITERAL: {
 			if (strong) {
 				Type_Error error = TYPE_OK;
-				type_check_expr(strong, expr, &error);
-				expr->type_return = strong;
+				if(type_primitive_int(strong) && type_primitive_int(expr->type_return)) {
+					expr->type_return = strong;
+				} else if(type_primitive_float(strong) && type_primitive_float(expr->type_return)){
+					expr->type_return = strong;
+				} else if(type_primitive_bool(strong) && type_primitive_bool(expr->type_return)){
+					assert(expr->type_return == strong);
+					expr->type_return = strong;
+				}
 			} else {
 				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
 				expr->type_return = internalize_type(&expr->type_return, true);
@@ -835,9 +852,8 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 
 		}break;
 		case AST_EXPRESSION_LITERAL: {
-			if (type_primitive_int(expr->type_return)) {
-
-			}
+			type_propagate(check_against, expr);
+			return defer_check_against(expr, check_against, expr->type_return, error);
 		}break;
 	}
 	return 0;

@@ -1,7 +1,7 @@
 #include "error.h"
 
 void report_error_location(Token* tok) {
-	fprintf(stderr, "%.*s (%d:%d) ", tok->filename.length, tok->filename.data, tok->line, tok->column);
+	fprintf(stderr, "%.*s:%d:%d: ", tok->filename.length, tok->filename.data, tok->line, tok->column);
 }
 void report_error_location(Ast* node) {
 	switch (node->node_type) {
