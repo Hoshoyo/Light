@@ -50,7 +50,7 @@ void LLVM_Code_Generator::reset_temp() {
 	br_label_temp = 0;
 }
 
-void report_fatal_error(char* msg, ...) {
+static void report_fatal_error(char* msg, ...) {
 	va_list args;
 	va_start(args, msg);
 	vfprintf(stderr, msg, args);

@@ -23,7 +23,6 @@ Type_Error report_type_not_defined_for_binop(Type_Instance* left, Type_Instance*
 }
 
 Type_Error type_update_weak(Ast* expr, Type_Instance* strong) { return 0; }
-void       type_propagate(Type_Instance* strong, Ast* expr);
 
 /* --------------------------------------------------------------
    -------------------- Type Inference --------------------------
@@ -179,7 +178,7 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 			result->primitive = TYPE_PRIMITIVE_S64;
 		}break;
 		case LITERAL_BOOL: {
-			return type_primitive_get(TYPE_PRIMITIVE_BOOL);
+			result = type_primitive_get(TYPE_PRIMITIVE_BOOL);
 		}break;
 		case LITERAL_FLOAT: {
 			result->kind = KIND_PRIMITIVE;

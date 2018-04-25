@@ -1,10 +1,15 @@
 main :: () {
+    t2 := !true;
     s : s8;
     buffer : ^s8;
     buffer = &s;
-    buffer = *cast(^^s8)s;
+    buffer = *cast(^^s8)2;
     a : vec2;
     b := *a.y;
+    t1 := ~2;
+    t3 := *buffer;
+    t4 := -s;
+    t5 := +s;
 }
 
 vec2 :: struct {

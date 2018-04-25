@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/gcc/light",
-            "args": ["examples/unarylval.li"],
+            "args": ["examples/linux_playground.li"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
