@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/gcc/light",
-            "args": ["examples/linux_playground.li"],
+            "args": ["examples/accesstest.li"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

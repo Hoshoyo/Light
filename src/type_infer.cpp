@@ -55,7 +55,9 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 	assert(expr->node_type == AST_EXPRESSION_BINARY);
 
 	expr->expr_binary.left->type_return = infer_from_expression(expr->expr_binary.left, error, flags);
-	expr->expr_binary.right->type_return = infer_from_expression(expr->expr_binary.right, error, flags);
+	if(expr->expr_binary.op != OP_BINARY_DOT){
+		expr->expr_binary.right->type_return = infer_from_expression(expr->expr_binary.right, error, flags);
+	}
 	if(*error & TYPE_ERROR_FATAL) return 0;
 	
 	expr->type_return = type_check_expr(0, expr, error);
@@ -859,7 +861,31 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					}
 				} break;
 				case OP_BINARY_DOT:
-					assert(0);
+					if(lt->kind != KIND_STRUCT){
+						// @IMPLEMENT namespaces
+						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot access field from a non structure type\n");
+						return 0;
+					}
+					if(expr->expr_binary.right->node_type != AST_EXPRESSION_VARIABLE){
+						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot access field of structure, name declaration required\n");
+						return 0;
+					}
+					Ast* decl_struct = decl_from_name(expr->scope, lt->struct_desc.name);
+					assert_msg(decl_struct, "how can we not get a struct that has a type defined?");
+					
+					Ast* decl = decl_from_name(decl_struct->decl_struct.struct_scope, expr->expr_binary.right->expr_variable.name);
+					if(!decl){
+						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "'%.*s' is not a field of struct '%.*s'\n", 
+							TOKEN_STR(expr->expr_binary.right->expr_variable.name), TOKEN_STR(decl_struct->decl_struct.name));
+						return 0;
+					}
+					assert(type_strong(decl->decl_variable.variable_type));
+
+					expr->flags |= AST_FLAG_LVALUE;
+					expr->type_return = decl->decl_variable.variable_type;
+					expr->expr_binary.right->type_return = expr->type_return;
+					return expr->type_return;
+
 					break;
 			}
 		} break;

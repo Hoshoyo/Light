@@ -1,0 +1,19 @@
+main :: () {
+	Pedro : Person;
+	a := Pedro.pos.y;
+	b := Pedro.pos.y;
+	c := Pedro.age;
+	//a := Pedro.pos.x;
+}
+
+vec4 :: struct {
+	x : r32;
+	y : r32;
+	z : r32;
+	w : r32;
+}
+
+Person :: struct {
+	pos : vec4;
+	age : s32;
+}
