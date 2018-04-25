@@ -7,7 +7,12 @@ factorial :: (v : s32) -> s32 {
     return v * factorial(v - 1);
 }
 
+map :: (v : s32, compare : (s32) -> bool) -> bool {
+	return compare(v);
+}
+
 main :: () -> s64 {
-    
+	 a : [256][3]s8;
+	 b := a[5];
     return 0;
 }

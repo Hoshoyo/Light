@@ -186,31 +186,44 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 
 Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags) {
 	Ast* decl = decl_from_name(expr->scope, expr->expr_proc_call.name);
-	if (!decl) {
-		return 0;
-	}
+	if (!decl) return 0;
+
+	Type_Instance* proc_type = 0;
+
 	if (decl->node_type != AST_DECL_PROCEDURE) {
-		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "'%.*s' is not a procedure\n", TOKEN_STR(expr->expr_proc_call.name));
-		return 0;
+		if(decl->node_type == AST_DECL_VARIABLE && decl->decl_variable.variable_type->kind != KIND_FUNCTION) {
+			*error |= report_type_error(TYPE_ERROR_FATAL, expr, "'%.*s' is not a procedure\n", TOKEN_STR(expr->expr_proc_call.name));
+			return 0;
+		}
+		proc_type = decl->decl_variable.variable_type;
+	} else {
+		proc_type = decl->decl_procedure.type_procedure;
 	}
-	Type_Instance* type = decl->decl_procedure.type_return;
-	assert(type->flags & TYPE_FLAG_INTERNALIZED);
+	assert(proc_type->flags & TYPE_FLAG_INTERNALIZED);
 
 	size_t nargs = expr->expr_proc_call.args_count;
-	for (size_t i = 0; i < nargs; ++i) {
-		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, false);
-		
-		Ast* arg_decl = decl->decl_procedure.arguments[i];
-		assert(arg_decl->node_type == AST_DECL_VARIABLE);
-		assert(arg_decl->decl_variable.variable_type->flags & TYPE_FLAG_INTERNALIZED);
-		
-		type_propagate(arg_decl->decl_variable.variable_type, expr->expr_proc_call.args[i]);
-		Type_Instance* arg_type = type_check_expr(arg_decl->decl_variable.variable_type, expr->expr_proc_call.args[i], error);
-
-		expr->expr_proc_call.args[i]->type_return = arg_type;
+	if(nargs < proc_type->function_desc.num_arguments) {
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "not enough arguments for '%.*s' procedure call, expected '%d' got '%d'\n",
+			TOKEN_STR(expr->expr_proc_call.name), proc_type->function_desc.num_arguments, nargs);
+		return 0;
+	} else if(nargs > proc_type->function_desc.num_arguments) {
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "too many arguments for '%.*s' procedure call, expected '%d' got '%d'\n",
+			TOKEN_STR(expr->expr_proc_call.name), proc_type->function_desc.num_arguments, nargs);
+		return 0;
 	}
 
-	return type;
+	for (size_t i = 0; i < nargs; ++i) {
+		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, false);
+		expr->expr_proc_call.args[i]->type_return = type;
+		
+		if(type_weak(type)){
+			type_propagate(proc_type->function_desc.arguments_type[i], expr->expr_proc_call.args[i]);
+		}
+		expr->expr_proc_call.args[i]->type_return = type_check_expr(proc_type->function_desc.arguments_type[i], expr->expr_proc_call.args[i], error);
+	}
+
+	expr->type_return = proc_type->function_desc.return_type;
+	return expr->type_return;
 }
 
 Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 flags) {
@@ -227,7 +240,7 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 	Type_Instance* type = 0;
 
 	if (decl->node_type != AST_DECL_VARIABLE && decl->node_type != AST_DECL_CONSTANT) {
-		assert(0); // implement function ptr
+		assert_msg(0, "function pointer not implemented"); // implement function ptr
 	} else if(decl->node_type == AST_DECL_VARIABLE){
 		type = decl->decl_variable.variable_type;
 
@@ -838,6 +851,8 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 						} else if (indexed_type->kind == KIND_ARRAY) {
 							assert(type_strong(indexed_type));
 							return defer_check_against(expr, check_against, indexed_type->array_desc.array_of, error);
+						} else {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "vector accessing operator requires addressable value\n");
 						}
 					} else {
 						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "vector accessing operator requires integer index\n");
@@ -849,12 +864,26 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 			}
 		} break;
 		case AST_EXPRESSION_UNARY: {
-
+			switch(expr->expr_unary.op){
+				case OP_UNARY_ADDRESSOF:
+				case OP_UNARY_BITWISE_NOT:
+				case OP_UNARY_CAST:
+				case OP_UNARY_DEREFERENCE:
+				case OP_UNARY_LOGIC_NOT:
+				case OP_UNARY_MINUS:
+				case OP_UNARY_PLUS:
+				break;
+			}
 		}break;
 		case AST_EXPRESSION_LITERAL: {
 			type_propagate(check_against, expr);
 			return defer_check_against(expr, check_against, expr->type_return, error);
 		}break;
+		case AST_EXPRESSION_PROCEDURE_CALL:
+		case AST_EXPRESSION_VARIABLE:{
+			assert(type_strong(expr->type_return));
+			return defer_check_against(expr, check_against, expr->type_return, error);
+		}
 	}
 	return 0;
 }

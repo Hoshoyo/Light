@@ -512,42 +512,6 @@ Decl_Error decl_check_inner_command(Ast* node) {
 
 	return error;
 }
-/*
-Decl_Error decl_check_inner_expr_lassign(Ast* node) {
-	assert(node->flags & AST_FLAG_IS_EXPRESSION);
-	Decl_Error error = DECL_OK;
-	Type_Instance* t = infer_from_expression(node, &error, true);
-	node->type_return = t;
-
-	return error;
-}
-
-Decl_Error decl_check_inner_expr(Ast* node) {
-	assert(node->flags & AST_FLAG_IS_EXPRESSION);
-	Decl_Error error = DECL_OK;
-	Type_Instance* t = infer_from_expression(node, &error, true);
-	node->type_return = t;
-
-	switch(node->node_type){
-		case AST_EXPRESSION_BINARY:{
-			error |= decl_check_inner_expr(node->expr_binary.left);
-			error |= decl_check_inner_expr(node->expr_binary.right);
-		}break;
-		case AST_EXPRESSION_PROCEDURE_CALL:{
-			for(s32 i = 0; i < node->expr_proc_call.args_count; ++i){
-				error |= decl_check_inner_expr(node->expr_proc_call.args[i]);
-			}
-		}break;
-		case AST_EXPRESSION_UNARY:{
-			error |= decl_check_inner_expr(node->expr_unary.operand);
-		}break;
-		case AST_EXPRESSION_LITERAL:
-		case AST_EXPRESSION_VARIABLE:
-		break;
-	}
-
-	return error;
-}*/
 
 Decl_Error decl_check_inner(Scope* global_scope, Ast** ast_top_level) {
 	Decl_Error error = DECL_OK;

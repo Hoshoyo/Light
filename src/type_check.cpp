@@ -73,7 +73,7 @@ Type_Error type_check(Ast* node) {
 		}
 	}break;
 
-		// Commands
+	// Commands
 	case AST_COMMAND_BLOCK: {
 		for (size_t i = 0; i < node->comm_block.command_count; ++i) {
 			error |= type_check(node->comm_block.commands[i]);

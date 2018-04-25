@@ -220,7 +220,7 @@ bool Lexer::read_token(char** begin)
 	case '\0': type = TOKEN_END_OF_STREAM;			break;
 	case '{': type = TOKEN_SYMBOL_OPEN_BRACE;		flags |= TOKEN_FLAG_UNARY_OPERATOR | TOKEN_FLAG_UNARY_POSTFIXED; break;
 	case '}': type = TOKEN_SYMBOL_CLOSE_BRACE;		break;
-	case '[': type = TOKEN_SYMBOL_OPEN_BRACKET;		break;
+	case '[': type = TOKEN_SYMBOL_OPEN_BRACKET;		flags |= TOKEN_FLAG_BINARY_OPERATOR; break;
 	case ']': type = TOKEN_SYMBOL_CLOSE_BRACKET;	break;
 	case '(': type = TOKEN_SYMBOL_OPEN_PAREN;		break;
 	case ')': type = TOKEN_SYMBOL_CLOSE_PAREN;		break;

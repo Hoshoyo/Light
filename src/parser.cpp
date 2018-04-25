@@ -370,18 +370,32 @@ Ast* Parser::parse_expression_precedence10(Scope* scope) {
 }
 
 Ast* Parser::parse_expression_precedence9(Scope* scope) {
+	Token* op = 0;
 	Ast* expr = parse_expression_precedence10(scope);
-	Token_Type next = lexer->peek_token_type();
-	if (next == '[')
-	{
-		Token* op  = lexer->eat_token();
-		Ast* index = parse_expression(scope);
-
-		Ast* e = ast_create_expr_binary(scope, expr, index, OP_BINARY_VECTOR_ACCESS, op);
-		require_and_eat(']');
-		return e;
+	while(true) {
+		op = lexer->peek_token();
+		if(op->type == '['){
+			lexer->eat_token();
+			Ast* r = parse_expression_precedence10(scope);
+			expr = ast_create_expr_binary(scope, expr, r, token_to_binary_op(op), op);
+			require_and_eat(']');
+		} else {
+			break;
+		}
 	}
 	return expr;
+	//Ast* expr = parse_expression_precedence10(scope);
+	//Token_Type next = lexer->peek_token_type();
+	//if (next == '[')
+	//{
+	//	Token* op  = lexer->eat_token();
+	//	Ast* index = parse_expression(scope);
+//
+	//	Ast* e = ast_create_expr_binary(scope, expr, index, OP_BINARY_VECTOR_ACCESS, op);
+	//	require_and_eat(']');
+	//	return e;
+	//}
+	//return expr;
 }
 
 Ast* Parser::parse_expression_precedence8(Scope* scope) {
@@ -879,7 +893,8 @@ Type_Instance* Parser::parse_type_function() {
 		for(s32 i = 0; ; ++i) {
 			if (i != 0)
 				require_and_eat(',');
-			t->function_desc.arguments_type[i] = parse_type();
+			Type_Instance* argtype = parse_type();
+			array_push(t->function_desc.arguments_type, &argtype);
 			t->function_desc.num_arguments += 1;
 			if (lexer->peek_token_type() != ',')
 				break;
