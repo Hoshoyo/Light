@@ -13,7 +13,7 @@ Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2)
 }
 Type_Error report_type_not_defined_for_binop(Type_Instance* left, Type_Instance* right, Ast* expr) {
 	Type_Error error = TYPE_OK;
-	error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '");
+	error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operation '");
 	DEBUG_print_type(stderr, left, true);
 	fprintf(stderr, "' %s '", binop_op_to_string(expr->expr_binary.op));
 	DEBUG_print_type(stderr, right, true);
@@ -109,7 +109,11 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 
 		// @INFER CAST
 		case OP_UNARY_CAST: {
-			Type_Instance* cast_to = resolve_type(expr->scope, expr->expr_unary.type_to_cast, false);
+			Type_Instance* cast_to = resolve_type(expr->scope, expr->expr_unary.type_to_cast, true);
+			if(!cast_to) {
+				*error |= TYPE_ERROR_FATAL;
+				return *error;
+			}
 			if (type_primitive_numeric(infered) || infered->kind == KIND_POINTER) {
 				type_propagate(0, expr->expr_unary.operand);
 				assert(type_strong(cast_to));
@@ -180,7 +184,7 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 			result->primitive = TYPE_PRIMITIVE_R64;
 		}break;
 		case LITERAL_STRUCT:
-		case LITERAL_ARRAY: assert(0); break;	// TODO(psv): not implemented yet
+		case LITERAL_ARRAY: assert_msg(0, "string literal not implemented yet"); break;	// TODO(psv): not implemented yet
 	}
 	expr->type_return = result;
 	return result;
@@ -590,7 +594,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 						}
 					} else if (type_strong(lt) && type_weak(rt)) {
 						// INT(strong) % INT(weak) |-> INT(strong) , propagate(INT(strong) -> INT(weak))
-						if (type_primitive_float(lt) && type_primitive_float(rt)) {
+						if (type_primitive_int(lt) && type_primitive_int(rt)) {
 							type_propagate(lt, expr->expr_binary.right);
 							return defer_check_against(expr, check_against, lt, error);
 						} else {
@@ -693,7 +697,6 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					expr->type_return = type_primitive_get(TYPE_PRIMITIVE_BOOL);
 
 					if (!(type_primitive_bool(lt) && type_primitive_bool(rt))) {
-						assert(lt == rt && lt == expr->type_return);
 						*error |= report_type_not_defined_for_binop(lt, rt, expr);
 					} else if (rt != lt) {
 						*error |= report_type_mismatch(expr, lt, rt);

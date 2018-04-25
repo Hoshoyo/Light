@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/gcc/light",
-            "args": ["examples/accesstest.li"],
+            "args": ["examples/operations.li"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

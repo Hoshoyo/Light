@@ -40,14 +40,14 @@ int main(int argc, char** argv) {
 
 	DEBUG_print_ast(stdout, ast_top_level, true);
 
-	Type_Error type_err = type_check(&global_scope, ast_top_level);
-	if (type_err) {
-		return -1;
-	}
+	//Type_Error type_err = type_check(&global_scope, ast_top_level);
+	//if (type_err) {
+	//	return -1;
+	//}
 
-	DEBUG_print_ast(stdout, ast_top_level, true);
+	//DEBUG_print_ast(stdout, ast_top_level, true);
 	//DEBUG_print_scope_decls(&global_scope);
-	DEBUG_print_type_table();
+	//DEBUG_print_type_table();
 
 	//llvm_generate_ir(ast_top_level, g_type_table, argv[1]);
 	return 0;

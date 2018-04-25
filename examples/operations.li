@@ -1,7 +1,7 @@
-proc : () -> void
+proc :: () -> void
 {
 	{
-		a : int;
+		a : s32;
 		a = 0;
 		a ^= 1;
 		a &= 2;
@@ -9,63 +9,63 @@ proc : () -> void
 		a *= 4;
 		a += 5;
 		a -= 6;
-		a <<= 7;
+		a = a << 7;
 		a >>= 8;
 		a %= 9;
 		a |= 10;
 		
-		a + a;
-		a - a;
-		a * a;
-		a / a;
-		a & a;
-		a | a;
-		a ^ a;
-		a % a;
-		a << a;
-		a >> a;
-		a < a;
-		a > a;
-		a <= a;
-		a >= a;
-		a == a;
-		a != a;
+		a = a + a;
+		a = a - a;
+		a = a * a;
+		a = a / a;
+		a = a & a;
+		a = a | a;
+		a = a ^ a;
+		a = a % a;
+		a = a << a;
+		a = a >> a;
+		b := a < a;
+		b = a > a;
+		b = a <= a;
+		b = a >= a;
+		b = a == a;
+		b = a != a;
 	}
 	{
-		c : ^int;
-		a : int = 0;
+		c : ^s32;
+		a : s32 = 0;
 		c += 1;
 		c -= 1;
-		c == c;
-		c != c;
-		c = c + a;
-		c = c - c;
-		c = c;
+		b := c == c;
+		b = c != c;
+		d := c + a;
+		e := c - c;
+		f : ^s32 = c;
 	}
 	{
 		b : bool;
-		b && b;
-		b || b;
-		b == b;
-		b != b;
+		b = b && b;
+		b = b || b;
+		b = b == b;
+		b = b != b;
 	}
 	{
-		d : float;
+		d : r32;
 		d = 0.0;
 		d *= d;
 		d /= d;
 		d += d;
 		d -= d;
-		d + d;
-		d - d;
-		d / d;
-		d * d;
-		d < d;
-		d > d;
-		d <= d;
-		d >= d;
-		d == d;
-		d != d;
+		d = d + d;
+		d = d - d;
+		d = d / d;
+		d = d * d;
+		b := d < d;
+		b = d > d;
+		b = d <= d;
+		b = d >= d;
+		b = d == d;
+		b = d != d;
 	}
 
 	return;

@@ -6,7 +6,7 @@
 #include <ho_system.h>
 
 void Parser::report_error_location(Token* tok) {
-	fprintf(stderr, "%.*s (%d:%d) ", tok->filename.length, tok->filename.data, tok->line, tok->column);
+	fprintf(stderr, "%.*s:%d:%d ", tok->filename.length, tok->filename.data, tok->line, tok->column);
 }
 
 void Parser::report_syntax_error(Token* error_token, char* msg, ...) {
@@ -376,7 +376,7 @@ Ast* Parser::parse_expression_precedence9(Scope* scope) {
 		op = lexer->peek_token();
 		if(op->type == '['){
 			lexer->eat_token();
-			Ast* r = parse_expression_precedence10(scope);
+			Ast* r = parse_expression(scope);
 			expr = ast_create_expr_binary(scope, expr, r, token_to_binary_op(op), op);
 			require_and_eat(']');
 		} else {

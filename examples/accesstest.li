@@ -1,9 +1,14 @@
-main :: () {
+foo :: () -> void {
+	a : Person;
+	b := a.age;
+}
+
+main :: () -> Person {
 	Pedro : Person;
 	a := Pedro.pos.y;
 	b := Pedro.pos.y;
 	c := Pedro.age;
-	//a := Pedro.pos.x;
+	d := Pedro.name;
 }
 
 vec4 :: struct {
@@ -16,4 +21,11 @@ vec4 :: struct {
 Person :: struct {
 	pos : vec4;
 	age : s32;
+	name : string;
+}
+
+string :: struct {
+	length   : s64 ;
+	capacity : s64 ;
+	data     : ^u8;
 }

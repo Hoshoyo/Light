@@ -1,13 +1,31 @@
-Person :: struct {
-    name : string;
-    age  : s32;
+foo :: () -> void {
+	a : Person;
+	b := a.age;
 }
 
-main :: () -> s32 {
-    //a := "hello".data;
-    b := "world";
-    c := b.data;
-    //p := Person;      // this causes segfault
-    //p : Person;
-    //n := p.name.length;
+main :: () -> Person {
+	Pedro : Person;
+	a := Pedro.pos.y;
+	b := Pedro.pos.y;
+	c := Pedro.age;
+	d := Pedro.name;
+}
+
+vec4 :: struct {
+	x : r32;
+	y : r32;
+	z : r32;
+	w : r32;
+}
+
+Person :: struct {
+	pos : vec4;
+	age : s32;
+	name : string;
+}
+
+string :: struct {
+	length   : s64 ;
+	capacity : s64 ;
+	data     : ^u8;
 }

@@ -200,6 +200,38 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				}
 			}
 		} break;
+		case AST_DECL_CONSTANT: {	// TODO(psv): only type aliases
+			if(!node->decl_constant.type_info){
+				// infer from exp
+				Type_Instance* type = infer_from_expression(node->decl_constant.value, &error, rep_undeclared);
+				if(error & DECL_ERROR_FATAL) return error;
+				if(!type){
+					infer_queue_push(node);
+					error |= DECL_QUEUED_TYPE;
+					return error;
+				}
+				type->flags |= TYPE_FLAG_RESOLVED;
+				infer_queue_remove(node);
+				node->decl_variable.variable_type = internalize_type(&type, true);
+				return error;
+			}
+			if(node->decl_constant.type_info->flags & TYPE_FLAG_RESOLVED) {
+				return error;
+			} else {
+				Type_Instance* type = resolve_type(scope, node->decl_constant.type_info, rep_undeclared);
+				if (!type) {
+					error |= DECL_ERROR_FATAL;
+					return error;
+				}
+				if (type->flags & TYPE_FLAG_RESOLVED) {
+					node->decl_constant.type_info = type;
+					infer_queue_remove(node);
+				} else {
+					infer_queue_push(node);
+					error |= DECL_QUEUED_TYPE;
+				}
+			}
+		}break;
 		case AST_DECL_STRUCT:{
 			if (node->decl_struct.type_info->flags & TYPE_FLAG_RESOLVED) {
 				return error;
@@ -275,7 +307,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 			}
 		} break;
 		case AST_DECL_ENUM:		// TODO(psv): types in namespaces
-		case AST_DECL_CONSTANT:	// TODO(psv): only type aliases
+			break;
 		default: // TODO(psv): internal error here
 			break;
 	}
@@ -493,6 +525,7 @@ Decl_Error decl_check_inner_command(Ast* node) {
 			}
 			//error |= decl_check_inner_expr(node->comm_var_assign.rvalue);
 			Type_Instance* rtype = infer_from_expression(node->comm_var_assign.rvalue, &error, TYPE_INFER_REPORT_UNDECLARED);
+			if(error & TYPE_ERROR_FATAL) return error;
 			if(rtype->flags & TYPE_FLAG_WEAK){
 				type_propagate(ltype, node->comm_var_assign.rvalue);
 			}
