@@ -1,0 +1,13 @@
+main :: () {
+    s : s8;
+    buffer : ^s8;
+    buffer = &s;
+    buffer = *cast(^^s8)s;
+    a : vec2;
+    b := *a.y;
+}
+
+vec2 :: struct {
+    x : r32;
+    y : ^r32;
+}

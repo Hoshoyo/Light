@@ -92,6 +92,8 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 			if (infered->kind == KIND_POINTER || infered->kind == KIND_ARRAY) {
 				assert(type_strong(infered));
 				expr->flags |= AST_FLAG_LVALUE;
+				expr->type_return = infered->pointer_to;
+				return infered->pointer_to;
 			} else {
 				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "operator dereference requires pointer or array type\n");
 			}
@@ -192,7 +194,13 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 
 Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags) {
 	Ast* decl = decl_from_name(expr->scope, expr->expr_proc_call.name);
-	if (!decl) return 0;
+	if (!decl) {
+		*error |= TYPE_ERROR_FATAL;
+		if(flags & TYPE_INFER_REPORT_UNDECLARED){
+			report_undeclared(expr->expr_proc_call.name);
+		}
+		return 0;
+	}
 
 	Type_Instance* proc_type = 0;
 
@@ -894,14 +902,19 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 		} break;
 		case AST_EXPRESSION_UNARY: {
 			switch(expr->expr_unary.op){
-				case OP_UNARY_ADDRESSOF:
+				case OP_UNARY_CAST:{
+					assert(type_strong(expr->expr_unary.operand->type_return));
+				}
 				case OP_UNARY_BITWISE_NOT:
-				case OP_UNARY_CAST:
-				case OP_UNARY_DEREFERENCE:
 				case OP_UNARY_LOGIC_NOT:
+				case OP_UNARY_DEREFERENCE:
 				case OP_UNARY_MINUS:
 				case OP_UNARY_PLUS:
-				break;
+				case OP_UNARY_ADDRESSOF:{
+					assert(expr->type_return->flags & TYPE_FLAG_STRONG);
+					return defer_check_against(expr, check_against, expr->type_return, error);
+				}break;
+				default: assert_msg(0, "internal error invalid unary expression"); break;
 			}
 		}break;
 		case AST_EXPRESSION_LITERAL: {

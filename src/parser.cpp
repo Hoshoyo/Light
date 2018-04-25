@@ -384,18 +384,6 @@ Ast* Parser::parse_expression_precedence9(Scope* scope) {
 		}
 	}
 	return expr;
-	//Ast* expr = parse_expression_precedence10(scope);
-	//Token_Type next = lexer->peek_token_type();
-	//if (next == '[')
-	//{
-	//	Token* op  = lexer->eat_token();
-	//	Ast* index = parse_expression(scope);
-//
-	//	Ast* e = ast_create_expr_binary(scope, expr, index, OP_BINARY_VECTOR_ACCESS, op);
-	//	require_and_eat(']');
-	//	return e;
-	//}
-	//return expr;
 }
 
 Ast* Parser::parse_expression_precedence8(Scope* scope) {
@@ -416,24 +404,24 @@ Ast* Parser::parse_expression_precedence8(Scope* scope) {
 
 Ast* Parser::parse_expression_precedence7(Scope* scope) {
 	Token_Type next = lexer->peek_token_type();
-	if (next == '~' || next == '!' || next == '&' || next == '*' || next == '-' || next == '+') {
-		Token* op = lexer->eat_token();
-		Ast* operand = parse_expression_precedence7(scope);
-		return ast_create_expr_unary(scope, operand, token_to_unary_op(op), op, 0, UNARY_EXPR_FLAG_PREFIXED);
-	}
-	return parse_expression_precedence8(scope);
-}
-
-Ast* Parser::parse_expression_precedence6(Scope* scope) {
-	Token_Type next = lexer->peek_token_type();
 	if (next == TOKEN_KEYWORD_CAST) {
 		// parse cast
 		Token* cast = lexer->eat_token();
 		require_and_eat('(');
 		Type_Instance* ttc = parse_type();
 		require_and_eat(')');
-		Ast* operand = parse_expression_precedence6(scope);
+		Ast* operand = parse_expression_precedence7(scope);
 		return ast_create_expr_unary(scope, operand, OP_UNARY_CAST, cast, ttc, UNARY_EXPR_FLAG_PREFIXED);
+	}
+	return parse_expression_precedence8(scope);
+}
+
+Ast* Parser::parse_expression_precedence6(Scope* scope) {
+	Token_Type next = lexer->peek_token_type();
+	if (next == '~' || next == '!' || next == '&' || next == '*' || next == '-' || next == '+') {
+		Token* op = lexer->eat_token();
+		Ast* operand = parse_expression_precedence6(scope);
+		return ast_create_expr_unary(scope, operand, token_to_unary_op(op), op, 0, UNARY_EXPR_FLAG_PREFIXED);
 	}
 	return parse_expression_precedence7(scope);
 }
@@ -452,16 +440,6 @@ Ast* Parser::parse_expression_precedence5(Scope* scope) {
 		}
 	}
 	return expr;
-
-	//Ast* expr = parse_expression_precedence6(scope);
-	//Token_Type next = lexer->peek_token_type();
-	//if (next == '*' || next == '/' || next == '%')
-	//{
-	//	Token* op = lexer->eat_token();
-	//	Ast* right = parse_expression_precedence5(scope);
-	//	return ast_create_expr_binary(scope, expr, right, token_to_binary_op(op), op);
-	//}
-	//return expr;
 }
 
 Ast* Parser::parse_expression_precedence4(Scope* scope) {
@@ -478,15 +456,6 @@ Ast* Parser::parse_expression_precedence4(Scope* scope) {
 		}
 	}
 	return expr;
-	//Ast* expr = parse_expression_precedence5(scope);
-	//Token_Type next = lexer->peek_token_type();
-	//if (next == '+' || next == '-')
-	//{
-	//	Token* op = lexer->eat_token();
-	//	Ast* right = parse_expression_precedence4(scope);
-	//	return ast_create_expr_binary(scope, expr, right, token_to_binary_op(op), op);
-	//}
-	//return expr;
 }
 
 Ast* Parser::parse_expression_precedence3(Scope* scope) {
@@ -503,16 +472,6 @@ Ast* Parser::parse_expression_precedence3(Scope* scope) {
 		}
 	}
 	return expr;
-
-	//Ast* expr = parse_expression_precedence4(scope);
-	//Token_Type next = lexer->peek_token_type();
-	//if (next == '^' || next == '|' || next == '&' || next == TOKEN_BITSHIFT_LEFT || next == TOKEN_BITSHIFT_RIGHT)
-	//{
-	//	Token* op = lexer->eat_token();
-	//	Ast* right = parse_expression_precedence3(scope);
-	//	return ast_create_expr_binary(scope, expr, right, token_to_binary_op(op), op);
-	//}
-	//return expr;
 }
 
 Ast* Parser::parse_expression_precedence2(Scope* scope) {
