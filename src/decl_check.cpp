@@ -457,7 +457,7 @@ Decl_Error decl_check_inner_command(Ast* node) {
 				node->comm_break.level->expr_literal.value_u64 = 1;
 			}
 			if (node->comm_break.level->node_type == AST_EXPRESSION_LITERAL) {
-				node->comm_break.level->type_return = infer_from_expression(node->comm_break.level, error, TYPE_INFER_REPORT_UNDECLARED);
+				node->comm_break.level->type_return = infer_from_expression(node->comm_break.level, &error, TYPE_INFER_REPORT_UNDECLARED);
 				if (error & DECL_ERROR_FATAL) return error;
 				if(node->comm_break.level->type_return->flags & TYPE_FLAG_WEAK){
 					type_propagate(0, node->comm_break.level);
@@ -536,7 +536,7 @@ Decl_Error decl_check_inner_command(Ast* node) {
 				if (node->comm_var_assign.rvalue->type_return && node->comm_var_assign.rvalue->type_return->flags & TYPE_FLAG_WEAK) {
 					//error |= type_update_weak(node->comm_var_assign.rvalue, node->comm_var_assign.lvalue->type_return->pointer_to);
 					type_propagate(node->comm_var_assign.lvalue->type_return, node->comm_var_assign.rvalue);
-					node->comm_var_assign.rvalue->type_return = type_check_expr(node->comm_var_assign.lvalue->type_return, node->comm_var_assign.rvalue, error);
+					node->comm_var_assign.rvalue->type_return = type_check_expr(node->comm_var_assign.lvalue->type_return, node->comm_var_assign.rvalue, &error);
 				}
 			}
 		}break;

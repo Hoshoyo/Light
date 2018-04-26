@@ -113,7 +113,7 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 			Type_Instance* cast_to = resolve_type(expr->scope, expr->expr_unary.type_to_cast, true);
 			if(!cast_to) {
 				*error |= TYPE_ERROR_FATAL;
-				return *error;
+				return 0;
 			}
 			if (type_primitive_numeric(infered) || infered->kind == KIND_POINTER) {
 				type_propagate(0, expr->expr_unary.operand);
@@ -227,6 +227,7 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 
 	for (size_t i = 0; i < nargs; ++i) {
 		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, false);
+		if (*error & TYPE_ERROR_FATAL) continue;
 		expr->expr_proc_call.args[i]->type_return = type;
 		
 		if(type_weak(type)){
@@ -244,6 +245,7 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 
 	Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
 	if (!decl) {
+		*error |= TYPE_ERROR_FATAL;
 		if(flags & TYPE_INFER_REPORT_UNDECLARED) {
 			*error |= report_undeclared(expr->expr_variable.name);
 		}

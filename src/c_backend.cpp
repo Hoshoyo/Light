@@ -11,7 +11,7 @@ static void report_fatal_error(char* msg, ...) {
 }
 
 int C_Code_Generator::sprint(char* msg, ...) {
-#define DEBUG 1
+#define DEBUG 0
 	va_list args;
 	va_start(args, msg);
 #if DEBUG
@@ -125,7 +125,7 @@ void C_Code_Generator::emit_decl(Ast* decl) {
             }
         }break;
         case AST_DECL_CONSTANT:{
-            sprint("const ");
+            sprint("static const ");
             emit_type(decl->decl_constant.type_info);
             sprint("%.*s", TOKEN_STR(decl->decl_constant.name));
         }break;
@@ -144,6 +144,39 @@ void C_Code_Generator::emit_decl(Ast* decl) {
             assert_msg(0, "enum C codegen not yet implemented");
         }break;
     }
+}
+
+void C_Code_Generator::emit_command(Ast* comm) {
+	switch (comm->node_type) {
+		case AST_COMMAND_BLOCK:{
+			sprint("{\n");
+			for (s32 i = 0; i < comm->comm_block.command_count; ++i) {
+				emit_command(comm->comm_block.commands[i]);
+			}
+			sprint("}\n");
+		}break;
+		case AST_COMMAND_BREAK: {
+			sprint("break;\n");
+		}break;
+		case AST_COMMAND_CONTINUE: {
+
+		}break;
+		case AST_COMMAND_FOR:
+		case AST_COMMAND_IF:
+		case AST_COMMAND_RETURN:
+		case AST_COMMAND_VARIABLE_ASSIGNMENT:
+			break;
+	}
+}
+
+void C_Code_Generator::emit_proc(Ast* decl) {
+	if (decl->decl_procedure.flags & DECL_PROC_FLAG_FOREIGN) return;
+
+	emit_decl(decl);
+	
+	// body
+	emit_command(decl->decl_procedure.body);
+	sprint("\n");
 }
 
 int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_table) {
@@ -168,6 +201,41 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
         sprint(";\n");
     }
 
+	for (size_t i = 0; i < ndecls; ++i) {
+		Ast* decl = toplevel[i];
+		if (decl->node_type == AST_DECL_PROCEDURE) {
+			emit_proc(decl);
+		}
+	}
+
+	// Global variable initialization
+	sprint("\nvoid __entry() {\n");
+	for (size_t i = 0; i < ndecls; ++i) {
+		Ast* decl = toplevel[i];
+		if (decl->node_type == AST_DECL_VARIABLE) {
+			sprint("\t%.*s = ", TOKEN_STR(decl->decl_variable.name));
+			if (decl->decl_variable.assignment) {
+				// emit expression
+				assert(0);
+			} else {
+				switch (decl->decl_variable.variable_type->kind) {
+					case KIND_PRIMITIVE:
+					case KIND_POINTER:
+					case KIND_ARRAY:
+					case KIND_FUNCTION:
+						sprint("0");
+						break;
+					case KIND_STRUCT:
+						sprint("{0}");
+						break;
+				}
+			}
+			sprint(";\n");
+		}
+	}
+	sprint("\n\tmain();\n");
+	sprint("}");
+
     return 0;
 }
 
@@ -187,12 +255,21 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 
     size_t fname_len = filename_length_strip_extension(filename);
 	string out_obj = string_new(filename, fname_len);
-	string_append(&out_obj, ".ll");
+	string_append(&out_obj, ".c");
 	
-	HANDLE out = ho_createfile(out_obj.data, FILE_WRITE, CREATE_ALWAYS);
+	if (code_generator.ptr == 0) return;
+	HANDLE out = ho_createfile((const char*)out_obj.data, FILE_WRITE, CREATE_ALWAYS);
 	if(out == INVALID_HANDLE_VALUE){
 		report_fatal_error("Could not create file %s", out_obj.data);
 	}
 	ho_writefile(out, code_generator.ptr, (u8*)code_generator.buffer);
 	ho_closefile(out);
+
+	// Execute commands to compile .c
+	char cmdbuffer[1024];
+	sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
+	system(cmdbuffer);
+	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib",
+		fname_len, out_obj.data, fname_len, out_obj.data);
+	system(cmdbuffer);
 }
