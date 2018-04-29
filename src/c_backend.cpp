@@ -11,7 +11,6 @@ static void report_fatal_error(char* msg, ...) {
 }
 
 int C_Code_Generator::sprint(char* msg, ...) {
-#define DEBUG 0
 	va_list args;
 	va_start(args, msg);
 #if DEBUG
@@ -61,8 +60,13 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
             sprint("*");
         }break;
         case KIND_ARRAY:{
-            emit_type(type->array_desc.array_of);
-            sprint("*");
+            if(name){
+                Type_Instance* auxtype = type;
+                sprint("char %.*s[%lld]", TOKEN_STR(name), type->type_size_bits /8);
+            } else {
+                emit_type(type->array_desc.array_of);
+                sprint("*");
+            }
         }break;
         case KIND_FUNCTION:{
             emit_type(type->function_desc.return_type);
@@ -120,12 +124,12 @@ void C_Code_Generator::emit_decl(Ast* decl) {
             if(decl->decl_variable.variable_type->kind == KIND_FUNCTION){
                 emit_type(decl->decl_variable.variable_type, decl->decl_variable.name);
             } else {
-                if(decl->decl_variable.type->kind == KIND_ARRAY){
-                    emit_type(decl->decl_variable.variable_type->array_desc.array_of);
+                if(decl->decl_variable.variable_type->kind == KIND_ARRAY){
+                    emit_type(decl->decl_variable.variable_type, decl->decl_variable.name);
                 } else {
                     emit_type(decl->decl_variable.variable_type);
+                    sprint(" %.*s", TOKEN_STR(decl->decl_variable.name));
                 }
-                sprint(" %.*s", TOKEN_STR(decl->decl_variable.name));
             }
         }break;
         case AST_DECL_CONSTANT:{
@@ -244,6 +248,10 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
         }break;
         case OP_BINARY_VECTOR_ACCESS:{
             Type_Instance* indexed_type = expr->expr_binary.left->type_return;
+            sprint("*(");
+            emit_type(indexed_type);
+            sprint(")");
+
             sprint("((");
             assert(indexed_type->kind == KIND_POINTER || indexed_type->kind == KIND_ARRAY);
             sprint("(char*)");

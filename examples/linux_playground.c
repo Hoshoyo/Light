@@ -12,11 +12,12 @@ typedef double r64;
 
 
 s64 print_s64(s64 value);
+void fill_array();
 s64 main();
-s64 main(){
-s32* a;
+void fill_array(){
+}
 
-print_s64(((s64)(((char*)a)+ 4 * (0))));
+s64 main(){
 return 0;
 }
 

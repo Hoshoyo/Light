@@ -330,9 +330,7 @@ Ast* Parser::parse_expr_proc_call(Scope* scope) {
 	s32    args_count = 0;
 	
 	require_and_eat('(');
-	if (lexer->peek_token_type() == ')') {
-		lexer->eat_token();
-	} else {
+	if (lexer->peek_token_type() != ')') {
 		arguments = array_create(Ast*, 4);
 		for (;;) {
 			if (args_count != 0)
