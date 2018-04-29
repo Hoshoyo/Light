@@ -125,7 +125,6 @@ void C_Code_Generator::emit_decl(Ast* decl) {
             }
         }break;
         case AST_DECL_CONSTANT:{
-            sprint("static const ");
             emit_type(decl->decl_constant.type_info);
             sprint("%.*s", TOKEN_STR(decl->decl_constant.name));
         }break;
@@ -159,14 +158,118 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			sprint("break;\n");
 		}break;
 		case AST_COMMAND_CONTINUE: {
-
+            sprint("continue;\n");
 		}break;
-		case AST_COMMAND_FOR:
-		case AST_COMMAND_IF:
-		case AST_COMMAND_RETURN:
-		case AST_COMMAND_VARIABLE_ASSIGNMENT:
-			break;
+		case AST_COMMAND_FOR:{
+            sprint("while(");
+            emit_expression(comm->comm_for.condition);
+            sprint(")");
+            emit_command(comm->comm_for.body);
+        }break;
+		case AST_COMMAND_IF:{
+            sprint("if(");
+            emit_expression(comm->comm_if.condition);
+            sprint(")");
+            emit_command(comm->comm_if.body_true);
+            if(comm->comm_if.body_false){
+                sprint(" else ");
+                emit_command(comm->comm_if.body_false);
+            }
+        }break;
+		case AST_COMMAND_RETURN:{
+            sprint("return ");
+            if(comm->comm_return.expression){
+                emit_expression(comm->comm_return.expression);
+            }
+            sprint(";");
+        }break;
+		case AST_COMMAND_VARIABLE_ASSIGNMENT:{
+            if(comm->comm_var_assign.lvalue){
+                emit_expression(comm->comm_var_assign.lvalue);
+                sprint(" = ");
+            }
+            emit_expression(comm->comm_var_assign.rvalue);
+        } break;
 	}
+}
+
+void C_Code_Generator::emit_expression(Ast* expr){
+    assert(expr->flags & AST_FLAG_IS_EXPRESSION);
+
+    switch(expr->node_type){
+        case AST_EXPRESSION_BINARY:{
+            sprint("(");
+            emit_expression(expr->expr_binary.left);
+            sprint(binop_op_to_string(expr->expr_binary.op));
+            emit_expression(expr->expr_binary.right);
+            sprint(")");
+        }break;
+        case AST_EXPRESSION_LITERAL:{
+            switch(expr->expr_literal.type){
+                case LITERAL_BIN_INT:
+                case LITERAL_HEX_INT:
+                case LITERAL_UINT:{
+                    sprint("0x%llx", expr->expr_literal.value_u64);
+                }break;
+                case LITERAL_SINT: {
+                    sprint("lld", expr->expr_literal.value_u64);
+                }break;
+                case LITERAL_FLOAT:{
+                    sprint("%f", expr->expr_literal.value_r64);
+                }break;
+                case LITERAL_BOOL:{
+                    if(expr->expr_literal.value_bool){
+                        sprint("true");
+                    } else {
+                        sprint("false");
+                    }
+                }break;
+                case LITERAL_ARRAY:
+                case LITERAL_STRUCT:
+                    assert_msg(0, "literal array and struct not yet implemented");
+                    break;
+            }
+        }break;
+        case AST_EXPRESSION_PROCEDURE_CALL:{
+            sprint("(%.*s(");
+            for(s32 i = 0; i < expr->expr_proc_call.args_count; ++i){
+                if(i != 0) sprint(",");
+                emit_expression(expr->expr_proc_call.args[i]);
+            }
+            sprint("))");
+        }break;
+        case AST_EXPRESSION_UNARY:{
+            sprint("(");
+            switch(expr->expr_unary.op){
+                case OP_UNARY_ADDRESSOF:{
+                    sprint("&");
+                }break;
+                case OP_UNARY_BITWISE_NOT:{
+                    sprint("~");
+                }break;
+                case OP_UNARY_CAST:{
+                    sprint("(");
+                    emit_type(expr->expr_unary.type_to_cast);
+                    sprint(")");
+                }break;
+                case OP_UNARY_DEREFERENCE:{
+                    sprint("*");
+                }break;
+                case OP_UNARY_LOGIC_NOT:{
+                    sprint("!");
+                }break;
+                case OP_UNARY_MINUS:{
+                    sprint("-");
+                }break;
+                case OP_UNARY_PLUS: break;
+            }
+            emit_expression(expr->expr_unary.operand);
+            sprint(")");
+        }break;
+        case AST_EXPRESSION_VARIABLE:{
+            sprint("%.*s", TOKEN_STR(expr->expr_variable.name));
+        }break;
+    }
 }
 
 void C_Code_Generator::emit_proc(Ast* decl) {

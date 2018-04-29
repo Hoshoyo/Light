@@ -15,6 +15,7 @@ struct C_Code_Generator {
     void emit_decl(Ast* decl);
 	void emit_proc(Ast* decl);
 	void emit_command(Ast* comm);
+	void emit_expression(Ast* expr);
     int  c_generate_top_level(Ast** toplevel, Type_Instance** type_table);
 };
 
