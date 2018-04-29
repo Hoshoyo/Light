@@ -1,18 +1,14 @@
 //malloc :: (size : s64) -> ^void #foreign("libc");
 //write  :: (fd : s32, buffer : ^void, size : s64) -> s64 #foreign("libc");
-//print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
+print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
 
-factorial :: (v : s32) -> s32 {
-    if v == 1 return 1;
-    return v * factorial(v - 1);
-}
-
-map :: (v : s32, compare : (s32) -> bool) -> bool {
-	return compare(v);
-}
+//factorial :: (v : s32) -> s32 {
+//    if v == 1 return 1;
+//    return v * factorial(v - 1);
+//}
 
 main :: () -> s64 {
-	 a : [256][3]s8;
-	 b := a[5];
+    a : [3]s32;
+    print_s64(cast(s64)a[0]);
     return 0;
 }

@@ -120,7 +120,11 @@ void C_Code_Generator::emit_decl(Ast* decl) {
             if(decl->decl_variable.variable_type->kind == KIND_FUNCTION){
                 emit_type(decl->decl_variable.variable_type, decl->decl_variable.name);
             } else {
-                emit_type(decl->decl_variable.variable_type);
+                if(decl->decl_variable.type->kind == KIND_ARRAY){
+                    emit_type(decl->decl_variable.variable_type->array_desc.array_of);
+                } else {
+                    emit_type(decl->decl_variable.variable_type);
+                }
                 sprint(" %.*s", TOKEN_STR(decl->decl_variable.name));
             }
         }break;
@@ -150,7 +154,24 @@ void C_Code_Generator::emit_command(Ast* comm) {
 		case AST_COMMAND_BLOCK:{
 			sprint("{\n");
 			for (s32 i = 0; i < comm->comm_block.command_count; ++i) {
-				emit_command(comm->comm_block.commands[i]);
+                Ast* cm = comm->comm_block.commands[i];
+                
+                if(cm->flags & AST_FLAG_IS_DECLARATION){
+                    if(cm->node_type == AST_DECL_VARIABLE){
+                        emit_decl(cm);
+                        sprint(";\n");
+                        if(cm->decl_variable.assignment){
+                            sprint("%.*s = ", TOKEN_STR(cm->decl_variable.name));
+                            emit_expression(cm->decl_variable.assignment);
+                            sprint(";");
+                        }
+                    } else {
+                        assert_msg(0, "scoped declaration of procedure, enum and union not yet implemented");
+                    }
+                } else {
+				    emit_command(cm);
+                }
+                sprint("\n");
 			}
 			sprint("}\n");
 		}break;
@@ -189,8 +210,54 @@ void C_Code_Generator::emit_command(Ast* comm) {
                 sprint(" = ");
             }
             emit_expression(comm->comm_var_assign.rvalue);
+            sprint(";");
         } break;
 	}
+}
+
+void C_Code_Generator::emit_expression_binary(Ast* expr){
+    switch(expr->expr_binary.op){
+        case OP_BINARY_PLUS:
+        case OP_BINARY_MINUS:
+        case OP_BINARY_AND:
+        case OP_BINARY_OR:
+        case OP_BINARY_SHL:
+        case OP_BINARY_SHR:
+        case OP_BINARY_XOR:
+        case OP_BINARY_DIV:
+        case OP_BINARY_MOD:
+        case OP_BINARY_MULT:
+        case OP_BINARY_EQUAL:
+        case OP_BINARY_GE:
+        case OP_BINARY_GT:
+        case OP_BINARY_LE:
+        case OP_BINARY_LT:
+        case OP_BINARY_LOGIC_AND:
+        case OP_BINARY_LOGIC_OR:
+        case OP_BINARY_NOT_EQUAL:
+        case OP_BINARY_DOT:{
+            sprint("(");
+            emit_expression(expr->expr_binary.left);
+            sprint(binop_op_to_string(expr->expr_binary.op));
+            emit_expression(expr->expr_binary.right);
+            sprint(")");
+        }break;
+        case OP_BINARY_VECTOR_ACCESS:{
+            Type_Instance* indexed_type = expr->expr_binary.left->type_return;
+            sprint("((");
+            assert(indexed_type->kind == KIND_POINTER || indexed_type->kind == KIND_ARRAY);
+            sprint("(char*)");
+            emit_expression(expr->expr_binary.left);
+            sprint(")");
+            if(indexed_type->kind == KIND_POINTER){
+                sprint("+ %lld * (", indexed_type->pointer_to->type_size_bits / 8);
+            } else {
+                sprint("+ %lld * (", indexed_type->array_desc.array_of->type_size_bits / 8);
+            }
+            emit_expression(expr->expr_binary.right);
+            sprint("))");
+        }break;
+    }
 }
 
 void C_Code_Generator::emit_expression(Ast* expr){
@@ -198,11 +265,7 @@ void C_Code_Generator::emit_expression(Ast* expr){
 
     switch(expr->node_type){
         case AST_EXPRESSION_BINARY:{
-            sprint("(");
-            emit_expression(expr->expr_binary.left);
-            sprint(binop_op_to_string(expr->expr_binary.op));
-            emit_expression(expr->expr_binary.right);
-            sprint(")");
+            emit_expression_binary(expr);
         }break;
         case AST_EXPRESSION_LITERAL:{
             switch(expr->expr_literal.type){
@@ -212,7 +275,7 @@ void C_Code_Generator::emit_expression(Ast* expr){
                     sprint("0x%llx", expr->expr_literal.value_u64);
                 }break;
                 case LITERAL_SINT: {
-                    sprint("lld", expr->expr_literal.value_u64);
+                    sprint("%lld", expr->expr_literal.value_u64);
                 }break;
                 case LITERAL_FLOAT:{
                     sprint("%f", expr->expr_literal.value_r64);
@@ -231,12 +294,12 @@ void C_Code_Generator::emit_expression(Ast* expr){
             }
         }break;
         case AST_EXPRESSION_PROCEDURE_CALL:{
-            sprint("(%.*s(");
+            sprint("%.*s(", TOKEN_STR(expr->expr_proc_call.name));
             for(s32 i = 0; i < expr->expr_proc_call.args_count; ++i){
                 if(i != 0) sprint(",");
                 emit_expression(expr->expr_proc_call.args[i]);
             }
-            sprint("))");
+            sprint(")");
         }break;
         case AST_EXPRESSION_UNARY:{
             sprint("(");
@@ -370,9 +433,17 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 
 	// Execute commands to compile .c
 	char cmdbuffer[1024];
+#if defined(_WIN32) || defined(_WIN64)
 	sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib",
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
+#elif defined(__linux__)
+    sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
+	system(cmdbuffer);
+	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",
+		fname_len, out_obj.data, fname_len, out_obj.data);
+	system(cmdbuffer);
+#endif
 }

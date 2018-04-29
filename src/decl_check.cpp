@@ -386,6 +386,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
 				if (infered->flags & TYPE_FLAG_WEAK) {
 					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
+					infered = node->decl_variable.assignment->type_return;
 				}
 				if(!node->decl_variable.variable_type){
 					node->decl_variable.variable_type = infered;

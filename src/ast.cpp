@@ -355,8 +355,8 @@ char* binop_op_to_string(Operator_Binary binop) {
 		case OP_BINARY_MINUS:			str = "-"; break;
 		case OP_BINARY_DIV:				str = "/"; break;
 		case OP_BINARY_MULT:			str = "*"; break;
-		case OP_BINARY_MOD:				str = "%"; break;
-		case OP_BINARY_EQUAL:			str = "="; break;
+		case OP_BINARY_MOD:				str = "%%"; break;
+		case OP_BINARY_EQUAL:			str = "=="; break;
 		case OP_BINARY_NOT_EQUAL:		str = "!="; break;
 		case OP_BINARY_GE:				str = ">="; break;
 		case OP_BINARY_GT:				str = ">"; break;
