@@ -24,6 +24,10 @@ int C_Code_Generator::sprint(char* msg, ...) {
 	return num_written;
 }
 
+bool type_regsize(Type_Instance* type) {
+	return (type->kind == KIND_POINTER || type->kind == KIND_PRIMITIVE);
+}
+
 void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
     assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit a type that is not internalized");
     switch(type->kind){
@@ -91,6 +95,45 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
     }
 }
 
+void C_Code_Generator::emit_default_value(Type_Instance* type) {
+	switch (type->kind) {
+		case KIND_PRIMITIVE:{
+			switch (type->primitive) {
+				case TYPE_PRIMITIVE_BOOL:
+					sprint("false");
+					break;
+				case TYPE_PRIMITIVE_R32:
+					sprint("0.0f");
+					break;
+				case TYPE_PRIMITIVE_R64:
+					sprint("0.0");
+					break;
+				case TYPE_PRIMITIVE_S8:
+				case TYPE_PRIMITIVE_S16:
+				case TYPE_PRIMITIVE_S32:
+				case TYPE_PRIMITIVE_S64:
+				case TYPE_PRIMITIVE_U8:
+				case TYPE_PRIMITIVE_U16:
+				case TYPE_PRIMITIVE_U32:
+				case TYPE_PRIMITIVE_U64:
+					sprint("0");
+					break;
+				case TYPE_PRIMITIVE_VOID:
+					assert(0);
+					break;
+			}
+		}break;
+		case KIND_POINTER:
+		case KIND_FUNCTION:
+			sprint("0");
+			break;
+		case KIND_STRUCT:
+		case KIND_ARRAY:
+			sprint("{0}");
+			break;
+	}
+}
+
 void C_Code_Generator::emit_decl(Ast* decl) {
     assert(decl->flags & AST_FLAG_IS_DECLARATION);
     switch(decl->node_type) {
@@ -110,7 +153,16 @@ void C_Code_Generator::emit_decl(Ast* decl) {
             } else {
                 emit_type(decl->decl_procedure.type_return);
             }
-            sprint(" %.*s(", TOKEN_STR(decl->decl_procedure.name));
+
+			if (decl->decl_procedure.flags & DECL_PROC_FLAG_FOREIGN) {
+				sprint(" %.*s(", TOKEN_STR(decl->decl_procedure.name));
+			} else {
+				if (decl->decl_procedure.flags & DECL_PROC_FLAG_MAIN) {
+					sprint(" __%.*s(", TOKEN_STR(decl->decl_procedure.name));
+				} else {
+					sprint(" %.*s(", TOKEN_STR(decl->decl_procedure.name));
+				}
+			}
             for(s32 i = 0; i < decl->decl_procedure.arguments_count; ++i){
                 if(i != 0) sprint(", ");
 
@@ -130,6 +182,10 @@ void C_Code_Generator::emit_decl(Ast* decl) {
                     emit_type(decl->decl_variable.variable_type);
                     sprint(" %.*s", TOKEN_STR(decl->decl_variable.name));
                 }
+				//if (decl->decl_variable.variable_type != type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+				//	sprint(" = ");
+				//	emit_default_value(decl->decl_variable.variable_type);
+				//}
             }
         }break;
         case AST_DECL_CONSTANT:{
@@ -137,12 +193,13 @@ void C_Code_Generator::emit_decl(Ast* decl) {
             sprint("%.*s", TOKEN_STR(decl->decl_constant.name));
         }break;
         case AST_DECL_STRUCT:{
-            sprint("typedef struct {\n");
+            sprint("typedef struct {");
             size_t nfields = decl->decl_struct.fields_count;
-            for(size_t i = 0; nfields; ++i){
+            for(size_t i = 0; i < nfields; ++i){
                 emit_decl(decl->decl_struct.fields[i]);
+				sprint(";");
             }
-            sprint("} %.*s", decl->decl_struct.name);
+            sprint("} %.*s", TOKEN_STR(decl->decl_struct.name));
         }break;
         case AST_DECL_UNION: {
             assert_msg(0, "union C codegen not yet implemented");
@@ -163,27 +220,28 @@ void C_Code_Generator::emit_command(Ast* comm) {
                 if(cm->flags & AST_FLAG_IS_DECLARATION){
                     if(cm->node_type == AST_DECL_VARIABLE){
                         emit_decl(cm);
-                        sprint(";\n");
+                        sprint(" = ");
                         if(cm->decl_variable.assignment){
-                            sprint("%.*s = ", TOKEN_STR(cm->decl_variable.name));
                             emit_expression(cm->decl_variable.assignment);
-                            sprint(";");
-                        }
+						} else {
+							emit_default_value(cm->decl_variable.variable_type);
+						}
+						sprint(";");
                     } else {
                         assert_msg(0, "scoped declaration of procedure, enum and union not yet implemented");
                     }
                 } else {
 				    emit_command(cm);
                 }
-                sprint("\n");
+				sprint("\n");
 			}
-			sprint("}\n");
+			sprint("}");
 		}break;
 		case AST_COMMAND_BREAK: {
-			sprint("break;\n");
+			sprint("break;");
 		}break;
 		case AST_COMMAND_CONTINUE: {
-            sprint("continue;\n");
+            sprint("continue;");
 		}break;
 		case AST_COMMAND_FOR:{
             sprint("while(");
@@ -209,15 +267,25 @@ void C_Code_Generator::emit_command(Ast* comm) {
             sprint(";");
         }break;
 		case AST_COMMAND_VARIABLE_ASSIGNMENT:{
-            if(comm->comm_var_assign.lvalue){
-                emit_expression(comm->comm_var_assign.lvalue);
-                sprint(" = ");
-            }
-            emit_expression(comm->comm_var_assign.rvalue);
-            sprint(";");
+			Ast* rval = comm->comm_var_assign.rvalue;
+            
+			// register size assignment
+			if (type_regsize(rval->type_return) || rval->type_return->kind == KIND_STRUCT) {
+				if (comm->comm_var_assign.lvalue) {
+					emit_expression(comm->comm_var_assign.lvalue);
+					sprint(" = ");
+				}
+				emit_expression(comm->comm_var_assign.rvalue);
+				sprint(";");
+			} 
+			// bigger than regsize
+			else {
+				assert_msg(0, "assignment of type not recognized");
+			}
         } break;
 	}
 }
+
 
 void C_Code_Generator::emit_expression_binary(Ast* expr){
     switch(expr->expr_binary.op){
@@ -248,7 +316,12 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
         }break;
         case OP_BINARY_VECTOR_ACCESS:{
             Type_Instance* indexed_type = expr->expr_binary.left->type_return;
-            sprint("*(");
+			if (indexed_type->kind == KIND_ARRAY) {
+				if(indexed_type->array_desc.array_of->kind != KIND_ARRAY)
+					sprint("*");
+			}
+
+            sprint("(");
             emit_type(indexed_type);
             sprint(")");
 
@@ -302,6 +375,9 @@ void C_Code_Generator::emit_expression(Ast* expr){
             }
         }break;
         case AST_EXPRESSION_PROCEDURE_CALL:{
+			if (expr->expr_proc_call.decl->flags & DECL_PROC_FLAG_MAIN) {
+				sprint("__");
+			}
             sprint("%.*s(", TOKEN_STR(expr->expr_proc_call.name));
             for(s32 i = 0; i < expr->expr_proc_call.args_count; ++i){
                 if(i != 0) sprint(",");
@@ -350,7 +426,7 @@ void C_Code_Generator::emit_proc(Ast* decl) {
 	
 	// body
 	emit_command(decl->decl_procedure.body);
-	sprint("\n");
+	sprint("\n\n");
 }
 
 int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_table) {
@@ -365,8 +441,14 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
     sprint("typedef u32 bool;\n");
     sprint("typedef float r32;\n");
     sprint("typedef double r64;\n");
+	sprint("#define true 1\n");
+	sprint("#define false 0\n");
     sprint("\n\n");
 
+	sprint("// Forward declarations\n");
+#if defined(_WIN32) || defined(_WIN64)
+	sprint("u32 ExitProcess(u32 ret);\n");
+#endif
     size_t ndecls = array_get_length(toplevel);
     // emit all declarations forward
     for(size_t i = 0; i < ndecls; ++i){
@@ -374,6 +456,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
         emit_decl(decl);
         sprint(";\n");
     }
+	sprint("\n");
 
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* decl = toplevel[i];
@@ -407,7 +490,12 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 			sprint(";\n");
 		}
 	}
-	sprint("\n\tmain();\n");
+
+#if defined(_WIN32) || defined(_WIN64)
+	sprint("\tExitProcess(__main());\n");
+#elif defined(__linux__)
+	sprint("\treturn main();\n");
+#endif
 	sprint("}");
 
     return 0;

@@ -16,3 +16,7 @@ extern "C" long long print_s64(long long value) {
 extern "C" void print_double(double value) {
 	printf("%f\n", value);
 }
+
+extern "C" long long print_r32(float value) {
+	return printf("%f\n", value);
+}

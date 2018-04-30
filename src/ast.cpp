@@ -152,6 +152,7 @@ Ast* ast_create_expr_proc_call(Scope* scope, Token* name, Ast** arguments, s32 a
 	epc->flags = AST_FLAG_IS_EXPRESSION;
 	epc->infer_queue_index = -1;
 
+	epc->expr_proc_call.decl = 0;
 	epc->expr_proc_call.name = name;
 	epc->expr_proc_call.args = arguments;
 	epc->expr_proc_call.args_count = args_count;

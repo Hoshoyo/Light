@@ -41,6 +41,7 @@ enum Literal_Type {
 	LITERAL_BIN_INT,
 	LITERAL_FLOAT,
 	LITERAL_BOOL,
+	LITERAL_CHAR,
 
 	LITERAL_STRUCT,
 	LITERAL_ARRAY,
@@ -137,6 +138,7 @@ struct Site {
 // ----------------------------------------
 
 const u32 DECL_PROC_FLAG_FOREIGN = FLAG(0);
+const u32 DECL_PROC_FLAG_MAIN = FLAG(1);
 struct Ast_Decl_Procedure {
 	Token*         name;
 	Ast**          arguments;		// DECL_VARIABLE
@@ -295,6 +297,7 @@ struct Ast_Expr_Variable {
 };
 struct Ast_Expr_ProcCall {
 	Token* name;
+	Ast*   decl;
 	Ast**  args;		// EXPRESSIONS
 	s32    args_count;
 };

@@ -177,6 +177,7 @@ struct Keyword {
 
 enum Compiler_Tags {
 	COMPILER_TAG_FOREIGN = 0,
+	COMPILER_TAG_MAIN_PROC = 1,
 };
 extern string compiler_tags[];
 
@@ -188,3 +189,4 @@ Operator_Binary token_to_binary_op(Token* t);
 u64 literal_integer_to_u64(Token* t);
 r64 literal_float_to_r64(Token* t);
 bool literal_bool_to_bool(Token* t);
+u64 literal_char_to_u64(Token* t);

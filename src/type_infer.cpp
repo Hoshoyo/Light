@@ -67,6 +67,7 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 flags) {
 	assert(expr->node_type == AST_EXPRESSION_UNARY);
 	Type_Instance* infered = infer_from_expression(expr->expr_unary.operand, error, flags);
+	if (!infered) return 0;
 	
 	switch (expr->expr_unary.op) {
 		// @INFER ADDRESSOF
@@ -111,6 +112,7 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 		// @INFER CAST
 		case OP_UNARY_CAST: {
 			Type_Instance* cast_to = resolve_type(expr->scope, expr->expr_unary.type_to_cast, true);
+			expr->expr_unary.type_to_cast = cast_to;
 			if(!cast_to) {
 				*error |= TYPE_ERROR_FATAL;
 				return 0;
@@ -121,7 +123,7 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 				expr->type_return = cast_to;
 				return cast_to;
 			} else {
-				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot cast from type '\n");
+				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot cast from type '");
 				DEBUG_print_type(stderr, infered, true);
 				fprintf(stderr, "' to '");
 				DEBUG_print_type(stderr, cast_to, true);
@@ -168,6 +170,10 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 	result->flags = TYPE_FLAG_WEAK;
 
 	switch (expr->expr_literal.type) {
+		case LITERAL_UINT:{
+			result->kind = KIND_PRIMITIVE;
+			result->primitive = TYPE_PRIMITIVE_U32;
+		} break;
 		case LITERAL_BIN_INT:
 		case LITERAL_HEX_INT: {
 			result->kind = KIND_PRIMITIVE;
@@ -200,6 +206,7 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 		}
 		return 0;
 	}
+	expr->expr_proc_call.decl = decl;
 
 	Type_Instance* proc_type = 0;
 
@@ -226,7 +233,7 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 	}
 
 	for (size_t i = 0; i < nargs; ++i) {
-		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, false);
+		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, true);
 		if (*error & TYPE_ERROR_FATAL) continue;
 		expr->expr_proc_call.args[i]->type_return = type;
 		
@@ -360,6 +367,7 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 				case OP_UNARY_MINUS:
 				case OP_UNARY_PLUS: {
 					type_propagate(strong, expr->expr_unary.operand);
+					expr->type_return = expr->expr_unary.operand->type_return;
 				}break;
 			}
 		}break;
@@ -912,7 +920,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 				case OP_UNARY_MINUS:
 				case OP_UNARY_PLUS:
 				case OP_UNARY_ADDRESSOF:{
-					assert(expr->type_return->flags & TYPE_FLAG_STRONG);
+					assert(type_strong(expr->expr_unary.operand->type_return));
 					return defer_check_against(expr, check_against, expr->type_return, error);
 				}break;
 				default: assert_msg(0, "internal error invalid unary expression"); break;

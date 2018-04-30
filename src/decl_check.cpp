@@ -262,6 +262,9 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 			}
 		} break;
 		case AST_DECL_PROCEDURE: {
+			if (node->decl_procedure.name->value.data == compiler_tags[COMPILER_TAG_MAIN_PROC].data) {
+				node->decl_procedure.flags |= DECL_PROC_FLAG_MAIN;
+			}
 			if (!(node->decl_procedure.type_return->flags & TYPE_FLAG_RESOLVED)) {
 				node->decl_procedure.type_return = resolve_type(scope, node->decl_procedure.type_return, rep_undeclared);
 				if (!node->decl_procedure.type_return) {
@@ -501,13 +504,13 @@ Decl_Error decl_check_inner_command(Ast* node) {
 			}
 		}break;
 		case AST_COMMAND_FOR: {
-			assert(node->comm_for.body->comm_block.block_scope->flags & SCOPE_LOOP);
-			//error |= decl_check_inner_expr(node->comm_for.condition);
+			if (node->comm_for.body->comm_block.block_scope) {
+				assert(node->comm_for.body->comm_block.block_scope->flags & SCOPE_LOOP);
+			}
 			node->comm_for.condition->type_return = infer_from_expression(node->comm_for.condition, &error, TYPE_INFER_REPORT_UNDECLARED);
 			error |= decl_check_inner_command(node->comm_for.body);
 		}break;
 		case AST_COMMAND_IF: {
-			//error |= decl_check_inner_expr(node->comm_if.condition);
 			node->comm_if.condition->type_return = infer_from_expression(node->comm_if.condition, &error, TYPE_INFER_REPORT_UNDECLARED);
 			error |= decl_check_inner_command(node->comm_if.body_true);
 			if (node->comm_if.body_false)

@@ -73,7 +73,7 @@ u64 type_hash(Type_Instance* type) {
 			for (size_t i = 0; i < n_args; ++i) {
 				return_type_hash = fnv_1_hash_combine(return_type_hash, type_hash(type->function_desc.arguments_type[i]));
 			}
-			hash = return_type_hash;
+			hash = fnv_1_hash_from_start(return_type_hash, (const u8*)"proc", sizeof("proc") - 1);
 		} break;
 		case KIND_ARRAY:
 			hash = fnv_1_hash_combine(type_hash(type->array_desc.array_of), type->array_desc.dimension); break;

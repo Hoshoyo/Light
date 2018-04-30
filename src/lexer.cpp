@@ -40,6 +40,7 @@ Keyword keywords_info[] = {
 
 string compiler_tags[] = {
 	{sizeof("foreign") - 1, (u8*)"foreign"},
+	{sizeof("main") - 1, (u8*)"main"},
 };
 
 s32 Lexer::report_lexer_error(char* msg, ...)
@@ -572,28 +573,37 @@ static char* make_null_term_string(char* s)
 	return ptr;
 }
 
+inline u8 hexdigit_to_u8(u8 d) {
+	if (d >= 'A' && d <= 'F')
+		return d - 'A' + 10;
+	if (d >= 'a' && d <= 'f')
+		return d - 'a' + 10;
+	return d - '0';
+}
+inline u8 bindigit_to_u8(u8 d) {
+	if (d == '1') return 1;
+	return 0;
+}
+
 u64 literal_integer_to_u64(Token* t) {
 	assert(t->flags & TOKEN_FLAG_INTEGER_LITERAL);
 	switch (t->type) {
 	case TOKEN_LITERAL_BIN_INT: {
 		u64 res = 0;
-		for (s32 i = t->value.length - 1; i >= 2 /* 0b */; --i) {
-			res <<= 1;
-			res |= (t->value.data[i] & 1);
+		for (s32 i = t->value.length - 1, count = 0; i >= 2 /* 0b */; --i, ++count) {
+			u8 c = bindigit_to_u8(t->value.data[i]);
+			res |= c << count;
 		}
 		return res;
 	}
 	case TOKEN_LITERAL_HEX_INT: {
 		u64 res = 0;
-		for (s32 i = t->value.length - 1; i >= 2 /* 0x */; --i) {
-			res <<= 4;
-			u8 c1 = t->value.data[i] & 0x0f;
-			res |= (c1 >= 'A') ? (c1 >= 'a') ? c1 - 0x57 : c1 - 0x37 : c1 - 0x30;
-
-			res <<= 4;
-			u8 c2 = t->value.data[i] & 0xf0;
-			res |= (c2 >= 'A') ? (c2 >= 'a') ? c2 - 0x57 : c2 - 0x37 : c2- 0x30;
+		for (s32 i = t->value.length - 1, count = 0; i >= 0; --i, ++count) {
+			if (t->value.data[i] == 'x') break;
+			u8 c = hexdigit_to_u8(t->value.data[i]);
+			res += c << (count * 4);
 		}
+
 		return res;
 	}
 	case TOKEN_LITERAL_INT: {
@@ -614,6 +624,18 @@ bool literal_bool_to_bool(Token* t) {
 	assert(t->flags & TOKEN_FLAG_RESERVED_WORD);
 	assert(t->type == TOKEN_LITERAL_BOOL_TRUE || t->type == TOKEN_LITERAL_BOOL_FALSE);
 	return(t->type == TOKEN_LITERAL_BOOL_TRUE);
+}
+
+u64 literal_char_to_u64(Token* t) {
+	u64 res = 0;
+	if (t->value.length == 1) {
+		res = (u64)t->value.data[0];
+	} else if (t->value.length > 1) {
+		assert_msg(0, "character literal not yet supported");
+	} else {
+		assert_msg(0, "literal token has negative length");
+	}
+	return res;
 }
 
 char* Lexer::get_token_string(Token_Type t)
