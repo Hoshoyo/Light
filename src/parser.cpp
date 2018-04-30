@@ -369,9 +369,9 @@ Ast* Parser::parse_expression_precedence10(Scope* scope) {
 	return 0;
 }
 
-Ast* Parser::parse_expression_precedence9(Scope* scope) {
+Ast* Parser::parse_expression_precedence8(Scope* scope) {
 	Token* op = 0;
-	Ast* expr = parse_expression_precedence10(scope);
+	Ast* expr = parse_expression_precedence9(scope);
 	while(true) {
 		op = lexer->peek_token();
 		if(op->type == '['){
@@ -386,14 +386,14 @@ Ast* Parser::parse_expression_precedence9(Scope* scope) {
 	return expr;
 }
 
-Ast* Parser::parse_expression_precedence8(Scope* scope) {
+Ast* Parser::parse_expression_precedence9(Scope* scope) {
 	Token* op = 0;
-	Ast* expr = parse_expression_precedence9(scope);
+	Ast* expr = parse_expression_precedence10(scope);
 	while(true) {
 		op = lexer->peek_token();
 		if(op->type == '.'){
 			lexer->eat_token();
-			Ast* r = parse_expression_precedence9(scope);
+			Ast* r = parse_expression_precedence10(scope);
 			expr = ast_create_expr_binary(scope, expr, r, OP_BINARY_DOT, op);
 		} else {
 			break;

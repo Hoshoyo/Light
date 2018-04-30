@@ -44,15 +44,21 @@ extern "C" s64 HO_API ho_getfilesize(const char* filename);
 extern "C" void* HO_API ho_readentirefile(int file, size_t file_size, void* mem);
 extern "C" s64 HO_API ho_writefile(int file, s64 bytes_to_write, char* bytes);
 
-/*
 struct Timer
 {
-	double g_freq;
-	Timer();
+	Timer() {}
 	double GetTime();
-};*/
+};
 
 #if defined(HO_SYSTEM_IMPLEMENT)
+#include <time.h>
+double Timer::GetTime(){
+	clockid_t clockid;
+	struct timespec t_spec;
+	int start = clock_gettime(CLOCK_MONOTONIC_RAW, &t_spec);
+	u64 res = t_spec.tv_nsec + 1000000000 * t_spec.tv_sec;
+	return (double)res / 1000.0;
+}
 
 /*
 Timer::Timer()

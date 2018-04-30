@@ -117,9 +117,14 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 				*error |= TYPE_ERROR_FATAL;
 				return 0;
 			}
-			if (type_primitive_numeric(infered) || infered->kind == KIND_POINTER) {
+			if ((type_primitive_numeric(infered) || infered->kind == KIND_POINTER)) {
+				// @TODO: check more types here and also check cast_to, cannot be any type.
 				type_propagate(0, expr->expr_unary.operand);
 				assert(type_strong(cast_to));
+				expr->type_return = cast_to;
+				return cast_to;
+			} else if (infered->kind == KIND_ARRAY && cast_to->kind == KIND_POINTER) {
+				assert(type_strong(infered) && type_strong(cast_to));
 				expr->type_return = cast_to;
 				return cast_to;
 			} else {
@@ -262,7 +267,15 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 	Type_Instance* type = 0;
 
 	if (decl->node_type != AST_DECL_VARIABLE && decl->node_type != AST_DECL_CONSTANT) {
-		assert_msg(0, "function pointer not implemented"); // implement function ptr
+		//assert_msg(0, "function pointer not implemented"); // implement function ptr
+		assert(decl->node_type == AST_DECL_PROCEDURE);
+		type = decl->decl_procedure.type_procedure;
+
+		if(!type) {
+			*error |= TYPE_ERROR_FATAL;
+			return 0;
+		}
+		expr->type_return = type;
 	} else if(decl->node_type == AST_DECL_VARIABLE){
 		type = decl->decl_variable.variable_type;
 

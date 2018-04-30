@@ -466,7 +466,11 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	}
 
 	// Global variable initialization
+#if defined(_WIN32) || defined(_WIN64)    
 	sprint("\nvoid __entry() {\n");
+#elif defined(__linux__)
+    sprint("\nint __entry() {\n");
+#endif
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* decl = toplevel[i];
 		if (decl->node_type == AST_DECL_VARIABLE) {
@@ -494,7 +498,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 #if defined(_WIN32) || defined(_WIN64)
 	sprint("\tExitProcess(__main());\n");
 #elif defined(__linux__)
-	sprint("\treturn main();\n");
+	sprint("\treturn __main();\n");
 #endif
 	sprint("}");
 

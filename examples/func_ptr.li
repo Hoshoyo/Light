@@ -1,0 +1,33 @@
+print_string :: (length : s64, str : ^u8) -> s64 #foreign("print_string.obj");
+print_s64    :: (val : s64) -> s64 #foreign("print_string.obj");
+
+Person :: struct {
+    name : [32]u8;
+    age  : s32;
+}
+
+print_array :: (a : [32]u8) {
+    i := 0;
+    for i < 32 {
+        if a[i] == 0 {
+            break;
+        }
+        print_s64(cast(s64)a[i]);
+        i += 1;
+    }
+}
+
+main :: () -> s32 {
+    p : Person;
+    p.name[0] = 'P';
+    p.name[1] = 'e';
+    p.name[2] = 'd';
+    p.name[3] = 'r';
+    p.name[4] = 'o';
+    p.age = 26;
+
+    //print_string(5, cast(^u8)p.name);
+    print_array(p.name);
+
+    return 0;
+}
