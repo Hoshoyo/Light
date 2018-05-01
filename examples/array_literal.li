@@ -1,0 +1,12 @@
+print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
+print_s32 :: (value : s32) -> s64 #foreign("print_string.obj");
+print_r32 :: (value : r32) -> s64 #foreign("print_string.obj");
+print_r64 :: (value : r64) -> s64 #foreign("print_string.obj");
+println :: () -> s64 #foreign("print_string.obj");
+print_string :: (length : s64, str : ^u8) -> s64 #foreign("print_string.obj");
+
+main :: () -> s32 {
+	a : [4]s32 = array {1, 2, 3, 4};
+	
+	return 0;
+}

@@ -474,7 +474,7 @@ Decl_Error decl_check_inner_command(Ast* node) {
 						return error;
 					} else {
 						report_error_location(node);
-						error |= report_semantic_error(DECL_ERROR_FATAL, "break command is not inside an iterative loop nested '%llu' deep\n", loop_level);
+						error |= report_semantic_error(DECL_ERROR_FATAL, "break command is not inside an iterative loop nested '%lld' deep\n", loop_level);
 					}
 				} else {
 					report_error_location(node);

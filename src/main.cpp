@@ -42,16 +42,18 @@ int main(int argc, char** argv) {
 	if (decl_err & (~DECL_ERROR_WARNING)) {
 		return -1;
 	}
+	Type_Error type_error = type_check(&global_scope, ast_top_level);
+	if (type_error) {
+		return -1;
+	}
+
 	double end = timer.GetTime();
 	printf("Compiler elapsed: %fms\n", (end - start));
 
 	DEBUG_print_ast(stdout, ast_top_level, true);
-
-	//DEBUG_print_ast(stdout, ast_top_level, true);
 	//DEBUG_print_scope_decls(&global_scope);
 	//DEBUG_print_type_table();
 
-	//llvm_generate_ir(ast_top_level, g_type_table, argv[1]);
 	double bend_start = timer.GetTime();
 	c_generate(ast_top_level, g_type_table, argv[1]);
 	double bend_end = timer.GetTime();

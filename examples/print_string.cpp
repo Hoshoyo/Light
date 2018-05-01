@@ -1,22 +1,25 @@
 #include <stdio.h>
 
-extern "C" void print_string(long long length, char* data){
-	printf("{ %lld, %s }\n", length, data);
+extern "C" long long println() {
+	return printf("\n");
 }
 
-typedef struct {
-	long long length;
-	char* data;
-} string;
+extern "C" long long print_string(long long length, char* data){
+	return printf("{ %lld, %s }\n", length, data);
+}
 
 extern "C" long long print_s64(long long value) {
-	return printf("%lld\n", value);
+	return printf("%lld", value);
 }
 
-extern "C" void print_double(double value) {
-	printf("%f\n", value);
+extern "C" long long print_s32(int value) {
+	return printf("%d", value);
+}
+
+extern "C" long long print_r64(double value) {
+	return printf("%f", value);
 }
 
 extern "C" long long print_r32(float value) {
-	return printf("%f\n", value);
+	return printf("%f", value);
 }
