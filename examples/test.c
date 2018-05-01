@@ -17,13 +17,14 @@ typedef double r64;
 u32 ExitProcess(u32 ret);
 s64 print_s64(s64 value);
 s64 print_r32(r32 value);
-s64 print_string(u8* str);
+s64 print_string(s64 length, u8* str);
 s32 factorial(s32 v);
 void fill_array();
 void multi_array();
 typedef struct {r32 x;r32 y;} vec2;
 void fill_struct();
 void pointer_arithmetic();
+void matrix();
 s64 __main();
 
 s32 factorial(s32 v){
@@ -38,11 +39,15 @@ while((i<10)){
 *(s32*)(((char*)a)+ 4 * (i)) = factorial(((s32)i));
 i = (i+1);
 }
+loop_0:;
+
 i = 0;
 while((i<10)){
 print_s64(((s64)*(s32*)(((char*)a)+ 4 * (i))));
 i = (i+1);
 }
+loop_1:;
+
 }
 
 void multi_array(){
@@ -57,8 +62,12 @@ while((x<4)){
 print_r32(*(r32*)(((char*)(r32**)(((char*)matrix)+ 16 * (y)))+ 4 * (x)));
 x = (x+1);
 }
+loop_3:;
+
 y = (y+1);
 }
+loop_2:;
+
 }
 }
 
@@ -75,10 +84,15 @@ char arr[10] = {0};
 u8* ptr = ((u8*)(&arr));
 (*ptr) = 0x48;
 (*(ptr+1)) = 0x49;
+print_string(2,ptr);
+}
+
+void matrix(){
+char m[64] = {0};
+char x[16] = (r32**)(((char*)m)+ 16 * (0));
 }
 
 s64 __main(){
-pointer_arithmetic();
 return 0;
 }
 

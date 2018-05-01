@@ -235,6 +235,7 @@ struct Ast_Comm_If {
 struct Ast_Comm_For {
 	Ast* condition;		// EXPRESSION (boolean)
 	Ast* body;			// COMMAND
+	s64  id;
 };
 struct Ast_Comm_Break {
 	Ast*   level;			// INT LITERAL [0, MAX_INT]

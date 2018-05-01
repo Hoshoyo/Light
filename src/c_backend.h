@@ -9,7 +9,11 @@ struct C_Code_Generator {
 	char buffer[1 << 16];
 	u32  ptr;
 
+	s64 loop_id;
+	s64 alloc_loop_id();
+
 	int sprint(char* msg, ...);
+
 
     void emit_type(Type_Instance* type, Token* name = 0);
     void emit_decl(Ast* decl);

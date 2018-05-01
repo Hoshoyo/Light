@@ -15,6 +15,11 @@ print_c_str(ptr : ^u8) {
 	}
 }*/
 
+matrix :: () {
+	m : [4][4]r32;
+	x := m[0];
+}
+
 pointer_arithmetic :: () {
 	arr : [16]u8;
 	ptr := cast(^u8)&arr;
@@ -36,9 +41,9 @@ pointer_arithmetic :: () {
 	
 	{
 		i := 0;
-		err := WriteConsoleA(stdhandle, cast(^void)ptr, 11, &written, cast(^void)0);
-		
+
 		for i < 11 {
+			err := WriteConsoleA(stdhandle, cast(^void)ptr, 11, &written, cast(^void)0);
 			i += 1;
 		}
 	}

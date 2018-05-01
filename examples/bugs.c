@@ -39,7 +39,13 @@ u8* ptr = ((u8*)(&arr));
 (*(ptr+10)) = 0x64;
 u32 written = 0;
 void* stdhandle = GetStdHandle(((u32)(-11)));
+{
+s64 i = 0;
+while((i<11)){
 bool err = WriteConsoleA(stdhandle,((void*)ptr),11,(&written),((void*)0));
+i = (i+1);
+}
+}
 }
 
 s64 __main(){

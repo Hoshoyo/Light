@@ -28,6 +28,11 @@ bool type_regsize(Type_Instance* type) {
 	return (type->kind == KIND_POINTER || type->kind == KIND_PRIMITIVE);
 }
 
+s64 C_Code_Generator::alloc_loop_id() {
+	loop_id++;
+	return loop_id - 1;
+}
+
 void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
     assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit a type that is not internalized");
     switch(type->kind){
@@ -238,16 +243,21 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			sprint("}");
 		}break;
 		case AST_COMMAND_BREAK: {
-			sprint("break;");
+			//sprint("break;");
+			s64 level = comm->comm_break.level->expr_literal.value_u64;
+			sprint("goto loop_%lld;", loop_id - level);
 		}break;
 		case AST_COMMAND_CONTINUE: {
             sprint("continue;");
 		}break;
 		case AST_COMMAND_FOR:{
+			s64 id = alloc_loop_id();
+			comm->comm_for.id = id;
             sprint("while(");
             emit_expression(comm->comm_for.condition);
             sprint(")");
             emit_command(comm->comm_for.body);
+			sprint("\nloop_%lld:;\n", id);
         }break;
 		case AST_COMMAND_IF:{
             sprint("if(");
@@ -319,6 +329,11 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
 			if (indexed_type->kind == KIND_ARRAY) {
 				if(indexed_type->array_desc.array_of->kind != KIND_ARRAY)
 					sprint("*");
+			}
+			if (indexed_type->kind == KIND_POINTER) {
+				if (indexed_type->pointer_to->kind != KIND_POINTER) {
+					sprint("*");
+				}
 			}
 
             sprint("(");

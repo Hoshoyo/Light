@@ -25,6 +25,7 @@ int main(int argc, char** argv) {
 	Timer timer;
 
 	double start = timer.GetTime();
+
 	initialize();
 
 	Lexer lexer;
@@ -42,7 +43,7 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 	double end = timer.GetTime();
-	printf("Compiler elapsed: %fms\n", (end - start) / 1000.0);
+	printf("Compiler elapsed: %fms\n", (end - start));
 
 	DEBUG_print_ast(stdout, ast_top_level, true);
 
@@ -54,7 +55,7 @@ int main(int argc, char** argv) {
 	double bend_start = timer.GetTime();
 	c_generate(ast_top_level, g_type_table, argv[1]);
 	double bend_end = timer.GetTime();
-	printf("Backend elapsed: %f\n", (bend_end - bend_start) / 1000.0);
-	printf("Total elapsed: %f\n", ((end - start) + (bend_end - bend_start)) / 1000.0);
+	printf("Backend elapsed: %f\n", (bend_end - bend_start));
+	printf("Total elapsed: %f\n", ((end - start) + (bend_end - bend_start)));
 	return 0;
 }

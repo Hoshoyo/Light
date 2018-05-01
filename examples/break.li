@@ -1,0 +1,19 @@
+print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
+
+main :: () -> s32 {
+	i := 0;
+	j := 0;
+	
+	for i < 10 {
+		j = 0;
+		for j < 10 {
+			print_s64(cast(s64)j);
+			if(i == 4 && j == 5)
+				break 2;
+			j += 1;
+		}
+		i += 1;
+	}
+	
+	return 0;
+}

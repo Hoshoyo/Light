@@ -1,6 +1,6 @@
 print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
 print_r32 :: (value : r32) -> s64 #foreign("print_string.obj");
-print_string :: (str : ^u8) -> s64 #foreign("print_string.obj");
+print_string :: (length : s64, str : ^u8) -> s64 #foreign("print_string.obj");
 
 factorial :: (v : s32) -> s32 {
     if v == 0 || v == 1 return 1;
@@ -59,12 +59,14 @@ pointer_arithmetic :: () {
 	ptr := cast(^u8)&arr;
 	*ptr = 0x48;
 	*(ptr + 1) = 0x49;
+	
+	print_string(2, ptr);
 }
 
 main :: () -> s64 {
 	//fill_array();
 	//fill_struct();
 	//multi_array();
-	pointer_arithmetic();
+	//pointer_arithmetic();
     return 0;
 }

@@ -79,7 +79,7 @@ double Timer::GetTime()
 {
 	LARGE_INTEGER li;
 	QueryPerformanceCounter(&li);
-	return double(li.QuadPart) / this->g_freq;
+	return (double(li.QuadPart) / this->g_freq) * 1000.0;
 }
 
 // return the number of directories found

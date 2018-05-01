@@ -1,0 +1,63 @@
+print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
+
+quicksort :: (values : ^s32, start : s64, end : s64) {
+	i := start;
+	j := end - 1;
+	pivo := values[(start + end) / 2];
+	
+	aux : s32;
+	
+	for i <= j {
+		for values[i] < pivo && i < end {
+			i += 1;
+		}
+		for values[j] > pivo && j > start {
+			j -= 1;
+		}
+		if i <= j {
+			aux = values[i];
+			values[i] = values[j];
+			values[j] = aux;
+			i += 1;
+			j -= 1;
+		}
+	}
+	if j > start
+		quicksort(values, start, j + 1);
+	if i < end
+		quicksort(values, i, end);
+
+}
+
+print_array :: (values : ^s32, length : s64) {
+	{
+		i := 0;
+		for i < length {
+			print_s64(cast(s64)values[i]);
+			i += 1;
+		}
+	}
+}
+
+main :: () -> s32 {
+
+	arr : [10]s32;
+	arr[0] = 5;
+	arr[1] = 8;
+	arr[2] = 1;
+	arr[3] = 2;
+	arr[4] = 7;
+	arr[5] = 3;
+	arr[6] = 6;
+	arr[7] = 9;
+	arr[8] = 4;
+	arr[9] = 10;
+	
+	print_array(cast(^s32)arr, 10);
+	
+	quicksort(cast(^s32)arr, 0, 10);
+	
+	print_array(cast(^s32)arr, 10);
+	
+	return 0;
+}
