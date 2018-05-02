@@ -155,7 +155,8 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 						return type;
 					}
 				}
-				type->flags |= TYPE_FLAG_RESOLVED;
+				type->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+				type->type_size_bits = type_pointer_size_bits();
 				type = internalize_type(&type, true);
 				return type;
 			}

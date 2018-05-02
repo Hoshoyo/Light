@@ -69,7 +69,8 @@ u64 type_hash(Type_Instance* type) {
 			hash = fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length); break;
 		case KIND_FUNCTION: {
 			u64 return_type_hash = type_hash(type->function_desc.return_type);
-			size_t n_args = array_get_length(type->function_desc.arguments_type);
+			size_t n_args = 0;
+			if(type->function_desc.arguments_type) n_args = array_get_length(type->function_desc.arguments_type);
 			for (size_t i = 0; i < n_args; ++i) {
 				return_type_hash = fnv_1_hash_combine(return_type_hash, type_hash(type->function_desc.arguments_type[i]));
 			}

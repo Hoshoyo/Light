@@ -34,6 +34,17 @@ s64 C_Code_Generator::alloc_loop_id() {
 	return loop_id - 1;
 }
 
+void C_Code_Generator::emit_typedef(Type_Instance* type, Token* name, char* prefix) {
+    switch(type->kind){
+        case KIND_PRIMITIVE:
+        case KIND_POINTER:
+        case KIND_FUNCTION:
+        case KIND_ARRAY:
+        case KIND_STRUCT:
+            break;
+    }
+}
+
 void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
     assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit a type that is not internalized");
     switch(type->kind){
@@ -149,13 +160,13 @@ void C_Code_Generator::emit_decl(Ast* decl) {
 
                 sprint("typedef ");
                 emit_type(typeproc->function_desc.return_type);
-                sprint("__ret_%.*s(", decl->decl_procedure.name);
+                sprint("__ret_%.*s(", TOKEN_STR(decl->decl_procedure.name));
                 for(s32 i = 0; i < typeproc->function_desc.num_arguments; ++i){
                     if(i != 0) sprint(", ");
                     emit_type(typeproc->function_desc.arguments_type[i]);
                 }
                 sprint(";\n");
-                sprint("__ret_%.*s", decl->decl_procedure.name);
+                sprint("__ret_%.*s", TOKEN_STR(decl->decl_procedure.name));
             } else {
                 emit_type(decl->decl_procedure.type_return);
             }
