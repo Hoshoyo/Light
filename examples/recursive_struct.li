@@ -1,0 +1,8 @@
+List :: struct {
+    next : ^List;
+}
+
+main :: () -> s32{
+    //l : List;
+    return 0;
+}
