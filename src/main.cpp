@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
 
 	DEBUG_print_ast(stdout, ast_top_level, true);
 	//DEBUG_print_scope_decls(&global_scope);
-	//DEBUG_print_type_table();
+	DEBUG_print_type_table();
 
 	double bend_start = timer.GetTime();
 	c_generate(ast_top_level, g_type_table, argv[1]);

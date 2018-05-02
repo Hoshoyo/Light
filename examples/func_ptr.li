@@ -1,16 +1,40 @@
+print_s32 :: (val : s32) -> s64 #foreign("print_string.obj");
 print_string :: (length : s64, str : ^u8) -> s64 #foreign("print_string.obj");
-print_s64    :: (val : s64) -> s64 #foreign("print_string.obj");
 
-foo :: () -> s32{
-    return 42;
+foo :: (v : r32) -> s32{
+    return cast(s32)v;
 }
 
-make_proc :: () -> ()->s32 {
+make_proc :: () -> (r32)->s32 {
     return foo;
+}
+
+map :: (arr : ^s32, length : s64, f : (s32)->s64) -> void {
+    delimiter : [2]u8;
+    delimiter[0] = ',';
+    delimiter[1] = ' ';
+
+    i := 0;
+    for i < length {
+        if i != 0 {
+            print_string(2, cast(^u8)delimiter);
+        }
+        f(arr[i]);
+        i += 1;
+    }
 }
 
 main :: () -> s32 {
     a := make_proc();
+    v : [5]s32;
 
-    return a();
+    v[0] = 0;
+    v[1] = 1;
+    v[2] = 2;
+    v[3] = 3;
+    v[4] = 4;
+
+    map(cast(^s32)v, 5, print_s32);
+
+    return a(32.0);
 }

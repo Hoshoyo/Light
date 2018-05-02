@@ -858,8 +858,6 @@ Type_Instance* Parser::parse_type_function() {
 				break;
 		}
 		require_and_eat(')');
-		require_and_eat(TOKEN_ARROW);
-		t->function_desc.return_type = parse_type();
 	}
 	require_and_eat(TOKEN_ARROW);
 	t->function_desc.return_type = parse_type();

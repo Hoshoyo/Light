@@ -323,14 +323,14 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			Ast* rval = comm->comm_var_assign.rvalue;
             
 			// register size assignment
-			if (type_regsize(rval->type_return) || rval->type_return->kind == KIND_STRUCT) {
+			if (type_regsize(rval->type_return) || rval->type_return->kind == KIND_STRUCT || rval->type_return->kind == KIND_FUNCTION) {
 				if (comm->comm_var_assign.lvalue) {
 					emit_expression(comm->comm_var_assign.lvalue);
 					sprint(" = ");
 				}
 				emit_expression(comm->comm_var_assign.rvalue);
 				sprint(";");
-			} 
+			}
 			// bigger than regsize
 			else {
 				assert_msg(0, "assignment of type not recognized");
@@ -552,7 +552,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 			sprint("\t%.*s = ", TOKEN_STR(decl->decl_variable.name));
 			if (decl->decl_variable.assignment) {
 				// emit expression
-				assert(0);
+				emit_expression(decl->decl_variable.assignment);
 			} else {
 				switch (decl->decl_variable.variable_type->kind) {
 					case KIND_PRIMITIVE:

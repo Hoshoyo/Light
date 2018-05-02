@@ -7,7 +7,7 @@ extern "C" long long println() {
 }
 
 extern "C" long long print_string(long long length, char* data){
-	int r = printf("{ %lld, %s }\n", length, data);
+	int r = printf("%.*s", (int)length, data);
 	fflush(stdout);
 	return r;
 }
