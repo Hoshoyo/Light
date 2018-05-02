@@ -1,25 +1,37 @@
 #include <stdio.h>
 
 extern "C" long long println() {
-	return printf("\n");
+	int r = printf("\n");
+	fflush(stdout);
+	return r;
 }
 
 extern "C" long long print_string(long long length, char* data){
-	return printf("{ %lld, %s }\n", length, data);
+	int r = printf("{ %lld, %s }\n", length, data);
+	fflush(stdout);
+	return r;
 }
 
 extern "C" long long print_s64(long long value) {
-	return printf("%lld", value);
+	int r = printf("%lld", value);
+	fflush(stdout);
+	return r;
 }
 
 extern "C" long long print_s32(int value) {
-	return printf("%d", value);
+	int r = printf("%d", value);
+	fflush(stdout);
+	return r;
 }
 
 extern "C" long long print_r64(double value) {
-	return printf("%f", value);
+	int r = printf("%f", value);
+	fflush(stdout);
+	return r;
 }
 
 extern "C" long long print_r32(float value) {
-	return printf("%f", value);
+	int r = printf("%f", value);
+	fflush(stdout);
+	return r;
 }

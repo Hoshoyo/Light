@@ -424,6 +424,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
 				if (infered->flags & TYPE_FLAG_WEAK) {
 					type_propagate(node->decl_constant.type_info, node->decl_constant.value);
+					infered = node->decl_constant.value->type_return;
 				}
 				if(!node->decl_constant.type_info){
 					node->decl_constant.type_info = infered;

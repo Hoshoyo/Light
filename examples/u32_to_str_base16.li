@@ -1,35 +1,43 @@
+print_string :: (length : s64, data : ^s8) -> s32 #foreign("print_string.obj");
 malloc :: (size : s64) -> ^void #foreign("libc");
 u32_to_str_base16 :: (val : u32, leading_zeros : bool, buffer : ^s8) -> s32
 {
 	numbuffer : ^s8 = cast(^s8)malloc(64);
 	at : ^s8=  numbuffer + 63;
-	count := 0;
+	count : u32 = 0;
 
 	if (val == 0) {
 		*buffer = '0';
 		count += 1;
-		return count + 1;
+		return cast(s32)count + 1;
 	}
 
-	mask : u32 = 15;//0x0000000f;
-	auxmask : u32 = 4294967296;//0xffffffff;
+	mask : u32 = 0x0000000f;
+	auxmask : u32 = 0xffffffff;
 	
 	for (count < 8) {
-		if (!(auxmask & val) && !leading_zeros) break;
+		if (!cast(bool)(auxmask & val) && !leading_zeros) break;
 		v : u32 = (val & (mask << (count * 4))) >> (count * 4);
 		if (v >= 10) v += 55;
 		else v += 48;
-		*at = v;
+		*at = cast(s8)v;
 		at -= 1;
 		auxmask &= ~mask << (count * 4);
 		count += 1;
 	}
-	i := 0;
+	i : u32 = 0;
 	for(i < count){
 		at += 1;
 		*buffer = *at;
 		buffer += 1;
 		i += 1;
 	}
-	return count;
+	return cast(s32)count;
+}
+
+main :: () -> s32 {
+	buffer : [256]s8;
+	a := u32_to_str_base16(32, true, cast(^s8)buffer);
+	print_string(cast(s64)a, cast(^s8)buffer);
+	return a;
 }

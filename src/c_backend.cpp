@@ -484,8 +484,14 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	// emit all declarations forward procedures
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* decl = toplevel[i];
-		if (decl->node_type == AST_DECL_PROCEDURE) {
+		if (decl->node_type == AST_DECL_PROCEDURE ||
+            decl->node_type == AST_DECL_CONSTANT || 
+            decl->node_type == AST_DECL_VARIABLE) {
 			emit_decl(decl);
+            if(decl->node_type == AST_DECL_CONSTANT){
+                sprint(" = ");
+                emit_expression(decl->decl_constant.value);
+            }
 			sprint(";\n");
 		}
 	}

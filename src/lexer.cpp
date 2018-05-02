@@ -718,7 +718,7 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_KEYWORD_UNION:		return ("union"); break;
 	case TOKEN_KEYWORD_ARRAY:		return ("array"); break;
 	default: {
-		assert(0);
+		//assert(0);
 		return ("UNKNOWN"); break;
 	}break;
 	}

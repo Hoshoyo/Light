@@ -14,6 +14,7 @@ typedef double r64;
 
 
 // Forward declarations
+
 s64 print_s64(s64 value);
 void fill_array();
 s64 __main();
@@ -25,11 +26,15 @@ while((i<3)){
 *(s32*)(((char*)a)+ 4 * (i)) = ((s32)i);
 i = (i+1);
 }
+loop_0:;
+
 i = 0;
 while((i<3)){
 print_s64(((s64)*(s32*)(((char*)a)+ 4 * (i))));
 i = (i+1);
 }
+loop_1:;
+
 }
 
 s64 __main(){
