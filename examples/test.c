@@ -24,7 +24,6 @@ void multi_array();
 typedef struct {r32 x;r32 y;} vec2;
 void fill_struct();
 void pointer_arithmetic();
-void matrix();
 s64 __main();
 
 s32 factorial(s32 v){
@@ -87,12 +86,10 @@ u8* ptr = ((u8*)(&arr));
 print_string(2,ptr);
 }
 
-void matrix(){
-char m[64] = {0};
-char x[16] = (r32**)(((char*)m)+ 16 * (0));
-}
-
 s64 __main(){
+if(((bool)1)){
+return 1;
+}
 return 0;
 }
 

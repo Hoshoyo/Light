@@ -290,6 +290,8 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 		expr->type_return = type;
 	} else if(decl->node_type == AST_DECL_CONSTANT) {
 		type = decl->decl_constant.type_info;
+		assert(type_strong(type));
+		expr->type_return = type;
 	}
 	return type;
 }

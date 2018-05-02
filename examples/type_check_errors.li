@@ -1,0 +1,50 @@
+/*
+if_error :: () {
+	if 1 return;
+}
+
+for_error :: () {
+	for 1 return;
+}
+
+break_error :: () {
+	break;
+	
+	for true {
+		break 2;
+	}
+	
+	for true {
+		break -1;
+	}
+}
+
+continue_error :: () {
+	continue;
+}
+
+// TODO: check all return paths
+proc_ret_nonvoid :: () -> s32 {
+	return;
+}
+
+proc_ret_void :: () {
+	return 1;
+}
+
+proc_mismatch :: () -> s32 {
+	return 1.0;
+}
+
+foo :: struct {
+	x : s32;
+}
+struct_field :: () {
+	a : foo;
+	a.y = 1;
+}
+*/
+
+main :: () -> s32{
+	return 0;
+}

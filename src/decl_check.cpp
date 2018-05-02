@@ -5,6 +5,14 @@
 #include "lexer.h"
 #include "error.h"
 
+static Ast** type_decl_array;
+inline void type_decl_push(Ast* node) {
+	array_push(type_decl_array, &node);
+}
+Ast** type_decl_array_get() {
+	return type_decl_array;
+}
+
 static Ast** infer_queue;
 inline void infer_queue_push(Ast* node) {
 	if (node->flags & AST_FLAG_QUEUED)
@@ -258,6 +266,8 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
 					node->decl_struct.type_info = internalize_type(&tinfo, true);
 					infer_queue_remove(node);
+					//printf("struct %.*s done\n", TOKEN_STR(node->decl_struct.name));
+					type_decl_push(node);
 				}
 			}
 		} break;
@@ -572,6 +582,7 @@ Decl_Error decl_check_inner(Scope* global_scope, Ast** ast_top_level) {
 Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 	Decl_Error error = DECL_OK;
 
+	type_decl_array = array_create(Ast*, 16);
 	infer_queue = array_create(Ast*, 16);
 	// Initialize the global scope symbol table
 	symbol_table_init(&global_scope->symb_table, (global_scope->decl_count + 4) * 8);

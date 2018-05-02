@@ -693,7 +693,7 @@ Ast* Parser::parse_comm_for(Scope* scope) {
 
 		inner->comm_block.block_scope->creator_node = for_cmd;
 		inner->comm_block.block_scope->decl_count = 1;
-		return inner;
+		return ast_create_comm_for(scope, condition, inner);
 	}
 }
 

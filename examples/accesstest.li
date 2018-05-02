@@ -1,14 +1,16 @@
-foo :: () -> void {
-	a : Person;
-	b := a.age;
-}
-
-main :: () -> Person {
+foo :: () -> Person {
 	Pedro : Person;
 	a := Pedro.pos.y;
 	b := Pedro.pos.y;
+	Pedro.age = 26;
 	c := Pedro.age;
 	d := Pedro.name;
+	return Pedro;
+}
+
+main :: () -> s32 {
+	x := foo();
+	return x.age;
 }
 
 vec4 :: struct {

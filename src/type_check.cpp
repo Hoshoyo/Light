@@ -117,18 +117,25 @@ Type_Error type_check(Ast* node) {
 			if (rettype == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
 				if (node->comm_return.expression) {
 					error |= report_type_error(TYPE_ERROR_FATAL, node, "non-void return statement of procedure returning void\n");
+					return error;
+				}
+			} else {
+				if (!node->comm_return.expression) {
+					if (rettype != type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "expected return value of type '");
+						DEBUG_print_type(stderr, rettype, true);
+						fprintf(stderr, "'\n");
+						return error;
+					}
+				} else if (node->comm_return.expression->type_return->flags & TYPE_FLAG_WEAK) {
+					type_propagate(rettype, node->comm_return.expression);
+					if (error & TYPE_ERROR_FATAL) return error;
+				}
+				if (rettype != node->comm_return.expression->type_return) {
+					error |= report_type_mismatch(node->comm_return.expression, rettype, node->comm_return.expression->type_return);
 				}
 			}
-			if (node->comm_return.expression->type_return->flags & TYPE_FLAG_WEAK) {
-				type_propagate(rettype, node->comm_return.expression);
-				if (error & TYPE_ERROR_FATAL) return error;
-			}
-			if (rettype != node->comm_return.expression->type_return) {
-				error |= report_type_mismatch(node->comm_return.expression, rettype, node->comm_return.expression->type_return);
-			}
 		}
-		if (node->comm_return.expression)
-			error |= type_check(node->comm_return.expression);
 	}break;
 	case AST_COMMAND_VARIABLE_ASSIGNMENT: {
 

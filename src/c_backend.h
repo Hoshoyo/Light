@@ -6,8 +6,8 @@
 struct C_Code_Generator {
 	char* in_filename;
 
-	char buffer[1 << 16];
-	u32  ptr;
+	char* buffer;
+	u32   ptr;
 
 	s64 loop_id;
 	s64 alloc_loop_id();

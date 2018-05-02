@@ -1,4 +1,5 @@
 #include "c_backend.h"
+#include "decl_check.h"
 #include <stdarg.h>
 
 static void report_fatal_error(char* msg, ...) {
@@ -195,7 +196,7 @@ void C_Code_Generator::emit_decl(Ast* decl) {
         }break;
         case AST_DECL_CONSTANT:{
             emit_type(decl->decl_constant.type_info);
-            sprint("%.*s", TOKEN_STR(decl->decl_constant.name));
+            sprint(" %.*s", TOKEN_STR(decl->decl_constant.name));
         }break;
         case AST_DECL_STRUCT:{
             sprint("typedef struct {");
@@ -232,7 +233,13 @@ void C_Code_Generator::emit_command(Ast* comm) {
 							emit_default_value(cm->decl_variable.variable_type);
 						}
 						sprint(";");
-                    } else {
+					} else if (cm->node_type == AST_DECL_CONSTANT) {
+						sprint("const ");
+						emit_decl(cm);
+						sprint(" = ");
+						emit_expression(cm->decl_constant.value);
+						sprint(";");
+					} else {
                         assert_msg(0, "scoped declaration of procedure, enum and union not yet implemented");
                     }
                 } else {
@@ -464,13 +471,24 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 #if defined(_WIN32) || defined(_WIN64)
 	sprint("u32 ExitProcess(u32 ret);\n");
 #endif
-    size_t ndecls = array_get_length(toplevel);
-    // emit all declarations forward
-    for(size_t i = 0; i < ndecls; ++i){
-        Ast* decl = toplevel[i];
+    // emit all declarations of types
+	Ast** type_decl_arr = type_decl_array_get();
+    for(size_t i = 0; i < array_get_length(type_decl_arr); ++i){
+        Ast* decl = type_decl_arr[i];
         emit_decl(decl);
         sprint(";\n");
     }
+	sprint("\n");
+
+    size_t ndecls = array_get_length(toplevel);
+	// emit all declarations forward procedures
+	for (size_t i = 0; i < ndecls; ++i) {
+		Ast* decl = toplevel[i];
+		if (decl->node_type == AST_DECL_PROCEDURE) {
+			emit_decl(decl);
+			sprint(";\n");
+		}
+	}
 	sprint("\n");
 
 	for (size_t i = 0; i < ndecls; ++i) {
@@ -531,6 +549,7 @@ static size_t filename_length_strip_extension(char* f) {
 
 void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
     C_Code_Generator code_generator = {};
+	code_generator.buffer = (char*)ho_bigalloc_rw(1 << 20);
 
     int err = code_generator.c_generate_top_level(toplevel, type_table);
 
@@ -561,4 +580,5 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #endif
+	ho_bigfree(code_generator.buffer, 1 << 20);
 }

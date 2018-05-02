@@ -15,28 +15,10 @@ typedef double r64;
 
 // Forward declarations
 u32 ExitProcess(u32 ret);
-s64 print_s64(s64 value);
+
 s32 __main();
 
 s32 __main(){
-s64 i = 0;
-s64 j = 0;
-while((i<10)){
-j = 0;
-while((j<10)){
-print_s64(((s64)j));
-if(((i==4)&&(j==5)))goto loop_0;
-j = (j+1);
-}
-loop_1:;
-
-i = (i+1);
-}
-loop_0:;
-
-if(((bool)1)){
-print_s64(1);
-}
 return 0;
 }
 
