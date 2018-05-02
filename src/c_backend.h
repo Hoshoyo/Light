@@ -16,12 +16,13 @@ struct C_Code_Generator {
 
 
     void emit_type(Type_Instance* type, Token* name = 0);
-    void emit_decl(Ast* decl);
+    void emit_decl(Ast* decl, bool forward = false);
 	void emit_proc(Ast* decl);
 	void emit_command(Ast* comm);
 	void emit_expression(Ast* expr);
 	void emit_expression_binary(Ast* expr);
 	void emit_default_value(Type_Instance* type);
+	void emit_typedef(Type_Instance* type, Token* name, char* prefix);
     int  c_generate_top_level(Ast** toplevel, Type_Instance** type_table);
 };
 

@@ -18,16 +18,15 @@ typedef double r64;
 s64 print_string(s64 length, u8* str);
 s64 print_s64(s64 val);
 s32 foo();
-typedef s32(*)()__ret_make_proc(;
-__ret_make_proc make_proc();
+typedef s32 __ret_make_proc();
+__ret_make_proc* make_proc();
 s32 __main();
 
 s32 foo(){
 return 42;
 }
 
-typedef s32(*)()__ret_make_proc(;
-__ret_make_proc make_proc(){
+__ret_make_proc* make_proc(){
 return foo;
 }
 

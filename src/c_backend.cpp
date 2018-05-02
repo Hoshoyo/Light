@@ -10,7 +10,7 @@ static void report_fatal_error(char* msg, ...) {
 	//assert(0);
 	exit(-1);
 }
-
+//#define DEBUG 1
 int C_Code_Generator::sprint(char* msg, ...) {
 	va_list args;
 	va_start(args, msg);
@@ -35,10 +35,46 @@ s64 C_Code_Generator::alloc_loop_id() {
 }
 
 void C_Code_Generator::emit_typedef(Type_Instance* type, Token* name, char* prefix) {
+    static int id = 0;
+
     switch(type->kind){
-        case KIND_PRIMITIVE:
         case KIND_POINTER:
-        case KIND_FUNCTION:
+        case KIND_PRIMITIVE:{
+            sprint("typedef ");
+            emit_type(type);
+            if(prefix) sprint(" %s", prefix);
+            if(name) sprint(" %.*s", TOKEN_STR(name));
+            sprint(";\n");
+        } break;
+
+        case KIND_FUNCTION:{
+            if(type->function_desc.return_type->kind == KIND_FUNCTION){
+                char p[64] = {0};
+                int rettype_id = id;
+                sprintf(p, "__typet_%d", prefix, id++);
+                emit_typedef(type->function_desc.return_type, 0, p);
+                sprint("typedef __typet_%d ", rettype_id);
+            } else {
+                sprint("typedef ");
+                emit_type(type->function_desc.return_type);
+            }
+
+            sprint(" ");
+            assert(prefix || name);
+            if(prefix) {
+                sprint("%s", prefix);
+            }
+            if(name){
+                sprint("%.*s", TOKEN_STR(name));
+            }
+            sprint("(");
+            for(s32 i = 0; i < type->function_desc.num_arguments; ++i) {
+                if(i != 0) sprint(", ");
+                emit_type(type->function_desc.arguments_type[i]);
+            }
+            sprint(");\n");
+
+        }break;
         case KIND_ARRAY:
         case KIND_STRUCT:
             break;
@@ -151,22 +187,15 @@ void C_Code_Generator::emit_default_value(Type_Instance* type) {
 	}
 }
 
-void C_Code_Generator::emit_decl(Ast* decl) {
+void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
     assert(decl->flags & AST_FLAG_IS_DECLARATION);
     switch(decl->node_type) {
         case AST_DECL_PROCEDURE: {
+            if(forward && decl->decl_procedure.type_return->kind == KIND_FUNCTION){
+                emit_typedef(decl->decl_procedure.type_return, decl->decl_procedure.name, "__ret_");
+            } 
             if(decl->decl_procedure.type_return->kind == KIND_FUNCTION){
-                Type_Instance* typeproc = decl->decl_procedure.type_procedure;
-
-                sprint("typedef ");
-                emit_type(typeproc->function_desc.return_type);
-                sprint("__ret_%.*s(", TOKEN_STR(decl->decl_procedure.name));
-                for(s32 i = 0; i < typeproc->function_desc.num_arguments; ++i){
-                    if(i != 0) sprint(", ");
-                    emit_type(typeproc->function_desc.arguments_type[i]);
-                }
-                sprint(";\n");
-                sprint("__ret_%.*s", TOKEN_STR(decl->decl_procedure.name));
+                sprint("__ret_%.*s*", TOKEN_STR(decl->decl_procedure.name));
             } else {
                 emit_type(decl->decl_procedure.type_return);
             }
@@ -199,10 +228,6 @@ void C_Code_Generator::emit_decl(Ast* decl) {
                     emit_type(decl->decl_variable.variable_type);
                     sprint(" %.*s", TOKEN_STR(decl->decl_variable.name));
                 }
-				//if (decl->decl_variable.variable_type != type_primitive_get(TYPE_PRIMITIVE_VOID)) {
-				//	sprint(" = ");
-				//	emit_default_value(decl->decl_variable.variable_type);
-				//}
             }
         }break;
         case AST_DECL_CONSTANT:{
@@ -498,7 +523,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 		if (decl->node_type == AST_DECL_PROCEDURE ||
             decl->node_type == AST_DECL_CONSTANT || 
             decl->node_type == AST_DECL_VARIABLE) {
-			emit_decl(decl);
+			emit_decl(decl, true);
             if(decl->node_type == AST_DECL_CONSTANT){
                 sprint(" = ");
                 emit_expression(decl->decl_constant.value);
