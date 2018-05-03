@@ -104,13 +104,25 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 		case KIND_POINTER: {
 			type->flags |= TYPE_FLAG_SIZE_RESOLVED;
 			type->type_size_bits = type_pointer_size_bits();
-			type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared);
-			if (!type->pointer_to) return 0;
-			if (type->pointer_to->flags & TYPE_FLAG_INTERNALIZED) {
+			if(type->pointer_to->kind == KIND_STRUCT){
+				Ast* struct_decl = decl_from_name(scope, type->pointer_to->struct_desc.name);
+				if(!struct_decl){
+					if(report_undeclared){
+						report_undeclared(type->struct_desc.name);
+					}
+					return 0;
+				}
 				type->flags |= TYPE_FLAG_RESOLVED;
 				return internalize_type(&type, true);
 			} else {
-				return type;
+				type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared);
+				if (!type->pointer_to) return 0;
+				if (type->pointer_to->flags & TYPE_FLAG_INTERNALIZED) {
+					type->flags |= TYPE_FLAG_RESOLVED;
+					return internalize_type(&type, true);
+				} else {
+					return type;
+				}
 			}
 		} break;
 		case KIND_STRUCT: {
@@ -316,6 +328,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				}
 				node->decl_procedure.type_procedure->flags |= TYPE_FLAG_RESOLVED;
 				node->decl_procedure.type_procedure->function_desc.return_type = node->decl_procedure.type_return;
+				node->decl_procedure.type_procedure = resolve_type(scope, node->decl_procedure.type_procedure, rep_undeclared);
 				node->decl_procedure.type_procedure = internalize_type(&node->decl_procedure.type_procedure, true);
 				infer_queue_remove(node);
 			}

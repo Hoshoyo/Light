@@ -113,7 +113,12 @@ Type_Instance* type_copy_internal(Type_Instance* type) {
 	switch (type->kind) {
 	case KIND_PRIMITIVE: break;
 	case KIND_POINTER:
-		internalize_type(&type->pointer_to, true);
+		if(type->pointer_to->kind == KIND_STRUCT) {
+			// @TODO IMPORTANT
+			// hanging uninternalized type. Patch later? @HACK
+		} else {
+			internalize_type(&type->pointer_to, true);
+		}
 		//result->pointer_to = type_copy_internal(type->pointer_to);
 		break;
 	case KIND_STRUCT: {
@@ -229,11 +234,20 @@ s64 type_pointer_size_bits() {
 }
 
 #include "ast.h"
+#include <math.h>
 void DEBUG_print_type_table() {
 	size_t len = array_get_length(g_type_table);
 	for (size_t i = 0; i < len; ++i) {
 		Type_Instance* t = g_type_table[i];
-		DEBUG_print_type(stdout, t, true);
-		fprintf(stdout, "\t\tsize: %lld\n", t->type_size_bits);
+		s32 c = DEBUG_print_type(stdout, t, true);
+		s32 tn = floorf((r32)((40 - c) / 8));
+		{
+			char buffer[64] = {0};
+			for(int n = 0; n < tn; ++n)
+				buffer[n] = '\t';
+			fprintf(stdout, "%s", buffer);
+		}
+
+		fprintf(stdout, "size: %lld bits\n", t->type_size_bits);
 	}
 }

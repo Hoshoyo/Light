@@ -400,59 +400,62 @@ void quick_type(FILE* out, Type_Instance* type) {
 	fprintf(out, ">");
 }
 
-void DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
+int DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
+	int count = 0;
 	if (!type) {
-		fprintf(out, "(TYPE_IS_NULL)");
+		count += fprintf(out, "(TYPE_IS_NULL)");
 		return;
 	}
 	if (type->kind == KIND_PRIMITIVE) {
 		switch (type->primitive) {
-		case TYPE_PRIMITIVE_S64:	fprintf(out, "s64"); break;
-		case TYPE_PRIMITIVE_S32:	fprintf(out, "s32"); break;
-		case TYPE_PRIMITIVE_S16:	fprintf(out, "s16"); break;
-		case TYPE_PRIMITIVE_S8:		fprintf(out, "s8"); break;
-		case TYPE_PRIMITIVE_U64:	fprintf(out, "u64"); break;
-		case TYPE_PRIMITIVE_U32:	fprintf(out, "u32"); break;
-		case TYPE_PRIMITIVE_U16:	fprintf(out, "u16"); break;
-		case TYPE_PRIMITIVE_U8:		fprintf(out, "u8"); break;
-		case TYPE_PRIMITIVE_BOOL:	fprintf(out, "bool"); break;
-		case TYPE_PRIMITIVE_R64:	fprintf(out, "r64"); break;
-		case TYPE_PRIMITIVE_R32:	fprintf(out, "r32"); break;
-		case TYPE_PRIMITIVE_VOID:	fprintf(out, "void"); break;
+		case TYPE_PRIMITIVE_S64:	count += fprintf(out, "s64"); break;
+		case TYPE_PRIMITIVE_S32:	count += fprintf(out, "s32"); break;
+		case TYPE_PRIMITIVE_S16:	count += fprintf(out, "s16"); break;
+		case TYPE_PRIMITIVE_S8:		count += fprintf(out, "s8"); break;
+		case TYPE_PRIMITIVE_U64:	count += fprintf(out, "u64"); break;
+		case TYPE_PRIMITIVE_U32:	count += fprintf(out, "u32"); break;
+		case TYPE_PRIMITIVE_U16:	count += fprintf(out, "u16"); break;
+		case TYPE_PRIMITIVE_U8:		count += fprintf(out, "u8"); break;
+		case TYPE_PRIMITIVE_BOOL:	count += fprintf(out, "bool"); break;
+		case TYPE_PRIMITIVE_R64:	count += fprintf(out, "r64"); break;
+		case TYPE_PRIMITIVE_R32:	count += fprintf(out, "r32"); break;
+		case TYPE_PRIMITIVE_VOID:	count += fprintf(out, "void"); break;
 		}
 	} else if (type->kind == KIND_POINTER) {
-		fprintf(out, "^");
-		DEBUG_print_type(out, type->pointer_to);
+		count += fprintf(out, "^");
+		count += DEBUG_print_type(out, type->pointer_to);
 	} else if (type->kind == KIND_STRUCT) {
 		if (short_) {
-			fprintf(out, "%.*s", TOKEN_STR(type->struct_desc.name));
+			count += fprintf(out, "%.*s", TOKEN_STR(type->struct_desc.name));
 		} else {
-			fprintf(out, "%.*s struct {\n", TOKEN_STR(type->struct_desc.name));
+			count += fprintf(out, "%.*s struct {\n", TOKEN_STR(type->struct_desc.name));
 			int num_fields = array_get_length(type->struct_desc.fields_types);
 			for (int i = 0; i < num_fields; ++i) {
 				Type_Instance* field_type = type->struct_desc.fields_types[i];
 				string name = type->struct_desc.fields_names[i];
-				fprintf(out, "%.*s : ", name.length, name.data);
-				DEBUG_print_type(out, field_type);
-				fprintf(out, ";\n");
+				count += fprintf(out, "%.*s : ", name.length, name.data);
+				count += DEBUG_print_type(out, field_type);
+				count += fprintf(out, ";\n");
 			}
-			fprintf(out, "}\n");
+			count += fprintf(out, "}\n");
 		}
 	} else if (type->kind == KIND_FUNCTION) {
-		fprintf(out, "(");
+		count += fprintf(out, "(");
 		int num_args = type->function_desc.num_arguments;
 		for (int i = 0; i < num_args; ++i) {
-			DEBUG_print_type(out, type->function_desc.arguments_type[i]);
-			if(i + 1 < num_args) fprintf(out, ",");
+			count += DEBUG_print_type(out, type->function_desc.arguments_type[i]);
+			if(i + 1 < num_args) {
+				count += fprintf(out, ",");
+			}
 		}
-		fprintf(out, ") -> ");
-		DEBUG_print_type(out, type->function_desc.return_type);
+		count += fprintf(out, ") -> ");
+		count += DEBUG_print_type(out, type->function_desc.return_type);
 	} else if (type->kind == KIND_ARRAY) {
-		fprintf(out, "[%llu", type->array_desc.dimension);
-		fprintf(out, "]");
-		DEBUG_print_type(out, type->array_desc.array_of);
+		count += fprintf(out, "[%llu", type->array_desc.dimension);
+		count += fprintf(out, "]");
+		count += DEBUG_print_type(out, type->array_desc.array_of);
 	}
-
+	return count;
 }
 
 void DEBUG_print_block(FILE* out, Ast* block)

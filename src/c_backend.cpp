@@ -82,7 +82,7 @@ void C_Code_Generator::emit_typedef(Type_Instance* type, Token* name, char* pref
 }
 
 void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
-    assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit a type that is not internalized");
+    //assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit a type that is not internalized");
     switch(type->kind){
         case KIND_PRIMITIVE:{
             switch(type->primitive){
@@ -139,6 +139,13 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
             sprint(")");
         }break;
         case KIND_STRUCT: {
+            // @HACK
+            // @HACK
+            // @HACK
+            // patch internalized type in type checking or something
+            if(!(type->flags & TYPE_FLAG_INTERNALIZED)) {
+                sprint("struct ");
+            }
             if(name){
                 sprint("%.*s", TOKEN_STR(name));
             } else {
@@ -235,7 +242,7 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
             sprint(" %.*s", TOKEN_STR(decl->decl_constant.name));
         }break;
         case AST_DECL_STRUCT:{
-            sprint("typedef struct {");
+            sprint("typedef struct %.*s{", TOKEN_STR(decl->decl_struct.name));
             size_t nfields = decl->decl_struct.fields_count;
             for(size_t i = 0; i < nfields; ++i){
                 emit_decl(decl->decl_struct.fields[i]);
