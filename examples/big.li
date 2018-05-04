@@ -1,3 +1,5 @@
+print_s64::(v : s64) -> s64 #foreign("print_string.obj");
+
 Display :: struct {
 	//XExtData *ext_data;	/* hook for extension to hang data */
 	//struct _XPrivate *private1;
@@ -48,6 +50,7 @@ Display :: struct {
 XOpenDisplay :: (v : ^s8) -> ^Display #foreign("GL");
 
 main :: () -> s32{
-	a : Display;
+	a := XOpenDisplay(cast(^s8)0);
+	print_s64(cast(s64)a);
     return 0;
 }

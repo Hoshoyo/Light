@@ -1,8 +1,30 @@
 #include "type_table.h"
 #include "util.h"
 #include "memory.h"
+#include "decl_check.h"
 
 Type_Instance** g_type_table = 0;
+static Hash_Table type_table;
+
+struct Internalize_Queue {
+	Type_Instance* type;
+	Scope* scope;
+};
+static Internalize_Queue* type_internalize_queue;
+
+// patches the hanging non-internalized pointers of recursive defined structs. 
+void resolve_type_internalize_queue() {
+	size_t length = array_get_length(type_internalize_queue);
+	for(size_t i = 0; i < length; ++i) {
+		Type_Instance* type = type_internalize_queue[i].type;
+		Scope* scope = type_internalize_queue[i].scope;
+		assert(type->kind == KIND_POINTER);
+		u64 hash = type_hash(type->pointer_to);
+		s64 index = hash_table_entry_exist(&type_table, type, hash);
+		assert(index != -1);
+		type->pointer_to = type_table.entries[index].data;
+	}
+}
 
 #define ALLOC_TYPE(ARENA) (Type_Instance*)(ARENA).allocate(sizeof(Type_Instance))
 
@@ -84,12 +106,11 @@ u64 type_hash(Type_Instance* type) {
 	return hash;
 }
 
-static Hash_Table type_table;
-
 void type_table_init() {
 	// TODO(psv): no compare function between types yet
 	hash_table_init(&type_table, 1024 * 1024 * 4, (hash_function_type*)type_hash, (hash_entries_equal_type*)0);
 	g_type_table = array_create(Type_Instance*, 1024);
+	type_internalize_queue = array_create(Internalize_Queue, 1024);
 
 	type_s64 = type_setup_primitive(TYPE_PRIMITIVE_S64);
 	type_s32 = type_setup_primitive(TYPE_PRIMITIVE_S32);
@@ -106,7 +127,7 @@ void type_table_init() {
 }
 
 // Deep copy of types, this function follow the pointers of all Type_Instance* in the type description
-Type_Instance* type_copy_internal(Type_Instance* type) {
+Type_Instance* type_copy_internal(Type_Instance* type, Scope* scope) {
 	Type_Instance* result = ALLOC_TYPE(types_internal);
 	memcpy(result, type, sizeof(Type_Instance));
 
@@ -114,10 +135,12 @@ Type_Instance* type_copy_internal(Type_Instance* type) {
 	case KIND_PRIMITIVE: break;
 	case KIND_POINTER:
 		if(type->pointer_to->kind == KIND_STRUCT) {
-			// @TODO IMPORTANT
-			// hanging uninternalized type. Patch later? @HACK
+			result->kind = KIND_POINTER;
+			result->pointer_to = type->pointer_to;
+			Internalize_Queue q = {result, scope};
+			array_push(type_internalize_queue, &q);
 		} else {
-			internalize_type(&type->pointer_to, true);
+			internalize_type(&type->pointer_to, scope, true);
 		}
 		//result->pointer_to = type_copy_internal(type->pointer_to);
 		break;
@@ -129,11 +152,11 @@ Type_Instance* type_copy_internal(Type_Instance* type) {
 		array_set_length(result->struct_desc.fields_types, num_args);
 		array_set_element_size(result->struct_desc.fields_types, sizeof(Type_Instance*));
 		for (size_t i = 0; i < num_args; ++i) {
-			result->struct_desc.fields_types[i] = internalize_type(&type->struct_desc.fields_types[i]);//type_copy_internal(type->struct_desc.fields_types[i]);
+			result->struct_desc.fields_types[i] = internalize_type(&type->struct_desc.fields_types[i], scope, true);//type_copy_internal(type->struct_desc.fields_types[i]);
 		}
 	}break;
 	case KIND_FUNCTION: {
-		result->function_desc.return_type = internalize_type(&type->function_desc.return_type);//type_copy_internal(type->function_desc.return_type);
+		result->function_desc.return_type = internalize_type(&type->function_desc.return_type, scope, true);//type_copy_internal(type->function_desc.return_type);
 		size_t num_args = type->function_desc.num_arguments;
 		result->function_desc.arguments_type = (Type_Instance**)types_internal.allocate(array_get_header_size() + num_args * sizeof(Type_Instance*));
 		result->function_desc.arguments_type = (Type_Instance**)((u8*)result->function_desc.arguments_type + array_get_header_size());
@@ -141,11 +164,11 @@ Type_Instance* type_copy_internal(Type_Instance* type) {
 		array_set_length(result->function_desc.arguments_type, num_args);
 		array_set_element_size(result->function_desc.arguments_type, sizeof(Type_Instance*));
 		for (size_t i = 0; i < num_args; ++i) {
-			result->function_desc.arguments_type[i] = internalize_type(&type->function_desc.arguments_type[i]);//type_copy_internal(type->function_desc.arguments_type[i]);
+			result->function_desc.arguments_type[i] = internalize_type(&type->function_desc.arguments_type[i], scope, true);//type_copy_internal(type->function_desc.arguments_type[i]);
 		}
 	}break;
 	case KIND_ARRAY:
-		internalize_type(&type->array_desc.array_of, true);
+		internalize_type(&type->array_desc.array_of, scope, true);
 		//result->array_desc.array_of = type_copy_internal(type->array_desc.array_of);
 		break;
 	default:
@@ -154,7 +177,7 @@ Type_Instance* type_copy_internal(Type_Instance* type) {
 	return result;
 }
 
-Type_Instance* internalize_type(Type_Instance** type, bool copy) {
+Type_Instance* internalize_type(Type_Instance** type, Scope* scope, bool copy) {
 	assert((*type)->flags & TYPE_FLAG_RESOLVED);
 	u64 hash = type_hash(*type);
 
@@ -163,7 +186,7 @@ Type_Instance* internalize_type(Type_Instance** type, bool copy) {
 	if (index == -1) {
 		if (copy) {
 			// copy into internal mem space
-			Type_Instance* copied = type_copy_internal(*type);
+			Type_Instance* copied = type_copy_internal(*type, scope);
 			index = hash_table_add(&type_table, copied, sizeof(copied), hash);
 		} else {
 			index = hash_table_add(&type_table, *type, sizeof(*type), hash);

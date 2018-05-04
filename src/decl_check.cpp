@@ -99,7 +99,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 		case KIND_PRIMITIVE:{
 			type->flags |= TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED;
 			type->type_size_bits = type_size_primitive(type->primitive) * 8;
-			return internalize_type(&type, true);
+			return internalize_type(&type, scope, true);
 		}
 		case KIND_POINTER: {
 			type->flags |= TYPE_FLAG_SIZE_RESOLVED;
@@ -113,13 +113,13 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 					return 0;
 				}
 				type->flags |= TYPE_FLAG_RESOLVED;
-				return internalize_type(&type, true);
+				return internalize_type(&type, scope, true);
 			} else {
 				type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared);
 				if (!type->pointer_to) return 0;
 				if (type->pointer_to->flags & TYPE_FLAG_INTERNALIZED) {
 					type->flags |= TYPE_FLAG_RESOLVED;
-					return internalize_type(&type, true);
+					return internalize_type(&type, scope, true);
 				} else {
 					return type;
 				}
@@ -147,7 +147,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 			if (type->array_desc.array_of->flags & TYPE_FLAG_INTERNALIZED) {
 				type->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
 				type->type_size_bits = type->array_desc.dimension * type->array_desc.array_of->type_size_bits;
-				return internalize_type(&type, true);
+				return internalize_type(&type, scope, true);
 			} else {
 				return type;
 			}
@@ -169,7 +169,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 				}
 				type->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
 				type->type_size_bits = type_pointer_size_bits();
-				type = internalize_type(&type, true);
+				type = internalize_type(&type, scope, true);
 				return type;
 			}
 		} break;
@@ -201,7 +201,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				}
 				type->flags |= TYPE_FLAG_RESOLVED;
 				infer_queue_remove(node);
-				node->decl_variable.variable_type = internalize_type(&type, true);
+				node->decl_variable.variable_type = internalize_type(&type, scope, true);
 				return error;
 			}
 			if (node->decl_variable.variable_type->flags & TYPE_FLAG_RESOLVED) {
@@ -233,7 +233,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				}
 				type->flags |= TYPE_FLAG_RESOLVED;
 				infer_queue_remove(node);
-				node->decl_variable.variable_type = internalize_type(&type, true);
+				node->decl_variable.variable_type = internalize_type(&type, scope, true);
 				return error;
 			}
 			if(node->decl_constant.type_info->flags & TYPE_FLAG_RESOLVED) {
@@ -277,7 +277,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				} else {
 					node->decl_struct.type_info->type_size_bits = type_size_bits;
 					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
-					node->decl_struct.type_info = internalize_type(&tinfo, true);
+					node->decl_struct.type_info = internalize_type(&tinfo, scope, true);
 					infer_queue_remove(node);
 					//printf("struct %.*s done\n", TOKEN_STR(node->decl_struct.name));
 					type_decl_push(node);
@@ -329,7 +329,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				node->decl_procedure.type_procedure->flags |= TYPE_FLAG_RESOLVED;
 				node->decl_procedure.type_procedure->function_desc.return_type = node->decl_procedure.type_return;
 				node->decl_procedure.type_procedure = resolve_type(scope, node->decl_procedure.type_procedure, rep_undeclared);
-				node->decl_procedure.type_procedure = internalize_type(&node->decl_procedure.type_procedure, true);
+				node->decl_procedure.type_procedure = internalize_type(&node->decl_procedure.type_procedure, scope, true);
 				infer_queue_remove(node);
 			}
 		} break;

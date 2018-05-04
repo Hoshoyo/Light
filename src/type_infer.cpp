@@ -80,7 +80,7 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 				ptrtype->type_size_bits = type_pointer_size_bits();
 				ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED;
 				ptrtype->pointer_to = infered;
-				expr->type_return = internalize_type(&ptrtype, true);
+				expr->type_return = internalize_type(&ptrtype, expr->scope, true);
 				return expr->type_return;
 			} else {
 				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "unary address of operator requires lvalue\n");
@@ -317,7 +317,7 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 				}
 			} else {
 				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
-				expr->type_return = internalize_type(&expr->type_return, true);
+				expr->type_return = internalize_type(&expr->type_return, expr->scope, true);
 			}
 		}break;
 

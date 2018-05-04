@@ -46,6 +46,7 @@ int main(int argc, char** argv) {
 	if (type_error) {
 		return -1;
 	}
+	resolve_type_internalize_queue();
 
 	double end = timer.GetTime();
 	printf("Compiler elapsed: %fms\n", (end - start));

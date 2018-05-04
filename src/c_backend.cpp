@@ -139,13 +139,11 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
             sprint(")");
         }break;
         case KIND_STRUCT: {
-            // @HACK
-            // @HACK
-            // @HACK
-            // patch internalized type in type checking or something
             if(!(type->flags & TYPE_FLAG_INTERNALIZED)) {
-                sprint("struct ");
+                assert(0);
             }
+            // TODO(psv): does this always work in C?
+            sprint("struct ");
             if(name){
                 sprint("%.*s", TOKEN_STR(name));
             } else {
@@ -625,7 +623,7 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",
+	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lGL -lX11",
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #endif
