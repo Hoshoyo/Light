@@ -14,13 +14,12 @@ typedef double r64;
 
 
 // Forward declarations
-u32 ExitProcess(u32 ret);
 typedef struct {r32 x;r32 y;r32 z;r32 w;} vec4;
 typedef struct {s64 length;s64 capacity;u8* data;} string;
 typedef struct {vec4 pos;s32 age;string name;} Person;
 
 Person foo();
-s32 __main();
+s32 s();
 
 Person foo(){
 Person Pedro = {0};
@@ -32,12 +31,12 @@ string d = (Pedro.name);
 return Pedro;
 }
 
-s32 __main(){
+s32 s(){
 Person x = foo();
 return (x.age);
 }
 
 
-void __entry() {
-	ExitProcess(__main());
+int __entry() {
+	return __main();
 }

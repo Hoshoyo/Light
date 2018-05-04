@@ -67,6 +67,6 @@ main :: () -> s64 {
 	//fill_array();
 	//fill_struct();
 	//multi_array();
-	//pointer_arithmetic();
+	pointer_arithmetic();
     return 0;
 }

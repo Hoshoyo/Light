@@ -16,6 +16,7 @@ typedef double r64;
 // Forward declarations
 
 s64 print_s64(s64 value);
+void println();
 s32 __main();
 
 s32 __main(){
@@ -25,12 +26,13 @@ while((i<10)){
 j = 0;
 while((j<10)){
 print_s64(((s64)j));
-if(((i==4)&&(j==5)))goto loop_0;
+if(((i==4)&&(j==5)))goto loop_1;
 j = (j+1);
 }
 loop_1:;
 
 i = (i+1);
+println();
 }
 loop_0:;
 

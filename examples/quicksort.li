@@ -1,4 +1,5 @@
 print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
+println :: () -> void #foreign("print_string.obj");
 
 quicksort :: (values : ^s32, start : s64, end : s64) {
 	i := start;
@@ -56,6 +57,7 @@ main :: () -> s32 {
 	print_array(cast(^s32)arr, 10);
 	
 	quicksort(cast(^s32)arr, 0, 10);
+	println();
 	
 	print_array(cast(^s32)arr, 10);
 	

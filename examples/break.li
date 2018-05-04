@@ -1,4 +1,5 @@
 print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
+println :: () -> void #foreign("print_string.obj");
 
 main :: () -> s32 {
 	i := 0;
@@ -13,6 +14,7 @@ main :: () -> s32 {
 			j += 1;
 		}
 		i += 1;
+		println();
 	}
 	
 	return 0;

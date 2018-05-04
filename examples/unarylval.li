@@ -1,4 +1,4 @@
-main :: () {
+main :: () -> s32{
     t2 := !true;
     s : s8;
     buffer : ^s8;

@@ -1,4 +1,3 @@
-
 Display :: struct {
 	//XExtData *ext_data;	/* hook for extension to hang data */
 	//struct _XPrivate *private1;
@@ -46,6 +45,9 @@ Display :: struct {
 	/* there is more to this structure, but it is private to Xlib */
 }
 
+XOpenDisplay :: (v : ^s8) -> ^Display #foreign("GL");
+
 main :: () -> s32{
+	a : Display;
     return 0;
 }

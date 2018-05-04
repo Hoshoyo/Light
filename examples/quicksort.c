@@ -14,8 +14,9 @@ typedef double r64;
 
 
 // Forward declarations
-u32 ExitProcess(u32 ret);
+
 s64 print_s64(s64 value);
+void println();
 void quicksort(s32* values, s64 start, s64 end);
 void print_array(s32* values, s64 length);
 s32 __main();
@@ -76,11 +77,12 @@ char arr[40] = {0};
 *(s32*)(((char*)arr)+ 4 * (9)) = 10;
 print_array(((s32*)arr),10);
 quicksort(((s32*)arr),0,10);
+println();
 print_array(((s32*)arr),10);
 return 0;
 }
 
 
-void __entry() {
-	ExitProcess(__main());
+int __entry() {
+	return __main();
 }

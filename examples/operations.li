@@ -13,15 +13,14 @@ proc :: () -> void
 		a >>= 8;
 		a %= 9;
 		a |= 10;
-		
 		a = a + a;
 		a = a - a;
 		a = a * a;
-		a = a / a;
+		a = a / (a + 1);
 		a = a & a;
 		a = a | a;
 		a = a ^ a;
-		a = a % a;
+		//a = a % a;
 		a = a << a;
 		a = a >> a;
 		b := a < a;
@@ -49,16 +48,17 @@ proc :: () -> void
 		b = b == b;
 		b = b != b;
 	}
+	return;
 	{
 		d : r32;
-		d = 0.0;
-		d *= d;
+		d = 2.0;
 		d /= d;
+		d = d / d;
+		d *= d;
 		d += d;
 		d -= d;
 		d = d + d;
 		d = d - d;
-		d = d / d;
 		d = d * d;
 		b := d < d;
 		b = d > d;
@@ -69,4 +69,9 @@ proc :: () -> void
 	}
 
 	return;
+}
+
+main :: () -> s32 {
+	proc();
+	return 0;
 }

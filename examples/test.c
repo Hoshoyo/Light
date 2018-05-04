@@ -14,14 +14,14 @@ typedef double r64;
 
 
 // Forward declarations
-u32 ExitProcess(u32 ret);
+typedef struct {r32 x;r32 y;} vec2;
+
 s64 print_s64(s64 value);
 s64 print_r32(r32 value);
 s64 print_string(s64 length, u8* str);
 s32 factorial(s32 v);
 void fill_array();
 void multi_array();
-typedef struct {r32 x;r32 y;} vec2;
 void fill_struct();
 void pointer_arithmetic();
 s64 __main();
@@ -87,13 +87,11 @@ print_string(2,ptr);
 }
 
 s64 __main(){
-if(((bool)1)){
-return 1;
-}
+pointer_arithmetic();
 return 0;
 }
 
 
-void __entry() {
-	ExitProcess(__main());
+int __entry() {
+	return __main();
 }
