@@ -508,10 +508,10 @@ Ast* Parser::parse_expression(Scope* scope) {
 }
 
 Ast* Parser::parse_expr_literal_array(Scope* scope) {
-	require_and_eat(TOKEN_KEYWORD_ARRAY);
+	Token* arraytok = require_and_eat(TOKEN_KEYWORD_ARRAY);
 	require_and_eat('{');
 
-	Ast* node = ast_create_expr_literal(scope, LITERAL_ARRAY, 0, 0, 0);
+	Ast* node = ast_create_expr_literal(scope, LITERAL_ARRAY, arraytok, 0, 0);
 
 	if(lexer->peek_token_type() != '}') {
 		Ast** exprs = array_create(Ast*, 4);

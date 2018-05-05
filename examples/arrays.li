@@ -11,7 +11,9 @@ handmade :: () {
 }
 
 literal :: () {
-    s : [4]u8 = array {'h', 'e', 'l', 'o'};
+    //s : [4]u8 = array {'h', 'e', 'l', 'o'};
+    //s := array {'h', 'e', 'l', 'o'};
+    
     print_string(4, cast(^u8)s);
 }
 

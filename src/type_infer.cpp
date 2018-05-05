@@ -347,8 +347,17 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 					expr->type_return = strong;
 				}
 			} else {
-				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
-				expr->type_return = internalize_type(&expr->type_return, expr->scope, true);
+				if(expr->expr_literal.type == LITERAL_ARRAY){
+					size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
+					for(size_t i = 0; i < nexpr; ++i){
+						type_propagate(0, expr->expr_literal.array_exprs[i]);
+					}
+					expr->type_return->array_desc.array_of = expr->expr_literal.array_exprs[0]->type_return;
+					expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+				} else {
+					expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+					expr->type_return = internalize_type(&expr->type_return, expr->scope, true);
+				}
 			}
 		}break;
 
@@ -977,7 +986,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 				size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
 				for(size_t i = 0; i < nexpr; ++i){
 					Type_Instance* type = type_check_expr(check_against->array_desc.array_of, expr->expr_literal.array_exprs[i], error);
-					if(!type) return 0;
+					if(*error) return 0;
 				}
 			} else {
 				type_propagate(check_against, expr);

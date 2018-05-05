@@ -405,6 +405,7 @@ bool Lexer::read_token(char** begin)
 		type = TOKEN_LITERAL_STRING;
 		int i = 0;
 		at++;
+		current_col++;
 		for (; at[i] != '"'; ++i) {
 			if (at[i] == 0) {
 				type = TOKEN_UNKNOWN;
@@ -421,6 +422,7 @@ bool Lexer::read_token(char** begin)
 		type = TOKEN_LITERAL_CHAR;
 		int i = 0;
 		at++;
+		current_col++;
 		length = 0;
 		for (; at[i] != '\''; ++i) {
 			if (at[i] == 0) {

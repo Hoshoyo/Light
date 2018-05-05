@@ -529,7 +529,15 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 			}
 		} else {
 			switch(node->expr_literal.type){
-				case LITERAL_ARRAY:		fprintf(out, "<UNSUPPORTED array literal>"); break;
+				case LITERAL_ARRAY:{
+					fprintf(out, "array {");
+					size_t nexpr = array_get_length(node->expr_literal.array_exprs);
+					for(size_t i = 0; i < nexpr; ++i) {
+						if(i != 0) fprintf(out, ", ");
+						DEBUG_print_expression(out, node->expr_literal.array_exprs[i]);
+					}
+					fprintf(out, "}");
+				}break;
 				case LITERAL_STRUCT:	fprintf(out, "<UNSUPPORTED struct literal>"); break;
 				default:				fprintf(out, "<UNSUPPORTED literal>"); break;
 			}
