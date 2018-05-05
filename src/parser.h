@@ -49,9 +49,8 @@ struct Parser {
 	Ast* parse_expression_precedence9(Scope* scope);
 	Ast* parse_expression_precedence10(Scope* scope);
 
-
+	Ast* parse_expr_literal_array(Scope* scope);
 	Ast* parse_expr_literal(Scope* scope);
-	//Ast* parse_expression(Scope* scope, Precedence caller_prec = PRECEDENCE_0, bool quit_on_precedence = false);
 	Ast* parse_expr_proc_call(Scope* scope);
 
 	// Expression auxiliary

@@ -1,12 +1,22 @@
 print_s32 :: (val : s32) -> s64 #foreign("print_string.obj");
 print_string :: (length : s64, str : ^u8) -> s64 #foreign("print_string.obj");
 
-foo :: (s : [4]s32) {
+handmade :: () {
+    s : [4]u8;
+    s[0] = 'h';
+    s[1] = 'e';
+    s[2] = 'l';
+    s[3] = 'o';
+    print_string(4, cast(^u8)s);
+}
 
+literal :: () {
+    s : [4]u8 = array {'h', 'e', 'l', 'o'};
+    print_string(4, cast(^u8)s);
 }
 
 main :: () -> s32 {
-    s : [4]s32;
-    foo(s);
+    //handmade();
+    literal();
     return 0;
 }

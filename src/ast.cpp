@@ -224,6 +224,8 @@ Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Token* tok
 	el->expr_literal.flags = flags;
 	el->expr_literal.type = literal_type;
 	el->expr_literal.token = token;
+	el->expr_literal.array_exprs = 0;
+	el->expr_literal.array_strong_type = 0;
 
 	return el;
 }

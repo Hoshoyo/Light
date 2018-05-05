@@ -286,8 +286,8 @@ struct Ast_Expr_Literal {
 
 		Ast*  value_struct;			// LITERALS
 		struct {
-			void* value_array;		// DATA IN MEMORY
-			u32   llvm_index;
+			Ast** array_exprs;
+			Type_Instance* array_strong_type;
 		};
 	};
 };

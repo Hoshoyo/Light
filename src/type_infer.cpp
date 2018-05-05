@@ -195,8 +195,33 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 			result->kind = KIND_PRIMITIVE;
 			result->primitive = TYPE_PRIMITIVE_R64;
 		}break;
+		case LITERAL_ARRAY: {
+			result->kind = KIND_ARRAY;
+			size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
+			for(size_t i = 0; i < nexpr; ++i){
+				Type_Instance* type = infer_from_expression(expr->expr_literal.array_exprs[i], error, flags);
+				expr->expr_literal.array_exprs[i]->type_return = type;
+				if(type_strong(type)){
+					expr->expr_literal.array_strong_type = type;
+				}
+			}
+			
+			result->array_desc.dimension_evaluated = true;
+			result->array_desc.dimension = (u64)nexpr;
+			
+			if(expr->expr_literal.array_strong_type){
+				for(size_t i = 0; i < nexpr; ++i){
+					type_propagate(expr->expr_literal.array_strong_type, expr->expr_literal.array_exprs[i]);
+				}
+				result->array_desc.array_of = expr->expr_literal.array_strong_type;
+				result->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+				result->type_size_bits = nexpr * expr->expr_literal.array_strong_type->type_size_bits;
+				internalize_type(&result->array_desc.array_of, expr->scope, true);
+			}
+
+		}break;
 		case LITERAL_STRUCT:
-		case LITERAL_ARRAY: assert_msg(0, "string literal not implemented yet"); break;	// TODO(psv): not implemented yet
+			assert_msg(0, "string literal not implemented yet"); break;	// TODO(psv): not implemented yet
 	}
 	expr->type_return = result;
 	return result;
@@ -313,6 +338,12 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 					expr->type_return = strong;
 				} else if(type_primitive_bool(strong) && type_primitive_bool(expr->type_return)){
 					assert(expr->type_return == strong);
+					expr->type_return = strong;
+				} else if(strong->kind == KIND_ARRAY && expr->expr_literal.type == LITERAL_ARRAY){
+					size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
+					for(size_t i = 0; i < nexpr; ++i){
+						type_propagate(strong->array_desc.array_of, expr->expr_literal.array_exprs[i]);
+					}
 					expr->type_return = strong;
 				}
 			} else {
@@ -942,7 +973,15 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 			}
 		}break;
 		case AST_EXPRESSION_LITERAL: {
-			type_propagate(check_against, expr);
+			if(expr->expr_literal.type == LITERAL_ARRAY){
+				size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
+				for(size_t i = 0; i < nexpr; ++i){
+					Type_Instance* type = type_check_expr(check_against->array_desc.array_of, expr->expr_literal.array_exprs[i], error);
+					if(!type) return 0;
+				}
+			} else {
+				type_propagate(check_against, expr);
+			}
 			return defer_check_against(expr, check_against, expr->type_return, error);
 		}break;
 		case AST_EXPRESSION_PROCEDURE_CALL:

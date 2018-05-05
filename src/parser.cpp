@@ -350,15 +350,22 @@ Ast* Parser::parse_expr_proc_call(Scope* scope) {
 Ast* Parser::parse_expression_precedence10(Scope* scope) {
 	Token* t = lexer->peek_token();
 	if (t->flags & TOKEN_FLAG_LITERAL) {
+		// literal
 		return parse_expr_literal(scope);
+	} else if(t->type == TOKEN_KEYWORD_ARRAY) {
+		// array literal
+		return parse_expr_literal_array(scope);
 	} else if (t->type == TOKEN_IDENTIFIER) {
 		if (lexer->peek_token_type(1) == '(') {
+			// proc call
 			return parse_expr_proc_call(scope);
 		} else {
+			// variable
 			lexer->eat_token();
 			return ast_create_expr_variable(t, scope, 0);
 		}
 	} else if(t->type == '(') {
+		// ( expr )
 		lexer->eat_token();
 		Ast* expr = parse_expression(scope);
 		require_and_eat(')');
@@ -498,6 +505,31 @@ Ast* Parser::parse_expression_precedence1(Scope* scope) {
 
 Ast* Parser::parse_expression(Scope* scope) {
 	return parse_expression_precedence1(scope);
+}
+
+Ast* Parser::parse_expr_literal_array(Scope* scope) {
+	require_and_eat(TOKEN_KEYWORD_ARRAY);
+	require_and_eat('{');
+
+	Ast* node = ast_create_expr_literal(scope, LITERAL_ARRAY, 0, 0, 0);
+
+	if(lexer->peek_token_type() != '}') {
+		Ast** exprs = array_create(Ast*, 4);
+		while(true){
+			Ast* expr = parse_expression(scope);
+			array_push(exprs, &expr);
+
+			if(lexer->peek_token_type() != ','){
+				break;
+			} else {
+				lexer->eat_token();
+			}
+		}
+		node->expr_literal.array_exprs = exprs;
+	}
+
+	require_and_eat('}');
+	return node;
 }
 
 Ast* Parser::parse_expr_literal(Scope* scope) {
