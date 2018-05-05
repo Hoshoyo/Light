@@ -193,7 +193,7 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 		}break;
 		case LITERAL_FLOAT: {
 			result->kind = KIND_PRIMITIVE;
-			result->primitive = TYPE_PRIMITIVE_R64;
+			result->primitive = TYPE_PRIMITIVE_R32;
 		}break;
 		case LITERAL_ARRAY: {
 			result->kind = KIND_ARRAY;

@@ -314,8 +314,8 @@ void C_Code_Generator::emit_command(Ast* comm) {
                         if(expr){
                             if(expr->type_return->kind == KIND_ARRAY){
                                 emit_array_assignment(cm);
-                            } else if(expr->type_return->kind == KIND_STRUCT) {
-                                assert_msg(0, "struct literal not implemented for c backend");
+                            //} else if(expr->type_return->kind == KIND_STRUCT) {
+                            //    assert_msg(0, "struct literal not implemented for c backend");
                             } else {
                                 sprint("%.*s = ", TOKEN_STR(cm->decl_variable.name));
                                 emit_expression(cm->decl_variable.assignment);

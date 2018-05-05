@@ -20,18 +20,20 @@ void println();
 s32 __main();
 
 s32 __main(){
-s64 i = 0;
-s64 j = 0;
-while((i<10)){
+s64 i;
+i = 0;
+s64 j;
 j = 0;
-while((j<10)){
+while(((i)<10)){
+j = 0;
+while(((j)<10)){
 print_s64(((s64)j));
-if(((i==4)&&(j==5)))goto loop_1;
-j = (j+1);
+if(((((i)==4))&&((j)==5)))goto loop_0;
+j = ((j)+1);
 }
 loop_1:;
 
-i = (i+1);
+i = ((i)+1);
 println();
 }
 loop_0:;
