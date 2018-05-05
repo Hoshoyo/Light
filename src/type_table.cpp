@@ -82,6 +82,7 @@ u64 type_primitive_hash(Type_Primitive p) {
 
 u64 type_hash(Type_Instance* type) {
 	u64 hash = 0;
+	if(!type) return 0;
 	switch (type->kind) {
 		case KIND_PRIMITIVE:
 			hash = type_primitive_hash(type->primitive); break;

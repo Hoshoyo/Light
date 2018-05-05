@@ -411,7 +411,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				Type_Error type_error = TYPE_OK;
 				Type_Instance* infered = infer_from_expression(node->decl_variable.assignment, &type_error, TYPE_INFER_REPORT_UNDECLARED);
 				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
-				if (infered->flags & TYPE_FLAG_WEAK) {
+				if (infered && infered->flags & TYPE_FLAG_WEAK) {
 					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
 					if(infered->kind == KIND_ARRAY) {
 						//internalize_type(&)
@@ -421,6 +421,10 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 					}
 				}
 				if(!node->decl_variable.variable_type){
+					if(!infered){
+						type_error |= report_type_error(TYPE_ERROR_FATAL, node, "could not infer variable type from assignment expression\n");
+						return type_error | error;
+					}
 					node->decl_variable.variable_type = infered;
 				} else {
 					node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);

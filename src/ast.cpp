@@ -405,7 +405,7 @@ void quick_type(FILE* out, Type_Instance* type) {
 int DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
 	int count = 0;
 	if (!type) {
-		count += fprintf(out, "(TYPE_IS_NULL)");
+		count += fprintf(out, "unknown");
 		return;
 	}
 	if (type->kind == KIND_PRIMITIVE) {
@@ -531,7 +531,10 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 			switch(node->expr_literal.type){
 				case LITERAL_ARRAY:{
 					fprintf(out, "array {");
-					size_t nexpr = array_get_length(node->expr_literal.array_exprs);
+					size_t nexpr = 0;
+					if(node->expr_literal.array_exprs){
+						nexpr = array_get_length(node->expr_literal.array_exprs);
+					}
 					for(size_t i = 0; i < nexpr; ++i) {
 						if(i != 0) fprintf(out, ", ");
 						DEBUG_print_expression(out, node->expr_literal.array_exprs[i]);

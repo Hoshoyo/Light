@@ -197,7 +197,12 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 		}break;
 		case LITERAL_ARRAY: {
 			result->kind = KIND_ARRAY;
-			size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
+
+			size_t nexpr = 0;
+			if(expr->expr_literal.array_exprs){
+				nexpr = array_get_length(expr->expr_literal.array_exprs);
+			}
+
 			for(size_t i = 0; i < nexpr; ++i){
 				Type_Instance* type = infer_from_expression(expr->expr_literal.array_exprs[i], error, flags);
 				expr->expr_literal.array_exprs[i]->type_return = type;
@@ -217,6 +222,10 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 				result->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
 				result->type_size_bits = nexpr * expr->expr_literal.array_strong_type->type_size_bits;
 				internalize_type(&result->array_desc.array_of, expr->scope, true);
+			} else if(expr->expr_literal.array_exprs) {
+				result->array_desc.array_of = expr->expr_literal.array_exprs[0]->type_return;
+			} else {
+				result->array_desc.array_of = 0;
 			}
 
 		}break;
@@ -340,7 +349,10 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 					assert(expr->type_return == strong);
 					expr->type_return = strong;
 				} else if(strong->kind == KIND_ARRAY && expr->expr_literal.type == LITERAL_ARRAY){
-					size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
+					size_t nexpr = 0;
+					if(expr->expr_literal.array_exprs){
+						nexpr = array_get_length(expr->expr_literal.array_exprs);
+					}
 					for(size_t i = 0; i < nexpr; ++i){
 						type_propagate(strong->array_desc.array_of, expr->expr_literal.array_exprs[i]);
 					}
@@ -983,10 +995,12 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 		}break;
 		case AST_EXPRESSION_LITERAL: {
 			if(expr->expr_literal.type == LITERAL_ARRAY){
-				size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
-				for(size_t i = 0; i < nexpr; ++i){
-					Type_Instance* type = type_check_expr(check_against->array_desc.array_of, expr->expr_literal.array_exprs[i], error);
-					if(*error) return 0;
+				if(expr->expr_literal.array_exprs){
+					size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
+					for(size_t i = 0; i < nexpr; ++i){
+						Type_Instance* type = type_check_expr(check_against->array_desc.array_of, expr->expr_literal.array_exprs[i], error);
+						if(*error) return 0;
+					}
 				}
 			} else {
 				type_propagate(check_against, expr);

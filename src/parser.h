@@ -48,6 +48,7 @@ struct Parser {
 	Ast* parse_expression_precedence8(Scope* scope);
 	Ast* parse_expression_precedence9(Scope* scope);
 	Ast* parse_expression_precedence10(Scope* scope);
+	Ast* parse_expression_left_dot(Scope* scope);
 
 	Ast* parse_expr_literal_array(Scope* scope);
 	Ast* parse_expr_literal(Scope* scope);
