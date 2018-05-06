@@ -411,11 +411,12 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				Type_Error type_error = TYPE_OK;
 				Type_Instance* infered = infer_from_expression(node->decl_variable.assignment, &type_error, TYPE_INFER_REPORT_UNDECLARED);
 				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
+				bool typechecked = false;
 				if (infered && infered->flags & TYPE_FLAG_WEAK) {
 					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
 					if(infered->kind == KIND_ARRAY || infered->kind == KIND_STRUCT) {
-						node->decl_variable.assignment->type_return = resolve_type(node->scope, node->decl_variable.assignment->type_return, true);
 						infered = type_check_expr(node->decl_variable.assignment->type_return, node->decl_variable.assignment, &error);
+						typechecked = true;
 					} else {
 						infered = node->decl_variable.assignment->type_return;
 					}
@@ -427,7 +428,8 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 					}
 					node->decl_variable.variable_type = infered;
 				} else {
-					node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);
+					if(!typechecked)
+						node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);
 				}
 				error |= type_error;
 			}

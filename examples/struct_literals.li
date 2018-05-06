@@ -1,11 +1,18 @@
+vec2 :: struct {
+	x : r32;
+	y : r32;
+}
+
 Person :: struct {
-	//name   : string;
+	name   : string;
 	age    : s32;
 	height : r32;
+	position : vec2;
 }
 
 main :: () -> s32 {
-	p : Person = Person{26, 1.75};
+	ptr : ^u8;
+	p : Person = Person{string{0, -1, ptr}, 26, 1.0, vec2{1.0, 2.0}};
 
 	//person1 := Person{ "P1", 26, 1.75 };
 	//println(person1);
@@ -22,6 +29,12 @@ main :: () -> s32 {
 	//person4 := Person{ name : "P4", age : 48 };
 	//println(person4);
 	return 0;
+}
+
+string :: struct {
+	length : s64;
+	capacity : s64;
+	data : ^u8;
 }
 
 /* 

@@ -90,6 +90,11 @@ u64 type_hash(Type_Instance* type) {
 			hash = fnv_1_hash_from_start(type_hash(type->pointer_to), (const u8*)"pointer", sizeof("pointer") - 1); break;
 		case KIND_STRUCT:
 			hash = fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length); break;
+			//size_t n_fields = 0;
+			//if(type->struct_desc.fields_types) n_fields = array_get_length(type->struct_desc.fields_types);
+			//for(size_t i = 0; i < n_args; ++i) {
+			//	
+			//}
 		case KIND_FUNCTION: {
 			u64 return_type_hash = type_hash(type->function_desc.return_type);
 			size_t n_args = 0;

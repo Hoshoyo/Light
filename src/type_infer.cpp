@@ -382,10 +382,17 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 					if(expr->expr_literal.struct_exprs) {
 						nexpr = array_get_length(expr->expr_literal.struct_exprs);
 					}
-					for(size_t i = 0; i < nexpr; ++i){
-						type_propagate(strong->struct_desc.fields_types[i], expr->expr_literal.struct_exprs[i]);
+					size_t strong_dim = 0;
+					if(strong->struct_desc.fields_types){
+						strong_dim = array_get_length(strong->struct_desc.fields_types);
 					}
-					expr->type_return = strong;
+					for(size_t i = 0; i < MIN(nexpr,strong_dim); ++i){
+						type_propagate(strong->struct_desc.fields_types[i], expr->expr_literal.struct_exprs[i]);
+						expr->type_return->struct_desc.fields_types[i] = expr->expr_literal.struct_exprs[i]->type_return;
+					}
+					expr->type_return->flags |= TYPE_FLAG_RESOLVED;
+					internalize_type(&expr->type_return, expr->scope, true);
+					int xxx =0;
 				}
 			} else {
 				if(expr->expr_literal.type == LITERAL_ARRAY){
@@ -1026,18 +1033,45 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 			}
 		}break;
 		case AST_EXPRESSION_LITERAL: {
-			if(expr->expr_literal.type == LITERAL_ARRAY) {
+			if(expr->expr_literal.type == LITERAL_ARRAY && check_against->kind == KIND_ARRAY) {
 				if(expr->expr_literal.array_exprs){
+					size_t check_against_dim = check_against->array_desc.dimension;
 					size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
-					for(size_t i = 0; i < nexpr; ++i){
-						Type_Instance* type = type_check_expr(check_against->array_desc.array_of, expr->expr_literal.array_exprs[i], error);
-						if(*error) return 0;
+					if(nexpr == check_against_dim){
+						for(size_t i = 0; i < nexpr; ++i){
+							Type_Instance* type = type_check_expr(check_against->array_desc.array_of, expr->expr_literal.array_exprs[i], error);
+							if(*error) return 0;
+						}
 					}
 				}
 				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
-			} else if(expr->expr_literal.type == LITERAL_STRUCT) {
+			} else if(expr->expr_literal.type == LITERAL_STRUCT && check_against->kind == KIND_STRUCT) {
 				if(expr->expr_literal.struct_exprs) {
+					size_t check_against_num_fields = 0;
+					if(check_against->struct_desc.fields_types) {
+						check_against_num_fields = array_get_length(check_against->struct_desc.fields_types);
+					}
 					size_t nexpr = array_get_length(expr->expr_literal.struct_exprs);
+					if(nexpr == check_against_num_fields){
+						for(size_t i = 0; i < nexpr; ++i) {
+							Ast* e = expr->expr_literal.struct_exprs[i];
+							Type_Instance* type = type_check_expr(check_against->struct_desc.fields_types[i], e, error);
+							if(*error) return 0;
+						}
+					} else if(nexpr > check_against_num_fields) {
+						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "too many fields for %.*s struct literal\n", TOKEN_STR(expr->expr_literal.token));
+						return 0;
+					} else if(nexpr < check_against_num_fields) {
+						size_t nmissing = check_against_num_fields - nexpr; 
+						if(nmissing == 1) {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "missing '%d' field in %.*s struct literal\n", 
+								nmissing, TOKEN_STR(expr->expr_literal.token));
+						} else {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "missing '%d' fields in %.*s struct literal\n", 
+								nmissing, TOKEN_STR(expr->expr_literal.token));
+						}
+						return 0;
+					}
 				}
 			} else {
 				type_propagate(check_against, expr);

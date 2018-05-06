@@ -556,8 +556,8 @@ Ast* Parser::parse_expr_literal_struct(Token* name, Scope* scope){
 			} else {
 				lexer->eat_token();
 			}
-			node->expr_literal.struct_exprs = exprs;
 		}
+		node->expr_literal.struct_exprs = exprs;
 	}
 	require_and_eat('}');
 	return node;
