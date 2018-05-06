@@ -95,8 +95,8 @@ bool str_equal(const string& s1, const string& s2)
 	return false;
 }
 
-s32 align_delta(s32 offset, s32 align_to){
-	s32 rest = offset % align_to;
+s64 align_delta(s64 offset, s64 align_to){
+	s64 rest = offset % align_to;
 	return((align_to - rest) % align_to);
 }
 

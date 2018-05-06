@@ -311,6 +311,11 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 	assert(expr->node_type == AST_EXPRESSION_VARIABLE);
 
 	Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
+	if(decl->node_type == KIND_STRUCT){
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot use structure name '%.*s' as expression\n", 
+			TOKEN_STR(expr->expr_variable.name));
+		return 0;
+	}
 	if (!decl) {
 		*error |= TYPE_ERROR_FATAL;
 		if(flags & TYPE_INFER_REPORT_UNDECLARED) {
@@ -322,8 +327,7 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 	Type_Instance* type = 0;
 
 	if (decl->node_type != AST_DECL_VARIABLE && decl->node_type != AST_DECL_CONSTANT) {
-		//assert_msg(0, "function pointer not implemented"); // implement function ptr
-		assert(decl->node_type == AST_DECL_PROCEDURE);
+		assert_msg(decl->node_type == AST_DECL_PROCEDURE, "invalid variable node");
 		type = decl->decl_procedure.type_procedure;
 
 		if(!type) {
@@ -340,9 +344,6 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 			return 0;
 		}
 
-		if(!type_strong(type)){
-			int x = 0;
-		}
 		assert(type_strong(type));
 		expr->flags |= AST_FLAG_LVALUE;
 		expr->type_return = type;
@@ -411,6 +412,9 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 						nexpr = array_get_length(expr->expr_literal.struct_exprs);
 					}
 					strong = expr->type_return = resolve_type(expr->scope, expr->type_return, true);
+					if(!strong) {
+						return 0;
+					}
 					for(size_t i = 0; i < nexpr; ++i){
 						type_propagate(strong->struct_desc.fields_types[i], expr->expr_literal.struct_exprs[i]);
 						expr->type_return->struct_desc.fields_types[i] = expr->expr_literal.struct_exprs[i]->type_return;
@@ -457,7 +461,9 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 				}
 
 				case OP_BINARY_DOT:
-					assert(0);
+					//assert(0);
+					assert(type_strong(expr->expr_binary.left->type_return));
+					assert(type_strong(expr->expr_binary.right->type_return));
 					break;
 				case OP_BINARY_VECTOR_ACCESS:
 					// index should be strong aswell as indexed
@@ -1056,6 +1062,9 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 				}
 				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
 			} else if(expr->expr_literal.type == LITERAL_STRUCT && check_against->kind == KIND_STRUCT) {
+				// @TODO set check_against here to 0
+				// @BUG
+				// using the struct name as variable i think this crashes, maybe?
 				if(expr->expr_literal.struct_exprs) {
 					size_t check_against_num_fields = 0;
 					if(check_against->struct_desc.fields_types) {

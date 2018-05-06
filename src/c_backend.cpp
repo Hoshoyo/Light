@@ -10,7 +10,7 @@ static void report_fatal_error(char* msg, ...) {
 	//assert(0);
 	exit(-1);
 }
-#define DEBUG 1
+//#define DEBUG 1
 int C_Code_Generator::sprint(char* msg, ...) {
 	va_list args;
 	va_start(args, msg);
@@ -281,7 +281,7 @@ void C_Code_Generator::emit_array_assignment(Ast* decl) {
     Type_Instance* indexed_type = decl->decl_variable.variable_type;
     Ast* expr = decl->decl_variable.assignment;
 
-    assert(decl->decl_variable.variable_type->kind == KIND_ARRAY);
+    assert(indexed_type->kind == KIND_ARRAY);
     assert(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY);
 
     sprint("{\n");
@@ -289,6 +289,41 @@ void C_Code_Generator::emit_array_assignment(Ast* decl) {
     emit_array_assignment_from_base(expr);
     sprint("}\n");
 
+}
+
+void C_Code_Generator::emit_struct_assignment_from_base(s64 offset_bytes, Ast* expr) {
+    // base is a char*
+    if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT){
+        size_t nexpr = 0;
+        Type_Instance* stype = expr->type_return;
+        if(expr->expr_literal.struct_exprs){
+            nexpr = array_get_length(expr->expr_literal.struct_exprs);
+            for(size_t i = 0; i < nexpr; ++i) {
+                s64 localoffset_bytes = stype->struct_desc.offset_bits[i] / 8;
+                emit_struct_assignment_from_base(offset_bytes + localoffset_bytes, expr->expr_literal.array_exprs[i]);
+            }
+        }
+    } else {
+        sprint("*(");
+        emit_type(expr->type_return);
+        sprint("*)((char*)base + %lld) = ", offset_bytes);
+        emit_expression(expr);
+        sprint(";\n");
+        //sprint("base += %lld;\n", expr->type_return->type_size_bits / 8);
+    }
+}
+
+void C_Code_Generator::emit_struct_assignment(Ast* decl) {
+    Type_Instance* struct_type = decl->decl_variable.variable_type;
+    Ast* expr = decl->decl_variable.assignment;
+
+    assert(struct_type->kind == KIND_STRUCT);
+    assert(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT);
+
+    sprint("{\n");
+    sprint("char* base = (char*)&(%.*s);\n", TOKEN_STR(decl->decl_variable.name));
+    emit_struct_assignment_from_base(0, expr);
+    sprint("}\n");
 }
 
 void C_Code_Generator::emit_command(Ast* comm) {
@@ -311,8 +346,8 @@ void C_Code_Generator::emit_command(Ast* comm) {
                             if(expr->type_return->kind == KIND_ARRAY){
                                 emit_array_assignment(cm);
                             } else if(expr->type_return->kind == KIND_STRUCT) {
-                                //emit_struct_assignment(cm);
-                                assert_msg(0, "struct literal not implemented for c backend");
+                                emit_struct_assignment(cm);
+                                //assert_msg(0, "struct literal not implemented for c backend");
                             } else {
                                 sprint("%.*s = ", TOKEN_STR(cm->decl_variable.name));
                                 emit_expression(cm->decl_variable.assignment);

@@ -277,31 +277,32 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				bool packed = false;
 				size_t nfields = node->decl_struct.fields_count;
 				Type_Instance* tinfo = node->decl_struct.type_info;
-				s32 offset = 0;
+				s64 offset = 0;
 				s32 alignment = 0;
 				size_t type_size_bits = 0;
+
 
 				for (size_t i = 0; i < nfields; ++i) {
 					Decl_Error e = resolve_types_decls(node->decl_struct.struct_scope, node->decl_struct.fields[i], rep_undeclared);
 					error |= e;
 					if (e & DECL_QUEUED_TYPE) {
-						continue;
+						break;
 					} else {
 						tinfo->struct_desc.fields_types[i] = node->decl_struct.fields[i]->decl_variable.variable_type;
-						s32 field_type_size = tinfo->struct_desc.fields_types[i]->type_size_bits;
+						s64 field_type_size = tinfo->struct_desc.fields_types[i]->type_size_bits;
 						tinfo->struct_desc.offset_bits[i] = offset;
 
 						type_size_bits += field_type_size;
-						if(type_size_bits == 0) continue;
+						if(field_type_size == 0) continue;
 
 						if(!packed){
 							// align type to its boundary
-							s32 offset_bytes = offset / 8;
-							s32 field_type_size_bytes = field_type_size / 8;
+							s64 offset_bytes = offset / 8;
+							s64 field_type_size_bytes = field_type_size / 8;
 							alignment = get_alignment_from_type(tinfo->struct_desc.fields_types[i]);
 
 							if(offset_bytes % alignment != 0) {
-								s32 delta = align_delta(offset_bytes, alignment);
+								s64 delta = align_delta(offset_bytes, alignment);
 								delta *= 8; // delta in bits
 								tinfo->struct_desc.offset_bits[i] += delta;
 								type_size_bits += delta;
@@ -309,15 +310,22 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 							}
 						}
 						offset += field_type_size;
-						if(i == 0){
+						if(i == 0 || alignment == 0){
 							tinfo->struct_desc.alignment = alignment;
 						}
 					}
 				}
+
 				if (error & DECL_QUEUED_TYPE) {
 					infer_queue_push(node);
 					error |= DECL_QUEUED_TYPE;
 				} else {
+					if(!packed){
+						// adjust for the alignment of the first element
+						s64 first_alignment = tinfo->struct_desc.alignment;
+						s64 delta = align_delta(type_size_bits / 8, first_alignment);
+						type_size_bits += delta * 8;
+					}
 					node->decl_struct.type_info->type_size_bits = type_size_bits;
 					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
 					node->decl_struct.type_info = internalize_type(&tinfo, scope, true);
@@ -634,6 +642,9 @@ Decl_Error decl_check_inner(Scope* global_scope, Ast** ast_top_level) {
 	size_t ndecls = array_get_length(ast_top_level);
 
 	for (size_t i = 0; i < ndecls; ++i) {
+		if(i == 8){
+			int x = 0;
+		}
 		Ast* node = ast_top_level[i];
 		if (node->flags & AST_FLAG_IS_DECLARATION) {
 			error |= decl_check_inner_decl(node);

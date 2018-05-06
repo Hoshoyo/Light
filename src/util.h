@@ -19,7 +19,7 @@ struct string {
 string string_new(const char* v, s64 length);
 void   string_free(string* s);
 void   string_append(string* s1, const char* s2);
-s32 align_delta(s32 offset, s32 align_to);
+s64 align_delta(s64 offset, s64 align_to);
 s32 next_power2(s32 v);
 
 string string_make(const char* v);

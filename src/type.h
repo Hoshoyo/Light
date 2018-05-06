@@ -44,7 +44,7 @@ struct Type_Struct {
 	Token*          name;
 	Type_Instance** fields_types;
 	string*         fields_names;
-	s32*            offset_bits;
+	s64*            offset_bits;
 	s32             fields_count;
 	s32             alignment;
 };
