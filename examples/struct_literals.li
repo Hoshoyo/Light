@@ -12,7 +12,7 @@ Person :: struct {
 
 main :: () -> s32 {
 	ptr : ^u8;
-	p : Person = Person{string{0, -1, ptr}, 26, 1.0, vec2{1.0, 2.0}};
+	p := Person{string{0, -1, ptr}, 26, 1.0, vec2{1.0, 2.0}};
 
 	//person1 := Person{ "P1", 26, 1.75 };
 	//println(person1);

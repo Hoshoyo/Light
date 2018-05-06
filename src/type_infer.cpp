@@ -392,7 +392,6 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 					}
 					expr->type_return->flags |= TYPE_FLAG_RESOLVED;
 					internalize_type(&expr->type_return, expr->scope, true);
-					int xxx =0;
 				}
 			} else {
 				if(expr->expr_literal.type == LITERAL_ARRAY){
@@ -403,8 +402,15 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 					expr->type_return->array_desc.array_of = expr->expr_literal.array_exprs[0]->type_return;
 					expr->type_return = resolve_type(expr->scope, expr->type_return, false);
 				} else if(expr->expr_literal.type == LITERAL_STRUCT) {
-					expr->type_return = resolve_type(expr->scope, expr->type_return, true);
-					expr->type_return = internalize_type(&expr->type_return, expr->scope, true);
+					size_t nexpr = 0;
+					if(expr->expr_literal.struct_exprs) {
+						nexpr = array_get_length(expr->expr_literal.struct_exprs);
+					}
+					strong = expr->type_return = resolve_type(expr->scope, expr->type_return, true);
+					for(size_t i = 0; i < nexpr; ++i){
+						type_propagate(strong->struct_desc.fields_types[i], expr->expr_literal.struct_exprs[i]);
+						expr->type_return->struct_desc.fields_types[i] = expr->expr_literal.struct_exprs[i]->type_return;
+					}
 				}else {
 					expr->type_return = resolve_type(expr->scope, expr->type_return, false);
 					expr->type_return = internalize_type(&expr->type_return, expr->scope, true);
@@ -1055,6 +1061,9 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					if(nexpr == check_against_num_fields){
 						for(size_t i = 0; i < nexpr; ++i) {
 							Ast* e = expr->expr_literal.struct_exprs[i];
+							if(type_weak(e->type_return)){
+								type_propagate(0, e);
+							}
 							Type_Instance* type = type_check_expr(check_against->struct_desc.fields_types[i], e, error);
 							if(*error) return 0;
 						}
