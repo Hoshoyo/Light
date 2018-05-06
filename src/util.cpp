@@ -95,6 +95,23 @@ bool str_equal(const string& s1, const string& s2)
 	return false;
 }
 
+s32 align_delta(s32 offset, s32 align_to){
+	s32 rest = offset % align_to;
+	return((align_to - rest) % align_to);
+}
+
+//https://stackoverflow.com/questions/466204/rounding-up-to-next-power-of-2
+s32 next_power2(s32 v) {
+	v--;
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	v++;
+	return v;
+}
+
 bool is_white_space(char str)
 {
 	return (str == ' ' ||

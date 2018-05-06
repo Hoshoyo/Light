@@ -27,6 +27,23 @@ inline void infer_queue_remove(Ast* node) {
 	}
 }
 
+s32 get_alignment_from_type(Type_Instance* type){
+	switch(type->kind) {
+		case KIND_PRIMITIVE: return type->type_size_bits / 8;
+		case KIND_POINTER:   return type_pointer_size_bits() / 8;
+		case KIND_FUNCTION:  return type_pointer_size_bits() / 8;
+		case KIND_ARRAY:     return get_alignment_from_type(type->array_desc.array_of);
+		case KIND_STRUCT:{
+			if(type->struct_desc.fields_count > 0){
+				return get_alignment_from_type(type->struct_desc.fields_types[0]);
+			} else {
+				return 0;
+			}
+		}   
+	}
+	return 0;
+}
+
 // ---------------------------------------------
 // -------------- Declarations -----------------
 // ---------------------------------------------
@@ -194,7 +211,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				}
 				Type_Instance* type = infer_from_expression(node->decl_variable.assignment, &error, rep_undeclared);
 				if (error & DECL_ERROR_FATAL) return error;
-				if (!type) {
+				if (!type || error & DECL_QUEUED_TYPE) {
 					infer_queue_push(node);
 					error |= DECL_QUEUED_TYPE;
 					return error;
@@ -226,7 +243,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				// infer from exp
 				Type_Instance* type = infer_from_expression(node->decl_constant.value, &error, rep_undeclared);
 				if(error & DECL_ERROR_FATAL) return error;
-				if(!type){
+				if(!type || error & DECL_QUEUED_TYPE){
 					infer_queue_push(node);
 					error |= DECL_QUEUED_TYPE;
 					return error;
@@ -257,10 +274,13 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 			if (node->decl_struct.type_info->flags & TYPE_FLAG_RESOLVED) {
 				return error;
 			} else {
+				bool packed = false;
 				size_t nfields = node->decl_struct.fields_count;
 				Type_Instance* tinfo = node->decl_struct.type_info;
-
+				s32 offset = 0;
+				s32 alignment = 0;
 				size_t type_size_bits = 0;
+
 				for (size_t i = 0; i < nfields; ++i) {
 					Decl_Error e = resolve_types_decls(node->decl_struct.struct_scope, node->decl_struct.fields[i], rep_undeclared);
 					error |= e;
@@ -268,7 +288,30 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 						continue;
 					} else {
 						tinfo->struct_desc.fields_types[i] = node->decl_struct.fields[i]->decl_variable.variable_type;
-						type_size_bits += tinfo->struct_desc.fields_types[i]->type_size_bits;
+						s32 field_type_size = tinfo->struct_desc.fields_types[i]->type_size_bits;
+						tinfo->struct_desc.offset_bits[i] = offset;
+
+						type_size_bits += field_type_size;
+						if(type_size_bits == 0) continue;
+
+						if(!packed){
+							// align type to its boundary
+							s32 offset_bytes = offset / 8;
+							s32 field_type_size_bytes = field_type_size / 8;
+							alignment = get_alignment_from_type(tinfo->struct_desc.fields_types[i]);
+
+							if(offset_bytes % alignment != 0) {
+								s32 delta = align_delta(offset_bytes, alignment);
+								delta *= 8; // delta in bits
+								tinfo->struct_desc.offset_bits[i] += delta;
+								type_size_bits += delta;
+								offset += delta;
+							}
+						}
+						offset += field_type_size;
+						if(i == 0){
+							tinfo->struct_desc.alignment = alignment;
+						}
 					}
 				}
 				if (error & DECL_QUEUED_TYPE) {

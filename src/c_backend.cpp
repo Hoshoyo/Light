@@ -10,7 +10,7 @@ static void report_fatal_error(char* msg, ...) {
 	//assert(0);
 	exit(-1);
 }
-//#define DEBUG 1
+#define DEBUG 1
 int C_Code_Generator::sprint(char* msg, ...) {
 	va_list args;
 	va_start(args, msg);
@@ -291,10 +291,6 @@ void C_Code_Generator::emit_array_assignment(Ast* decl) {
 
 }
 
-void C_Code_Generator::emit_array_assignment(Ast* l, Ast* right){
-
-}
-
 void C_Code_Generator::emit_command(Ast* comm) {
 	switch (comm->node_type) {
 		case AST_COMMAND_BLOCK:{
@@ -314,8 +310,9 @@ void C_Code_Generator::emit_command(Ast* comm) {
                         if(expr){
                             if(expr->type_return->kind == KIND_ARRAY){
                                 emit_array_assignment(cm);
-                            //} else if(expr->type_return->kind == KIND_STRUCT) {
-                            //    assert_msg(0, "struct literal not implemented for c backend");
+                            } else if(expr->type_return->kind == KIND_STRUCT) {
+                                //emit_struct_assignment(cm);
+                                assert_msg(0, "struct literal not implemented for c backend");
                             } else {
                                 sprint("%.*s = ", TOKEN_STR(cm->decl_variable.name));
                                 emit_expression(cm->decl_variable.assignment);

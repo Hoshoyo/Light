@@ -184,7 +184,10 @@ Type_Instance* type_copy_internal(Type_Instance* type, Scope* scope) {
 }
 
 Type_Instance* internalize_type(Type_Instance** type, Scope* scope, bool copy) {
-	assert((*type)->flags & TYPE_FLAG_RESOLVED);
+	if(!((*type)->flags & TYPE_FLAG_RESOLVED)){
+		int x= 0;
+	}
+	//assert_msg((*type)->flags & TYPE_FLAG_RESOLVED, "trying to internalize a type that is not resolved");
 	u64 hash = type_hash(*type);
 
 	s64 index = hash_table_entry_exist(&type_table, *type, hash);
@@ -278,5 +281,17 @@ void DEBUG_print_type_table() {
 		}
 
 		fprintf(stdout, "size: %lld bits\n", t->type_size_bits);
+	}
+}
+
+void DEBUG_print_type_table_structs() {
+	size_t len = array_get_length(g_type_table);
+	for (size_t i = 0; i < len; ++i) {
+		Type_Instance* t = g_type_table[i];
+		if(t->kind == KIND_STRUCT){
+			s32 c = DEBUG_print_type_detailed(stdout, t);
+		} else {
+			continue;
+		}
 	}
 }

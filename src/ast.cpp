@@ -402,6 +402,61 @@ void quick_type(FILE* out, Type_Instance* type) {
 	fprintf(out, ">");
 }
 
+
+int DEBUG_print_type_detailed(FILE* out, Type_Instance* type) {
+	int count = 0;
+	if (!type) {
+		count += fprintf(out, "unknown");
+		return;
+	}
+	if (type->kind == KIND_PRIMITIVE) {
+		switch (type->primitive) {
+			case TYPE_PRIMITIVE_S64:	count += fprintf(out, "(%d)s64", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_S32:	count += fprintf(out, "(%d)s32", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_S16:	count += fprintf(out, "(%d)s16", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_S8:		count += fprintf(out, "(%d)s8", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_U64:	count += fprintf(out, "(%d)u64", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_U32:	count += fprintf(out, "(%d)u32", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_U16:	count += fprintf(out, "(%d)u16", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_U8:		count += fprintf(out, "(%d)u8", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_BOOL:	count += fprintf(out, "(%d)bool", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_R64:	count += fprintf(out, "(%d)r64", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_R32:	count += fprintf(out, "(%d)r32", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_VOID:	count += fprintf(out, "(%d)void", type->type_size_bits / 8); break;
+		}
+	} else if (type->kind == KIND_POINTER) {
+		count += fprintf(out, "(8)^");
+		count += DEBUG_print_type(out, type->pointer_to);
+	} else if (type->kind == KIND_STRUCT) {
+		count += fprintf(out, "(total size %d) %.*s struct {\n", type->type_size_bits / 8, TOKEN_STR(type->struct_desc.name));
+		int num_fields = array_get_length(type->struct_desc.fields_types);
+		for (int i = 0; i < num_fields; ++i) {
+			Type_Instance* field_type = type->struct_desc.fields_types[i];
+			string name = type->struct_desc.fields_names[i];
+			count += fprintf(out, "(offset %d)%.*s : ", type->struct_desc.offset_bits[i] / 8,name.length, name.data);
+			count += DEBUG_print_type(out, field_type);
+			count += fprintf(out, ";\n");
+		}
+		count += fprintf(out, "}\n");
+	} else if (type->kind == KIND_FUNCTION) {
+		count += fprintf(out, "(");
+		int num_args = type->function_desc.num_arguments;
+		for (int i = 0; i < num_args; ++i) {
+			count += DEBUG_print_type(out, type->function_desc.arguments_type[i]);
+			if(i + 1 < num_args) {
+				count += fprintf(out, ",");
+			}
+		}
+		count += fprintf(out, ") -> ");
+		count += DEBUG_print_type(out, type->function_desc.return_type);
+	} else if (type->kind == KIND_ARRAY) {
+		count += fprintf(out, "[%llu", type->array_desc.dimension);
+		count += fprintf(out, "]");
+		count += DEBUG_print_type(out, type->array_desc.array_of);
+	}
+	return count;
+}
+
 int DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
 	int count = 0;
 	if (!type) {

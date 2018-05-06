@@ -367,3 +367,4 @@ char* binop_op_to_string(Operator_Binary binop);
 void DEBUG_print_node(FILE* out, Ast* node);
 void DEBUG_print_ast(FILE* out, Ast** ast, bool print_ts);
 int  DEBUG_print_type(FILE* out, Type_Instance* type, bool short_ = true);
+int  DEBUG_print_type_detailed(FILE* out, Type_Instance* type);

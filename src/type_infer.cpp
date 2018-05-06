@@ -232,6 +232,10 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 		case LITERAL_STRUCT:{
 			result->kind = KIND_STRUCT;
 			result->struct_desc.name = expr->expr_literal.token;
+			Ast* struct_decl = decl_from_name(expr->scope, result->struct_desc.name);
+			if(!struct_decl){
+				*error |= DECL_QUEUED_TYPE;
+			}
 
 			size_t nexpr = 0;
 			if(expr->expr_literal.struct_exprs){

@@ -252,9 +252,13 @@ Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
 	struct_type->kind = KIND_STRUCT;
 	struct_type->struct_desc.fields_names = array_create(string, fields_count);
 	struct_type->struct_desc.fields_types = array_create(Type_Instance*, fields_count);
+	struct_type->struct_desc.offset_bits  = array_create(s32, fields_count);
+	struct_type->struct_desc.fields_count = fields_count;
+	struct_type->struct_desc.alignment    = 0;
 	struct_type->struct_desc.name = name;
 	array_allocate(struct_type->struct_desc.fields_names, fields_count);
 	array_allocate(struct_type->struct_desc.fields_types, fields_count);
+	array_allocate(struct_type->struct_desc.offset_bits, fields_count);
 	for (s32 i = 0; i < fields_count; ++i) {
 		struct_type->struct_desc.fields_names[i] = fields[i]->decl_variable.name->value;
 		struct_type->struct_desc.fields_types[i] = fields[i]->decl_variable.variable_type;

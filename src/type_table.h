@@ -15,3 +15,4 @@ void resolve_type_internalize_queue();
 extern Type_Instance** g_type_table;
 
 void DEBUG_print_type_table();
+void DEBUG_print_type_table_structs();
