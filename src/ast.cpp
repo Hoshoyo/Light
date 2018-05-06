@@ -507,11 +507,11 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 	quick_type(out, node->type_return);
 	switch (node->node_type) {
 	case AST_EXPRESSION_LITERAL: {
-		if(!node->type_return) {
+		if(!node->type_return && print_types) {
 			fprintf(out, "<nil>");
 			break;
 		}
-		if(node->type_return->kind == KIND_PRIMITIVE){
+		if(node->type_return && node->type_return->kind == KIND_PRIMITIVE){
 			switch(node->type_return->primitive){
 				case TYPE_PRIMITIVE_BOOL:	(node->expr_literal.value_bool) ? fprintf(out, "true") : fprintf(out, "false"); break;
 				case TYPE_PRIMITIVE_R32:
@@ -541,7 +541,34 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 					}
 					fprintf(out, "}");
 				}break;
-				case LITERAL_STRUCT:	fprintf(out, "<UNSUPPORTED struct literal>"); break;
+				case LITERAL_STRUCT:{
+					fprintf(out, "%.*s {", TOKEN_STR(node->expr_literal.token));
+					size_t nexpr = 0;
+					if(node->expr_literal.struct_exprs){
+						nexpr = array_get_length(node->expr_literal.struct_exprs);
+					}
+					for (size_t i = 0; i < nexpr; ++i){
+						if(i != 0) fprintf(out, ", ");
+						DEBUG_print_expression(out, node->expr_literal.struct_exprs[i]);
+					}
+					fprintf(out, "}");
+				}break;
+				case LITERAL_FLOAT:{
+					fprintf(out, "%f", node->expr_literal.value_r64);
+				}break;
+				case LITERAL_HEX_INT:
+				case LITERAL_SINT:
+				case LITERAL_UINT:
+				case LITERAL_BIN_INT:{
+					fprintf(out, "0x%llx", node->expr_literal.value_u64);
+				}break;
+				case LITERAL_BOOL:{
+					if(node->expr_literal.value_bool){
+						fprintf(out, "true");
+					} else {
+						fprintf(out, "false");
+					}
+				}break;
 				default:				fprintf(out, "<UNSUPPORTED literal>"); break;
 			}
 		}

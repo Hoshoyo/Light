@@ -38,6 +38,9 @@ int main(int argc, char** argv) {
 	Parser parser(&lexer, &global_scope);
 	Ast** ast_top_level = parser.parse_top_level();
 	
+	//DEBUG_print_ast(stdout, ast_top_level, false);
+	//return 0;
+
 	Decl_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
 	if (decl_err & (~DECL_ERROR_WARNING)) {
 		return -1;
@@ -52,9 +55,9 @@ int main(int argc, char** argv) {
 	printf("Compiler elapsed: %fms\n", (end - start));
 
 	DEBUG_print_ast(stdout, ast_top_level, true);
+	return 0;
 	//DEBUG_print_scope_decls(&global_scope);
 	//DEBUG_print_type_table();
-
 	double bend_start = timer.GetTime();
 	c_generate(ast_top_level, g_type_table, argv[1]);
 	double bend_end = timer.GetTime();

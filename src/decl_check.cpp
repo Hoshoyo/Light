@@ -413,8 +413,8 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
 				if (infered && infered->flags & TYPE_FLAG_WEAK) {
 					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
-					if(infered->kind == KIND_ARRAY) {
-						//internalize_type(&)
+					if(infered->kind == KIND_ARRAY || infered->kind == KIND_STRUCT) {
+						node->decl_variable.assignment->type_return = resolve_type(node->scope, node->decl_variable.assignment->type_return, true);
 						infered = type_check_expr(node->decl_variable.assignment->type_return, node->decl_variable.assignment, &error);
 					} else {
 						infered = node->decl_variable.assignment->type_return;

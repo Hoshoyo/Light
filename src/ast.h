@@ -284,7 +284,7 @@ struct Ast_Expr_Literal {
 
 		bool value_bool;
 
-		Ast*  value_struct;			// LITERALS
+		Ast**  struct_exprs;
 		struct {
 			Ast** array_exprs;
 			Type_Instance* array_strong_type;
