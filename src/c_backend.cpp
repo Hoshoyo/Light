@@ -514,7 +514,7 @@ void C_Code_Generator::emit_expression(Ast* expr){
                 }break;
                 case LITERAL_ARRAY:
                 case LITERAL_STRUCT:
-                    assert_msg(0, "literal array and struct not yet implemented");
+                    assert_msg(0, "incorrect path for array and struct literals");
                     break;
             }
         }break;
@@ -635,10 +635,22 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* decl = toplevel[i];
 		if (decl->node_type == AST_DECL_VARIABLE) {
-			sprint("\t%.*s = ", TOKEN_STR(decl->decl_variable.name));
 			if (decl->decl_variable.assignment) {
 				// emit expression
-				emit_expression(decl->decl_variable.assignment);
+                switch(decl->decl_variable.assignment->type_return->kind){
+                    case KIND_ARRAY:{
+                        emit_array_assignment(decl);
+                    }break;
+                    case KIND_STRUCT:{
+                        emit_struct_assignment(decl);
+                    }break;
+                    case KIND_FUNCTION:
+                    case KIND_POINTER:
+                    case KIND_PRIMITIVE:{
+			            sprint("\t%.*s = ", TOKEN_STR(decl->decl_variable.name));
+				        emit_expression(decl->decl_variable.assignment);
+                    }break;
+                }
 			} else {
 				switch (decl->decl_variable.variable_type->kind) {
 					case KIND_PRIMITIVE:

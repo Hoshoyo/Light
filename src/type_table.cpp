@@ -184,10 +184,8 @@ Type_Instance* type_copy_internal(Type_Instance* type, Scope* scope) {
 }
 
 Type_Instance* internalize_type(Type_Instance** type, Scope* scope, bool copy) {
-	if(!((*type)->flags & TYPE_FLAG_RESOLVED)){
-		int x= 0;
-	}
 	//assert_msg((*type)->flags & TYPE_FLAG_RESOLVED, "trying to internalize a type that is not resolved");
+	// @TODO check this
 	u64 hash = type_hash(*type);
 
 	s64 index = hash_table_entry_exist(&type_table, *type, hash);

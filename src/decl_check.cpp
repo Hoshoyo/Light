@@ -218,7 +218,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				}
 				type->flags |= TYPE_FLAG_RESOLVED;
 				infer_queue_remove(node);
-				node->decl_variable.variable_type = internalize_type(&type, scope, true);
+				//node->decl_variable.variable_type = internalize_type(&type, scope, true);
 				return error;
 			}
 			if (node->decl_variable.variable_type->flags & TYPE_FLAG_RESOLVED) {
@@ -642,9 +642,6 @@ Decl_Error decl_check_inner(Scope* global_scope, Ast** ast_top_level) {
 	size_t ndecls = array_get_length(ast_top_level);
 
 	for (size_t i = 0; i < ndecls; ++i) {
-		if(i == 8){
-			int x = 0;
-		}
 		Ast* node = ast_top_level[i];
 		if (node->flags & AST_FLAG_IS_DECLARATION) {
 			error |= decl_check_inner_decl(node);
