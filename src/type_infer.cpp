@@ -382,6 +382,7 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 						type_propagate(strong->array_desc.array_of, expr->expr_literal.array_exprs[i]);
 					}
 					expr->type_return->array_desc.array_of = strong->array_desc.array_of;
+					internalize_type(&expr->type_return, expr->scope, true);
 				} else if(strong->kind == KIND_STRUCT && expr->expr_literal.type == LITERAL_STRUCT) {
 					size_t nexpr = 0;
 					if(expr->expr_literal.struct_exprs) {

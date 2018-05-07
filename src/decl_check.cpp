@@ -465,6 +465,10 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				bool typechecked = false;
 				if (infered && infered->flags & TYPE_FLAG_WEAK) {
 					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
+					if(!node->decl_variable.assignment->type_return){
+						type_error |= report_type_error(TYPE_ERROR_FATAL, node, "could not infer variable type from assignment expression\n");
+						return type_error | error;
+					}
 					if(infered->kind == KIND_ARRAY || infered->kind == KIND_STRUCT) {
 						infered = type_check_expr(node->decl_variable.assignment->type_return, node->decl_variable.assignment, &error);
 						typechecked = true;

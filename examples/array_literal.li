@@ -5,8 +5,11 @@ print_r64 :: (value : r64) -> s64 #foreign("print_string.obj");
 println :: () -> s64 #foreign("print_string.obj");
 print_string :: (length : s64, str : ^u8) -> s64 #foreign("print_string.obj");
 
+//a : [4]s32 = array {1, 2, 3, 4};
+
 main :: () -> s32 {
 	a : [4]s32 = array {1, 2, 3, 4};
+	print_s32(a[3]);
 	
 	return 0;
 }

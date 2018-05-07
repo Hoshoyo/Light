@@ -14,7 +14,7 @@ typedef double r64;
 
 
 // Forward declarations
-u32 ExitProcess(u32 ret);
+
 s64 print_s64(s64 value);
 s64 print_s32(s32 value);
 s64 print_r32(r32 value);
@@ -24,10 +24,24 @@ s64 print_string(s64 length, u8* str);
 s32 __main();
 
 s32 __main(){
+char a[16];
+{
+char* base = (char*)a;
+*(s32*)base = 1;
+base += 4;
+*(s32*)base = 2;
+base += 4;
+*(s32*)base = 3;
+base += 4;
+*(s32*)base = 4;
+base += 4;
+}
+
+print_s32(*(s32*)(((char*)a)+ 4 * (3)));
 return 0;
 }
 
 
-void __entry() {
-	ExitProcess(__main());
+int __entry() {
+	return __main();
 }
