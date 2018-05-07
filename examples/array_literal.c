@@ -14,6 +14,8 @@ typedef double r64;
 
 
 // Forward declarations
+typedef struct arr{char a[16];} arr;
+typedef struct vec2{r32 x;r32 y;} vec2;
 
 s64 print_s64(s64 value);
 s64 print_s32(s32 value);
@@ -27,17 +29,24 @@ s32 __main(){
 char a[16];
 {
 char* base = (char*)a;
-*(s32*)base = 1;
-base += 4;
-*(s32*)base = 2;
-base += 4;
-*(s32*)base = 3;
-base += 4;
-*(s32*)base = 4;
-base += 4;
+char* struct_base = base;
+struct_base = base;
+{
+char* base = struct_base;
+*(r32*)((char*)base + 0) = 1.000000;
+*(r32*)((char*)base + 4) = 2.000000;
+}
+base += 8;
+struct_base = base;
+{
+char* base = struct_base;
+*(r32*)((char*)base + 0) = 3.000000;
+*(r32*)((char*)base + 4) = 4.000000;
+}
+base += 8;
 }
 
-print_s32(*(s32*)(((char*)a)+ 4 * (3)));
+print_r32(((*(struct vec2*)(((char*)a)+ 8 * (1))).x));
 return 0;
 }
 

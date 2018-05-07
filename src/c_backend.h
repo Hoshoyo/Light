@@ -18,7 +18,7 @@ struct C_Code_Generator {
     void emit_type(Type_Instance* type, Token* name = 0);
 	
 	void emit_array_assignment(Ast* decl);
-	void emit_array_assignment_from_base(Ast* expr);
+	void emit_array_assignment_from_base(s64 offset, Ast* expr);
 	
 	void emit_struct_assignment(Ast* decl);
 	void emit_struct_assignment_from_base(s64 offset, Ast* expr);

@@ -257,23 +257,30 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
     }
 }
 
-void C_Code_Generator::emit_array_assignment_from_base(Ast* expr){
+void C_Code_Generator::emit_array_assignment_from_base(s64 offset_bytes, Ast* expr){
     // base is a char*
     if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY){
-        size_t nexpr = 0;
-        if(expr->expr_literal.array_exprs){
-            nexpr = array_get_length(expr->expr_literal.array_exprs);
-            for(size_t i = 0; i < nexpr; ++i) {
-                emit_array_assignment_from_base(expr->expr_literal.array_exprs[i]);
+            size_t nexpr = 0;
+            if(expr->expr_literal.array_exprs){
+                nexpr = array_get_length(expr->expr_literal.array_exprs);
+                for(size_t i = 0; i < nexpr; ++i) {
+                    emit_array_assignment_from_base(offset_bytes, expr->expr_literal.array_exprs[i]);
+                }
             }
-        }
+    } else if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT) {
+        sprint("struct_base = base;\n");
+        sprint("{\n");
+        sprint("char* base = struct_base;\n");
+        emit_struct_assignment_from_base(0, expr);
+        sprint("}\n");
+        sprint("base += %lld;\n", (expr->type_return->type_size_bits / 8) + offset_bytes);
     } else {
         sprint("*(");
         emit_type(expr->type_return);
         sprint("*)base = ");
         emit_expression(expr);
         sprint(";\n");
-        sprint("base += %lld;\n", expr->type_return->type_size_bits / 8);
+        sprint("base += %lld;\n", (expr->type_return->type_size_bits / 8) + offset_bytes);
     }
 }
 
@@ -286,7 +293,8 @@ void C_Code_Generator::emit_array_assignment(Ast* decl) {
 
     sprint("{\n");
     sprint("char* base = (char*)%.*s;\n", TOKEN_STR(decl->decl_variable.name));
-    emit_array_assignment_from_base(expr);
+    sprint("char* struct_base = base;\n");
+    emit_array_assignment_from_base(0, expr);
     sprint("}\n");
 
 }
@@ -294,22 +302,26 @@ void C_Code_Generator::emit_array_assignment(Ast* decl) {
 void C_Code_Generator::emit_struct_assignment_from_base(s64 offset_bytes, Ast* expr) {
     // base is a char*
     if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT){
-        size_t nexpr = 0;
-        Type_Instance* stype = expr->type_return;
-        if(expr->expr_literal.struct_exprs){
-            nexpr = array_get_length(expr->expr_literal.struct_exprs);
-            for(size_t i = 0; i < nexpr; ++i) {
-                s64 localoffset_bytes = stype->struct_desc.offset_bits[i] / 8;
-                emit_struct_assignment_from_base(offset_bytes + localoffset_bytes, expr->expr_literal.array_exprs[i]);
+            size_t nexpr = 0;
+            Type_Instance* stype = expr->type_return;
+            if(expr->expr_literal.struct_exprs){
+                nexpr = array_get_length(expr->expr_literal.struct_exprs);
+                for(size_t i = 0; i < nexpr; ++i) {
+                    s64 localoffset_bytes = stype->struct_desc.offset_bits[i] / 8;
+                    emit_struct_assignment_from_base(offset_bytes + localoffset_bytes, expr->expr_literal.array_exprs[i]);
+                }
             }
-        }
+    } else if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY) {
+        sprint("{\n");
+        sprint("char* base = array_base;\n");
+        emit_array_assignment_from_base(offset_bytes, expr);
+        sprint("}\n");
     } else {
         sprint("*(");
         emit_type(expr->type_return);
         sprint("*)((char*)base + %lld) = ", offset_bytes);
         emit_expression(expr);
         sprint(";\n");
-        //sprint("base += %lld;\n", expr->type_return->type_size_bits / 8);
     }
 }
 
@@ -321,8 +333,13 @@ void C_Code_Generator::emit_struct_assignment(Ast* decl) {
     assert(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT);
 
     sprint("{\n");
+
     sprint("char* base = (char*)&(%.*s);\n", TOKEN_STR(decl->decl_variable.name));
+
+    // array copies will use this
+    sprint("char* array_base = base;\n");
     emit_struct_assignment_from_base(0, expr);
+
     sprint("}\n");
 }
 
