@@ -268,19 +268,19 @@ void C_Code_Generator::emit_array_assignment_from_base(s64 offset_bytes, Ast* ex
                 }
             }
     } else if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT) {
-        sprint("struct_base = base;\n");
+        sprint("__struct_base = base;\n");
         sprint("{\n");
-        sprint("char* base = struct_base;\n");
+        sprint("char* __t_base = __struct_base;\n");
         emit_struct_assignment_from_base(0, expr);
         sprint("}\n");
-        sprint("base += %lld;\n", (expr->type_return->type_size_bits / 8) + offset_bytes);
+        sprint("__t_base += %lld;\n", (expr->type_return->type_size_bits / 8) + offset_bytes);
     } else {
         sprint("*(");
         emit_type(expr->type_return);
-        sprint("*)base = ");
+        sprint("*)__t_base = ");
         emit_expression(expr);
         sprint(";\n");
-        sprint("base += %lld;\n", (expr->type_return->type_size_bits / 8) + offset_bytes);
+        sprint("__t_base += %lld;\n", (expr->type_return->type_size_bits / 8) + offset_bytes);
     }
 }
 
@@ -292,8 +292,8 @@ void C_Code_Generator::emit_array_assignment(Ast* decl) {
     assert(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY);
 
     sprint("{\n");
-    sprint("char* base = (char*)%.*s;\n", TOKEN_STR(decl->decl_variable.name));
-    sprint("char* struct_base = base;\n");
+    sprint("char* __t_base = (char*)%.*s;\n", TOKEN_STR(decl->decl_variable.name));
+    sprint("char* __struct_base = __t_base;\n");
     emit_array_assignment_from_base(0, expr);
     sprint("}\n");
 
@@ -313,13 +313,13 @@ void C_Code_Generator::emit_struct_assignment_from_base(s64 offset_bytes, Ast* e
             }
     } else if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY) {
         sprint("{\n");
-        sprint("char* base = array_base;\n");
+        sprint("char* __t_base = __array_base;\n");
         emit_array_assignment_from_base(offset_bytes, expr);
         sprint("}\n");
     } else {
         sprint("*(");
         emit_type(expr->type_return);
-        sprint("*)((char*)base + %lld) = ", offset_bytes);
+        sprint("*)((char*)__t_base + %lld) = ", offset_bytes);
         emit_expression(expr);
         sprint(";\n");
     }
@@ -334,10 +334,10 @@ void C_Code_Generator::emit_struct_assignment(Ast* decl) {
 
     sprint("{\n");
 
-    sprint("char* base = (char*)&(%.*s);\n", TOKEN_STR(decl->decl_variable.name));
+    sprint("char* __t_base = (char*)&(%.*s);\n", TOKEN_STR(decl->decl_variable.name));
 
     // array copies will use this
-    sprint("char* array_base = base;\n");
+    sprint("char* __array_base = __t_base;\n");
     emit_struct_assignment_from_base(0, expr);
 
     sprint("}\n");
@@ -425,7 +425,7 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			Ast* rval = comm->comm_var_assign.rvalue;
             
 			// register size assignment
-			if (type_regsize(rval->type_return) || rval->type_return->kind == KIND_STRUCT || rval->type_return->kind == KIND_FUNCTION) {
+			if (type_regsize(rval->type_return) || rval->type_return->kind == KIND_FUNCTION) {
 				if (comm->comm_var_assign.lvalue) {
 					emit_expression(comm->comm_var_assign.lvalue);
 					sprint(" = ");
@@ -435,7 +435,30 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			}
 			// bigger than regsize
 			else {
-				assert_msg(0, "assignment of type not recognized");
+                if(rval->node_type == AST_EXPRESSION_VARIABLE && rval->type_return->kind == KIND_STRUCT){
+                    if (comm->comm_var_assign.lvalue) {
+                        emit_expression(comm->comm_var_assign.lvalue);
+                        sprint(" = ");
+                    }
+                    emit_expression(comm->comm_var_assign.rvalue);
+                    sprint(";");
+                } else if(rval->node_type == AST_EXPRESSION_LITERAL && rval->expr_literal.type == LITERAL_STRUCT) {
+                    sprint("{\n");
+                    sprint("char* __t_base = (char*)&(");
+                    emit_expression(comm->comm_var_assign.lvalue);
+                    sprint(");\n");
+                    emit_struct_assignment_from_base(0, rval);
+                    sprint("}\n");
+                } else if(rval->node_type == AST_EXPRESSION_LITERAL && rval->expr_literal.type == LITERAL_ARRAY) {
+                    sprint("{\n");
+                    sprint("char* __t_base = (char*)(");
+                    emit_expression(comm->comm_var_assign.lvalue);
+                    sprint(");\n");
+                    emit_array_assignment_from_base(0, rval);
+                    sprint("}\n");
+                } else {
+				    assert_msg(0, "assignment of type not recognized");
+                }
 			}
         } break;
 	}

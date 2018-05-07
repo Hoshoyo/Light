@@ -11,9 +11,24 @@ string :: struct {
     data     : ^u8;
 }
 
+//print :: (s : string) {
+//    print_string(s.length, s.data);
+//}
+
+bar :: (a : [2]s32) {
+    print_s32(a[0]);
+    println();
+    print_s32(a[1]);
+}
+
 main :: () -> s32 {
-    foo := "Hello";
-    print_string(foo.length, foo.data);
+    //foo(array{1, 2});
+    base : [2]s32;    
+    base = array{1, 2};
+
+    bar(base);
+
+    //print("Hello");
 
     return 0;
 }
