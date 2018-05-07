@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/gcc/light",
-            "args": ["examples/array_literal.li"],
+            "args": ["examples/string.li"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

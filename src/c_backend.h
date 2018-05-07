@@ -30,6 +30,9 @@ struct C_Code_Generator {
 	void emit_expression_binary(Ast* expr);
 	void emit_default_value(Type_Instance* type);
 	void emit_typedef(Type_Instance* type, Token* name, char* prefix);
+
+	void emit_data_decl(Ast* decl);
+
     int  c_generate_top_level(Ast** toplevel, Type_Instance** type_table);
 };
 

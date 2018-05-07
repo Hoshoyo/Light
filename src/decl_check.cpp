@@ -531,6 +531,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 		case AST_DECL_STRUCT: break; // should not have struct inner decl yet
 		case AST_DECL_ENUM: break; // should not have enum inner decl yet
 		case AST_DECL_UNION: break; // should not have union inner decl yet
+		case AST_DATA: break;		// no need to check is just raw data
 		default: assert(0); break; // TODO(psv): internal error
 	}
 
@@ -672,6 +673,7 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* node = ast_top_level[i];
 		assert(node->flags & AST_FLAG_IS_DECLARATION);
+		if(node->node_type == AST_DATA) continue;
 
 		error |= decl_check_redefinition(global_scope, node);
 		if (error & DECL_ERROR_FATAL) continue;

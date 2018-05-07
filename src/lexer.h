@@ -178,6 +178,7 @@ struct Keyword {
 enum Compiler_Tags {
 	COMPILER_TAG_FOREIGN = 0,
 	COMPILER_TAG_MAIN_PROC = 1,
+	COMPILER_TAG_STRING = 2,
 };
 extern string compiler_tags[];
 

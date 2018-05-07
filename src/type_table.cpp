@@ -44,7 +44,21 @@ static Type_Instance* type_r64;
 static Type_Instance* type_bool;
 static Type_Instance* type_void;
 
+static Type_Instance* type_ptr_s8;
+static Type_Instance* type_ptr_s16;
+static Type_Instance* type_ptr_s32;
+static Type_Instance* type_ptr_s64;
+static Type_Instance* type_ptr_u8;
+static Type_Instance* type_ptr_u16;
+static Type_Instance* type_ptr_u32;
+static Type_Instance* type_ptr_u64;
+static Type_Instance* type_ptr_r32;
+static Type_Instance* type_ptr_r64;
+static Type_Instance* type_ptr_bool;
+static Type_Instance* type_ptr_void;
+
 inline Type_Instance* type_setup_primitive(Type_Primitive p);
+inline Type_Instance* type_setup_ptr(Type_Instance* p);
 
 #if defined(_WIN32) || defined(_WIN64)
 constexpr 
@@ -90,11 +104,6 @@ u64 type_hash(Type_Instance* type) {
 			hash = fnv_1_hash_from_start(type_hash(type->pointer_to), (const u8*)"pointer", sizeof("pointer") - 1); break;
 		case KIND_STRUCT:
 			hash = fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length); break;
-			//size_t n_fields = 0;
-			//if(type->struct_desc.fields_types) n_fields = array_get_length(type->struct_desc.fields_types);
-			//for(size_t i = 0; i < n_args; ++i) {
-			//	
-			//}
 		case KIND_FUNCTION: {
 			u64 return_type_hash = type_hash(type->function_desc.return_type);
 			size_t n_args = 0;
@@ -130,6 +139,19 @@ void type_table_init() {
 	type_r64 = type_setup_primitive(TYPE_PRIMITIVE_R64);
 	type_bool = type_setup_primitive(TYPE_PRIMITIVE_BOOL);
 	type_void = type_setup_primitive(TYPE_PRIMITIVE_VOID);
+
+	type_ptr_s64 = type_setup_ptr(type_s64);
+	type_ptr_s32 = type_setup_ptr(type_s32);
+	type_ptr_s16 = type_setup_ptr(type_s16);
+	type_ptr_s8 = type_setup_ptr(type_s8);
+	type_ptr_u64 = type_setup_ptr(type_u64);
+	type_ptr_u32 = type_setup_ptr(type_u32);
+	type_ptr_u16 = type_setup_ptr(type_u16);
+	type_ptr_u8 = type_setup_ptr(type_u8);
+	type_ptr_r32 = type_setup_ptr(type_r32);
+	type_ptr_r64 = type_setup_ptr(type_r64);
+	type_ptr_bool = type_setup_ptr(type_bool);
+	type_ptr_void = type_setup_ptr(type_void);
 }
 
 // Deep copy of types, this function follow the pointers of all Type_Instance* in the type description
@@ -206,10 +228,21 @@ Type_Instance* internalize_type(Type_Instance** type, Scope* scope, bool copy) {
 	return *type;
 }
 
+inline Type_Instance* type_setup_ptr(Type_Instance* p) {
+	assert(p->flags & TYPE_FLAG_INTERNALIZED);
+	Type_Instance* res = ALLOC_TYPE(types_internal);
+	res->kind = KIND_POINTER;
+	res->flags = TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+	res->type_size_bits = type_pointer_size_bits();
+	res->pointer_to = p;
+	internalize_type(&res, false);
+	return res;
+}
+
 inline Type_Instance* type_setup_primitive(Type_Primitive p) {
 	Type_Instance* res = ALLOC_TYPE(types_internal);
 	res->kind = KIND_PRIMITIVE;
-	res->flags = TYPE_FLAG_RESOLVED | TYPE_FLAG_INTERNALIZED | TYPE_FLAG_SIZE_RESOLVED;
+	res->flags = TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
 	res->primitive = p;
 	switch (p) {
 		case TYPE_PRIMITIVE_S64:  res->type_size_bits = 64; break;
@@ -243,6 +276,24 @@ Type_Instance* type_primitive_get(Type_Primitive p) {
 	case TYPE_PRIMITIVE_R64:  return type_r64;
 	case TYPE_PRIMITIVE_BOOL: return type_bool;
 	case TYPE_PRIMITIVE_VOID: return type_void;
+	default: report_internal_compiler_error(__FILE__, __LINE__, "tried to get unknown primitive type from type table\n"); break;
+	}
+}
+
+Type_Instance* type_pointer_get(Type_Primitive p) {
+	switch (p) {
+	case TYPE_PRIMITIVE_S64:  return type_ptr_s64;
+	case TYPE_PRIMITIVE_S32:  return type_ptr_s32;
+	case TYPE_PRIMITIVE_S16:  return type_ptr_s16;
+	case TYPE_PRIMITIVE_S8:   return type_ptr_s8;
+	case TYPE_PRIMITIVE_U64:  return type_ptr_u64;
+	case TYPE_PRIMITIVE_U32:  return type_ptr_u32;
+	case TYPE_PRIMITIVE_U16:  return type_ptr_u16;
+	case TYPE_PRIMITIVE_U8:   return type_ptr_u8;
+	case TYPE_PRIMITIVE_R32:  return type_ptr_r32;
+	case TYPE_PRIMITIVE_R64:  return type_ptr_r64;
+	case TYPE_PRIMITIVE_BOOL: return type_ptr_bool;
+	case TYPE_PRIMITIVE_VOID: return type_ptr_void;
 	default: report_internal_compiler_error(__FILE__, __LINE__, "tried to get unknown primitive type from type table\n"); break;
 	}
 }

@@ -39,8 +39,9 @@ Keyword keywords_info[] = {
 };
 
 string compiler_tags[] = {
-	{sizeof("foreign") - 1, (u8*)"foreign"},
-	{sizeof("main") - 1, (u8*)"main"},
+	{sizeof("foreign") - 1, (u8*)"foreign", -1},
+	{sizeof("main") - 1, (u8*)"main", -1},
+	{sizeof("string") - 1, (u8*)"string", -1}
 };
 
 s32 Lexer::report_lexer_error(char* msg, ...)

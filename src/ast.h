@@ -6,6 +6,9 @@
 enum Ast_NodeType {
 	AST_UNKNOWN = 0,
 	
+	// Data
+	AST_DATA,
+
 	// Declarations
 	AST_DECL_PROCEDURE,
 	AST_DECL_VARIABLE,
@@ -86,6 +89,10 @@ enum Operator_Binary {
 
 	OP_BINARY_DOT,			// .
 	OP_BINARY_VECTOR_ACCESS, // []
+};
+
+enum Data_Type {
+	GLOBAL_STRING,
 };
 
 enum Precedence {
@@ -303,11 +310,21 @@ struct Ast_Expr_ProcCall {
 	s32    args_count;
 };
 
+struct Ast_Data {
+	Data_Type type;
+	u8*       data;
+	s64       length_bytes;
+	Token*    location;
+	Type_Instance* data_type;
+	s32       id;
+};
+
 const u32 AST_FLAG_IS_DECLARATION = FLAG(0);
 const u32 AST_FLAG_IS_COMMAND     = FLAG(1);
 const u32 AST_FLAG_IS_EXPRESSION  = FLAG(2);
-const u32 AST_FLAG_QUEUED         = FLAG(3);
-const u32 AST_FLAG_LVALUE         = FLAG(4);
+const u32 AST_FLAG_IS_DATA        = FLAG(3);
+const u32 AST_FLAG_QUEUED         = FLAG(4);
+const u32 AST_FLAG_LVALUE         = FLAG(5);
 
 struct Ast {
 	Ast_NodeType   node_type;
@@ -338,10 +355,14 @@ struct Ast {
 		Ast_Expr_Literal        expr_literal;
 		Ast_Expr_Variable       expr_variable;
 		Ast_Expr_ProcCall       expr_proc_call;
+
+		Ast_Data                data_global;
 	};
 };
 
 Scope* scope_create(Ast* creator, Scope* parent, u32 flags);
+
+Ast* ast_create_data(Data_Type type, Scope* scope, Token* location, u8* data, s64 length_bytes, Type_Instance* data_type);
 
 Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Type_Instance* ptype, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count);
 Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_Instance* var_type, u32 flags);

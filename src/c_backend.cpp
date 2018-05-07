@@ -503,7 +503,7 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
 }
 
 void C_Code_Generator::emit_expression(Ast* expr){
-    assert(expr->flags & AST_FLAG_IS_EXPRESSION);
+    assert(expr->flags & AST_FLAG_IS_EXPRESSION || expr->node_type == AST_DATA);
 
     switch(expr->node_type){
         case AST_EXPRESSION_BINARY:{
@@ -577,6 +577,22 @@ void C_Code_Generator::emit_expression(Ast* expr){
         case AST_EXPRESSION_VARIABLE:{
             sprint("%.*s", TOKEN_STR(expr->expr_variable.name));
         }break;
+        case AST_DATA: {
+            if(expr->data_global.type == GLOBAL_STRING) {
+                sprint("__string_data_%d", expr->data_global.id);
+            } else {
+                assert_msg(0, "undefined data type");
+            }
+        }break;
+    }
+}
+
+void C_Code_Generator::emit_data_decl(Ast* decl) {
+    if(decl->data_global.type == GLOBAL_STRING) {
+        sprint("char* __string_data_%d = \"", decl->data_global.id);
+        sprint("%.*s\";\n", decl->data_global.length_bytes, decl->data_global.data);
+    } else {
+        assert_msg(0, "trying to generate code for undefined data node");
     }
 }
 
@@ -620,7 +636,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	sprint("\n");
 
     size_t ndecls = array_get_length(toplevel);
-	// emit all declarations forward procedures
+	// emit all declarations forward procedures and strings
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* decl = toplevel[i];
 		if (decl->node_type == AST_DECL_PROCEDURE ||
@@ -632,7 +648,9 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
                 emit_expression(decl->decl_constant.value);
             }
 			sprint(";\n");
-		}
+		} else if (decl->node_type == AST_DATA) {
+            emit_data_decl(decl);
+        }
 	}
 	sprint("\n");
 

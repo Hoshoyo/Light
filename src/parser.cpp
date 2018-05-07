@@ -38,6 +38,7 @@ Ast** Parser::parse_top_level() {
 	Parser_Error perr = PARSER_OK;
 
 	Ast** ast_top_level = array_create(Ast*, 64);
+	top_level = ast_top_level;
 
 	while (perr == PARSER_OK && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
 		Ast* decl = parse_declaration(global_scope);
@@ -58,6 +59,19 @@ Ast** Parser::parse_top_level() {
 		return 0;
 	}
 	return ast_top_level;
+}
+
+// pushes a u8* literal to the data segment
+Ast* Parser::data_global_string_push(Token* s) {
+
+	char* data = s->value.data;
+	s64   length = s->value.length;
+
+	s->value = compiler_tags[COMPILER_TAG_STRING];
+
+	Ast* node = ast_create_data(GLOBAL_STRING, global_scope, s, data, length, type_pointer_get(TYPE_PRIMITIVE_U8));
+	array_push(top_level, &node);
+	return node;
 }
 
 // -------------------------------------------
@@ -166,9 +180,10 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 		Token* tag = lexer->eat_token();
 		if (compiler_tags[COMPILER_TAG_FOREIGN].data == tag->value.data) {
 			require_and_eat('(');
-			Ast* libname = parse_expr_literal(scope);
-			if (libname->expr_literal.flags & LITERAL_FLAG_STRING) {
-				extern_library_name = libname->expr_literal.token;
+			Token* libname = lexer->eat_token();
+			// TODO(psv): still not used
+			if (libname->type == TOKEN_LITERAL_STRING) {
+				extern_library_name = libname;
 			} else {
 				report_syntax_error(tag, "foreign compiler tag requires string literal as library path\n");
 			}
@@ -615,46 +630,63 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 		report_syntax_error(first, "expected integer literal after %c operator but got '%.*s'\n", (char)first->type, TOKEN_STR(first));
 	} else {
 		switch (first->type) {
-		case TOKEN_LITERAL_INT: {
-			node->expr_literal.type = LITERAL_SINT;
-			node->expr_literal.value_s64 = str_to_s64((char*)first->value.data, first->value.length);
-		} break;
-		case TOKEN_LITERAL_HEX_INT: {
-			node->expr_literal.type = LITERAL_HEX_INT;
-			node->expr_literal.value_u64 = literal_integer_to_u64(first);
-		} break;
-		case TOKEN_LITERAL_BIN_INT: {
-			node->expr_literal.type = LITERAL_BIN_INT;
-			node->expr_literal.value_u64 = literal_integer_to_u64(first);
-		} break;
-		case TOKEN_LITERAL_BOOL_FALSE: {
-			node->expr_literal.type = LITERAL_BOOL;
-			node->expr_literal.value_bool = false;
-		} break;
-		case TOKEN_LITERAL_BOOL_TRUE: {
-			node->expr_literal.type = LITERAL_BOOL;
-			node->expr_literal.value_bool = true;
-		} break;
-		case TOKEN_LITERAL_CHAR:
-			// TODO(psv): utf8 encoding
-			node->expr_literal.type = LITERAL_UINT;
-			node->expr_literal.value_u64 = literal_char_to_u64(first);
-			node->type_return = type_primitive_get(TYPE_PRIMITIVE_U32);
-			break;
-		case TOKEN_LITERAL_FLOAT:
-			node->expr_literal.type = LITERAL_FLOAT;
-			node->expr_literal.value_r64 = literal_float_to_r64(first);
-			break;
-		case TOKEN_LITERAL_STRING:
-			node->expr_literal.type = LITERAL_STRUCT;
-			node->expr_literal.flags |= LITERAL_FLAG_STRING;
-			// TODO(psv): get type string here already
-			break;
-		default: {
-			// TODO(psv):
-			// struct literal
-			// array literal
-		}break;
+			case TOKEN_LITERAL_INT: {
+				node->expr_literal.type = LITERAL_SINT;
+				node->expr_literal.value_s64 = str_to_s64((char*)first->value.data, first->value.length);
+			} break;
+			case TOKEN_LITERAL_HEX_INT: {
+				node->expr_literal.type = LITERAL_HEX_INT;
+				node->expr_literal.value_u64 = literal_integer_to_u64(first);
+			} break;
+			case TOKEN_LITERAL_BIN_INT: {
+				node->expr_literal.type = LITERAL_BIN_INT;
+				node->expr_literal.value_u64 = literal_integer_to_u64(first);
+			} break;
+			case TOKEN_LITERAL_BOOL_FALSE: {
+				node->expr_literal.type = LITERAL_BOOL;
+				node->expr_literal.value_bool = false;
+			} break;
+			case TOKEN_LITERAL_BOOL_TRUE: {
+				node->expr_literal.type = LITERAL_BOOL;
+				node->expr_literal.value_bool = true;
+			} break;
+			case TOKEN_LITERAL_CHAR:
+				// TODO(psv): utf8 encoding
+				node->expr_literal.type = LITERAL_UINT;
+				node->expr_literal.value_u64 = literal_char_to_u64(first);
+				node->type_return = type_primitive_get(TYPE_PRIMITIVE_U32);
+				break;
+			case TOKEN_LITERAL_FLOAT:
+				node->expr_literal.type = LITERAL_FLOAT;
+				node->expr_literal.value_r64 = literal_float_to_r64(first);
+				break;
+			case TOKEN_LITERAL_STRING:
+				node->expr_literal.type = LITERAL_STRUCT;
+				node->expr_literal.flags |= LITERAL_FLAG_STRING;
+
+				// example "Hello"
+				// string { 5, -1, &global_array }
+
+				Ast* g_data = data_global_string_push(first);
+				node->expr_literal.struct_exprs = array_create(Ast*, 3);
+				Ast** exprs = node->expr_literal.struct_exprs;
+
+				// Length
+				Ast* length_expr = ast_create_expr_literal(scope, LITERAL_HEX_INT, first, 0, type_primitive_get(TYPE_PRIMITIVE_S64));
+				length_expr->expr_literal.value_s64 = g_data->data_global.length_bytes;
+
+				Ast* capacity_expr = ast_create_expr_literal(scope, LITERAL_HEX_INT, first, 0, type_primitive_get(TYPE_PRIMITIVE_S64));
+				capacity_expr->expr_literal.value_s64 = -1;	// start immutable
+
+				Ast* data_expr = g_data;
+
+				array_push(exprs, &length_expr);
+				array_push(exprs, &capacity_expr);
+				array_push(exprs, &data_expr);
+
+				break;
+			default: {
+			}break;
 		}
 	}
 

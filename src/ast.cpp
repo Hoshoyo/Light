@@ -23,6 +23,26 @@ Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {
 	return scope;
 }
 
+Ast* ast_create_data(Data_Type type, Scope* scope, Token* location, u8* data, s64 length_bytes, Type_Instance* data_type) {
+	static s32 id = 0;
+	Ast* d = ALLOC_AST();
+
+	d->node_type = AST_DATA;
+	d->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	d->scope = scope;
+	d->flags = AST_FLAG_IS_DECLARATION;
+	d->infer_queue_index = -1;
+
+	d->data_global.type = type;
+	d->data_global.data = data;
+	d->data_global.length_bytes = length_bytes;
+	d->data_global.location = location;
+	d->data_global.data_type = data_type;
+	d->data_global.id = id++;
+
+	return d;
+}
+
 Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Type_Instance* ptype, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count) {
 	Ast* dp = ALLOC_AST();
 
@@ -696,6 +716,11 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 		}
 		fprintf(out, ")");
 	} break;
+	case AST_DATA: {
+		if(node->data_global.type == GLOBAL_STRING){
+			fprintf(out, "__global_string_%d", node->data_global.id);
+		}
+	}break;
 	}
 }
 
@@ -847,6 +872,16 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 		case AST_EXPRESSION_LITERAL:
 		case AST_EXPRESSION_VARIABLE:
 		case AST_EXPRESSION_PROCEDURE_CALL:		DEBUG_print_expression(out, node); break;
+
+		// Data
+		case AST_DATA: {
+			if(node->data_global.type == GLOBAL_STRING){
+				quick_type(out, node->data_global.data_type);
+				fprintf(out, "__global_string_%d = \"%.*s\";\n", node->data_global.id, node->data_global.length_bytes, node->data_global.data);
+			} else {
+				fprintf(out, "<Unsupported AST Data Node>\n");				
+			}
+		}break;
 	default: {
 		fprintf(out, "<Unsupported AST Node>\n");
 	}break;

@@ -36,6 +36,12 @@ inline bool type_strong(Type_Instance* type) {
 }
 
 Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
+	// if it is raw data, get the type directly
+	if(expr->node_type == AST_DATA) {
+		assert(expr->data_global.data_type->flags & TYPE_FLAG_INTERNALIZED);
+		return expr->data_global.data_type;
+	}
+
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 
 	Type_Instance* type_infered = 0;
@@ -311,7 +317,7 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 	assert(expr->node_type == AST_EXPRESSION_VARIABLE);
 
 	Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
-	if(decl->node_type == KIND_STRUCT){
+	if(decl->type_return->kind == KIND_STRUCT){
 		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot use structure name '%.*s' as expression\n", 
 			TOKEN_STR(expr->expr_variable.name));
 		return 0;
@@ -356,7 +362,7 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 }
 
 void type_propagate(Type_Instance* strong, Ast* expr) {
-	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
+	assert(expr->flags & AST_FLAG_IS_EXPRESSION || expr->node_type == AST_DATA);
 
 	if (expr->flags & TYPE_FLAG_STRONG)
 		return;

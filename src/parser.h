@@ -14,10 +14,14 @@ enum Parser_Error {
 struct Parser {
 	Lexer* lexer;
 	Scope* global_scope;
+	Ast**  top_level;
 
 	Parser(Lexer* lexer, Scope* global_scope) : lexer(lexer), global_scope(global_scope) {}
 
 	Ast** parse_top_level();
+
+	// String data
+	Ast* data_global_string_push(Token* s);
 
 	// Type parsing
 	Type_Instance* parse_type();
