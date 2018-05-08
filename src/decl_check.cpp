@@ -125,7 +125,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 				Ast* struct_decl = decl_from_name(scope, type->pointer_to->struct_desc.name);
 				if(!struct_decl){
 					if(report_undeclared){
-						report_undeclared(type->struct_desc.name);
+						report_undeclared(type->pointer_to->struct_desc.name);
 					}
 					return 0;
 				}
@@ -683,6 +683,8 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 	if (error & DECL_ERROR_FATAL) {
 		return DECL_ERROR_FATAL;
 	}
+
+	resolve_type_internalize_queue();
 
 	// infer queue of top level
 	size_t n = array_get_length(infer_queue);

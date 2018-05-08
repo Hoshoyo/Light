@@ -772,7 +772,8 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					} else if (type_weak(lt) && type_weak(rt)) {
 						if (type_primitive_int(lt) && type_primitive_int(rt)) {
 							// TODO: can types here be different?
-							return defer_check_against(expr, check_against, rt, error);
+							return lt;
+							//return defer_check_against(expr, check_against, rt, error);
 						} else {
 							if (type_hash(lt) != type_hash(rt))
 								*error |= report_type_mismatch(expr, lt, rt);

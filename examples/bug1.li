@@ -1,0 +1,12 @@
+Display :: struct {
+    screen : ^Screen;   // undeclared identifier screen
+}
+
+Screen :: struct {
+    s : s32;
+    //display : ^Display;
+}
+
+main :: () -> s32 {
+    return 0;
+}
