@@ -772,7 +772,7 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 #if defined(_WIN32) || defined(_WIN64)
 	sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib",
+	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib opengl32.lib",
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #elif defined(__linux__)

@@ -124,7 +124,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 			if(type->pointer_to->kind == KIND_STRUCT){
 				Ast* struct_decl = decl_from_name(scope, type->pointer_to->struct_desc.name);
 				if(!struct_decl){
-					if(report_undeclared){
+					if(rep_undeclared){
 						report_undeclared(type->pointer_to->struct_desc.name);
 					}
 					return 0;
@@ -225,11 +225,8 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				return error;
 			} else {
 				Type_Instance* type = resolve_type(scope, node->decl_variable.variable_type, rep_undeclared);
-				if (!type) {
-					error |= DECL_ERROR_FATAL;
-					return error;
-				}
-				if (type->flags & TYPE_FLAG_RESOLVED) {
+
+				if (type && type->flags & TYPE_FLAG_RESOLVED) {
 					node->decl_variable.variable_type = type;
 					infer_queue_remove(node);
 				} else {
@@ -257,11 +254,8 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				return error;
 			} else {
 				Type_Instance* type = resolve_type(scope, node->decl_constant.type_info, rep_undeclared);
-				if (!type) {
-					error |= DECL_ERROR_FATAL;
-					return error;
-				}
-				if (type->flags & TYPE_FLAG_RESOLVED) {
+
+				if (type && type->flags & TYPE_FLAG_RESOLVED) {
 					node->decl_constant.type_info = type;
 					infer_queue_remove(node);
 				} else {
@@ -684,8 +678,6 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		return DECL_ERROR_FATAL;
 	}
 
-	resolve_type_internalize_queue();
-
 	// infer queue of top level
 	size_t n = array_get_length(infer_queue);
 	while (error) {
@@ -702,11 +694,11 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		}
 	}
 
+	error |= resolve_type_internalize_queue();
+
 	if (error & DECL_ERROR_FATAL) {
 		return DECL_ERROR_FATAL;
 	}
-
-	resolve_type_internalize_queue();
 
 	error |= decl_check_inner(global_scope, ast_top_level);
 

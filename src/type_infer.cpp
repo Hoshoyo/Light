@@ -429,7 +429,7 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 					}
 					strong = expr->type_return = resolve_type(expr->scope, expr->type_return, true);
 					if(!strong) {
-						return 0;
+						return;
 					}
 					for(size_t i = 0; i < nexpr; ++i){
 						type_propagate(strong->struct_desc.fields_types[i], expr->expr_literal.struct_exprs[i]);

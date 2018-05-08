@@ -64,12 +64,12 @@ Ast** Parser::parse_top_level() {
 // pushes a u8* literal to the data segment
 Ast* Parser::data_global_string_push(Token* s) {
 
-	char* data = s->value.data;
+	char* data = (char*)s->value.data;
 	s64   length = s->value.length;
 
 	s->value = compiler_tags[COMPILER_TAG_STRING];
 
-	Ast* node = ast_create_data(GLOBAL_STRING, global_scope, s, data, length, type_pointer_get(TYPE_PRIMITIVE_U8));
+	Ast* node = ast_create_data(GLOBAL_STRING, global_scope, s, (u8*)data, length, type_pointer_get(TYPE_PRIMITIVE_U8));
 	array_push(top_level, &node);
 	return node;
 }
@@ -660,7 +660,7 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 				node->expr_literal.type = LITERAL_FLOAT;
 				node->expr_literal.value_r64 = literal_float_to_r64(first);
 				break;
-			case TOKEN_LITERAL_STRING:
+			case TOKEN_LITERAL_STRING: {
 				node->expr_literal.type = LITERAL_STRUCT;
 				node->expr_literal.flags |= LITERAL_FLAG_STRING;
 
@@ -683,8 +683,7 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 				array_push(exprs, &length_expr);
 				array_push(exprs, &capacity_expr);
 				array_push(exprs, &data_expr);
-
-				break;
+			} break;
 			default: {
 			}break;
 		}

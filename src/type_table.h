@@ -11,7 +11,7 @@ s64            type_pointer_size();
 s64            type_pointer_size_bits();
 
 Type_Instance* internalize_type(Type_Instance** type, Scope* scope, bool copy = true);
-void resolve_type_internalize_queue();
+int resolve_type_internalize_queue();
 
 extern Type_Instance** g_type_table;
 

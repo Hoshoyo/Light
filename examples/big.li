@@ -70,7 +70,6 @@ Display :: struct {
 	/* there is more to this structure, but it is private to Xlib */
 }
 
-
 XGenericEvent :: struct {
     type       : s32;         /* of event. Always GenericEvent */
     serial     : u64;       /* # of last request processed */
@@ -175,7 +174,7 @@ XResizeRequestEvent :: struct {
 	type       : s32;
 	serial     : u64;	/* # of last request processed by server */
 	send_event : s32;	/* true if this came from a SendEvent request */
-	display    : ^display;	/* Display the event was read from */
+	display    : ^Display;	/* Display the event was read from */
 	window     : u64;
 	width      : s32;
 	height     : s32;

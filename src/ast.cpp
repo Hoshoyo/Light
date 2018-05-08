@@ -427,7 +427,7 @@ int DEBUG_print_type_detailed(FILE* out, Type_Instance* type) {
 	int count = 0;
 	if (!type) {
 		count += fprintf(out, "unknown");
-		return;
+		return count;
 	}
 	if (type->kind == KIND_PRIMITIVE) {
 		switch (type->primitive) {
@@ -481,7 +481,7 @@ int DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
 	int count = 0;
 	if (!type) {
 		count += fprintf(out, "unknown");
-		return;
+		return count;
 	}
 	if (type->kind == KIND_PRIMITIVE) {
 		switch (type->primitive) {

@@ -13,7 +13,8 @@ struct Internalize_Queue {
 static Internalize_Queue* type_internalize_queue;
 
 // patches the hanging non-internalized pointers of recursive defined structs. 
-void resolve_type_internalize_queue() {
+int resolve_type_internalize_queue() {
+	Type_Error error = TYPE_OK;
 	size_t length = array_get_length(type_internalize_queue);
 	for(size_t i = 0; i < length; ++i) {
 		Type_Instance* type = type_internalize_queue[i].type;
@@ -21,9 +22,18 @@ void resolve_type_internalize_queue() {
 		assert(type->kind == KIND_POINTER);
 		u64 hash = type_hash(type->pointer_to);
 		s64 index = hash_table_entry_exist(&type_table, type, hash);
-		assert(index != -1);
-		type->pointer_to = type_table.entries[index].data;
+
+		assert(type->pointer_to->kind == KIND_STRUCT);
+		Token* struct_name = type->pointer_to->struct_desc.name;
+
+		if (index == -1) {
+			error |= report_type_error(TYPE_ERROR_FATAL, struct_name, "Undefined type '%.*s'\n", TOKEN_STR(struct_name));
+			continue;
+		}
+		type->pointer_to = (Type_Instance*)type_table.entries[index].data;
 	}
+
+	return error;
 }
 
 #define ALLOC_TYPE(ARENA) (Type_Instance*)(ARENA).allocate(sizeof(Type_Instance))

@@ -77,8 +77,8 @@ void Lexer::init() {
 		// @TODO(psv): check for necessity for more
 		// @Hardcoded
 
-		// 32 Mega bytes of hash for identifiers
-		hash_table_init(&identifiers, 1024 * 1024 * 32);
+		// 1 million entries
+		hash_table_init(&identifiers, 1024 * 1024);
 		for (s32 i = 0; i < ARRAY_COUNT(compiler_tags); ++i) {
 			internalize_identifier(&compiler_tags[i]);
 		}
