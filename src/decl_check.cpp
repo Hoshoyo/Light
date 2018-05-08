@@ -704,6 +704,8 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		return DECL_ERROR_FATAL;
 	}
 
+	resolve_type_internalize_queue();
+
 	error |= decl_check_inner(global_scope, ast_top_level);
 
 	return error;

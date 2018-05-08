@@ -1,8 +1,30 @@
 print_s64::(v : s64) -> s64 #foreign("print_string.obj");
 
+Screen :: struct {
+	ext_data    : ^void;	/* hook for extension to hang data */
+	root        : u64;		/* back pointer to display structure */
+	width       : s32;		/* Root window id. */
+	height      : s32;		/* width and height of screen */
+	mwidth      : s32;		
+	mheight     : s32;		/* width and height of  in millimeters */
+	ndepths     : s32;		/* number of depths possible */
+	depths      : ^void;	/* list of allowable depths on the screen */
+	root_depth  : s32;		/* bits per pixel */
+	root_visual : ^void;	/* root visual */
+	default_gc  : ^void;	/* GC for the root root visual */
+	cmap        : u64; 		/* default color map */
+	white_pixel : u64;		
+	black_pixel : u64;		/* White and Black pixel values */
+	max_maps    : s32;		/* max and min color maps */
+	min_maps    : s32;
+	backing_store : s32;	/* Never, WhenMapped, Always */
+	save_unders : s32;
+	root_input_mask : s64;	/* initial root input mask */
+}
+
 Display :: struct {
-	//XExtData *ext_data;	/* hook for extension to hang data */
-	//struct _XPrivate *private1;
+	ext_data            : ^void; //XExtData *ext_data;	/* hook for extension to hang data */
+	private1            : ^void; //struct _XPrivate *private1;
 	fd                  : s32;			/* Network socket. */
 	private2            : s32;
 	proto_major_version : s32;/* major version of server's X protocol */
@@ -18,10 +40,10 @@ Display :: struct {
 	bitmap_pad          : s32;		/* padding requirements on bitmaps */
 	bitmap_bit_order    : s32;	/* LeastSignificant or MostSignificant */
 	nformats            : s32;		/* number of pixmap formats in list */
-	//ScreenFormat *pixmap_format;	/* pixmap format list */
+	pixmap_format       : ^void;//ScreenFormat *pixmap_format;	/* pixmap format list */
 	private8            : s32;
 	release             : s32;		/* release of the server */
-	//struct _XPrivate *private9, *private10;
+	private9            : ^void; //struct _XPrivate *private9, *private10;
 	qlen                : s32;		/* Length of input event queue */
 	last_request_read   : u64; /* seq number of last event read */
 	request             : u64;	/* sequence number of last request. */
@@ -30,12 +52,12 @@ Display :: struct {
 	private13           : ^s8; // XPointer private13;
 	private14           : ^s8; // XPointer private14;
 	max_request_size    : u32; /* maximum number 32 bit words in request*/
-	//struct _XrmHashBucketRec *db;
+	db                  : ^void; //struct _XrmHashBucketRec *db;
     private15           : (^void) -> s32;
 	display_name        : ^s8;	/* "host:display" string used on this connect*/
 	default_screen      : s32;	/* default screen for operations */
 	nscreens            : s32;		/* number of screens on this server*/
-	//Screen *screens;	/* pointer to list of screens */
+	screens             : ^Screen; //Screen *screens;	/* pointer to list of screens */
 	motion_buffer       : u64;	/* size of motion buffer */
 	private16           : u64;
 	min_keycode         : s32;	/* minimum defined keycode */
@@ -47,10 +69,44 @@ Display :: struct {
 	/* there is more to this structure, but it is private to Xlib */
 }
 
-XOpenDisplay :: (v : ^s8) -> ^Display #foreign("GL");
+string :: struct {
+	length   : s64;
+	capacity : s64;
+	data     : ^u8;
+}
+//#define ScreenOfDisplay(dpy, scr)(&((_XPrivDisplay)dpy)->screens[scr])
+XOpenDisplay :: (v : ^s8) -> ^Display #foreign("X11");
+XCreateSimpleWindow :: (display : ^Display, 
+	parent : u64, 
+	x : s32, 
+	y : s32, 
+	width : u32, 
+	height : u32, 
+	border_width : u32, 
+	border : u64, 
+	background : u64) -> u64 #foreign("X11");
+
+CopyFromParent : u64 : 0;	/* border pixmap in CreateWindow */
 
 main :: () -> s32{
-	a := XOpenDisplay(cast(^s8)0);
-	print_s64(cast(s64)a);
+	name := "Squiggly";
+	display := XOpenDisplay(cast(^s8)0);
+	screen := (*display).default_screen;
+	window : u64;
+
+	if(display == cast(^Display)0) {
+		return -1;
+	}
+
+	// this errors out saying is not lvalue
+	// problem is vector access is probably not returning an lvalue flag
+	//root_window := &((*display).screens[screen]);
+	root_window := ((*display).screens[screen]);
+
+	xx := root_window;
+	//window = XCreateSimpleWindow(display, root_window, 50, 50, 800, 600, 1, CopyFromParent, CopyFromParent);
+
+	print_s64(cast(s64)display);
+
     return 0;
 }

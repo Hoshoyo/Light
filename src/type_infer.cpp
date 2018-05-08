@@ -317,16 +317,16 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 	assert(expr->node_type == AST_EXPRESSION_VARIABLE);
 
 	Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
-	if(decl->type_return->kind == KIND_STRUCT){
-		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot use structure name '%.*s' as expression\n", 
-			TOKEN_STR(expr->expr_variable.name));
-		return 0;
-	}
 	if (!decl) {
 		*error |= TYPE_ERROR_FATAL;
 		if(flags & TYPE_INFER_REPORT_UNDECLARED) {
 			*error |= report_undeclared(expr->expr_variable.name);
 		}
+		return 0;
+	}
+	if(decl->type_return->kind == KIND_STRUCT){
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot use structure name '%.*s' as expression\n", 
+			TOKEN_STR(expr->expr_variable.name));
 		return 0;
 	}
 	expr->expr_variable.decl = decl;
@@ -350,6 +350,9 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 			return 0;
 		}
 
+		if(!type_strong(type)){
+			int x = 0;
+		}
 		assert(type_strong(type));
 		expr->flags |= AST_FLAG_LVALUE;
 		expr->type_return = type;
