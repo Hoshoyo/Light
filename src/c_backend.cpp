@@ -330,17 +330,21 @@ void C_Code_Generator::emit_struct_assignment(Ast* decl) {
     Ast* expr = decl->decl_variable.assignment;
 
     assert(struct_type->kind == KIND_STRUCT);
-    assert(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT);
+    if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT) {
+        sprint("{\n");
 
-    sprint("{\n");
+        sprint("char* __t_base = (char*)&(%.*s);\n", TOKEN_STR(decl->decl_variable.name));
 
-    sprint("char* __t_base = (char*)&(%.*s);\n", TOKEN_STR(decl->decl_variable.name));
+        // array copies will use this
+        sprint("char* __array_base = __t_base;\n");
+        emit_struct_assignment_from_base(0, expr);
 
-    // array copies will use this
-    sprint("char* __array_base = __t_base;\n");
-    emit_struct_assignment_from_base(0, expr);
-
-    sprint("}\n");
+        sprint("}\n");
+    } else {
+        sprint("%.*s = ", TOKEN_STR(decl->decl_variable.name));
+        emit_expression(decl->decl_variable.assignment);
+        sprint(";\n");
+    }
 }
 
 void C_Code_Generator::emit_command(Ast* comm) {

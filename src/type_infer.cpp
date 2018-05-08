@@ -62,6 +62,10 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 	expr->expr_binary.left->type_return = infer_from_expression(expr->expr_binary.left, error, flags);
 	if(expr->expr_binary.op != OP_BINARY_DOT){
 		expr->expr_binary.right->type_return = infer_from_expression(expr->expr_binary.right, error, flags);
+		// @IMPORTANT
+		// TODO(psv): more cases could be lvalue
+		// arr[0] -> array dereference
+		expr->flags |= AST_FLAG_LVALUE;
 	}
 	if(*error & TYPE_ERROR_FATAL) return 0;
 	
@@ -331,7 +335,6 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 			TOKEN_STR(expr->expr_variable.name));
 		return 0;
 	}
-
 	expr->expr_variable.decl = decl;
 	Type_Instance* type = 0;
 
@@ -353,6 +356,9 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 			return 0;
 		}
 
+		if(!type_strong(type)){
+			int x = 0;
+		}
 		assert(type_strong(type));
 		expr->flags |= AST_FLAG_LVALUE;
 		expr->type_return = type;
