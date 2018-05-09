@@ -75,7 +75,27 @@ Ast* Parser::data_global_string_push(Token* s) {
 }
 
 void Parser::parse_directive(Scope* scope) {
-	assert_msg(0, "not implemented");
+	//assert_msg(0, "not implemented");
+	Token* directive = lexer->eat_token();
+	if(directive->type != TOKEN_IDENTIFIER) {
+		report_syntax_error(directive, "expected compiler directive but got '%.*s'\n", TOKEN_STR(directive));
+	}
+
+	if(directive->value.data == compiler_tags[COMPILER_TAG_IMPORT].data){
+		Token* import_str = lexer->eat_token();
+		if(import_str->type == TOKEN_LITERAL_STRING) {
+			char buffer[PATH_MAX + 1] = {0};
+			char rpath[PATH_MAX + 1] = {0};
+			sprintf(buffer, "%.*s", TOKEN_STR(import_str));
+			char* ptr = ho_realpath(buffer, rpath);
+			printf("%s\n", ptr);
+			fflush(stdout);
+		} else {
+			report_syntax_error(directive, "expected filepath after import directive but got '%.*s'\n", TOKEN_STR(directive));	
+		}
+	} else {
+		report_syntax_error(directive, "unrecognized compiler directive '%.*s'\n", TOKEN_STR(directive));
+	}
 }
 
 // -------------------------------------------

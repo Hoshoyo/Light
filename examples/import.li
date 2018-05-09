@@ -1,0 +1,4 @@
+#import "./examples/gcd.li"
+main :: () -> s32 {
+    return 0;
+}

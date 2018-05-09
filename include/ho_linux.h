@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <errno.h>
 
 typedef int HANDLE;
 #define INVALID_HANDLE_VALUE -1
@@ -25,6 +26,7 @@ typedef int HANDLE;
 #define FILE_WRITE O_WRONLY
 #define FILE_READ_WRITE O_RDWR
 #define FILE_APPEND O_APPEND
+#define PATH_MAX 4096
 
 /* Allocations */
 extern "C" void* ho_bigalloc_rw(size_t size);
@@ -43,6 +45,7 @@ extern "C" s64 HO_API ho_getfilesize(const char* filename);
 #define HO_ALLOC ((void*)0)
 extern "C" void* HO_API ho_readentirefile(int file, size_t file_size, void* mem);
 extern "C" s64 HO_API ho_writefile(int file, s64 bytes_to_write, char* bytes);
+extern "C" char* ho_realpath(const char* path, char* resolved_path);
 
 struct Timer
 {
@@ -89,7 +92,12 @@ void HO_API ho_bigfree(void* block, size_t size)
 {
 	free(block);
 }
-#include <errno.h>
+
+char* HO_API ho_realpath(const char* path, char* resolved_path)
+{
+	return realpath(path, resolved_path);
+}
+
 int HO_API ho_createfile(const char* filename, int access_flags, int action_flags)
 {
 	int err =  open(filename, access_flags | action_flags | O_TRUNC, 0644);
