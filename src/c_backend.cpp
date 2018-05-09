@@ -778,7 +778,7 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lX11",
+	sprintf(cmdbuffer, "ld %.*s.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lX11",
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #endif

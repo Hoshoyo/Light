@@ -1,0 +1,117 @@
+STDIN_FILENO	: s32 : 0;	/* Standard input.  */
+STDOUT_FILENO	: s32 : 1;	/* Standard output.  */
+STDERR_FILENO	: s32 : 2;	/* Standard error output.  */
+
+memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void #foreign("libc");
+write :: (fd : s32, buf : ^void, count : u64) -> u64 #foreign("libc");
+
+string :: struct {
+    length   : s64;
+    capacity : s64;
+    data     : ^u8;
+}
+
+string_length :: (s : ^u8) -> s64 {
+    c := 0;
+    for *s != 0 {
+        c += 1;
+        s += 1;
+    }
+    return c;
+}
+
+r64_to_str :: (val : r64, buffer : [32]u8) -> s64 {
+    print_s64(cast(s64)val);
+}
+
+s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
+    b : [16]u8;
+    sum : s32;
+    
+    if val < 0 {
+        val = -val;
+        buffer[0] = cast(u8)'-';
+        sum = 1;
+    }
+    auxbuffer := &b[16];
+    start := auxbuffer;
+
+    for val != 0 {
+        rem := val % 10;
+        val /= 10;
+        *auxbuffer = '0' + cast(u8)rem;
+        auxbuffer -= 1;
+    }
+
+    size := start - auxbuffer;
+    memcpy(cast(^void)(&buffer[sum]), cast(^void)(auxbuffer + 1), cast(u64)size);
+    return size;
+}
+
+s64_to_str :: (val : s64, buffer : [32]u8) -> s64 {
+    b : [32]u8;
+    sum : s32;
+    
+    if val < 0 {
+        val = -val;
+        buffer[0] = cast(u8)'-';
+        sum = 1;
+    }
+    auxbuffer := &b[32];
+    start := auxbuffer;
+
+    for val != 0 {
+        rem := val % 10;
+        val /= 10;
+        *auxbuffer = '0' + cast(u8)rem;
+        auxbuffer -= 1;
+    }
+
+    size := start - auxbuffer;
+    memcpy(cast(^void)(&buffer[sum]), cast(^void)(auxbuffer + 1), cast(u64)size);
+    return size;
+}
+
+print_bool :: (v : bool) -> s64 {
+    buffer : [5]u8;
+    len : s64;
+
+    if v {
+        buffer = array {'t', 'r', 'u', 'e', 0};
+        len = 4;
+    } else {
+        buffer = array {'f', 'a', 'l', 's', 'e'};
+        len = 5;
+    }
+    return print_cstr_length(cast(^u8)buffer, len);
+}
+
+print_s32 :: (v : s32) -> s64 {
+    buffer : [16]u8;
+    len := s32_to_str(v, buffer);
+    return print_cstr_length(cast(^u8)buffer, len);
+}
+
+print_s64 :: (v : s64) -> s64 {
+    buffer : [32]u8;
+    len := s64_to_str(v, buffer);
+    return print_cstr_length(cast(^u8)buffer, len);
+}
+
+print_cstr :: (s : ^u8) -> s64 {
+    write(STDOUT_FILENO, cast(^void)s, cast(u64)string_length(s));
+}
+
+print_cstr_length :: (s : ^u8, length : s64) -> s64 {
+    write(STDOUT_FILENO, cast(^void)s, cast(u64)length);
+}
+
+print_str :: (s : string) -> s64 {
+    write(STDOUT_FILENO, cast(^void)s.data, s.length);
+}
+
+println :: (s : string) -> s64 {
+    print_str(s);
+    nl := "\n";
+    print_str(nl);
+}
