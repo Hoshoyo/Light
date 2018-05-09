@@ -20,6 +20,8 @@ struct Parser {
 
 	Ast** parse_top_level();
 
+	void parse_directive(Scope* scope);
+
 	// String data
 	Ast* data_global_string_push(Token* s);
 

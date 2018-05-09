@@ -28,22 +28,22 @@ s32 __main();
 s32 __main(){
 char a[16];
 {
-char* base = (char*)a;
-char* struct_base = base;
-struct_base = base;
+char* __t_base = (char*)a;
+char* __struct_base = __t_base;
+__struct_base = __t_base;
 {
-char* base = struct_base;
-*(r32*)((char*)base + 0) = 1.000000;
-*(r32*)((char*)base + 4) = 2.000000;
+char* __t_base = __struct_base;
+*(r32*)((char*)__t_base + 0) = 1.000000;
+*(r32*)((char*)__t_base + 4) = 2.000000;
 }
-base += 8;
-struct_base = base;
+__t_base += 8;
+__struct_base = __t_base;
 {
-char* base = struct_base;
-*(r32*)((char*)base + 0) = 3.000000;
-*(r32*)((char*)base + 4) = 4.000000;
+char* __t_base = __struct_base;
+*(r32*)((char*)__t_base + 0) = 3.000000;
+*(r32*)((char*)__t_base + 4) = 4.000000;
 }
-base += 8;
+__t_base += 8;
 }
 
 print_r32(((*(struct vec2*)(((char*)a)+ 8 * (1))).x));

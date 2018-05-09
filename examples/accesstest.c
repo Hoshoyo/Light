@@ -23,17 +23,25 @@ s32 __main();
 
 struct Person foo(){
 struct Person Pedro = {0};
-r32 a = ((Pedro.pos).y);
-r32 b = ((Pedro.pos).y);
-(Pedro.age) = 26;
-s32 c = (Pedro.age);
-struct string d = (Pedro.name);
+
+r32 a;
+a = ((((Pedro).pos)).y);
+r32 b;
+b = ((((Pedro).pos)).y);
+((Pedro).age) = 26;
+s32 c;
+c = ((Pedro).age);
+struct string d;
+d = ((Pedro).name);
+
 return Pedro;
 }
 
 s32 __main(){
-struct Person x = foo();
-return (x.age);
+struct Person x;
+x = foo();
+
+return ((x).age);
 }
 
 

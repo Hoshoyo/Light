@@ -74,12 +74,20 @@ Ast* Parser::data_global_string_push(Token* s) {
 	return node;
 }
 
+void Parser::parse_directive(Scope* scope) {
+	assert_msg(0, "not implemented");
+}
+
 // -------------------------------------------
 // ------------- Declarations ----------------
 // -------------------------------------------
 
 Ast* Parser::parse_declaration(Scope* scope) {
 	Token* name = lexer->eat_token();
+
+	if(name->type == '#') {
+		parse_directive(scope);
+	}
 
 	if (name->type != TOKEN_IDENTIFIER)
 		report_syntax_error(name, "invalid identifier %.*s on declaration.\n", TOKEN_STR(name));
@@ -383,7 +391,8 @@ Ast* Parser::parse_expression_precedence10(Scope* scope) {
 		} else {
 			// variable
 			lexer->eat_token();
-			if(lexer->peek_token_type() == '{'){
+			if(lexer->peek_token_type() == ':'){
+				lexer->eat_token();
 				return parse_expr_literal_struct(t, scope);
 			} else {
 				return ast_create_expr_variable(t, scope, 0);

@@ -47,7 +47,7 @@ main :: () -> s32 {
 	//var : foo = foo{1.0, 2.0};
 	//print_r32(var.x);
 	ptr : ^u8;
-	p := Person{string{0, -1, ptr}, 26, 1.0, vec2{1.0, 2.0}};
+	p := Person:{string:{0, -1, ptr}, 26, 1.0, vec2:{1.0, 2.0}};
 
 	print_person(p);
 

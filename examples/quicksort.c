@@ -22,41 +22,46 @@ void print_array(s32* values, s64 length);
 s32 __main();
 
 void quicksort(s32* values, s64 start, s64 end){
-s64 i = start;
-s64 j = (end-1);
-s32 pivo = *(s32*)(((char*)values)+ 4 * (((start+end)/2)));
+s64 i;
+i = start;
+s64 j;
+j = ((end)-1);
+s32 pivo;
+pivo = *(s32*)(((char*)values)+ 4 * (((((start)+end))/2)));
 s32 aux = 0;
-while((i<=j)){
-while(((*(s32*)(((char*)values)+ 4 * (i))<pivo)&&(i<end))){
-i = (i+1);
+
+while(((i)<=j)){
+while(((((*(s32*)(((char*)values)+ 4 * (i)))<pivo))&&((i)<end))){
+i = ((i)+1);
 }
 loop_1:;
 
-while(((*(s32*)(((char*)values)+ 4 * (j))>pivo)&&(j>start))){
-j = (j-1);
+while(((((*(s32*)(((char*)values)+ 4 * (j)))>pivo))&&((j)>start))){
+j = ((j)-1);
 }
 loop_2:;
 
-if((i<=j)){
+if(((i)<=j)){
 aux = *(s32*)(((char*)values)+ 4 * (i));
 *(s32*)(((char*)values)+ 4 * (i)) = *(s32*)(((char*)values)+ 4 * (j));
 *(s32*)(((char*)values)+ 4 * (j)) = aux;
-i = (i+1);
-j = (j-1);
+i = ((i)+1);
+j = ((j)-1);
 }
 }
 loop_0:;
 
-if((j>start))quicksort(values,start,(j+1));
-if((i<end))quicksort(values,i,end);
+if(((j)>start))quicksort(values,start,((j)+1));
+if(((i)<end))quicksort(values,i,end);
 }
 
 void print_array(s32* values, s64 length){
 {
-s64 i = 0;
-while((i<length)){
+s64 i;
+i = 0;
+while(((i)<length)){
 print_s64(((s64)*(s32*)(((char*)values)+ 4 * (i))));
-i = (i+1);
+i = ((i)+1);
 }
 loop_3:;
 
@@ -65,6 +70,7 @@ loop_3:;
 
 s32 __main(){
 char arr[40] = {0};
+
 *(s32*)(((char*)arr)+ 4 * (0)) = 5;
 *(s32*)(((char*)arr)+ 4 * (1)) = 8;
 *(s32*)(((char*)arr)+ 4 * (2)) = 1;

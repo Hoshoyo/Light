@@ -2,13 +2,13 @@ proc :: ()
 {
 	array1 : [3]s32;
 	
-	array2 := { 1, 2, 3 };
+	array2 := array { 1, 2, 3 };
 	
-	array3 : [3][4]s32 = { {1, 2, 3, 4}, {4, 5, 6, 7}, {8, 9, 10, 11} };
+	array3 : [3][4]s32 = array { array {1, 2, 3, 4}, array {4, 5, 6, 7}, array {8, 9, 10, 11} };
 
-	array4 : [5]r32 = { 1.0 ..5, 2.0 ..3 };
+	array4 : [5]r32 = array { 1.0 ..5, 2.0 ..3 };
 
-	array5 : [3][4]s32 = { {1, 2, 3, 4} ..3 }
+	array5 : [3][4]s32 = array { array {1, 2, 3, 4} ..3 }
 
 	println(array1);
 	println(array2);
