@@ -14,6 +14,7 @@
 void initialize() {
 	type_table_init();
 	Lexer::init();
+	Parser::init();
 }
 
 int main(int argc, char** argv) {
@@ -35,12 +36,15 @@ int main(int argc, char** argv) {
 	// Global scope
 	Scope  global_scope = { 0 };
 
-	Parser parser(&lexer, &global_scope);
-	Ast** ast_top_level = parser.parse_top_level();
-	
-	//DEBUG_print_ast(stdout, ast_top_level, false);
-	//return 0;
+	// TODO(psv): multiple input files
+	queue_file_for_parsing(argv[1]);
 
+	Ast** ast_top_level = parse_files_in_queue(&global_scope);
+	if(ast_top_level == 0) {
+		return -1;
+	}
+
+	// TODO(psv): Fuse type checking, and also refactor it
 	Decl_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
 	if (decl_err & (~DECL_ERROR_WARNING)) {
 		return -1;
@@ -53,6 +57,7 @@ int main(int argc, char** argv) {
 	double end = timer.GetTime();
 	printf("Compiler elapsed: %fms\n", (end - start));
 
+	// TODO(psv): make compiler options/flags to print this
 	DEBUG_print_ast(stdout, ast_top_level, true);
 	//DEBUG_print_scope_decls(&global_scope);
 	//DEBUG_print_type_table();

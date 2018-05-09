@@ -1,0 +1,13 @@
+#import "./examples/print.li"
+
+main :: () -> s32 {
+    str := "Hello World!";
+    print_str(str);
+    //println(str);
+    print_s32(42);
+    print_s64(431231232);
+    print_bool(true);
+    print_bool(false);
+
+    return 0;
+}

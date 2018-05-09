@@ -5,6 +5,4 @@ gcd :: (a : s32, b : s32) -> s32 {
 	return a;
 }
 
-main :: () -> s32 {
-	return gcd(27, 9);
-}
+#import "./examples/lib.li"

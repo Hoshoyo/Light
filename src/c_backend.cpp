@@ -268,7 +268,7 @@ void C_Code_Generator::emit_array_assignment_from_base(s64 offset_bytes, Ast* ex
                 }
             }
     } else if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT) {
-        sprint("__struct_base = base;\n");
+        sprint("__struct_base = __t_base;\n");
         sprint("{\n");
         sprint("char* __t_base = __struct_base;\n");
         emit_struct_assignment_from_base(0, expr);
@@ -772,13 +772,13 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 #if defined(_WIN32) || defined(_WIN64)
 	sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib opengl32.lib",
+	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib",
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lGL -lX11",
+	sprintf(cmdbuffer, "ld %.*s.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lX11",
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #endif

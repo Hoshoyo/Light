@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/gcc/light",
-            "args": ["examples/big.li"],
+            "args": ["examples/import.li"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
