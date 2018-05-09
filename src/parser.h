@@ -76,8 +76,21 @@ struct Parser {
 	Ast* parse_comm_variable_assignment(Scope* scope);
 
 	// Error report
+	void   report_fatal_error(Token* error_token, char* msg, ...);
 	void   report_syntax_error(Token* error_token, char* msg, ...);
 	void   report_error_location(Token* tok);
 	Token* require_and_eat(Token_Type t);
 	Token* require_and_eat(char c);
+
+	static void init();
 };
+
+struct Parse_Queue {
+	char**  queue_main;
+	Token** queue_imports;	// array of filenames (fullpath) of files to be parsed
+	Ast***  files_toplevels;
+};
+
+s32  parse_files_in_queue(Scope* global_scope);
+void queue_file_for_parsing(Token* token);
+void queue_file_for_parsing(char* filename);

@@ -292,6 +292,14 @@ u32 djb2_hash(u32 hash1, u32 hash2) {
 	return hash;
 }
 
+char* make_c_string(char* str, size_t length) {
+	if (length == 0) return 0;
+	char* mem = (char*)malloc(length + 1);
+	mem[length] = 0;
+	memcpy(mem, str, length);
+	return mem;
+}
+
 char* make_c_string(string& s)
 {
 	if (s.length == 0) return 0;

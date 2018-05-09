@@ -31,6 +31,7 @@ bool is_letter(char c);
 bool is_hex_digit(char c);
 
 s64  str_length(const char* str);
+char* make_c_string(char* str, size_t length);
 bool c_str_equal(const char* s1, const char* s2);
 bool str_equal(const char* s1, int s1_len, const char* s2, int s2_len);
 bool str_equal(const string& s1, const string& s2);

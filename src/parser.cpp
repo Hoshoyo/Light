@@ -5,6 +5,85 @@
 #include <stdarg.h>
 #include <ho_system.h>
 
+static Parse_Queue parsing_queue;
+
+void Parser::init() {
+	if(!parsing_queue.queue_imports) {
+		parsing_queue.queue_imports = array_create(Token*, 4);
+	}
+	if(!parsing_queue.files_toplevels) {
+		parsing_queue.files_toplevels = array_create(Ast**, 4);
+	}
+	if(!parsing_queue.queue_main) {
+		parsing_queue.queue_main = array_create(char*, 4);
+	}
+}
+
+void queue_file_for_parsing(char* filename) {
+	array_push(parsing_queue.queue_main, &filename);
+}
+
+void queue_file_for_parsing(Token* token) {
+	array_push(parsing_queue.queue_imports, &token);
+}
+
+s32 parse_files_in_queue(Scope* global_scope) {
+	// TODO(psv): check for double include
+	// TODO(psv): include recursively
+
+	// Main files
+	size_t mlen = array_get_length(parsing_queue.queue_main);
+	for(size_t i = 0; i < mlen; ++i) {
+		char* file = parsing_queue.queue_main[i];
+
+		Lexer lexer;
+		if (lexer.start(file) != LEXER_OK)
+			return -1;
+
+		Parser parser(&lexer, global_scope);
+		Ast** ast_top_level = parser.parse_top_level();
+		array_push(parsing_queue.files_toplevels, &ast_top_level);
+	}
+
+	//do {
+		// Imports
+		while(array_get_length(parsing_queue.queue_imports) > 0) {
+			Token* file = parsing_queue.queue_imports[0];
+			// remove the first of the array
+			array_remove(parsing_queue.queue_imports, 0);
+
+			Lexer lexer;
+			// TODO(psv): Make lexer accept my style of string for filename so
+			// we dont need to allocate a name for this
+			char* c_filename = make_c_string(file->value.data, file->value.length);
+			if (lexer.start(c_filename) != LEXER_OK)
+				return -1;
+
+			Parser parser(&lexer, global_scope);
+			Ast** ast_top_level = parser.parse_top_level();
+			array_push(parsing_queue.files_toplevels, &ast_top_level);
+		}
+	//} while(array_get_length(parsing_queue.queue_imports) > 0);
+	
+
+	size_t num_files = array_get_length(parsing_queue.files_toplevels);
+	size_t num_top_level_decls = 0;
+	for(size_t i = 0; i < num_files; ++i) {
+		num_top_level_decls += array_get_length(parsing_queue.files_toplevels[i]);
+	}
+
+	// Fuse all top levels
+	Ast** top_level = array_create(Ast*, num_top_level_decls);
+	for(size_t i = 0; i < num_files; ++i) {
+		size_t ndecls = array_get_length(parsing_queue.files_toplevels[i]);
+		for(size_t j = 0; j < ndecls; ++j){
+			array_push(top_level, &parsing_queue.files_toplevels[i][j]);
+		}
+	}
+
+	return top_level;
+}
+
 void Parser::report_error_location(Token* tok) {
 	fprintf(stderr, "%.*s:%d:%d ", tok->filename.length, tok->filename.data, tok->line, tok->column);
 }
@@ -14,6 +93,15 @@ void Parser::report_syntax_error(Token* error_token, char* msg, ...) {
 	va_start(args, msg);
 	report_error_location(error_token);
 	fprintf(stderr, "Syntax Error: ");
+	vfprintf(stderr, msg, args);
+	va_end(args);
+	system_exit(-1);
+}
+
+void Parser::report_fatal_error(Token* error_token, char* msg, ...) {
+	va_list args;
+	va_start(args, msg);
+	report_error_location(error_token);
 	vfprintf(stderr, msg, args);
 	va_end(args);
 	system_exit(-1);
@@ -41,6 +129,10 @@ Ast** Parser::parse_top_level() {
 	top_level = ast_top_level;
 
 	while (perr == PARSER_OK && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
+		if(lexer->peek_token_type() == '#') {
+			parse_directive(global_scope);
+			continue;
+		}
 		Ast* decl = parse_declaration(global_scope);
 		switch (decl->node_type) {
 			case AST_DECL_VARIABLE:
@@ -75,7 +167,8 @@ Ast* Parser::data_global_string_push(Token* s) {
 }
 
 void Parser::parse_directive(Scope* scope) {
-	//assert_msg(0, "not implemented");
+	require_and_eat('#');
+
 	Token* directive = lexer->eat_token();
 	if(directive->type != TOKEN_IDENTIFIER) {
 		report_syntax_error(directive, "expected compiler directive but got '%.*s'\n", TOKEN_STR(directive));
@@ -84,12 +177,17 @@ void Parser::parse_directive(Scope* scope) {
 	if(directive->value.data == compiler_tags[COMPILER_TAG_IMPORT].data){
 		Token* import_str = lexer->eat_token();
 		if(import_str->type == TOKEN_LITERAL_STRING) {
+			// TODO(psv): refactor this to use a string library, ugly stuff.
 			char buffer[PATH_MAX + 1] = {0};
 			char rpath[PATH_MAX + 1] = {0};
 			sprintf(buffer, "%.*s", TOKEN_STR(import_str));
 			char* ptr = ho_realpath(buffer, rpath);
-			printf("%s\n", ptr);
-			fflush(stdout);
+			if(ptr) {
+				queue_file_for_parsing(import_str);
+			} else {
+				// TODO(psv): refactor this error to not be fatal
+				report_fatal_error(import_str, "import directive, file '%.*s' could not be found\n", TOKEN_STR(import_str));
+			}
 		} else {
 			report_syntax_error(directive, "expected filepath after import directive but got '%.*s'\n", TOKEN_STR(directive));	
 		}
@@ -104,10 +202,6 @@ void Parser::parse_directive(Scope* scope) {
 
 Ast* Parser::parse_declaration(Scope* scope) {
 	Token* name = lexer->eat_token();
-
-	if(name->type == '#') {
-		parse_directive(scope);
-	}
 
 	if (name->type != TOKEN_IDENTIFIER)
 		report_syntax_error(name, "invalid identifier %.*s on declaration.\n", TOKEN_STR(name));
