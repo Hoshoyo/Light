@@ -91,6 +91,6 @@ struct Parse_Queue {
 	Ast***  files_toplevels;
 };
 
-s32  parse_files_in_queue(Scope* global_scope);
+Ast** parse_files_in_queue(Scope* global_scope);
 void queue_file_for_parsing(Token* token);
 void queue_file_for_parsing(char* filename);

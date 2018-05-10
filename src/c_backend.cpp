@@ -537,17 +537,46 @@ void C_Code_Generator::emit_expression(Ast* expr){
             emit_expression_binary(expr);
         }break;
         case AST_EXPRESSION_LITERAL:{
+			assert_msg(expr->type_return->kind == KIND_PRIMITIVE, "integer literal of type not primitive");
             switch(expr->expr_literal.type){
+				case LITERAL_SINT:
                 case LITERAL_BIN_INT:
                 case LITERAL_HEX_INT:
                 case LITERAL_UINT:{
-                    sprint("0x%llx", expr->expr_literal.value_u64);
-                }break;
-                case LITERAL_SINT: {
-                    sprint("%lld", expr->expr_literal.value_u64);
+					switch (expr->type_return->primitive) {
+						case TYPE_PRIMITIVE_S8:
+							sprint("0x%x", (s8)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_S16:
+							sprint("0x%x", (s16)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_S32:
+							sprint("0x%x", (s32)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_S64:
+							sprint("0x%llx", expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_U8:
+							sprint("0x%x", (u8)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_U16:
+							sprint("0x%x", (u16)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_U32:
+							sprint("0x%x", (u32)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_U64:
+							sprint("0x%llx", expr->expr_literal.value_u64);
+							break;
+					}
+                    
                 }break;
                 case LITERAL_FLOAT:{
-                    sprint("%f", expr->expr_literal.value_r64);
+					if (expr->type_return->primitive == TYPE_PRIMITIVE_R32) {
+						sprint("%f", expr->expr_literal.value_r32);
+					} else {
+						sprint("%f", expr->expr_literal.value_r64);
+					}
                 }break;
                 case LITERAL_BOOL:{
                     if(expr->expr_literal.value_bool){
@@ -772,7 +801,7 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 #if defined(_WIN32) || defined(_WIN64)
 	sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib",
+	sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib",
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #elif defined(__linux__)

@@ -14,6 +14,7 @@ typedef double r64;
 
 
 // Forward declarations
+u32 ExitProcess(u32 ret);
 
 s64 print_s64(s64 value);
 void println();
@@ -42,6 +43,6 @@ return 0;
 }
 
 
-int __entry() {
-	return __main();
+void __entry() {
+	ExitProcess(__main());
 }

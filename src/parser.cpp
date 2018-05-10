@@ -27,7 +27,7 @@ void queue_file_for_parsing(Token* token) {
 	array_push(parsing_queue.queue_imports, &token);
 }
 
-s32 parse_files_in_queue(Scope* global_scope) {
+Ast** parse_files_in_queue(Scope* global_scope) {
 	// TODO(psv): check for double include
 	// TODO(psv): include recursively
 
@@ -38,7 +38,7 @@ s32 parse_files_in_queue(Scope* global_scope) {
 
 		Lexer lexer;
 		if (lexer.start(file) != LEXER_OK)
-			return -1;
+			return 0;
 
 		Parser parser(&lexer, global_scope);
 		Ast** ast_top_level = parser.parse_top_level();
@@ -55,9 +55,9 @@ s32 parse_files_in_queue(Scope* global_scope) {
 			Lexer lexer;
 			// TODO(psv): Make lexer accept my style of string for filename so
 			// we dont need to allocate a name for this
-			char* c_filename = make_c_string(file->value.data, file->value.length);
+			char* c_filename = make_c_string((char*)file->value.data, file->value.length);
 			if (lexer.start(c_filename) != LEXER_OK)
-				return -1;
+				return 0;
 
 			Parser parser(&lexer, global_scope);
 			Ast** ast_top_level = parser.parse_top_level();
@@ -177,11 +177,12 @@ void Parser::parse_directive(Scope* scope) {
 	if(directive->value.data == compiler_tags[COMPILER_TAG_IMPORT].data){
 		Token* import_str = lexer->eat_token();
 		if(import_str->type == TOKEN_LITERAL_STRING) {
-			// TODO(psv): refactor this to use a string library, ugly stuff.
-			char buffer[PATH_MAX + 1] = {0};
-			char rpath[PATH_MAX + 1] = {0};
-			sprintf(buffer, "%.*s", TOKEN_STR(import_str));
-			char* ptr = ho_realpath(buffer, rpath);
+			char* b = make_c_string((char*)import_str->value.data, import_str->value.length);
+			size_t size = 0;
+			char* ptr = ho_realpath(b, &size);
+			import_str->value.data = (const u8*)ptr;
+			import_str->value.length = size;
+			free(b);
 			if(ptr) {
 				queue_file_for_parsing(import_str);
 			} else {

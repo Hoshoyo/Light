@@ -1,38 +1,24 @@
-EXIT_SUCCESS : u32 : 0;
-EXIT_FAILED  : u32 : -1;
-STD_INPUT_HANDLE  : u32 : -10;
-STD_OUTPUT_HANDLE : u32 : -11;
-STD_ERROR_HANDLE  : u32 : -12;
+#import "./examples/windows/windows.li"
 
-ExitProcess   :: (v : u32) -> u32 #foreign("kernel32.lib");
-GetStdHandle  :: (std_handle : u32) -> ^void #foreign("kernel32.lib");
-WriteConsoleA :: (console_output : ^void, lp_buffer : ^void, num_chars_to_write : u32, num_chars_written : ^u32, reserved : ^void) -> bool #foreign("kernel32.lib");
+string :: struct {
+	length : s64;
+	capacity : s64;
+	data : ^u8;
+}
 
-malloc :: (size : s64) -> ^void #foreign("msvcrt.lib");
-
-
-main :: () -> u32 {
-	int_vector : ^u32 = cast(^u32)malloc(256);
-	*int_vector = 0;
-	*int_vector + 1 = 1;
-	
-	*int_vector + *(*int_vector + 1) = 5;
-	buffer := malloc(10);
-	aux := cast(^u8)buffer;
-
-	i : s32 = 0;
-	for i < cast(s32)10 {
-		*aux = cast(u8)48 + cast(u8)i;
-		aux = aux + 1;
-		i = i + cast(s32)1;
-	}
-	
-	//written : u32;
-	//stdhandle := GetStdHandle(STD_OUTPUT_HANDLE);
-	//b := WriteConsoleA(stdhandle, buffer, 5, &written, cast(^void)0);
-	
-	exit_code := ExitProcess(*(int_vector + 1));
+foo :: (exception_ptrs : ^void) -> s64 {
+	std_handle := GetStdHandle(STD_OUTPUT_HANDLE);
+	f := "Hello";
+	written : u32;
+	WriteConsoleA(std_handle, cast(^void)f.data, cast(u32)f.length, &written, cast(^void)0);
 	return 0;
 }
 
-print_s64 :: (v : s64) -> s64 #foreign("print_string.obj");
+main :: () -> s32 {
+	SetUnhandledExceptionFilter(foo);
+	
+	foo : ^s8;
+	*foo = 1;
+	
+	return 0;
+}

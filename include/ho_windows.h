@@ -9,6 +9,7 @@
 #define assert(x) do { if(!(x)) { DebugBreak(); }}while(0)
 #else
 #define assert(x)
+#define assert_msg(x, MSG)
 #endif
 
 #if defined(HO_DLL_EXPORT)
@@ -34,7 +35,6 @@ void* HO_API ho_bigalloc_rw(size_t size);
 void* HO_API ho_bigalloc_r(size_t size);
 void HO_API ho_bigfree(void* block, size_t size);
 
-
 /* Files */
 #define FILE_READ GENERIC_READ
 #define FILE_WRITE GENERIC_WRITE
@@ -57,6 +57,8 @@ u64 HO_API ho_getfilesize(const char* filename);
 #define HO_ALLOC ((void*)0)
 void* HO_API ho_readentirefile(HANDLE file, size_t file_size, void* mem);
 u32 HO_API ho_writefile(HANDLE file, u32 bytes_to_write, u8* bytes);
+
+char* HO_API ho_realpath(const char* path, size_t* size);
 } // extern C
 
 struct Timer
@@ -113,6 +115,19 @@ void HO_API ho_getfileinfo(const char* filename, WIN32_FIND_DATA* info)
 	if (search_handle == INVALID_HANDLE_VALUE)
 		return;
 	FindClose(search_handle);
+}
+
+char* HO_API ho_realpath(const char* path, size_t* size) {
+	char* buffer = (char*)calloc(1, 4096);
+	DWORD err = GetFullPathNameA(path, 4096, buffer, 0);
+	if (err > 4096) {
+		buffer = (char*)realloc(buffer, err);
+		err = GetFullPathNameA(path, err, buffer, 0);
+	} else if (err == 0) {
+		return 0;
+	}
+	*size = err;
+	return buffer;
 }
 
 int HO_API ho_mkdir(const char* path)

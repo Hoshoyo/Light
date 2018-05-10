@@ -45,7 +45,7 @@ extern "C" s64 HO_API ho_getfilesize(const char* filename);
 #define HO_ALLOC ((void*)0)
 extern "C" void* HO_API ho_readentirefile(int file, size_t file_size, void* mem);
 extern "C" s64 HO_API ho_writefile(int file, s64 bytes_to_write, char* bytes);
-extern "C" char* ho_realpath(const char* path, char* resolved_path);
+extern "C" char* HO_API ho_realpath(const char* path, size_t* size);
 
 struct Timer
 {
@@ -93,9 +93,12 @@ void HO_API ho_bigfree(void* block, size_t size)
 	free(block);
 }
 
-char* HO_API ho_realpath(const char* path, char* resolved_path)
+char* HO_API ho_realpath(const char* path, size_t* size)
 {
-	return realpath(path, resolved_path);
+	// this function uses malloc, should free after
+	char* result = realpath(path, 0);
+	*size = strlen(result);
+	return result;
 }
 
 int HO_API ho_createfile(const char* filename, int access_flags, int action_flags)
