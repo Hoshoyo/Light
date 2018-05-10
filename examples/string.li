@@ -1,0 +1,34 @@
+print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
+print_s32 :: (value : s32) -> s64 #foreign("print_string.obj");
+print_r32 :: (value : r32) -> s64 #foreign("print_string.obj");
+print_r64 :: (value : r64) -> s64 #foreign("print_string.obj");
+print_string :: (length : s64, data : ^u8) -> s64 #foreign("print_string.obj");
+println :: () -> s64 #foreign("print_string.obj");
+
+string :: struct {
+    length   : s64;
+    capacity : s64;
+    data     : ^u8;
+}
+
+//print :: (s : string) {
+//    print_string(s.length, s.data);
+//}
+
+bar :: (a : [2]s32) {
+    print_s32(a[0]);
+    println();
+    print_s32(a[1]);
+}
+
+main :: () -> s32 {
+    //foo(array{1, 2});
+    base : [2]s32;    
+    base = array{1, 2};
+
+    bar(base);
+
+    //print("Hello");
+
+    return 0;
+}

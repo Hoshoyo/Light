@@ -14,10 +14,16 @@ enum Parser_Error {
 struct Parser {
 	Lexer* lexer;
 	Scope* global_scope;
+	Ast**  top_level;
 
 	Parser(Lexer* lexer, Scope* global_scope) : lexer(lexer), global_scope(global_scope) {}
 
 	Ast** parse_top_level();
+
+	void parse_directive(Scope* scope);
+
+	// String data
+	Ast* data_global_string_push(Token* s);
 
 	// Type parsing
 	Type_Instance* parse_type();
@@ -48,10 +54,11 @@ struct Parser {
 	Ast* parse_expression_precedence8(Scope* scope);
 	Ast* parse_expression_precedence9(Scope* scope);
 	Ast* parse_expression_precedence10(Scope* scope);
+	Ast* parse_expression_left_dot(Scope* scope);
 
-
+	Ast* parse_expr_literal_struct(Token* name, Scope* scope);
+	Ast* parse_expr_literal_array(Scope* scope);
 	Ast* parse_expr_literal(Scope* scope);
-	//Ast* parse_expression(Scope* scope, Precedence caller_prec = PRECEDENCE_0, bool quit_on_precedence = false);
 	Ast* parse_expr_proc_call(Scope* scope);
 
 	// Expression auxiliary
@@ -69,8 +76,21 @@ struct Parser {
 	Ast* parse_comm_variable_assignment(Scope* scope);
 
 	// Error report
+	void   report_fatal_error(Token* error_token, char* msg, ...);
 	void   report_syntax_error(Token* error_token, char* msg, ...);
 	void   report_error_location(Token* tok);
 	Token* require_and_eat(Token_Type t);
 	Token* require_and_eat(char c);
+
+	static void init();
 };
+
+struct Parse_Queue {
+	char**  queue_main;
+	Token** queue_imports;	// array of filenames (fullpath) of files to be parsed
+	Ast***  files_toplevels;
+};
+
+Ast** parse_files_in_queue(Scope* global_scope);
+void queue_file_for_parsing(Token* token);
+void queue_file_for_parsing(char* filename);

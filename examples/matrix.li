@@ -24,8 +24,6 @@ main :: () -> s32 {
         y += 1;
     }
 
-    mm := matrix[0];
-
     print_r32(matrix[3][3]);
 
     return 0;

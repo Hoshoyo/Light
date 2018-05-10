@@ -19,6 +19,8 @@ struct string {
 string string_new(const char* v, s64 length);
 void   string_free(string* s);
 void   string_append(string* s1, const char* s2);
+s64 align_delta(s64 offset, s64 align_to);
+s32 next_power2(s32 v);
 
 string string_make(const char* v);
 string string_make(const char* v, s64 length);
@@ -29,6 +31,7 @@ bool is_letter(char c);
 bool is_hex_digit(char c);
 
 s64  str_length(const char* str);
+char* make_c_string(char* str, size_t length);
 bool c_str_equal(const char* s1, const char* s2);
 bool str_equal(const char* s1, int s1_len, const char* s2, int s2_len);
 bool str_equal(const string& s1, const string& s2);

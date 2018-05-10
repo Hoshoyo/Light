@@ -13,7 +13,8 @@ struct Internalize_Queue {
 static Internalize_Queue* type_internalize_queue;
 
 // patches the hanging non-internalized pointers of recursive defined structs. 
-void resolve_type_internalize_queue() {
+int resolve_type_internalize_queue() {
+	Type_Error error = TYPE_OK;
 	size_t length = array_get_length(type_internalize_queue);
 	for(size_t i = 0; i < length; ++i) {
 		Type_Instance* type = type_internalize_queue[i].type;
@@ -21,9 +22,18 @@ void resolve_type_internalize_queue() {
 		assert(type->kind == KIND_POINTER);
 		u64 hash = type_hash(type->pointer_to);
 		s64 index = hash_table_entry_exist(&type_table, type, hash);
-		assert(index != -1);
-		type->pointer_to = type_table.entries[index].data;
+
+		assert(type->pointer_to->kind == KIND_STRUCT);
+		Token* struct_name = type->pointer_to->struct_desc.name;
+
+		if (index == -1) {
+			error |= report_type_error(TYPE_ERROR_FATAL, struct_name, "Undefined type '%.*s'\n", TOKEN_STR(struct_name));
+			continue;
+		}
+		type->pointer_to = (Type_Instance*)type_table.entries[index].data;
 	}
+
+	return error;
 }
 
 #define ALLOC_TYPE(ARENA) (Type_Instance*)(ARENA).allocate(sizeof(Type_Instance))
@@ -44,7 +54,21 @@ static Type_Instance* type_r64;
 static Type_Instance* type_bool;
 static Type_Instance* type_void;
 
+static Type_Instance* type_ptr_s8;
+static Type_Instance* type_ptr_s16;
+static Type_Instance* type_ptr_s32;
+static Type_Instance* type_ptr_s64;
+static Type_Instance* type_ptr_u8;
+static Type_Instance* type_ptr_u16;
+static Type_Instance* type_ptr_u32;
+static Type_Instance* type_ptr_u64;
+static Type_Instance* type_ptr_r32;
+static Type_Instance* type_ptr_r64;
+static Type_Instance* type_ptr_bool;
+static Type_Instance* type_ptr_void;
+
 inline Type_Instance* type_setup_primitive(Type_Primitive p);
+inline Type_Instance* type_setup_ptr(Type_Instance* p);
 
 #if defined(_WIN32) || defined(_WIN64)
 constexpr 
@@ -82,6 +106,7 @@ u64 type_primitive_hash(Type_Primitive p) {
 
 u64 type_hash(Type_Instance* type) {
 	u64 hash = 0;
+	if(!type) return 0;
 	switch (type->kind) {
 		case KIND_PRIMITIVE:
 			hash = type_primitive_hash(type->primitive); break;
@@ -124,6 +149,19 @@ void type_table_init() {
 	type_r64 = type_setup_primitive(TYPE_PRIMITIVE_R64);
 	type_bool = type_setup_primitive(TYPE_PRIMITIVE_BOOL);
 	type_void = type_setup_primitive(TYPE_PRIMITIVE_VOID);
+
+	type_ptr_s64 = type_setup_ptr(type_s64);
+	type_ptr_s32 = type_setup_ptr(type_s32);
+	type_ptr_s16 = type_setup_ptr(type_s16);
+	type_ptr_s8 = type_setup_ptr(type_s8);
+	type_ptr_u64 = type_setup_ptr(type_u64);
+	type_ptr_u32 = type_setup_ptr(type_u32);
+	type_ptr_u16 = type_setup_ptr(type_u16);
+	type_ptr_u8 = type_setup_ptr(type_u8);
+	type_ptr_r32 = type_setup_ptr(type_r32);
+	type_ptr_r64 = type_setup_ptr(type_r64);
+	type_ptr_bool = type_setup_ptr(type_bool);
+	type_ptr_void = type_setup_ptr(type_void);
 }
 
 // Deep copy of types, this function follow the pointers of all Type_Instance* in the type description
@@ -178,7 +216,8 @@ Type_Instance* type_copy_internal(Type_Instance* type, Scope* scope) {
 }
 
 Type_Instance* internalize_type(Type_Instance** type, Scope* scope, bool copy) {
-	assert((*type)->flags & TYPE_FLAG_RESOLVED);
+	//assert_msg((*type)->flags & TYPE_FLAG_RESOLVED, "trying to internalize a type that is not resolved");
+	// @TODO check this
 	u64 hash = type_hash(*type);
 
 	s64 index = hash_table_entry_exist(&type_table, *type, hash);
@@ -199,10 +238,21 @@ Type_Instance* internalize_type(Type_Instance** type, Scope* scope, bool copy) {
 	return *type;
 }
 
+inline Type_Instance* type_setup_ptr(Type_Instance* p) {
+	assert(p->flags & TYPE_FLAG_INTERNALIZED);
+	Type_Instance* res = ALLOC_TYPE(types_internal);
+	res->kind = KIND_POINTER;
+	res->flags = TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+	res->type_size_bits = type_pointer_size_bits();
+	res->pointer_to = p;
+	internalize_type(&res, false);
+	return res;
+}
+
 inline Type_Instance* type_setup_primitive(Type_Primitive p) {
 	Type_Instance* res = ALLOC_TYPE(types_internal);
 	res->kind = KIND_PRIMITIVE;
-	res->flags = TYPE_FLAG_RESOLVED | TYPE_FLAG_INTERNALIZED | TYPE_FLAG_SIZE_RESOLVED;
+	res->flags = TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
 	res->primitive = p;
 	switch (p) {
 		case TYPE_PRIMITIVE_S64:  res->type_size_bits = 64; break;
@@ -240,6 +290,24 @@ Type_Instance* type_primitive_get(Type_Primitive p) {
 	}
 }
 
+Type_Instance* type_pointer_get(Type_Primitive p) {
+	switch (p) {
+	case TYPE_PRIMITIVE_S64:  return type_ptr_s64;
+	case TYPE_PRIMITIVE_S32:  return type_ptr_s32;
+	case TYPE_PRIMITIVE_S16:  return type_ptr_s16;
+	case TYPE_PRIMITIVE_S8:   return type_ptr_s8;
+	case TYPE_PRIMITIVE_U64:  return type_ptr_u64;
+	case TYPE_PRIMITIVE_U32:  return type_ptr_u32;
+	case TYPE_PRIMITIVE_U16:  return type_ptr_u16;
+	case TYPE_PRIMITIVE_U8:   return type_ptr_u8;
+	case TYPE_PRIMITIVE_R32:  return type_ptr_r32;
+	case TYPE_PRIMITIVE_R64:  return type_ptr_r64;
+	case TYPE_PRIMITIVE_BOOL: return type_ptr_bool;
+	case TYPE_PRIMITIVE_VOID: return type_ptr_void;
+	default: report_internal_compiler_error(__FILE__, __LINE__, "tried to get unknown primitive type from type table\n"); break;
+	}
+}
+
 Type_Instance* type_new_temporary() {
 	Type_Instance* t = ALLOC_TYPE(types_temporary);
 	t->type_queue_index = -1;
@@ -272,5 +340,17 @@ void DEBUG_print_type_table() {
 		}
 
 		fprintf(stdout, "size: %lld bits\n", t->type_size_bits);
+	}
+}
+
+void DEBUG_print_type_table_structs() {
+	size_t len = array_get_length(g_type_table);
+	for (size_t i = 0; i < len; ++i) {
+		Type_Instance* t = g_type_table[i];
+		if(t->kind == KIND_STRUCT){
+			s32 c = DEBUG_print_type_detailed(stdout, t);
+		} else {
+			continue;
+		}
 	}
 }

@@ -34,11 +34,7 @@ main :: () -> s32 {
     v[3] = 3;
     v[4] = 4;
 
-    map(cast(^s32)v, 5, print_r32);
+    map(cast(^s32)v, 5, print_s32);
 
     return a(32.0);
-}
-
-print_r32 :: (v : r32) -> void {
-    
 }

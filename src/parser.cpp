@@ -5,6 +5,85 @@
 #include <stdarg.h>
 #include <ho_system.h>
 
+static Parse_Queue parsing_queue;
+
+void Parser::init() {
+	if(!parsing_queue.queue_imports) {
+		parsing_queue.queue_imports = array_create(Token*, 4);
+	}
+	if(!parsing_queue.files_toplevels) {
+		parsing_queue.files_toplevels = array_create(Ast**, 4);
+	}
+	if(!parsing_queue.queue_main) {
+		parsing_queue.queue_main = array_create(char*, 4);
+	}
+}
+
+void queue_file_for_parsing(char* filename) {
+	array_push(parsing_queue.queue_main, &filename);
+}
+
+void queue_file_for_parsing(Token* token) {
+	array_push(parsing_queue.queue_imports, &token);
+}
+
+Ast** parse_files_in_queue(Scope* global_scope) {
+	// TODO(psv): check for double include
+	// TODO(psv): include recursively
+
+	// Main files
+	size_t mlen = array_get_length(parsing_queue.queue_main);
+	for(size_t i = 0; i < mlen; ++i) {
+		char* file = parsing_queue.queue_main[i];
+
+		Lexer lexer;
+		if (lexer.start(file) != LEXER_OK)
+			return 0;
+
+		Parser parser(&lexer, global_scope);
+		Ast** ast_top_level = parser.parse_top_level();
+		array_push(parsing_queue.files_toplevels, &ast_top_level);
+	}
+
+	//do {
+		// Imports
+		while(array_get_length(parsing_queue.queue_imports) > 0) {
+			Token* file = parsing_queue.queue_imports[0];
+			// remove the first of the array
+			array_remove(parsing_queue.queue_imports, 0);
+
+			Lexer lexer;
+			// TODO(psv): Make lexer accept my style of string for filename so
+			// we dont need to allocate a name for this
+			char* c_filename = make_c_string((char*)file->value.data, file->value.length);
+			if (lexer.start(c_filename) != LEXER_OK)
+				return 0;
+
+			Parser parser(&lexer, global_scope);
+			Ast** ast_top_level = parser.parse_top_level();
+			array_push(parsing_queue.files_toplevels, &ast_top_level);
+		}
+	//} while(array_get_length(parsing_queue.queue_imports) > 0);
+	
+
+	size_t num_files = array_get_length(parsing_queue.files_toplevels);
+	size_t num_top_level_decls = 0;
+	for(size_t i = 0; i < num_files; ++i) {
+		num_top_level_decls += array_get_length(parsing_queue.files_toplevels[i]);
+	}
+
+	// Fuse all top levels
+	Ast** top_level = array_create(Ast*, num_top_level_decls);
+	for(size_t i = 0; i < num_files; ++i) {
+		size_t ndecls = array_get_length(parsing_queue.files_toplevels[i]);
+		for(size_t j = 0; j < ndecls; ++j){
+			array_push(top_level, &parsing_queue.files_toplevels[i][j]);
+		}
+	}
+
+	return top_level;
+}
+
 void Parser::report_error_location(Token* tok) {
 	fprintf(stderr, "%.*s:%d:%d ", tok->filename.length, tok->filename.data, tok->line, tok->column);
 }
@@ -14,6 +93,15 @@ void Parser::report_syntax_error(Token* error_token, char* msg, ...) {
 	va_start(args, msg);
 	report_error_location(error_token);
 	fprintf(stderr, "Syntax Error: ");
+	vfprintf(stderr, msg, args);
+	va_end(args);
+	system_exit(-1);
+}
+
+void Parser::report_fatal_error(Token* error_token, char* msg, ...) {
+	va_list args;
+	va_start(args, msg);
+	report_error_location(error_token);
 	vfprintf(stderr, msg, args);
 	va_end(args);
 	system_exit(-1);
@@ -38,8 +126,13 @@ Ast** Parser::parse_top_level() {
 	Parser_Error perr = PARSER_OK;
 
 	Ast** ast_top_level = array_create(Ast*, 64);
+	top_level = ast_top_level;
 
 	while (perr == PARSER_OK && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
+		if(lexer->peek_token_type() == '#') {
+			parse_directive(global_scope);
+			continue;
+		}
 		Ast* decl = parse_declaration(global_scope);
 		switch (decl->node_type) {
 			case AST_DECL_VARIABLE:
@@ -58,6 +151,50 @@ Ast** Parser::parse_top_level() {
 		return 0;
 	}
 	return ast_top_level;
+}
+
+// pushes a u8* literal to the data segment
+Ast* Parser::data_global_string_push(Token* s) {
+
+	char* data = (char*)s->value.data;
+	s64   length = s->value.length;
+
+	s->value = compiler_tags[COMPILER_TAG_STRING];
+
+	Ast* node = ast_create_data(GLOBAL_STRING, global_scope, s, (u8*)data, length, type_pointer_get(TYPE_PRIMITIVE_U8));
+	array_push(top_level, &node);
+	return node;
+}
+
+void Parser::parse_directive(Scope* scope) {
+	require_and_eat('#');
+
+	Token* directive = lexer->eat_token();
+	if(directive->type != TOKEN_IDENTIFIER) {
+		report_syntax_error(directive, "expected compiler directive but got '%.*s'\n", TOKEN_STR(directive));
+	}
+
+	if(directive->value.data == compiler_tags[COMPILER_TAG_IMPORT].data){
+		Token* import_str = lexer->eat_token();
+		if(import_str->type == TOKEN_LITERAL_STRING) {
+			char* b = make_c_string((char*)import_str->value.data, import_str->value.length);
+			size_t size = 0;
+			char* ptr = ho_realpath(b, &size);
+			import_str->value.data = (const u8*)ptr;
+			import_str->value.length = size;
+			free(b);
+			if(ptr) {
+				queue_file_for_parsing(import_str);
+			} else {
+				// TODO(psv): refactor this error to not be fatal
+				report_fatal_error(import_str, "import directive, file '%.*s' could not be found\n", TOKEN_STR(import_str));
+			}
+		} else {
+			report_syntax_error(directive, "expected filepath after import directive but got '%.*s'\n", TOKEN_STR(directive));	
+		}
+	} else {
+		report_syntax_error(directive, "unrecognized compiler directive '%.*s'\n", TOKEN_STR(directive));
+	}
 }
 
 // -------------------------------------------
@@ -166,9 +303,10 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 		Token* tag = lexer->eat_token();
 		if (compiler_tags[COMPILER_TAG_FOREIGN].data == tag->value.data) {
 			require_and_eat('(');
-			Ast* libname = parse_expr_literal(scope);
-			if (libname->expr_literal.flags & LITERAL_FLAG_STRING) {
-				extern_library_name = libname->expr_literal.token;
+			Token* libname = lexer->eat_token();
+			// TODO(psv): still not used
+			if (libname->type == TOKEN_LITERAL_STRING) {
+				extern_library_name = libname;
 			} else {
 				report_syntax_error(tag, "foreign compiler tag requires string literal as library path\n");
 			}
@@ -252,9 +390,13 @@ Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
 	struct_type->kind = KIND_STRUCT;
 	struct_type->struct_desc.fields_names = array_create(string, fields_count);
 	struct_type->struct_desc.fields_types = array_create(Type_Instance*, fields_count);
+	struct_type->struct_desc.offset_bits  = array_create(s64, fields_count);
+	struct_type->struct_desc.fields_count = fields_count;
+	struct_type->struct_desc.alignment    = 0;
 	struct_type->struct_desc.name = name;
 	array_allocate(struct_type->struct_desc.fields_names, fields_count);
 	array_allocate(struct_type->struct_desc.fields_types, fields_count);
+	array_allocate(struct_type->struct_desc.offset_bits, fields_count);
 	for (s32 i = 0; i < fields_count; ++i) {
 		struct_type->struct_desc.fields_names[i] = fields[i]->decl_variable.name->value;
 		struct_type->struct_desc.fields_types[i] = fields[i]->decl_variable.variable_type;
@@ -350,15 +492,29 @@ Ast* Parser::parse_expr_proc_call(Scope* scope) {
 Ast* Parser::parse_expression_precedence10(Scope* scope) {
 	Token* t = lexer->peek_token();
 	if (t->flags & TOKEN_FLAG_LITERAL) {
+		// literal
 		return parse_expr_literal(scope);
+	} /*else if(t->type == TOKEN_KEYWORD_STRUCT) {
+
+	} */else if(t->type == TOKEN_KEYWORD_ARRAY) {
+		// array literal
+		return parse_expr_literal_array(scope);
 	} else if (t->type == TOKEN_IDENTIFIER) {
 		if (lexer->peek_token_type(1) == '(') {
+			// proc call
 			return parse_expr_proc_call(scope);
 		} else {
+			// variable
 			lexer->eat_token();
-			return ast_create_expr_variable(t, scope, 0);
+			if(lexer->peek_token_type() == ':'){
+				lexer->eat_token();
+				return parse_expr_literal_struct(t, scope);
+			} else {
+				return ast_create_expr_variable(t, scope, 0);
+			}
 		}
 	} else if(t->type == '(') {
+		// ( expr )
 		lexer->eat_token();
 		Ast* expr = parse_expression(scope);
 		require_and_eat(')');
@@ -369,9 +525,9 @@ Ast* Parser::parse_expression_precedence10(Scope* scope) {
 	return 0;
 }
 
-Ast* Parser::parse_expression_precedence8(Scope* scope) {
+Ast* Parser::parse_expression_precedence9(Scope* scope) {
 	Token* op = 0;
-	Ast* expr = parse_expression_precedence9(scope);
+	Ast* expr = parse_expression_precedence10(scope);
 	while(true) {
 		op = lexer->peek_token();
 		if(op->type == '['){
@@ -386,15 +542,43 @@ Ast* Parser::parse_expression_precedence8(Scope* scope) {
 	return expr;
 }
 
-Ast* Parser::parse_expression_precedence9(Scope* scope) {
+Ast* Parser::parse_expression_left_dot(Scope* scope){
 	Token* op = 0;
 	Ast* expr = parse_expression_precedence10(scope);
+	while(true) {
+		op = lexer->peek_token();
+		if(op->type == '['){
+			lexer->eat_token();
+			Ast* r = parse_expression(scope);
+			expr = ast_create_expr_binary(scope, expr, r, token_to_binary_op(op), op);
+			require_and_eat(']');
+		} else {
+			break;
+		}
+	}
+	return expr;
+}
+
+Ast* Parser::parse_expression_precedence8(Scope* scope) {
+	Token* op = 0;
+	Ast* expr = parse_expression_left_dot(scope);
 	while(true) {
 		op = lexer->peek_token();
 		if(op->type == '.'){
 			lexer->eat_token();
 			Ast* r = parse_expression_precedence10(scope);
 			expr = ast_create_expr_binary(scope, expr, r, OP_BINARY_DOT, op);
+			while(true) {
+				op = lexer->peek_token();
+				if(op->type == '['){
+					lexer->eat_token();
+					Ast* r = parse_expression(scope);
+					expr = ast_create_expr_binary(scope, expr, r, token_to_binary_op(op), op);
+					require_and_eat(']');
+				} else {
+					break;
+				}
+			}
 		} else {
 			break;
 		}
@@ -500,6 +684,53 @@ Ast* Parser::parse_expression(Scope* scope) {
 	return parse_expression_precedence1(scope);
 }
 
+Ast* Parser::parse_expr_literal_struct(Token* name, Scope* scope){
+	Ast* node = ast_create_expr_literal(scope, LITERAL_STRUCT, name, 0, 0);
+	require_and_eat('{');
+	
+	Ast** exprs = array_create(Ast*, 8);
+	if(lexer->peek_token_type() != '}'){
+		while(true){
+			Ast* expr = parse_expression(scope);
+			array_push(exprs, &expr);
+
+			if(lexer->peek_token_type() != ','){
+				break;
+			} else {
+				lexer->eat_token();
+			}
+		}
+		node->expr_literal.struct_exprs = exprs;
+	}
+	require_and_eat('}');
+	return node;
+}
+
+Ast* Parser::parse_expr_literal_array(Scope* scope) {
+	Token* arraytok = require_and_eat(TOKEN_KEYWORD_ARRAY);
+	require_and_eat('{');
+
+	Ast* node = ast_create_expr_literal(scope, LITERAL_ARRAY, arraytok, 0, 0);
+
+	if(lexer->peek_token_type() != '}') {
+		Ast** exprs = array_create(Ast*, 16);
+		while(true){
+			Ast* expr = parse_expression(scope);
+			array_push(exprs, &expr);
+
+			if(lexer->peek_token_type() != ','){
+				break;
+			} else {
+				lexer->eat_token();
+			}
+		}
+		node->expr_literal.array_exprs = exprs;
+	}
+
+	require_and_eat('}');
+	return node;
+}
+
 Ast* Parser::parse_expr_literal(Scope* scope) {
 	Token* first = lexer->eat_token();
 	Ast* node = ast_create_expr_literal(scope, LITERAL_UNKNOWN, first, 0, 0);
@@ -523,46 +754,62 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 		report_syntax_error(first, "expected integer literal after %c operator but got '%.*s'\n", (char)first->type, TOKEN_STR(first));
 	} else {
 		switch (first->type) {
-		case TOKEN_LITERAL_INT: {
-			node->expr_literal.type = LITERAL_SINT;
-			node->expr_literal.value_s64 = str_to_s64((char*)first->value.data, first->value.length);
-		} break;
-		case TOKEN_LITERAL_HEX_INT: {
-			node->expr_literal.type = LITERAL_HEX_INT;
-			node->expr_literal.value_u64 = literal_integer_to_u64(first);
-		} break;
-		case TOKEN_LITERAL_BIN_INT: {
-			node->expr_literal.type = LITERAL_BIN_INT;
-			node->expr_literal.value_u64 = literal_integer_to_u64(first);
-		} break;
-		case TOKEN_LITERAL_BOOL_FALSE: {
-			node->expr_literal.type = LITERAL_BOOL;
-			node->expr_literal.value_bool = false;
-		} break;
-		case TOKEN_LITERAL_BOOL_TRUE: {
-			node->expr_literal.type = LITERAL_BOOL;
-			node->expr_literal.value_bool = true;
-		} break;
-		case TOKEN_LITERAL_CHAR:
-			// TODO(psv): utf8 encoding
-			node->expr_literal.type = LITERAL_UINT;
-			node->expr_literal.value_u64 = literal_char_to_u64(first);
-			node->type_return = type_primitive_get(TYPE_PRIMITIVE_U32);
-			break;
-		case TOKEN_LITERAL_FLOAT:
-			node->expr_literal.type = LITERAL_FLOAT;
-			node->expr_literal.value_r64 = literal_float_to_r64(first);
-			break;
-		case TOKEN_LITERAL_STRING:
-			node->expr_literal.type = LITERAL_STRUCT;
-			node->expr_literal.flags |= LITERAL_FLAG_STRING;
-			// TODO(psv): get type string here already
-			break;
-		default: {
-			// TODO(psv):
-			// struct literal
-			// array literal
-		}break;
+			case TOKEN_LITERAL_INT: {
+				node->expr_literal.type = LITERAL_SINT;
+				node->expr_literal.value_s64 = str_to_s64((char*)first->value.data, first->value.length);
+			} break;
+			case TOKEN_LITERAL_HEX_INT: {
+				node->expr_literal.type = LITERAL_HEX_INT;
+				node->expr_literal.value_u64 = literal_integer_to_u64(first);
+			} break;
+			case TOKEN_LITERAL_BIN_INT: {
+				node->expr_literal.type = LITERAL_BIN_INT;
+				node->expr_literal.value_u64 = literal_integer_to_u64(first);
+			} break;
+			case TOKEN_LITERAL_BOOL_FALSE: {
+				node->expr_literal.type = LITERAL_BOOL;
+				node->expr_literal.value_bool = false;
+			} break;
+			case TOKEN_LITERAL_BOOL_TRUE: {
+				node->expr_literal.type = LITERAL_BOOL;
+				node->expr_literal.value_bool = true;
+			} break;
+			case TOKEN_LITERAL_CHAR:
+				// TODO(psv): utf8 encoding
+				node->expr_literal.type = LITERAL_UINT;
+				node->expr_literal.value_u64 = literal_char_to_u64(first);
+				node->type_return = type_primitive_get(TYPE_PRIMITIVE_U32);
+				break;
+			case TOKEN_LITERAL_FLOAT:
+				node->expr_literal.type = LITERAL_FLOAT;
+				node->expr_literal.value_r64 = literal_float_to_r64(first);
+				break;
+			case TOKEN_LITERAL_STRING: {
+				node->expr_literal.type = LITERAL_STRUCT;
+				node->expr_literal.flags |= LITERAL_FLAG_STRING;
+
+				// example "Hello"
+				// string { 5, -1, &global_array }
+
+				Ast* g_data = data_global_string_push(first);
+				node->expr_literal.struct_exprs = array_create(Ast*, 3);
+				Ast** exprs = node->expr_literal.struct_exprs;
+
+				// Length
+				Ast* length_expr = ast_create_expr_literal(scope, LITERAL_HEX_INT, first, 0, type_primitive_get(TYPE_PRIMITIVE_S64));
+				length_expr->expr_literal.value_s64 = g_data->data_global.length_bytes;
+
+				Ast* capacity_expr = ast_create_expr_literal(scope, LITERAL_HEX_INT, first, 0, type_primitive_get(TYPE_PRIMITIVE_S64));
+				capacity_expr->expr_literal.value_s64 = -1;	// start immutable
+
+				Ast* data_expr = g_data;
+
+				array_push(exprs, &length_expr);
+				array_push(exprs, &capacity_expr);
+				array_push(exprs, &data_expr);
+			} break;
+			default: {
+			}break;
 		}
 	}
 

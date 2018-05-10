@@ -27,6 +27,23 @@ inline void infer_queue_remove(Ast* node) {
 	}
 }
 
+s32 get_alignment_from_type(Type_Instance* type){
+	switch(type->kind) {
+		case KIND_PRIMITIVE: return type->type_size_bits / 8;
+		case KIND_POINTER:   return type_pointer_size_bits() / 8;
+		case KIND_FUNCTION:  return type_pointer_size_bits() / 8;
+		case KIND_ARRAY:     return get_alignment_from_type(type->array_desc.array_of);
+		case KIND_STRUCT:{
+			if(type->struct_desc.fields_count > 0){
+				return get_alignment_from_type(type->struct_desc.fields_types[0]);
+			} else {
+				return 0;
+			}
+		}   
+	}
+	return 0;
+}
+
 // ---------------------------------------------
 // -------------- Declarations -----------------
 // ---------------------------------------------
@@ -107,8 +124,8 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 			if(type->pointer_to->kind == KIND_STRUCT){
 				Ast* struct_decl = decl_from_name(scope, type->pointer_to->struct_desc.name);
 				if(!struct_decl){
-					if(report_undeclared){
-						report_undeclared(type->struct_desc.name);
+					if(rep_undeclared){
+						report_undeclared(type->pointer_to->struct_desc.name);
 					}
 					return 0;
 				}
@@ -194,25 +211,22 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				}
 				Type_Instance* type = infer_from_expression(node->decl_variable.assignment, &error, rep_undeclared);
 				if (error & DECL_ERROR_FATAL) return error;
-				if (!type) {
+				if (!type || error & DECL_QUEUED_TYPE) {
 					infer_queue_push(node);
 					error |= DECL_QUEUED_TYPE;
 					return error;
 				}
 				type->flags |= TYPE_FLAG_RESOLVED;
 				infer_queue_remove(node);
-				node->decl_variable.variable_type = internalize_type(&type, scope, true);
+				//node->decl_variable.variable_type = internalize_type(&type, scope, true);
 				return error;
 			}
 			if (node->decl_variable.variable_type->flags & TYPE_FLAG_RESOLVED) {
 				return error;
 			} else {
 				Type_Instance* type = resolve_type(scope, node->decl_variable.variable_type, rep_undeclared);
-				if (!type) {
-					error |= DECL_ERROR_FATAL;
-					return error;
-				}
-				if (type->flags & TYPE_FLAG_RESOLVED) {
+
+				if (type && type->flags & TYPE_FLAG_RESOLVED) {
 					node->decl_variable.variable_type = type;
 					infer_queue_remove(node);
 				} else {
@@ -226,7 +240,7 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				// infer from exp
 				Type_Instance* type = infer_from_expression(node->decl_constant.value, &error, rep_undeclared);
 				if(error & DECL_ERROR_FATAL) return error;
-				if(!type){
+				if(!type || error & DECL_QUEUED_TYPE){
 					infer_queue_push(node);
 					error |= DECL_QUEUED_TYPE;
 					return error;
@@ -240,11 +254,8 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				return error;
 			} else {
 				Type_Instance* type = resolve_type(scope, node->decl_constant.type_info, rep_undeclared);
-				if (!type) {
-					error |= DECL_ERROR_FATAL;
-					return error;
-				}
-				if (type->flags & TYPE_FLAG_RESOLVED) {
+
+				if (type && type->flags & TYPE_FLAG_RESOLVED) {
 					node->decl_constant.type_info = type;
 					infer_queue_remove(node);
 				} else {
@@ -257,24 +268,58 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 			if (node->decl_struct.type_info->flags & TYPE_FLAG_RESOLVED) {
 				return error;
 			} else {
+				bool packed = false;
 				size_t nfields = node->decl_struct.fields_count;
 				Type_Instance* tinfo = node->decl_struct.type_info;
-
+				s64 offset = 0;
+				s32 alignment = 0;
 				size_t type_size_bits = 0;
+
+
 				for (size_t i = 0; i < nfields; ++i) {
 					Decl_Error e = resolve_types_decls(node->decl_struct.struct_scope, node->decl_struct.fields[i], rep_undeclared);
 					error |= e;
 					if (e & DECL_QUEUED_TYPE) {
-						continue;
+						break;
 					} else {
 						tinfo->struct_desc.fields_types[i] = node->decl_struct.fields[i]->decl_variable.variable_type;
-						type_size_bits += tinfo->struct_desc.fields_types[i]->type_size_bits;
+						s64 field_type_size = tinfo->struct_desc.fields_types[i]->type_size_bits;
+						tinfo->struct_desc.offset_bits[i] = offset;
+
+						type_size_bits += field_type_size;
+						if(field_type_size == 0) continue;
+
+						if(!packed){
+							// align type to its boundary
+							s64 offset_bytes = offset / 8;
+							s64 field_type_size_bytes = field_type_size / 8;
+							alignment = get_alignment_from_type(tinfo->struct_desc.fields_types[i]);
+
+							if(offset_bytes % alignment != 0) {
+								s64 delta = align_delta(offset_bytes, alignment);
+								delta *= 8; // delta in bits
+								tinfo->struct_desc.offset_bits[i] += delta;
+								type_size_bits += delta;
+								offset += delta;
+							}
+						}
+						offset += field_type_size;
+						if(i == 0 || alignment == 0){
+							tinfo->struct_desc.alignment = alignment;
+						}
 					}
 				}
+
 				if (error & DECL_QUEUED_TYPE) {
 					infer_queue_push(node);
 					error |= DECL_QUEUED_TYPE;
 				} else {
+					if(!packed){
+						// adjust for the alignment of the first element
+						s64 first_alignment = tinfo->struct_desc.alignment;
+						s64 delta = align_delta(type_size_bits / 8, first_alignment);
+						type_size_bits += delta * 8;
+					}
 					node->decl_struct.type_info->type_size_bits = type_size_bits;
 					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
 					node->decl_struct.type_info = internalize_type(&tinfo, scope, true);
@@ -411,14 +456,29 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				Type_Error type_error = TYPE_OK;
 				Type_Instance* infered = infer_from_expression(node->decl_variable.assignment, &type_error, TYPE_INFER_REPORT_UNDECLARED);
 				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
-				if (infered->flags & TYPE_FLAG_WEAK) {
+				bool typechecked = false;
+				if (infered && infered->flags & TYPE_FLAG_WEAK) {
 					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
-					infered = node->decl_variable.assignment->type_return;
+					if(!node->decl_variable.assignment->type_return){
+						type_error |= report_type_error(TYPE_ERROR_FATAL, node, "could not infer variable type from assignment expression\n");
+						return type_error | error;
+					}
+					if(infered->kind == KIND_ARRAY || infered->kind == KIND_STRUCT) {
+						infered = type_check_expr(node->decl_variable.assignment->type_return, node->decl_variable.assignment, &error);
+						typechecked = true;
+					} else {
+						infered = node->decl_variable.assignment->type_return;
+					}
 				}
 				if(!node->decl_variable.variable_type){
+					if(!infered){
+						type_error |= report_type_error(TYPE_ERROR_FATAL, node, "could not infer variable type from assignment expression\n");
+						return type_error | error;
+					}
 					node->decl_variable.variable_type = infered;
 				} else {
-					node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);
+					if(!typechecked)
+						node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);
 				}
 				error |= type_error;
 			}
@@ -465,6 +525,7 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 		case AST_DECL_STRUCT: break; // should not have struct inner decl yet
 		case AST_DECL_ENUM: break; // should not have enum inner decl yet
 		case AST_DECL_UNION: break; // should not have union inner decl yet
+		case AST_DATA: break;		// no need to check is just raw data
 		default: assert(0); break; // TODO(psv): internal error
 	}
 
@@ -606,6 +667,7 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* node = ast_top_level[i];
 		assert(node->flags & AST_FLAG_IS_DECLARATION);
+		if(node->node_type == AST_DATA) continue;
 
 		error |= decl_check_redefinition(global_scope, node);
 		if (error & DECL_ERROR_FATAL) continue;
@@ -631,6 +693,8 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 			return DECL_ERROR_FATAL;
 		}
 	}
+
+	error |= resolve_type_internalize_queue();
 
 	if (error & DECL_ERROR_FATAL) {
 		return DECL_ERROR_FATAL;

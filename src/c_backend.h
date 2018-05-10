@@ -16,6 +16,13 @@ struct C_Code_Generator {
 
 
     void emit_type(Type_Instance* type, Token* name = 0);
+	
+	void emit_array_assignment(Ast* decl);
+	void emit_array_assignment_from_base(s64 offset, Ast* expr);
+	
+	void emit_struct_assignment(Ast* decl);
+	void emit_struct_assignment_from_base(s64 offset, Ast* expr);
+
     void emit_decl(Ast* decl, bool forward = false);
 	void emit_proc(Ast* decl);
 	void emit_command(Ast* comm);
@@ -23,6 +30,9 @@ struct C_Code_Generator {
 	void emit_expression_binary(Ast* expr);
 	void emit_default_value(Type_Instance* type);
 	void emit_typedef(Type_Instance* type, Token* name, char* prefix);
+
+	void emit_data_decl(Ast* decl);
+
     int  c_generate_top_level(Ast** toplevel, Type_Instance** type_table);
 };
 

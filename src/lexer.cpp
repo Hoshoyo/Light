@@ -39,8 +39,10 @@ Keyword keywords_info[] = {
 };
 
 string compiler_tags[] = {
-	{sizeof("foreign") - 1, (u8*)"foreign"},
-	{sizeof("main") - 1, (u8*)"main"},
+	{sizeof("foreign") - 1, (u8*)"foreign", -1},
+	{sizeof("main") - 1, (u8*)"main", -1},
+	{sizeof("string") - 1, (u8*)"string", -1},
+	{sizeof("import") - 1, (u8*)"import", -1}
 };
 
 s32 Lexer::report_lexer_error(char* msg, ...)
@@ -76,8 +78,8 @@ void Lexer::init() {
 		// @TODO(psv): check for necessity for more
 		// @Hardcoded
 
-		// 32 Mega bytes of hash for identifiers
-		hash_table_init(&identifiers, 1024 * 1024 * 32);
+		// 1 million entries
+		hash_table_init(&identifiers, 1024 * 1024);
 		for (s32 i = 0; i < ARRAY_COUNT(compiler_tags); ++i) {
 			internalize_identifier(&compiler_tags[i]);
 		}
@@ -405,6 +407,7 @@ bool Lexer::read_token(char** begin)
 		type = TOKEN_LITERAL_STRING;
 		int i = 0;
 		at++;
+		current_col++;
 		for (; at[i] != '"'; ++i) {
 			if (at[i] == 0) {
 				type = TOKEN_UNKNOWN;
@@ -421,6 +424,7 @@ bool Lexer::read_token(char** begin)
 		type = TOKEN_LITERAL_CHAR;
 		int i = 0;
 		at++;
+		current_col++;
 		length = 0;
 		for (; at[i] != '\''; ++i) {
 			if (at[i] == 0) {

@@ -883,7 +883,7 @@ s32 LLVM_Code_Generator::llvm_define_string_literal(Ast_Expr_Literal* lit) {
 	s32 n = alloc_strlit_temp();
 
 	size_t litlength = lit->token->value.length;
-	lit->llvm_index = n;
+	//lit->llvm_index = n;
 	// @TODO(psv): temporary print of literal string
 	sprint_strlit("@__str$%d = private global [%d x i8] c\"%.*s\\00\"\n", n, litlength + 1, TOKEN_STR(lit->token));
 	return n;

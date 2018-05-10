@@ -1,12 +1,95 @@
 print_s32 :: (val : s32) -> s64 #foreign("print_string.obj");
+print_r32 :: (val : r32) -> s64 #foreign("print_string.obj");
+print_s64 :: (val : s64) -> s64 #foreign("print_string.obj");
 print_string :: (length : s64, str : ^u8) -> s64 #foreign("print_string.obj");
+println :: () -> void #foreign("print_string.obj");
+/*
+/*
+handmade :: () {
+    s : [4]u8;
+    s[0] = 'h';
+    s[1] = 'e';
+    s[2] = 'l';
+    s[3] = 'o';
+    print_string(4, cast(^u8)s);
+}
+*/
 
-foo :: (s : [4]s32) {
-
+vec4 :: struct {
+    x : r32;
+    y : r32;
+    z : r32;
+    w : r32;
 }
 
+print_vec4 :: (v : vec4) {
+    print_r32(v.x);
+    println();
+    print_r32(v.y);
+    println();
+    print_r32(v.z);
+    println();
+    print_r32(v.w);
+    println();
+}
+
+mult_matrix_by_vec :: (m : [4][4]r32, v : [4]r32) -> vec4 {
+    r : vec4;
+    r.x = m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2] + m[0][3] * v[3];
+    r.y = m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2] + m[1][3] * v[3];
+    r.z = m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2] + m[2][3] * v[3];
+    r.w = m[3][0] * v[0] + m[3][1] * v[1] + m[3][2] * v[2] + m[3][3] * v[3];
+    return r;
+}
+
+literal :: () {
+    //s := array {array{1, 2}, array{3, 4}};
+    //s : [4]u8 = array {'h', 'e', 'l', 'o'};
+    //s := array {'h', 'e', 'l', 'o'};
+    //s := array {'h', 'e', 'l', 'o'} + 1;
+    //s : [0]u8 = array{'u'} + array{'u'};
+    //s := array{ array {1, 2}, array{3, 4} };
+
+    translation := array {
+        array{1.0, 0.0, 0.0, 2.0},
+        array{0.0, 1.0, 0.0, 3.0},
+        array{0.0, 0.0, 1.0, 4.0},
+        array{0.0, 0.0, 0.0, 1.0}
+    };
+
+    vec := array {
+        0.0, 0.0, 0.0, 1.0
+    };
+
+    res := mult_matrix_by_vec(translation, vec);
+    print_vec4(res);
+
+    s := 2.0;
+    scale := array {
+        array{s, 0.0, 0.0, 0.0},
+        array{0.0, s, 0.0, 0.0},
+        array{0.0, 0.0, s, 0.0},
+        array{0.0, 0.0, 0.0, 1.0}
+    };
+
+    vec4 := array {1.0, 1.0, 1.0, 1.0};
+
+    res = mult_matrix_by_vec(scale, vec4);
+    print_vec4(res);
+
+    //s := array {1, 3};
+    //v := array {s, s, s};
+
+    //s := 1.0;
+    //v := array {s, 2.0};
+
+    //a : vec2;
+    //s := array {a, a};
+}
+*/
 main :: () -> s32 {
-    s : [4]s32;
-    foo(s);
+    //handmade();
+    //literal();
+    a : [2]s32 = array {1, 2, 3};
     return 0;
 }

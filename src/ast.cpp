@@ -23,6 +23,26 @@ Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {
 	return scope;
 }
 
+Ast* ast_create_data(Data_Type type, Scope* scope, Token* location, u8* data, s64 length_bytes, Type_Instance* data_type) {
+	static s32 id = 0;
+	Ast* d = ALLOC_AST();
+
+	d->node_type = AST_DATA;
+	d->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	d->scope = scope;
+	d->flags = AST_FLAG_IS_DECLARATION;
+	d->infer_queue_index = -1;
+
+	d->data_global.type = type;
+	d->data_global.data = data;
+	d->data_global.length_bytes = length_bytes;
+	d->data_global.location = location;
+	d->data_global.data_type = data_type;
+	d->data_global.id = id++;
+
+	return d;
+}
+
 Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Type_Instance* ptype, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count) {
 	Ast* dp = ALLOC_AST();
 
@@ -224,6 +244,8 @@ Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Token* tok
 	el->expr_literal.flags = flags;
 	el->expr_literal.type = literal_type;
 	el->expr_literal.token = token;
+	el->expr_literal.array_exprs = 0;
+	el->expr_literal.array_strong_type = 0;
 
 	return el;
 }
@@ -400,11 +422,66 @@ void quick_type(FILE* out, Type_Instance* type) {
 	fprintf(out, ">");
 }
 
+
+int DEBUG_print_type_detailed(FILE* out, Type_Instance* type) {
+	int count = 0;
+	if (!type) {
+		count += fprintf(out, "unknown");
+		return count;
+	}
+	if (type->kind == KIND_PRIMITIVE) {
+		switch (type->primitive) {
+			case TYPE_PRIMITIVE_S64:	count += fprintf(out, "(%d)s64", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_S32:	count += fprintf(out, "(%d)s32", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_S16:	count += fprintf(out, "(%d)s16", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_S8:		count += fprintf(out, "(%d)s8", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_U64:	count += fprintf(out, "(%d)u64", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_U32:	count += fprintf(out, "(%d)u32", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_U16:	count += fprintf(out, "(%d)u16", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_U8:		count += fprintf(out, "(%d)u8", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_BOOL:	count += fprintf(out, "(%d)bool", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_R64:	count += fprintf(out, "(%d)r64", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_R32:	count += fprintf(out, "(%d)r32", type->type_size_bits / 8); break;
+			case TYPE_PRIMITIVE_VOID:	count += fprintf(out, "(%d)void", type->type_size_bits / 8); break;
+		}
+	} else if (type->kind == KIND_POINTER) {
+		count += fprintf(out, "(8)^");
+		count += DEBUG_print_type(out, type->pointer_to);
+	} else if (type->kind == KIND_STRUCT) {
+		count += fprintf(out, "(total size %d) %.*s struct {\n", type->type_size_bits / 8, TOKEN_STR(type->struct_desc.name));
+		int num_fields = array_get_length(type->struct_desc.fields_types);
+		for (int i = 0; i < num_fields; ++i) {
+			Type_Instance* field_type = type->struct_desc.fields_types[i];
+			string name = type->struct_desc.fields_names[i];
+			count += fprintf(out, "(offset %d)%.*s : ", type->struct_desc.offset_bits[i] / 8,name.length, name.data);
+			count += DEBUG_print_type(out, field_type);
+			count += fprintf(out, ";\n");
+		}
+		count += fprintf(out, "}\n");
+	} else if (type->kind == KIND_FUNCTION) {
+		count += fprintf(out, "(");
+		int num_args = type->function_desc.num_arguments;
+		for (int i = 0; i < num_args; ++i) {
+			count += DEBUG_print_type(out, type->function_desc.arguments_type[i]);
+			if(i + 1 < num_args) {
+				count += fprintf(out, ",");
+			}
+		}
+		count += fprintf(out, ") -> ");
+		count += DEBUG_print_type(out, type->function_desc.return_type);
+	} else if (type->kind == KIND_ARRAY) {
+		count += fprintf(out, "[%llu", type->array_desc.dimension);
+		count += fprintf(out, "]");
+		count += DEBUG_print_type(out, type->array_desc.array_of);
+	}
+	return count;
+}
+
 int DEBUG_print_type(FILE* out, Type_Instance* type, bool short_) {
 	int count = 0;
 	if (!type) {
-		count += fprintf(out, "(TYPE_IS_NULL)");
-		return;
+		count += fprintf(out, "unknown");
+		return count;
 	}
 	if (type->kind == KIND_PRIMITIVE) {
 		switch (type->primitive) {
@@ -505,11 +582,11 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 	quick_type(out, node->type_return);
 	switch (node->node_type) {
 	case AST_EXPRESSION_LITERAL: {
-		if(!node->type_return) {
+		if(!node->type_return && print_types) {
 			fprintf(out, "<nil>");
 			break;
 		}
-		if(node->type_return->kind == KIND_PRIMITIVE){
+		if(node->type_return && node->type_return->kind == KIND_PRIMITIVE){
 			switch(node->type_return->primitive){
 				case TYPE_PRIMITIVE_BOOL:	(node->expr_literal.value_bool) ? fprintf(out, "true") : fprintf(out, "false"); break;
 				case TYPE_PRIMITIVE_R32:
@@ -527,8 +604,46 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 			}
 		} else {
 			switch(node->expr_literal.type){
-				case LITERAL_ARRAY:		fprintf(out, "<UNSUPPORTED array literal>"); break;
-				case LITERAL_STRUCT:	fprintf(out, "<UNSUPPORTED struct literal>"); break;
+				case LITERAL_ARRAY:{
+					fprintf(out, "array {");
+					size_t nexpr = 0;
+					if(node->expr_literal.array_exprs){
+						nexpr = array_get_length(node->expr_literal.array_exprs);
+					}
+					for(size_t i = 0; i < nexpr; ++i) {
+						if(i != 0) fprintf(out, ", ");
+						DEBUG_print_expression(out, node->expr_literal.array_exprs[i]);
+					}
+					fprintf(out, "}");
+				}break;
+				case LITERAL_STRUCT:{
+					fprintf(out, "%.*s {", TOKEN_STR(node->expr_literal.token));
+					size_t nexpr = 0;
+					if(node->expr_literal.struct_exprs){
+						nexpr = array_get_length(node->expr_literal.struct_exprs);
+					}
+					for (size_t i = 0; i < nexpr; ++i){
+						if(i != 0) fprintf(out, ", ");
+						DEBUG_print_expression(out, node->expr_literal.struct_exprs[i]);
+					}
+					fprintf(out, "}");
+				}break;
+				case LITERAL_FLOAT:{
+					fprintf(out, "%f", node->expr_literal.value_r64);
+				}break;
+				case LITERAL_HEX_INT:
+				case LITERAL_SINT:
+				case LITERAL_UINT:
+				case LITERAL_BIN_INT:{
+					fprintf(out, "0x%llx", node->expr_literal.value_u64);
+				}break;
+				case LITERAL_BOOL:{
+					if(node->expr_literal.value_bool){
+						fprintf(out, "true");
+					} else {
+						fprintf(out, "false");
+					}
+				}break;
 				default:				fprintf(out, "<UNSUPPORTED literal>"); break;
 			}
 		}
@@ -601,6 +716,11 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 		}
 		fprintf(out, ")");
 	} break;
+	case AST_DATA: {
+		if(node->data_global.type == GLOBAL_STRING){
+			fprintf(out, "__global_string_%d", node->data_global.id);
+		}
+	}break;
 	}
 }
 
@@ -752,6 +872,16 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 		case AST_EXPRESSION_LITERAL:
 		case AST_EXPRESSION_VARIABLE:
 		case AST_EXPRESSION_PROCEDURE_CALL:		DEBUG_print_expression(out, node); break;
+
+		// Data
+		case AST_DATA: {
+			if(node->data_global.type == GLOBAL_STRING){
+				quick_type(out, node->data_global.data_type);
+				fprintf(out, "__global_string_%d = \"%.*s\";\n", node->data_global.id, node->data_global.length_bytes, node->data_global.data);
+			} else {
+				fprintf(out, "<Unsupported AST Data Node>\n");				
+			}
+		}break;
 	default: {
 		fprintf(out, "<Unsupported AST Node>\n");
 	}break;

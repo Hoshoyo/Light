@@ -95,6 +95,23 @@ bool str_equal(const string& s1, const string& s2)
 	return false;
 }
 
+s64 align_delta(s64 offset, s64 align_to){
+	s64 rest = offset % align_to;
+	return((align_to - rest) % align_to);
+}
+
+//https://stackoverflow.com/questions/466204/rounding-up-to-next-power-of-2
+s32 next_power2(s32 v) {
+	v--;
+	v |= v >> 1;
+	v |= v >> 2;
+	v |= v >> 4;
+	v |= v >> 8;
+	v |= v >> 16;
+	v++;
+	return v;
+}
+
 bool is_white_space(char str)
 {
 	return (str == ' ' ||
@@ -273,6 +290,14 @@ u32 djb2_hash(u32 starting_hash, u8 *str, int size)
 u32 djb2_hash(u32 hash1, u32 hash2) {
 	u32 hash = ((hash1 << 5) + hash1) + hash2;
 	return hash;
+}
+
+char* make_c_string(char* str, size_t length) {
+	if (length == 0) return 0;
+	char* mem = (char*)malloc(length + 1);
+	mem[length] = 0;
+	memcpy(mem, str, length);
+	return mem;
 }
 
 char* make_c_string(string& s)

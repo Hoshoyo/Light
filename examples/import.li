@@ -1,0 +1,6 @@
+#import "./examples/gcd.li"
+
+main :: () -> s32 {
+    a := factorial(4);
+    return gcd(9, 27) * a;
+}

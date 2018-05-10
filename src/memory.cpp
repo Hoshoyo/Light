@@ -18,6 +18,7 @@ Memory_Arena::Memory_Arena(s64 block_size)
 	current_using = 0;
 	memset(size, 0, sizeof(int) * MAX_ARENA);
 	size[0] = block_size;
+	this->block_size = block_size;
 	memory[0] = _aligned_malloc(size[0], 16);							// SIZE THEN ALIGNMENT THANK YOU LINUX
 	allocated[0] = 0;
 	free_ptr[0] = memory[0];
@@ -25,6 +26,8 @@ Memory_Arena::Memory_Arena(s64 block_size)
 
 void* Memory_Arena::allocate(int s)
 {
+	//return malloc(s);
+
 	void* result = free_ptr[current_using];
 	if (((char*)memory[current_using] + size[current_using]) < ((char*)free_ptr[current_using] + s))
 	{

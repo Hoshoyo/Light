@@ -33,23 +33,27 @@ return foo;
 
 void map(s32* arr, s64 length, s64(*f)(s32)){
 char delimiter[2] = {0};
+
 *(u8*)(((char*)delimiter)+ 1 * (0)) = 0x2c;
 *(u8*)(((char*)delimiter)+ 1 * (1)) = 0x20;
-s64 i = 0;
-while((i<length)){
-if((i!=0)){
+s64 i;
+i = 0;
+while(((i)<length)){
+if(((i)!=0)){
 print_string(2,((u8*)delimiter));
 }
 f(*(s32*)(((char*)arr)+ 4 * (i)));
-i = (i+1);
+i = ((i)+1);
 }
 loop_0:;
 
 }
 
 s32 __main(){
-s32(*a)(r32) = make_proc();
+s32(*a)(r32);
+a = make_proc();
 char v[20] = {0};
+
 *(s32*)(((char*)v)+ 4 * (0)) = 0;
 *(s32*)(((char*)v)+ 4 * (1)) = 1;
 *(s32*)(((char*)v)+ 4 * (2)) = 2;

@@ -257,6 +257,96 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
     }
 }
 
+void C_Code_Generator::emit_array_assignment_from_base(s64 offset_bytes, Ast* expr){
+    // base is a char*
+    if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY){
+            size_t nexpr = 0;
+            if(expr->expr_literal.array_exprs){
+                nexpr = array_get_length(expr->expr_literal.array_exprs);
+                for(size_t i = 0; i < nexpr; ++i) {
+                    emit_array_assignment_from_base(offset_bytes, expr->expr_literal.array_exprs[i]);
+                }
+            }
+    } else if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT) {
+        sprint("__struct_base = __t_base;\n");
+        sprint("{\n");
+        sprint("char* __t_base = __struct_base;\n");
+        emit_struct_assignment_from_base(0, expr);
+        sprint("}\n");
+        sprint("__t_base += %lld;\n", (expr->type_return->type_size_bits / 8) + offset_bytes);
+    } else {
+        sprint("*(");
+        emit_type(expr->type_return);
+        sprint("*)__t_base = ");
+        emit_expression(expr);
+        sprint(";\n");
+        sprint("__t_base += %lld;\n", (expr->type_return->type_size_bits / 8) + offset_bytes);
+    }
+}
+
+void C_Code_Generator::emit_array_assignment(Ast* decl) {
+    Type_Instance* indexed_type = decl->decl_variable.variable_type;
+    Ast* expr = decl->decl_variable.assignment;
+
+    assert(indexed_type->kind == KIND_ARRAY);
+    assert(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY);
+
+    sprint("{\n");
+    sprint("char* __t_base = (char*)%.*s;\n", TOKEN_STR(decl->decl_variable.name));
+    sprint("char* __struct_base = __t_base;\n");
+    emit_array_assignment_from_base(0, expr);
+    sprint("}\n");
+
+}
+
+void C_Code_Generator::emit_struct_assignment_from_base(s64 offset_bytes, Ast* expr) {
+    // base is a char*
+    if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT){
+            size_t nexpr = 0;
+            Type_Instance* stype = expr->type_return;
+            if(expr->expr_literal.struct_exprs){
+                nexpr = array_get_length(expr->expr_literal.struct_exprs);
+                for(size_t i = 0; i < nexpr; ++i) {
+                    s64 localoffset_bytes = stype->struct_desc.offset_bits[i] / 8;
+                    emit_struct_assignment_from_base(offset_bytes + localoffset_bytes, expr->expr_literal.array_exprs[i]);
+                }
+            }
+    } else if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY) {
+        sprint("{\n");
+        sprint("char* __t_base = __array_base;\n");
+        emit_array_assignment_from_base(offset_bytes, expr);
+        sprint("}\n");
+    } else {
+        sprint("*(");
+        emit_type(expr->type_return);
+        sprint("*)((char*)__t_base + %lld) = ", offset_bytes);
+        emit_expression(expr);
+        sprint(";\n");
+    }
+}
+
+void C_Code_Generator::emit_struct_assignment(Ast* decl) {
+    Type_Instance* struct_type = decl->decl_variable.variable_type;
+    Ast* expr = decl->decl_variable.assignment;
+
+    assert(struct_type->kind == KIND_STRUCT);
+    if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT) {
+        sprint("{\n");
+
+        sprint("char* __t_base = (char*)&(%.*s);\n", TOKEN_STR(decl->decl_variable.name));
+
+        // array copies will use this
+        sprint("char* __array_base = __t_base;\n");
+        emit_struct_assignment_from_base(0, expr);
+
+        sprint("}\n");
+    } else {
+        sprint("%.*s = ", TOKEN_STR(decl->decl_variable.name));
+        emit_expression(decl->decl_variable.assignment);
+        sprint(";\n");
+    }
+}
+
 void C_Code_Generator::emit_command(Ast* comm) {
 	switch (comm->node_type) {
 		case AST_COMMAND_BLOCK:{
@@ -267,13 +357,24 @@ void C_Code_Generator::emit_command(Ast* comm) {
                 if(cm->flags & AST_FLAG_IS_DECLARATION){
                     if(cm->node_type == AST_DECL_VARIABLE){
                         emit_decl(cm);
-                        sprint(" = ");
-                        if(cm->decl_variable.assignment){
-                            emit_expression(cm->decl_variable.assignment);
-						} else {
-							emit_default_value(cm->decl_variable.variable_type);
-						}
-						sprint(";");
+                        Ast* expr = cm->decl_variable.assignment;
+                        if(!expr){
+                            sprint(" = ", TOKEN_STR(cm->decl_variable.name));
+                            emit_default_value(cm->decl_variable.variable_type);
+                        }
+                        sprint(";\n");
+                        if(expr){
+                            if(expr->type_return->kind == KIND_ARRAY){
+                                emit_array_assignment(cm);
+                            } else if(expr->type_return->kind == KIND_STRUCT) {
+                                emit_struct_assignment(cm);
+                                //assert_msg(0, "struct literal not implemented for c backend");
+                            } else {
+                                sprint("%.*s = ", TOKEN_STR(cm->decl_variable.name));
+                                emit_expression(cm->decl_variable.assignment);
+                                sprint(";");
+                            }
+                        }
 					} else if (cm->node_type == AST_DECL_CONSTANT) {
 						sprint("const ");
 						emit_decl(cm);
@@ -328,7 +429,7 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			Ast* rval = comm->comm_var_assign.rvalue;
             
 			// register size assignment
-			if (type_regsize(rval->type_return) || rval->type_return->kind == KIND_STRUCT || rval->type_return->kind == KIND_FUNCTION) {
+			if (type_regsize(rval->type_return) || rval->type_return->kind == KIND_FUNCTION) {
 				if (comm->comm_var_assign.lvalue) {
 					emit_expression(comm->comm_var_assign.lvalue);
 					sprint(" = ");
@@ -338,7 +439,30 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			}
 			// bigger than regsize
 			else {
-				assert_msg(0, "assignment of type not recognized");
+                if(rval->node_type == AST_EXPRESSION_VARIABLE && rval->type_return->kind == KIND_STRUCT){
+                    if (comm->comm_var_assign.lvalue) {
+                        emit_expression(comm->comm_var_assign.lvalue);
+                        sprint(" = ");
+                    }
+                    emit_expression(comm->comm_var_assign.rvalue);
+                    sprint(";");
+                } else if(rval->node_type == AST_EXPRESSION_LITERAL && rval->expr_literal.type == LITERAL_STRUCT) {
+                    sprint("{\n");
+                    sprint("char* __t_base = (char*)&(");
+                    emit_expression(comm->comm_var_assign.lvalue);
+                    sprint(");\n");
+                    emit_struct_assignment_from_base(0, rval);
+                    sprint("}\n");
+                } else if(rval->node_type == AST_EXPRESSION_LITERAL && rval->expr_literal.type == LITERAL_ARRAY) {
+                    sprint("{\n");
+                    sprint("char* __t_base = (char*)(");
+                    emit_expression(comm->comm_var_assign.lvalue);
+                    sprint(");\n");
+                    emit_array_assignment_from_base(0, rval);
+                    sprint("}\n");
+                } else {
+				    assert_msg(0, "assignment of type not recognized");
+                }
 			}
         } break;
 	}
@@ -366,8 +490,9 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
         case OP_BINARY_LOGIC_OR:
         case OP_BINARY_NOT_EQUAL:
         case OP_BINARY_DOT:{
-            sprint("(");
+            sprint("((");
             emit_expression(expr->expr_binary.left);
+            sprint(")");
             sprint(binop_op_to_string(expr->expr_binary.op));
             emit_expression(expr->expr_binary.right);
             sprint(")");
@@ -405,24 +530,53 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
 }
 
 void C_Code_Generator::emit_expression(Ast* expr){
-    assert(expr->flags & AST_FLAG_IS_EXPRESSION);
+    assert(expr->flags & AST_FLAG_IS_EXPRESSION || expr->node_type == AST_DATA);
 
     switch(expr->node_type){
         case AST_EXPRESSION_BINARY:{
             emit_expression_binary(expr);
         }break;
         case AST_EXPRESSION_LITERAL:{
+			assert_msg(expr->type_return->kind == KIND_PRIMITIVE, "integer literal of type not primitive");
             switch(expr->expr_literal.type){
+				case LITERAL_SINT:
                 case LITERAL_BIN_INT:
                 case LITERAL_HEX_INT:
                 case LITERAL_UINT:{
-                    sprint("0x%llx", expr->expr_literal.value_u64);
-                }break;
-                case LITERAL_SINT: {
-                    sprint("%lld", expr->expr_literal.value_u64);
+					switch (expr->type_return->primitive) {
+						case TYPE_PRIMITIVE_S8:
+							sprint("0x%x", (s8)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_S16:
+							sprint("0x%x", (s16)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_S32:
+							sprint("0x%x", (s32)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_S64:
+							sprint("0x%llx", expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_U8:
+							sprint("0x%x", (u8)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_U16:
+							sprint("0x%x", (u16)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_U32:
+							sprint("0x%x", (u32)expr->expr_literal.value_u64);
+							break;
+						case TYPE_PRIMITIVE_U64:
+							sprint("0x%llx", expr->expr_literal.value_u64);
+							break;
+					}
+                    
                 }break;
                 case LITERAL_FLOAT:{
-                    sprint("%f", expr->expr_literal.value_r64);
+					if (expr->type_return->primitive == TYPE_PRIMITIVE_R32) {
+						sprint("%f", expr->expr_literal.value_r32);
+					} else {
+						sprint("%f", expr->expr_literal.value_r64);
+					}
                 }break;
                 case LITERAL_BOOL:{
                     if(expr->expr_literal.value_bool){
@@ -433,7 +587,7 @@ void C_Code_Generator::emit_expression(Ast* expr){
                 }break;
                 case LITERAL_ARRAY:
                 case LITERAL_STRUCT:
-                    assert_msg(0, "literal array and struct not yet implemented");
+                    assert_msg(0, "incorrect path for array and struct literals");
                     break;
             }
         }break;
@@ -479,6 +633,22 @@ void C_Code_Generator::emit_expression(Ast* expr){
         case AST_EXPRESSION_VARIABLE:{
             sprint("%.*s", TOKEN_STR(expr->expr_variable.name));
         }break;
+        case AST_DATA: {
+            if(expr->data_global.type == GLOBAL_STRING) {
+                sprint("__string_data_%d", expr->data_global.id);
+            } else {
+                assert_msg(0, "undefined data type");
+            }
+        }break;
+    }
+}
+
+void C_Code_Generator::emit_data_decl(Ast* decl) {
+    if(decl->data_global.type == GLOBAL_STRING) {
+        sprint("char* __string_data_%d = \"", decl->data_global.id);
+        sprint("%.*s\";\n", decl->data_global.length_bytes, decl->data_global.data);
+    } else {
+        assert_msg(0, "trying to generate code for undefined data node");
     }
 }
 
@@ -522,7 +692,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	sprint("\n");
 
     size_t ndecls = array_get_length(toplevel);
-	// emit all declarations forward procedures
+	// emit all declarations forward procedures and strings
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* decl = toplevel[i];
 		if (decl->node_type == AST_DECL_PROCEDURE ||
@@ -534,7 +704,9 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
                 emit_expression(decl->decl_constant.value);
             }
 			sprint(";\n");
-		}
+		} else if (decl->node_type == AST_DATA) {
+            emit_data_decl(decl);
+        }
 	}
 	sprint("\n");
 
@@ -554,10 +726,22 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* decl = toplevel[i];
 		if (decl->node_type == AST_DECL_VARIABLE) {
-			sprint("\t%.*s = ", TOKEN_STR(decl->decl_variable.name));
 			if (decl->decl_variable.assignment) {
 				// emit expression
-				emit_expression(decl->decl_variable.assignment);
+                switch(decl->decl_variable.assignment->type_return->kind){
+                    case KIND_ARRAY:{
+                        emit_array_assignment(decl);
+                    }break;
+                    case KIND_STRUCT:{
+                        emit_struct_assignment(decl);
+                    }break;
+                    case KIND_FUNCTION:
+                    case KIND_POINTER:
+                    case KIND_PRIMITIVE:{
+			            sprint("\t%.*s = ", TOKEN_STR(decl->decl_variable.name));
+				        emit_expression(decl->decl_variable.assignment);
+                    }break;
+                }
 			} else {
 				switch (decl->decl_variable.variable_type->kind) {
 					case KIND_PRIMITIVE:
@@ -617,13 +801,13 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 #if defined(_WIN32) || defined(_WIN64)
 	sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib",
+	sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib",
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj examples/print_string.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lGL -lX11",
+	sprintf(cmdbuffer, "ld %.*s.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lX11",
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #endif

@@ -36,6 +36,12 @@ inline bool type_strong(Type_Instance* type) {
 }
 
 Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
+	// if it is raw data, get the type directly
+	if(expr->node_type == AST_DATA) {
+		assert(expr->data_global.data_type->flags & TYPE_FLAG_INTERNALIZED);
+		return expr->data_global.data_type;
+	}
+
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 
 	Type_Instance* type_infered = 0;
@@ -56,6 +62,10 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 	expr->expr_binary.left->type_return = infer_from_expression(expr->expr_binary.left, error, flags);
 	if(expr->expr_binary.op != OP_BINARY_DOT){
 		expr->expr_binary.right->type_return = infer_from_expression(expr->expr_binary.right, error, flags);
+		// @IMPORTANT
+		// TODO(psv): more cases could be lvalue
+		// arr[0] -> array dereference
+		expr->flags |= AST_FLAG_LVALUE;
 	}
 	if(*error & TYPE_ERROR_FATAL) return 0;
 	
@@ -193,10 +203,65 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 		}break;
 		case LITERAL_FLOAT: {
 			result->kind = KIND_PRIMITIVE;
-			result->primitive = TYPE_PRIMITIVE_R64;
+			result->primitive = TYPE_PRIMITIVE_R32;
 		}break;
-		case LITERAL_STRUCT:
-		case LITERAL_ARRAY: assert_msg(0, "string literal not implemented yet"); break;	// TODO(psv): not implemented yet
+		case LITERAL_ARRAY: {
+			result->kind = KIND_ARRAY;
+
+			size_t nexpr = 0;
+			if(expr->expr_literal.array_exprs){
+				nexpr = array_get_length(expr->expr_literal.array_exprs);
+			}
+
+			for(size_t i = 0; i < nexpr; ++i){
+				Type_Instance* type = infer_from_expression(expr->expr_literal.array_exprs[i], error, flags);
+				expr->expr_literal.array_exprs[i]->type_return = type;
+				if(type_strong(type)){
+					expr->expr_literal.array_strong_type = type;
+				}
+			}
+			
+			result->array_desc.dimension_evaluated = true;
+			result->array_desc.dimension = (u64)nexpr;
+			
+			if(expr->expr_literal.array_strong_type){
+				for(size_t i = 0; i < nexpr; ++i){
+					type_propagate(expr->expr_literal.array_strong_type, expr->expr_literal.array_exprs[i]);
+				}
+				result->array_desc.array_of = expr->expr_literal.array_strong_type;
+				result->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+				result->type_size_bits = nexpr * expr->expr_literal.array_strong_type->type_size_bits;
+				internalize_type(&result->array_desc.array_of, expr->scope, true);
+			} else if(expr->expr_literal.array_exprs) {
+				result->array_desc.array_of = expr->expr_literal.array_exprs[0]->type_return;
+			} else {
+				result->array_desc.array_of = 0;
+			}
+
+		}break;
+		case LITERAL_STRUCT:{
+			result->kind = KIND_STRUCT;
+			result->struct_desc.name = expr->expr_literal.token;
+			Ast* struct_decl = decl_from_name(expr->scope, result->struct_desc.name);
+			if(!struct_decl){
+				*error |= DECL_QUEUED_TYPE;
+			}
+
+			size_t nexpr = 0;
+			if(expr->expr_literal.struct_exprs){
+				nexpr = array_get_length(expr->expr_literal.struct_exprs);
+				result->struct_desc.fields_types = array_create(Type_Instance*, nexpr);
+			}
+
+			for(size_t i = 0; i < nexpr; ++i){
+				Type_Instance* type = infer_from_expression(expr->expr_literal.struct_exprs[i], error, flags);
+				expr->expr_literal.struct_exprs[i]->type_return = type;
+				array_push(result->struct_desc.fields_types, &type);
+			}
+		}break;
+		default: {
+			assert_msg(0, "tried to infer type of undefined literal");
+		}break;
 	}
 	expr->type_return = result;
 	return result;
@@ -256,6 +321,7 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 	assert(expr->node_type == AST_EXPRESSION_VARIABLE);
 
 	Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
+	
 	if (!decl) {
 		*error |= TYPE_ERROR_FATAL;
 		if(flags & TYPE_INFER_REPORT_UNDECLARED) {
@@ -263,12 +329,17 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 		}
 		return 0;
 	}
+	
+	if(decl->type_return->kind == KIND_STRUCT){
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot use structure name '%.*s' as expression\n", 
+			TOKEN_STR(expr->expr_variable.name));
+		return 0;
+	}
 	expr->expr_variable.decl = decl;
 	Type_Instance* type = 0;
 
 	if (decl->node_type != AST_DECL_VARIABLE && decl->node_type != AST_DECL_CONSTANT) {
-		//assert_msg(0, "function pointer not implemented"); // implement function ptr
-		assert(decl->node_type == AST_DECL_PROCEDURE);
+		assert_msg(decl->node_type == AST_DECL_PROCEDURE, "invalid variable node");
 		type = decl->decl_procedure.type_procedure;
 
 		if(!type) {
@@ -285,6 +356,9 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 			return 0;
 		}
 
+		if(!type_strong(type)){
+			int x = 0;
+		}
 		assert(type_strong(type));
 		expr->flags |= AST_FLAG_LVALUE;
 		expr->type_return = type;
@@ -297,7 +371,7 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 }
 
 void type_propagate(Type_Instance* strong, Ast* expr) {
-	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
+	assert(expr->flags & AST_FLAG_IS_EXPRESSION || expr->node_type == AST_DATA);
 
 	if (expr->flags & TYPE_FLAG_STRONG)
 		return;
@@ -314,10 +388,57 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 				} else if(type_primitive_bool(strong) && type_primitive_bool(expr->type_return)){
 					assert(expr->type_return == strong);
 					expr->type_return = strong;
+				} else if(strong->kind == KIND_ARRAY && expr->expr_literal.type == LITERAL_ARRAY){
+					size_t nexpr = 0;
+					if(expr->expr_literal.array_exprs){
+						nexpr = array_get_length(expr->expr_literal.array_exprs);
+					}
+					for(size_t i = 0; i < nexpr; ++i){
+						type_propagate(strong->array_desc.array_of, expr->expr_literal.array_exprs[i]);
+					}
+					expr->type_return->array_desc.array_of = strong->array_desc.array_of;
+					internalize_type(&expr->type_return, expr->scope, true);
+				} else if(strong->kind == KIND_STRUCT && expr->expr_literal.type == LITERAL_STRUCT) {
+					size_t nexpr = 0;
+					if(expr->expr_literal.struct_exprs) {
+						nexpr = array_get_length(expr->expr_literal.struct_exprs);
+					}
+					size_t strong_dim = 0;
+					if(strong->struct_desc.fields_types){
+						strong_dim = array_get_length(strong->struct_desc.fields_types);
+					}
+					for(size_t i = 0; i < MIN(nexpr,strong_dim); ++i){
+						type_propagate(strong->struct_desc.fields_types[i], expr->expr_literal.struct_exprs[i]);
+						expr->type_return->struct_desc.fields_types[i] = expr->expr_literal.struct_exprs[i]->type_return;
+					}
+					expr->type_return->flags |= TYPE_FLAG_RESOLVED;
+					internalize_type(&expr->type_return, expr->scope, true);
 				}
 			} else {
-				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
-				expr->type_return = internalize_type(&expr->type_return, expr->scope, true);
+				if(expr->expr_literal.type == LITERAL_ARRAY){
+					size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
+					for(size_t i = 0; i < nexpr; ++i){
+						type_propagate(0, expr->expr_literal.array_exprs[i]);
+					}
+					expr->type_return->array_desc.array_of = expr->expr_literal.array_exprs[0]->type_return;
+					expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+				} else if(expr->expr_literal.type == LITERAL_STRUCT) {
+					size_t nexpr = 0;
+					if(expr->expr_literal.struct_exprs) {
+						nexpr = array_get_length(expr->expr_literal.struct_exprs);
+					}
+					strong = expr->type_return = resolve_type(expr->scope, expr->type_return, true);
+					if(!strong) {
+						return;
+					}
+					for(size_t i = 0; i < nexpr; ++i){
+						type_propagate(strong->struct_desc.fields_types[i], expr->expr_literal.struct_exprs[i]);
+						expr->type_return->struct_desc.fields_types[i] = expr->expr_literal.struct_exprs[i]->type_return;
+					}
+				}else {
+					expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+					expr->type_return = internalize_type(&expr->type_return, expr->scope, true);
+				}
 			}
 		}break;
 
@@ -356,7 +477,9 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 				}
 
 				case OP_BINARY_DOT:
-					assert(0);
+					//assert(0);
+					assert(type_strong(expr->expr_binary.left->type_return));
+					assert(type_strong(expr->expr_binary.right->type_return));
 					break;
 				case OP_BINARY_VECTOR_ACCESS:
 					// index should be strong aswell as indexed
@@ -649,7 +772,8 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					} else if (type_weak(lt) && type_weak(rt)) {
 						if (type_primitive_int(lt) && type_primitive_int(rt)) {
 							// TODO: can types here be different?
-							return defer_check_against(expr, check_against, rt, error);
+							return lt;
+							//return defer_check_against(expr, check_against, rt, error);
 						} else {
 							if (type_hash(lt) != type_hash(rt))
 								*error |= report_type_mismatch(expr, lt, rt);
@@ -942,7 +1066,55 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 			}
 		}break;
 		case AST_EXPRESSION_LITERAL: {
-			type_propagate(check_against, expr);
+			if(expr->expr_literal.type == LITERAL_ARRAY && check_against->kind == KIND_ARRAY) {
+				if(expr->expr_literal.array_exprs){
+					size_t check_against_dim = check_against->array_desc.dimension;
+					size_t nexpr = array_get_length(expr->expr_literal.array_exprs);
+					if(nexpr == check_against_dim){
+						for(size_t i = 0; i < nexpr; ++i){
+							Type_Instance* type = type_check_expr(check_against->array_desc.array_of, expr->expr_literal.array_exprs[i], error);
+							if(*error) return 0;
+						}
+					}
+				}
+				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+			} else if(expr->expr_literal.type == LITERAL_STRUCT && check_against->kind == KIND_STRUCT) {
+				// @TODO set check_against here to 0
+				// @BUG
+				// using the struct name as variable i think this crashes, maybe?
+				if(expr->expr_literal.struct_exprs) {
+					size_t check_against_num_fields = 0;
+					if(check_against->struct_desc.fields_types) {
+						check_against_num_fields = array_get_length(check_against->struct_desc.fields_types);
+					}
+					size_t nexpr = array_get_length(expr->expr_literal.struct_exprs);
+					if(nexpr == check_against_num_fields){
+						for(size_t i = 0; i < nexpr; ++i) {
+							Ast* e = expr->expr_literal.struct_exprs[i];
+							if(type_weak(e->type_return)){
+								type_propagate(0, e);
+							}
+							Type_Instance* type = type_check_expr(check_against->struct_desc.fields_types[i], e, error);
+							if(*error) return 0;
+						}
+					} else if(nexpr > check_against_num_fields) {
+						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "too many fields for %.*s struct literal\n", TOKEN_STR(expr->expr_literal.token));
+						return 0;
+					} else if(nexpr < check_against_num_fields) {
+						size_t nmissing = check_against_num_fields - nexpr; 
+						if(nmissing == 1) {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "missing '%d' field in %.*s struct literal\n", 
+								nmissing, TOKEN_STR(expr->expr_literal.token));
+						} else {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "missing '%d' fields in %.*s struct literal\n", 
+								nmissing, TOKEN_STR(expr->expr_literal.token));
+						}
+						return 0;
+					}
+				}
+			} else {
+				type_propagate(check_against, expr);
+			}
 			return defer_check_against(expr, check_against, expr->type_return, error);
 		}break;
 		case AST_EXPRESSION_PROCEDURE_CALL:
