@@ -379,7 +379,7 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 void type_propagate(Type_Instance* strong, Ast* expr) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION || expr->node_type == AST_DATA);
 
-	if (expr->flags & TYPE_FLAG_STRONG)
+	if (expr->type_return->flags & TYPE_FLAG_STRONG)
 		return;
 
 	switch(expr->node_type){
@@ -493,9 +493,16 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 					assert(type_strong(expr->expr_binary.right->type_return));
 					break;
 				case OP_BINARY_VECTOR_ACCESS:
+					//assert(type_strong(expr->expr_binary.left->type_return));
+					if(!type_strong(expr->expr_binary.left->type_return)) {
+						// type is an array literal
+						assert(expr->expr_binary.left->node_type == AST_EXPRESSION_LITERAL && expr->expr_binary.left->expr_literal.type == LITERAL_ARRAY);
+						type_propagate(strong, expr->expr_binary.left);
+						expr->type_return = resolve_type(expr->scope, expr->type_return, true);
+					}
+
 					// index should be strong aswell as indexed
 					assert(type_strong(expr->expr_binary.right->type_return));
-					assert(type_strong(expr->expr_binary.left->type_return));
 					break;
 
 			}
@@ -1025,7 +1032,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 							// @TODO(psv):
 							// @IMPORTANT
 							// this can be weak when an array literal is accessed
-							assert(type_strong(indexed_type));
+							//assert(type_strong(indexed_type));
 							return defer_check_against(expr, check_against, indexed_type->array_desc.array_of, error);
 						} else {
 							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "vector accessing operator requires addressable value\n");
@@ -1058,8 +1065,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					expr->flags |= AST_FLAG_LVALUE;
 					expr->type_return = decl->decl_variable.variable_type;
 					expr->expr_binary.right->type_return = expr->type_return;
-					return expr->type_return;
-
+					return defer_check_against(expr, check_against, expr->type_return, error);
 					break;
 			}
 		} break;

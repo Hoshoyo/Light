@@ -535,11 +535,16 @@ void C_Code_Generator::emit_command(Ast* comm) {
 void C_Code_Generator::emit_temp_assignment(Ast* expr) {
 	deferring = false;
 	if (expr->type_return->kind == KIND_ARRAY) {
-		sprint("char* ");
+		sprint("char ");
 	} else {
 		emit_type(expr->type_return);
 	}
-	sprint(" __temp_v_%lld;\n", temp_variable);
+	sprint(" __temp_v_%lld", temp_variable);
+    if (expr->type_return->kind == KIND_ARRAY) {
+        sprint("[%lld]", expr->type_return->type_size_bits / 8);
+    }
+    sprint(";\n");
+
 	emit_expression(expr);
 	deferring = true;
 	sprint("__temp_v_%lld", temp_variable);

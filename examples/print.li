@@ -107,7 +107,7 @@ print_cstr_length :: (s : ^u8, length : s64) -> s64 {
 }
 
 print_str :: (s : string) -> s64 {
-    write(STDOUT_FILENO, cast(^void)s.data, s.length);
+    write(STDOUT_FILENO, cast(^void)s.data, cast(u64)s.length);
 }
 
 println :: (s : string) -> s64 {
