@@ -1,3 +1,4 @@
+/*
 #import "./examples/print.li"
 
 
@@ -6,4 +7,9 @@ main :: () -> s32 {
     print_s64(foo);
 
     return 0;
+}
+*/
+main :: () -> s32 {
+	a := "Hello".data;
+	return 0;
 }
