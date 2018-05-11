@@ -1,3 +1,9 @@
+- make array infer its size from expression
+
+- this causes error, to fix just need to syntax sugar expression to be a block with 1 command.
+if i != 0
+	print_str(", ");
+
 - this causes warning in the c backend
 main :: () -> s32 {
 	a := "Hello".data;

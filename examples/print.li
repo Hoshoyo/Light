@@ -20,14 +20,15 @@ string_length :: (s : ^u8) -> s64 {
     return c;
 }
 
-r64_to_str :: (val : r64, buffer : [32]u8) -> s64 {
-    print_s64(cast(s64)val);
-}
-
 s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
     b : [16]u8;
     sum : s32;
     
+    if val == 0 {
+        buffer[0] = '0';
+        return 1;
+    }
+
     if val < 0 {
         val = -val;
         buffer[0] = cast(u8)'-';
@@ -52,6 +53,11 @@ s64_to_str :: (val : s64, buffer : [32]u8) -> s64 {
     b : [32]u8;
     sum : s32;
     
+    if val == 0 {
+        buffer[0] = '0';
+        return 1;
+    }
+
     if val < 0 {
         val = -val;
         buffer[0] = cast(u8)'-';

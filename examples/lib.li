@@ -1,4 +1,0 @@
-factorial :: (v : s32) -> s32{
-    if v <= 1 return 1;
-    return v * factorial(v - 1);
-}

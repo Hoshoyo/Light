@@ -1,8 +1,4 @@
-print_s32 :: (val : s32) -> s64 #foreign("print_string.obj");
-print_r32 :: (val : r32) -> s64 #foreign("print_string.obj");
-print_s64 :: (val : s64) -> s64 #foreign("print_string.obj");
-print_string :: (length : s64, str : ^u8) -> s64 #foreign("print_string.obj");
-println :: () -> void #foreign("print_string.obj");
+#import "./examples/print.li"
 /*
 /*
 handmade :: () {

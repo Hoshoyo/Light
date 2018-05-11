@@ -428,11 +428,12 @@ void quick_type(FILE* out, Type_Instance* type) {
 	if (!print_types)  return;
 	fprintf(out, "<");
 	if(type->flags & TYPE_FLAG_INTERNALIZED){
-		fprintf(out, "%ss%s, ", KGRN, KNRM);
+		fprintf(out, "%s", KGRN);
 	} else {
-		fprintf(out, "%sw%s, ", KRED, KNRM);
+		fprintf(out, "%s", KRED);
 	}
 	DEBUG_print_type(out, type, true);
+	fprintf(out, KNRM);
 	fprintf(out, ">");
 }
 
