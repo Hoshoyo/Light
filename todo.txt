@@ -1,3 +1,9 @@
+- this causes warning in the c backend
+main :: () -> s32 {
+	a := "Hello".data;
+	return cast(s32)a;
+}
+
 - do better errors in parser stage and check for end of stream
 - do better errors in semantic stage
 - check this code, detecting circular dependency

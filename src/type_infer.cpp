@@ -258,6 +258,9 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 				expr->expr_literal.struct_exprs[i]->type_return = type;
 				array_push(result->struct_desc.fields_types, &type);
 			}
+			expr->type_return = result;
+			type_propagate(0, expr);
+			result = type_check_expr(struct_decl->decl_struct.type_info, expr, error);
 		}break;
 		default: {
 			assert_msg(0, "tried to infer type of undefined literal");
