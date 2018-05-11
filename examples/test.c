@@ -17,21 +17,23 @@ typedef double r64;
 u32 ExitProcess(u32 ret);
 typedef struct string{s64 length;s64 capacity;u8* data;} string;
 
-char* __string_data_0 = "Hello";
 s32 __main();
 
 s32 __main(){
-s64 a;
-struct string __temp_v_0;
+r32 b;
+char*  __temp_v_0;
 {
-char* __t_base = (char*)&(__temp_v_0);
-char* __array_base = __t_base;
-*(s64*)((char*)__t_base + 0) = 0x5;
-*(s64*)((char*)__t_base + 8) = 0xffffffffffffffff;
-*(u8**)((char*)__t_base + 16) = __string_data_0;
+char* __t_base = (char*)__temp_v_0;
+char* __struct_base = __t_base;
+*(r32*)__t_base = 0.000000;
+__t_base += 0;
+*(r32*)__t_base = 0.000000;
+__t_base += 0;
+*(r32*)__t_base = 0.000000;
+__t_base += 0;
 }
-a = ((__temp_v_0).length);
-return ((s32)a);
+b = *(r32*)(((char*)__temp_v_0)+ 0 * (0x0));
+return 0x0;
 }
 
 

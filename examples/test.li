@@ -38,6 +38,6 @@ string :: struct {
 }
 
 main :: () -> s32 {
-	a := "Hello".length;
-	return cast(s32)a;
+	b := array{1.0, 2.0, 3.0}[0];
+	return 0;
 }

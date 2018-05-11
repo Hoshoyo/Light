@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
 	printf("Compiler elapsed: %fms\n", (end - start));
 
 	// TODO(psv): make compiler options/flags to print this
-	//DEBUG_print_ast(stdout, ast_top_level, true);
+	DEBUG_print_ast(stdout, ast_top_level, true);
 	//DEBUG_print_scope_decls(&global_scope);
 	//DEBUG_print_type_table();
 	//DEBUG_print_type_table_structs();

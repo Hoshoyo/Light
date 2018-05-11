@@ -1013,6 +1013,10 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 							assert(type_strong(indexed_type));
 							return defer_check_against(expr, check_against, indexed_type->pointer_to, error);
 						} else if (indexed_type->kind == KIND_ARRAY) {
+
+							// @TODO(psv):
+							// @IMPORTANT
+							// this can be weak when an array literal is accessed
 							assert(type_strong(indexed_type));
 							return defer_check_against(expr, check_against, indexed_type->array_desc.array_of, error);
 						} else {
