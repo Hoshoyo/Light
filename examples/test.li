@@ -1,72 +1,38 @@
-print_s64 :: (value : s64) -> s64 #foreign("print_string.obj");
-print_r32 :: (value : r32) -> s64 #foreign("print_string.obj");
-print_string :: (length : s64, str : ^u8) -> s64 #foreign("print_string.obj");
+#import "./examples/windows/windows.li"
 
-factorial :: (v : s32) -> s32 {
-    if v == 0 || v == 1 return 1;
-    return v * factorial(v - 1);
+string :: struct {
+	length   : s64;
+	capacity : s64;
+	data     : ^u8;
 }
 
-fill_array :: () {	
-    a : [10]s32;
-
-    i := 0;
-    for i < 10 {
-        a[i] = factorial(cast(s32)i);
-        i += 1;
-    }
-
-    i = 0;
-    for i < 10 {
-        print_s64(cast(s64)a[i]);
-        i += 1;
-    }
+foo :: (str : string, str2 : string) -> s32 {
+	written : u32;
+	stdhandle := GetStdHandle(STD_OUTPUT_HANDLE);
+	WriteConsoleA(stdhandle, cast(^void)str.data, cast(u32)str.length, &written, cast(^void)0);
+	WriteConsoleA(stdhandle, cast(^void)str2.data, cast(u32)str2.length, &written, cast(^void)0);
+	return 23;
 }
 
-multi_array :: () {
-	matrix : [4][4]r32;
-	{
-		x := 0;
-		y := 0;
-		for y < 4 {
-			x = 0;
-			for x < 4 {
-				matrix[y][x] = cast(r32)(x * y);
-				print_r32(matrix[y][x]);
-				x += 1;
-			}
-			y += 1;
-		}
+arr :: (a : [3]s32) -> s32 {
+	result : s32 = 0;
+	i := 0;
+	for i < 3 {
+		result += a[i];
+		i += 1;
 	}
+	return result;
 }
 
-vec2 :: struct {
-	x : r32;
-	y : r32;
+hey :: struct {
+	foo : [3]s32;
 }
 
-fill_struct :: () {
-	pos : vec2;
-	pos.x = 1.0;
-	pos.y = 2.0;
+main :: () -> s32 {
+	hello := 2 + foo("Hello", "bar");
+	world := 4 * arr(array{1, 2, 3});
 	
-	print_s64(pos.x);
-	print_s64(pos.y);
-}
-
-pointer_arithmetic :: () {
-	arr : [10]u8;
-	ptr := cast(^u8)&arr;
-	*ptr = 0x48;
-	*(ptr + 1) = 0x49;
+	oi := hey:{array{1,2,3}};
 	
-	print_string(2, ptr);
-}
-
-main :: () -> s64 {
-	//fill_array();
-	//fill_struct();
-	//multi_array();
-	pointer_arithmetic();
-    return 0;
+    return hello + world;
 }
