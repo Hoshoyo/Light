@@ -437,7 +437,12 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 					if(!strong) {
 						return;
 					}
-					for(size_t i = 0; i < nexpr; ++i){
+					size_t strong_dim = 0;
+					if(strong->kind == KIND_STRUCT) {
+						strong_dim = strong->struct_desc.fields_count;
+					}
+
+					for(size_t i = 0; i < MIN(nexpr, strong_dim); ++i){
 						type_propagate(strong->struct_desc.fields_types[i], expr->expr_literal.struct_exprs[i]);
 						expr->type_return->struct_desc.fields_types[i] = expr->expr_literal.struct_exprs[i]->type_return;
 					}
