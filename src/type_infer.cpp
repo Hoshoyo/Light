@@ -260,6 +260,9 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 			}
 			expr->type_return = result;
 			type_propagate(0, expr);
+			if(!struct_decl){
+				return 0;
+			}
 			result = type_check_expr(struct_decl->decl_struct.type_info, expr, error);
 		}break;
 		default: {
