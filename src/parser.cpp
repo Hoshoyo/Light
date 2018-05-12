@@ -947,13 +947,41 @@ Ast* Parser::parse_comm_for(Scope* scope) {
 Ast* Parser::parse_comm_if(Scope* scope) {
 	require_and_eat(TOKEN_KEYWORD_IF);
 	Ast* condition = parse_expression(scope);
-	Ast* command_true = parse_command(scope);
+	Ast* command_true  = 0;
 	Ast* command_false = 0;
+
+	if (lexer->peek_token_type('{')) {
+		command_true = parse_command(scope);
+	} else {
+		Ast** commands = array_create(Ast*, 1);
+		Scope* block_scope = scope_create(0, scope, SCOPE_BLOCK);
+		command_true = parse_command(block_scope);
+		array_push(commands, &command_true);
+
+		command_true = ast_create_comm_block(scope, block_scope, commands, 0, 1);
+	}
+
 	if (lexer->peek_token_type() == TOKEN_KEYWORD_ELSE) {
 		lexer->eat_token();
-		command_false = parse_command(scope);
+
+		if (lexer->peek_token_type('{')) {
+			command_false = parse_command(scope);
+		} else {
+			Ast** commands = array_create(Ast*, 1);
+			Scope* block_scope = scope_create(0, scope, SCOPE_BLOCK);
+			command_false = parse_command(block_scope);
+			array_push(commands, &command_false);
+
+			command_false = ast_create_comm_block(scope, block_scope, commands, 0, 1);
+		}
 	}
-	return ast_create_comm_if(scope, condition, command_true, command_false);
+	Ast* cmd_if = ast_create_comm_if(scope, condition, command_true, command_false);
+	command_true->scope->creator_node = cmd_if;
+	if (command_false) {
+		command_false->scope->creator_node = cmd_if;
+	}
+
+	return cmd_if;
 }
 
 Ast* Parser::parse_comm_block(Scope* scope, Ast* creator) {

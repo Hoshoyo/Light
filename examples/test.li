@@ -31,6 +31,14 @@ main :: () -> s32 {
 }
 */
 
+#import "./examples/windows/windows.li"
+
+foo :: (str : string){
+	stdhandle := GetStdHandle(STD_OUTPUT_HANDLE);
+	written : u32;
+	WriteConsoleA(stdhandle, cast(^void)str.data, cast(u32)str.length, &written, cast(^void)0);
+}
+
 string :: struct {
 	length   : s64;
 	capacity : s64;
@@ -38,6 +46,9 @@ string :: struct {
 }
 
 main :: () -> s32 {
-	b := array{1.0, 2.0, 3.0}[0];
+	i := 0;
+	if i == 0
+		foo(", ");
+		
 	return 0;
 }

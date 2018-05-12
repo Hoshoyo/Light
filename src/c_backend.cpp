@@ -655,7 +655,7 @@ void C_Code_Generator::emit_expression(Ast* expr){
                 }break;
                 case LITERAL_FLOAT:{
 					if (expr->type_return->primitive == TYPE_PRIMITIVE_R32) {
-						sprint("%f", expr->expr_literal.value_r32);
+						sprint("%f", (r32)expr->expr_literal.value_r64);
 					} else {
 						sprint("%f", expr->expr_literal.value_r64);
 					}
