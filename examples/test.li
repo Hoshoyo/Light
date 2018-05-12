@@ -31,24 +31,21 @@ main :: () -> s32 {
 }
 */
 
-#import "./examples/windows/windows.li"
-
-foo :: (str : string){
-	stdhandle := GetStdHandle(STD_OUTPUT_HANDLE);
-	written : u32;
-	WriteConsoleA(stdhandle, cast(^void)str.data, cast(u32)str.length, &written, cast(^void)0);
-}
-
 string :: struct {
 	length   : s64;
 	capacity : s64;
 	data     : ^u8;
 }
 
+memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void {
+	i :u64= 0;
+	for i < size {
+		*cast(^u8)(dest + i) = *cast(^u8)(src + i);
+		i += 1;
+	}
+}
+
 main :: () -> s32 {
-	i := 0;
-	if i == 0
-		foo(", ");
-		
+	
 	return 0;
 }

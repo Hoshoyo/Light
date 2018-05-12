@@ -1,11 +1,6 @@
 #bugs
 
-- this causes error, to fix just need to syntax sugar expression to be a block with 1 command.
-if i != 0
-	print_str(", ");
-
-// when proc returns void this is allowed somehow
-b := proc();
+- make includes in files from where they are
 
 - this causes warning in the c backend and crashes the compiler if string is not declared
 main :: () -> s32 {
@@ -13,12 +8,19 @@ main :: () -> s32 {
 	return cast(s32)a;
 }
 
+- verify if main is declared before compiling
+
+
 #changes
 
 - change cast to be .(type)
 - dereference pointer on . operator
 - check return in all paths, proc with no return clause and other commands is ignored when returning any non-void
 - make array infer its size from expression
+
+#features
+
+- more useful 'for' command
 
 #backlog
 

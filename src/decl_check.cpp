@@ -218,7 +218,9 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				}
 				type->flags |= TYPE_FLAG_RESOLVED;
 				infer_queue_remove(node);
-				//node->decl_variable.variable_type = internalize_type(&type, scope, true);
+				if (type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot assign a variable to an expression returning void\n");
+				}
 				return error;
 			}
 			if (node->decl_variable.variable_type->flags & TYPE_FLAG_RESOLVED) {
@@ -228,6 +230,10 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 
 				if (type && type->flags & TYPE_FLAG_RESOLVED) {
 					node->decl_variable.variable_type = type;
+					if (type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a variable of type void\n");
+					}
+
 					infer_queue_remove(node);
 				} else {
 					infer_queue_push(node);
@@ -449,12 +455,18 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 		case AST_DECL_VARIABLE:{
 			if (node->decl_variable.variable_type) {
 				node->decl_variable.variable_type = resolve_type(node->scope, node->decl_variable.variable_type, true);
+				if (node->decl_variable.variable_type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a variable of type void\n");
+				}
 				if (error & DECL_ERROR_FATAL) return error;
 			}
 
 			if (node->decl_variable.assignment) {
 				Type_Error type_error = TYPE_OK;
 				Type_Instance* infered = infer_from_expression(node->decl_variable.assignment, &type_error, TYPE_INFER_REPORT_UNDECLARED);
+				if (infered == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a variable of type void\n");
+				}
 				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
 				bool typechecked = false;
 				if (infered && infered->flags & TYPE_FLAG_WEAK) {

@@ -283,6 +283,8 @@ WriteConsoleA :: (handle_console_output : ^void, buffer : ^void, number_chars_to
 WriteConsoleW :: (handle_console_output : ^void, buffer : ^void, number_chars_to_write : u32, number_chars_written : ^u32, reserved : ^void) -> bool #foreign("Kernel32.lib");
 ReadConsole   :: (console_input : ^void, buffer : ^void, number_chars_to_read : u32, number_chars_read : ^u32, input_control : ^void) -> bool #foreign("Kernel32.lib");
 
+GetCommandLineA :: () -> ^u8 #foreign("Kernel32.lib");
+
 GetLastError :: () -> u32 #foreign("kernel32.lib");
 //ExitProcess  :: (exit_code : u32) -> void #foreign("kernel32.lib");
 

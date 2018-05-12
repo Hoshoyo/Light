@@ -188,7 +188,7 @@ void C_Code_Generator::emit_default_value(Type_Instance* type) {
 					sprint("0");
 					break;
 				case TYPE_PRIMITIVE_VOID:
-					assert(0);
+					assert_msg(0, "unexpected void expression in code generation");
 					break;
 			}
 		}break;
@@ -586,9 +586,12 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
 					sprint("*");
 			}
 			if (indexed_type->kind == KIND_POINTER) {
-				if (indexed_type->pointer_to->kind != KIND_POINTER) {
+				// @TODO check if this causes a bug anywhere?
+				// why is this here ?
+
+				//if (indexed_type->pointer_to->kind != KIND_POINTER) {
 					sprint("*");
-				}
+				//}
 			}
 
 			sprint("(");

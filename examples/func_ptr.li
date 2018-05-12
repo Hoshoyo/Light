@@ -1,4 +1,5 @@
-#import "./examples/print.li"
+//#import "./examples/print.li"
+#import "./examples/windows/print.li"
 
 square :: (v : s32) -> s32{
     return (v * v);

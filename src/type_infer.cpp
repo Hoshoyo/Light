@@ -277,9 +277,12 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags) {
 	Ast* decl = decl_from_name(expr->scope, expr->expr_proc_call.name);
 	if (!decl) {
-		*error |= TYPE_ERROR_FATAL;
-		if(flags & TYPE_INFER_REPORT_UNDECLARED){
+		// We cannot safely error here, this might be declared later on in the pipeline
+		if (flags & TYPE_INFER_REPORT_UNDECLARED) {
+			*error |= TYPE_ERROR_FATAL;
 			report_undeclared(expr->expr_proc_call.name);
+		} else {
+			*error |= DECL_QUEUED_TYPE;
 		}
 		return 0;
 	}
@@ -330,9 +333,11 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 	Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
 	
 	if (!decl) {
-		*error |= TYPE_ERROR_FATAL;
 		if(flags & TYPE_INFER_REPORT_UNDECLARED) {
+			*error |= TYPE_ERROR_FATAL;
 			*error |= report_undeclared(expr->expr_variable.name);
+		} else {
+			*error |= DECL_QUEUED_TYPE;
 		}
 		return 0;
 	}
