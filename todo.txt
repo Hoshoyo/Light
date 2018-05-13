@@ -24,6 +24,8 @@ main :: () -> s32 {
 - type alias
 - file scope
 - switch
+- scoped functions
+- namespaces
 
 #backlog
 

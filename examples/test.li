@@ -1,4 +1,4 @@
-#import "/linux/print.li"
+#import "linux/print.li"
 
 main :: () -> s32 {
 	print_string("Hello World");

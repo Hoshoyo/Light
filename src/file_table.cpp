@@ -28,7 +28,7 @@ s64 file_table_push(char* fullpath) {
     entry->fullpath = string_make(fullpath);
     entry->filename = filename_from_path(entry->fullpath);
 
-    u64 hash = file_table_hash(&entry->fullpath);
+    u64 hash = file_table_hash(entry);
     s64 index = hash_table_entry_exist(&file_table, entry, hash);
 
     if(index == -1) {
