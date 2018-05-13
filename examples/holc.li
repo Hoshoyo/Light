@@ -4,11 +4,6 @@ main :: () -> s32 {
 	
 	foo := GetCommandLineA();
 	print_cstr(foo);
-	
-	//i := 0;
-	//for foo[i] != 0 {
-	//	
-	//}
-	
+
 	return 0;
 }

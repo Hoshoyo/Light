@@ -25,6 +25,7 @@ Keyword keywords_info[] = {
 	{ MAKE_STRING("if"),		TOKEN_KEYWORD_IF,			TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("else"),		TOKEN_KEYWORD_ELSE,			TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("for"),		TOKEN_KEYWORD_FOR,			TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("while"),		TOKEN_KEYWORD_WHILE,		TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("break"),		TOKEN_KEYWORD_BREAK,		TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("continue"),  TOKEN_KEYWORD_CONTINUE,		TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("return"),	TOKEN_KEYWORD_RETURN,		TOKEN_FLAG_RESERVED_WORD },
@@ -32,7 +33,7 @@ Keyword keywords_info[] = {
 	{ MAKE_STRING("enum"),		TOKEN_KEYWORD_ENUM,			TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("union"),		TOKEN_KEYWORD_UNION,		TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("array"),		TOKEN_KEYWORD_ARRAY,		TOKEN_FLAG_RESERVED_WORD },
-	{ MAKE_STRING("cast"),		TOKEN_KEYWORD_CAST,			TOKEN_FLAG_RESERVED_WORD },
+	//{ MAKE_STRING("cast"),		TOKEN_KEYWORD_CAST,			TOKEN_FLAG_RESERVED_WORD },
 
 	{ MAKE_STRING("true"),   TOKEN_LITERAL_BOOL_TRUE,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
 	{ MAKE_STRING("false"),  TOKEN_LITERAL_BOOL_FALSE,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
@@ -695,7 +696,7 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_SHL_EQUAL:	return ("<<="); break;
 	case TOKEN_SHR_EQUAL:	return (">>="); break;
 
-	case TOKEN_KEYWORD_CAST:		return  ("cast"); break;
+	//case TOKEN_KEYWORD_CAST:		return  ("cast"); break;
 
 	case TOKEN_SINT64:		return ("s64"); break;
 	case TOKEN_SINT32:		return ("s32"); break;
@@ -713,6 +714,7 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_KEYWORD_IF:			return ("if"); break;
 	case TOKEN_KEYWORD_ELSE:		return ("else"); break;
 	case TOKEN_KEYWORD_FOR:			return ("for"); break;
+	case TOKEN_KEYWORD_WHILE:		return ("while"); break;
 	case TOKEN_KEYWORD_BREAK:		return ("break"); break;
 	case TOKEN_KEYWORD_CONTINUE:	return ("continue"); break;
 	case TOKEN_KEYWORD_RETURN:		return ("return"); break;
@@ -737,7 +739,8 @@ Operator_Unary token_to_unary_op(Token* t) {
 		case '&': return OP_UNARY_ADDRESSOF;
 		case '!': return OP_UNARY_LOGIC_NOT;
 		case '~': return OP_UNARY_BITWISE_NOT;
-		case TOKEN_KEYWORD_CAST: return OP_UNARY_CAST;
+		//case TOKEN_KEYWORD_CAST: return OP_UNARY_CAST;
+		case '[': return OP_UNARY_CAST;
 	}
 	return OP_UNARY_UNKNOWN;
 }

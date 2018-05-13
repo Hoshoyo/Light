@@ -1,3 +1,4 @@
+
 /*
 #import "./examples/windows/windows.li"
 
@@ -39,13 +40,12 @@ string :: struct {
 
 memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void {
 	i :u64= 0;
-	for i < size {
-		*cast(^u8)(dest + i) = *cast(^u8)(src + i);
+	while i < size {
+		*[^u8](dest + i) = *[^u8](src + i);
 		i += 1;
 	}
 }
-
 main :: () -> s32 {
-	
-	return 0;
+	a := "Hello".data;
+	return [s32]a;
 }

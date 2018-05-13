@@ -596,12 +596,12 @@ Ast* Parser::parse_expression_precedence6(Scope* scope) {
 		Token* op = lexer->eat_token();
 		Ast* operand = parse_expression_precedence6(scope);
 		return ast_create_expr_unary(scope, operand, token_to_unary_op(op), op, 0, UNARY_EXPR_FLAG_PREFIXED);
-	} else if (next == TOKEN_KEYWORD_CAST) {
+	} else if (next == '[') {
 		// parse cast
-		Token* cast = lexer->eat_token();
-		require_and_eat('(');
+		//Token* cast = lexer->eat_token();
+		Token* cast = require_and_eat('[');
 		Type_Instance* ttc = parse_type();
-		require_and_eat(')');
+		require_and_eat(']');
 		Ast* operand = parse_expression_precedence6(scope);
 		return ast_create_expr_unary(scope, operand, OP_UNARY_CAST, cast, ttc, UNARY_EXPR_FLAG_PREFIXED);
 	}
@@ -809,6 +809,7 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 				array_push(exprs, &data_expr);
 			} break;
 			default: {
+				report_syntax_error(first, "expected literal expression but got '%.*s'\n", TOKEN_STR(first));
 			}break;
 		}
 	}
@@ -820,7 +821,21 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 // --------------- Commands ------------------
 // -------------------------------------------
 
-Ast* Parser::parse_command(Scope* scope) {
+Ast** Parser::parse_command_comma_list(Scope* scope) {
+	Ast** commands = array_create(Ast*, 2);
+	while(true) {
+		Ast* comm = parse_command(scope, false);
+		array_push(commands, &comm);
+		if (lexer->peek_token_type() != ',') {
+			break;
+		} else {
+			lexer->eat_token();
+		}
+	}
+	return commands;
+}
+
+Ast* Parser::parse_command(Scope* scope, bool eat_semicolon) {
 	Token* next = lexer->peek_token();
 	Ast* command = 0;
 	switch (next->type) {
@@ -830,20 +845,23 @@ Ast* Parser::parse_command(Scope* scope) {
 		case TOKEN_KEYWORD_IF:
 			command = parse_comm_if(scope); 
 			break;
+		case TOKEN_KEYWORD_WHILE:
+			command = parse_comm_while(scope);
+			break;
 		case TOKEN_KEYWORD_FOR:
 			command = parse_comm_for(scope);
 			break;
 		case TOKEN_KEYWORD_BREAK:
 			command = parse_comm_break(scope);
-			require_and_eat(';');
+			if(eat_semicolon) require_and_eat(';');
 			break;
 		case TOKEN_KEYWORD_CONTINUE:
 			command = parse_comm_continue(scope);
-			require_and_eat(';');
+			if (eat_semicolon) require_and_eat(';');
 			break;
 		case TOKEN_KEYWORD_RETURN:
 			command = parse_comm_return(scope);
-			require_and_eat(';');
+			if (eat_semicolon) require_and_eat(';');
 			break;
 		case TOKEN_IDENTIFIER:{
 			Token_Type t = lexer->peek_token_type(1);
@@ -856,11 +874,11 @@ Ast* Parser::parse_command(Scope* scope) {
 			} else {
 				command = parse_comm_variable_assignment(scope);
 			}
-			require_and_eat(';');
+			if (eat_semicolon) require_and_eat(';');
 		}break;
 		default: {
 			command = parse_comm_variable_assignment(scope);
-			require_and_eat(';');
+			if (eat_semicolon) require_and_eat(';');
 		}break;
 	}
 	return command;
@@ -915,26 +933,28 @@ Ast* Parser::parse_comm_continue(Scope* scope) {
 Ast* Parser::parse_comm_break(Scope* scope) {
 	Token* t = require_and_eat(TOKEN_KEYWORD_BREAK);
 	Ast* lit = 0;
-	if(lexer->peek_token_type() != ';')
+	Token_Type next_type = lexer->peek_token_type();
+	if(next_type != ';' && next_type != ',')
 		lit = parse_expr_literal(scope);
 	return ast_create_comm_break(scope, lit, t);
 }
 
-Ast* Parser::parse_comm_for(Scope* scope) {
-	require_and_eat(TOKEN_KEYWORD_FOR);
-	
+Ast* Parser::parse_comm_while(Scope* scope) {
+	require_and_eat(TOKEN_KEYWORD_WHILE);
+
 	Ast* condition = parse_expression(scope);
 
 	Ast* body = parse_command(scope);
-	if(body->node_type == AST_COMMAND_BLOCK) {
-		if(body->comm_block.block_scope)
+	if (body->node_type == AST_COMMAND_BLOCK) {
+		if (body->comm_block.block_scope)
 			body->comm_block.block_scope->flags |= SCOPE_LOOP;
 		return ast_create_comm_for(scope, condition, body);
-	} else {
+	}
+	else {
 		Ast** commands = array_create(Ast*, 1);
 		array_push(commands, &body);
 		Ast* inner = ast_create_comm_block(scope, scope_create(0, scope, SCOPE_LOOP), commands, 0, 1);
-		
+
 		Ast* for_cmd = ast_create_comm_for(scope, condition, inner);
 		inner->comm_block.creator = for_cmd;
 
@@ -942,6 +962,72 @@ Ast* Parser::parse_comm_for(Scope* scope) {
 		inner->comm_block.block_scope->decl_count = 1;
 		return ast_create_comm_for(scope, condition, inner);
 	}
+}
+
+Ast* Parser::parse_comm_for(Scope* scope) {
+	require_and_eat(TOKEN_KEYWORD_FOR);
+
+	Ast** commands = 0;
+	Scope* for_scope = scope_create(0, scope, SCOPE_BLOCK);
+
+	if (lexer->peek_token_type() != ';') {
+		Ast** initialization = parse_command_comma_list(for_scope);
+		commands = initialization;
+	} else {
+		commands = array_create(Ast*, 4);
+	}
+	require_and_eat(';');
+	
+	Ast* condition = parse_expression(for_scope);
+
+	require_and_eat(';');
+
+	Ast** deferred = 0;
+	if (lexer->peek_token_type() != ';') {
+		// fill scope of the commands with the loop scope later
+		deferred = parse_command_comma_list(for_scope);
+	}
+
+	Ast* comm_for = 0;
+	Ast* body = parse_command(for_scope);
+	if(body->node_type == AST_COMMAND_BLOCK) {
+		if (body->comm_block.block_scope) {
+			body->comm_block.block_scope->flags |= SCOPE_LOOP;
+		}
+		if (!body->comm_block.commands && deferred) {
+			body->comm_block.commands = array_create(Ast*, array_get_length(deferred));
+		}
+		comm_for = ast_create_comm_for(for_scope, condition, body);
+	} else {
+		Ast** commands = array_create(Ast*, 1);
+		array_push(commands, &body);
+		Ast* inner = ast_create_comm_block(for_scope, scope_create(0, for_scope, SCOPE_LOOP), commands, 0, 1);
+		body = inner;
+		
+		Ast* for_cmd = ast_create_comm_for(for_scope, condition, inner);
+		inner->comm_block.creator = for_cmd;
+
+		inner->comm_block.block_scope->creator_node = for_cmd;
+		inner->comm_block.block_scope->decl_count = 1;
+		comm_for = ast_create_comm_for(for_scope, condition, inner);
+	}
+
+	// fill deferred
+	if (deferred) {
+		size_t def_count = array_get_length(deferred);
+		body->comm_block.command_count += def_count;
+		if (body->comm_block.commands) {
+			array_append(body->comm_block.commands, deferred);
+			array_release(deferred);
+		} else {
+			comm_for->comm_block.commands = deferred;
+		}
+	}
+
+	array_push(commands, &comm_for);
+
+	for_scope->creator_node = comm_for;
+	return ast_create_comm_block(scope, for_scope, commands, comm_for, array_get_length(commands));
 }
 
 Ast* Parser::parse_comm_if(Scope* scope) {

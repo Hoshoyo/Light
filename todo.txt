@@ -1,26 +1,31 @@
 #bugs
 
 - make includes in files from where they are
+- make includes in files unique
+- make forward decls declarable more than once
 
-- this causes warning in the c backend and crashes the compiler if string is not declared
+- this causes warning in the c backend
 main :: () -> s32 {
 	a := "Hello".data;
 	return cast(s32)a;
 }
+- check constants
 
 - verify if main is declared before compiling
+	if not, then compile a .obj file (for now)
 
 
 #changes
 
-- change cast to be .(type)
+- change cast to be [type]
 - dereference pointer on . operator
 - check return in all paths, proc with no return clause and other commands is ignored when returning any non-void
 - make array infer its size from expression
 
 #features
 
-- more useful 'for' command
+- type alias
+- file scope
 
 #backlog
 

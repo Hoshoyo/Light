@@ -66,14 +66,16 @@ struct Parser {
 	Precedence binary_op_precedence_level(Operator_Binary bo);
 
 	// Command parsing
-	Ast* parse_command(Scope* scope);
-	Ast* parse_comm_block(Scope* scope, Ast* creator);
-	Ast* parse_comm_if(Scope* scope);
-	Ast* parse_comm_for(Scope* scope);
-	Ast* parse_comm_break(Scope* scope);
-	Ast* parse_comm_continue(Scope* scope);
-	Ast* parse_comm_return(Scope* scope);
-	Ast* parse_comm_variable_assignment(Scope* scope);
+	Ast** parse_command_comma_list(Scope* scope);
+	Ast*  parse_command(Scope* scope, bool eat_semicolon = true);
+	Ast*  parse_comm_block(Scope* scope, Ast* creator);
+	Ast*  parse_comm_if(Scope* scope);
+	Ast*  parse_comm_for(Scope* scope);
+	Ast*  parse_comm_while(Scope* scope);
+	Ast*  parse_comm_break(Scope* scope);
+	Ast*  parse_comm_continue(Scope* scope);
+	Ast*  parse_comm_return(Scope* scope);
+	Ast*  parse_comm_variable_assignment(Scope* scope);
 
 	// Error report
 	void   report_fatal_error(Token* error_token, char* msg, ...);

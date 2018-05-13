@@ -66,6 +66,9 @@ HO_EXPORT void    HO_API array_set_capacity(void* array_, size_t s);
 HO_EXPORT void    HO_API array_set_length(void* array_, size_t s);
 HO_EXPORT void    HO_API array_set_element_size(void* array_, size_t s);
 
+// array_append     : appends the left array with the right array, it does not release the right array
+HO_EXPORT   void* HO_API array_append(void* array_1, void* array_2);
+
 // array_pop		: removes the last element of the array if it exists and returns it.
 HO_EXPORT   void* HO_API array_pop(void* array);
 
@@ -97,6 +100,15 @@ typedef struct dynamic_array_t {
 	size_t length;
 	size_t size_element;
 } dynamic_array;
+
+HO_EXPORT void* HO_API array_append(void* array_1, void* array_2) {
+	size_t arr2len = array_get_length(array_2);
+	size_t arr2elemsize = array_get_element_size(array_2);
+	for (size_t i = 0; i < arr2len; ++i) {
+		array_push(array_1, (char*)array_2 + i * arr2elemsize);
+	}
+	return array_1;
+}
 
 HO_EXPORT void* HO_API array_pop(void* array_)
 {
