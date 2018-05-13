@@ -247,8 +247,8 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
             }
         }break;
         case AST_DECL_CONSTANT:{
-            emit_type(decl->decl_constant.type_info);
-            sprint(" %.*s", TOKEN_STR(decl->decl_constant.name));
+            //emit_type(decl->decl_constant.type_info);
+            //sprint(" %.*s", TOKEN_STR(decl->decl_constant.name));
         }break;
         case AST_DECL_STRUCT:{
             sprint("typedef struct %.*s{", TOKEN_STR(decl->decl_struct.name));
@@ -421,14 +421,14 @@ void C_Code_Generator::emit_command(Ast* comm) {
                             }
                         }
 					} else if (cm->node_type == AST_DECL_CONSTANT) {
-						deferring = true;
-						sprint("const ");
-						emit_decl(cm);
-						sprint(" = ");
-						emit_expression(cm->decl_constant.value);
-						sprint(";");
-						deferring = false;
-						defer_flush();
+						//deferring = true;
+						//sprint("const ");
+						//emit_decl(cm);
+						//sprint(" = ");
+						//emit_expression(cm->decl_constant.value);
+						//sprint(";");
+						//deferring = false;
+						//defer_flush();
 					} else {
                         assert_msg(0, "scoped declaration of procedure, enum and union not yet implemented");
                     }
@@ -687,10 +687,9 @@ void C_Code_Generator::emit_expression(Ast* expr){
             }
         }break;
         case AST_EXPRESSION_PROCEDURE_CALL:{
-			if (expr->expr_proc_call.decl->flags & DECL_PROC_FLAG_MAIN) {
-				sprint("__");
-			}
-			sprint("%.*s(", TOKEN_STR(expr->expr_proc_call.name));
+            sprint("(");
+            emit_expression(expr->expr_proc_call.caller);
+            sprint(")(");
             for(s32 i = 0; i < expr->expr_proc_call.args_count; ++i){
                 if(i != 0) sprint(",");
                 emit_expression(expr->expr_proc_call.args[i]);
@@ -726,7 +725,15 @@ void C_Code_Generator::emit_expression(Ast* expr){
 			sprint(")");
         }break;
         case AST_EXPRESSION_VARIABLE:{
-			sprint("%.*s", TOKEN_STR(expr->expr_variable.name));
+            Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
+            if(decl->node_type == AST_DECL_CONSTANT){
+                emit_expression(decl->decl_constant.value);
+            } else {
+                if(expr->expr_variable.name->value.data == compiler_tags[COMPILER_TAG_MAIN_PROC].data){
+                    sprint("__");
+                }
+			    sprint("%.*s", TOKEN_STR(expr->expr_variable.name));
+            }
         }break;
         case AST_DATA: {
             if(expr->data_global.type == GLOBAL_STRING) {
@@ -791,15 +798,14 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* decl = toplevel[i];
 		if (decl->node_type == AST_DECL_PROCEDURE ||
-            decl->node_type == AST_DECL_CONSTANT || 
             decl->node_type == AST_DECL_VARIABLE) 
 		{
 			deferring = true;
 			emit_decl(decl, true);
-            if(decl->node_type == AST_DECL_CONSTANT){
-                sprint(" = ");
-                emit_expression(decl->decl_constant.value);
-            }
+            //if(decl->node_type == AST_DECL_CONSTANT){
+            //    sprint(" = ");
+            //    emit_expression(decl->decl_constant.value);
+            //}
 			sprint(";\n");
 			deferring = false;
 			defer_flush();

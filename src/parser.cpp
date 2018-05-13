@@ -461,14 +461,7 @@ Ast* Parser::parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint_type
 
 Ast* Parser::parse_decl_constant(Token* name, Scope* scope, Type_Instance* type) {
 	// either literal or another constant
-	Ast* value = 0;
-
-	Token* next = lexer->peek_token();
-	if (next->type == TOKEN_IDENTIFIER) {
-		value = ast_create_expr_variable(name, scope, type);
-	} else {
-		value = parse_expr_literal(scope);
-	}
+	Ast* value = parse_expression(scope);
 
 	scope->decl_count += 1;
 
@@ -478,7 +471,7 @@ Ast* Parser::parse_decl_constant(Token* name, Scope* scope, Type_Instance* type)
 // -------------------------------------------
 // ------------- Expressions -----------------
 // -------------------------------------------
-
+/*
 Ast* Parser::parse_expr_proc_call(Scope* scope) {
 	Token* name = lexer->eat_token();
 	Ast**  arguments = 0;
@@ -500,7 +493,7 @@ Ast* Parser::parse_expr_proc_call(Scope* scope) {
 	require_and_eat(')');
 
 	return ast_create_expr_proc_call(scope, name, arguments, args_count);
-}
+}*/
 
 Ast* Parser::parse_expression_precedence10(Scope* scope) {
 	Token* t = lexer->peek_token();
@@ -513,18 +506,13 @@ Ast* Parser::parse_expression_precedence10(Scope* scope) {
 		// array literal
 		return parse_expr_literal_array(scope);
 	} else if (t->type == TOKEN_IDENTIFIER) {
-		if (lexer->peek_token_type(1) == '(') {
-			// proc call
-			return parse_expr_proc_call(scope);
-		} else {
-			// variable
+		// variable
+		lexer->eat_token();
+		if(lexer->peek_token_type() == ':'){
 			lexer->eat_token();
-			if(lexer->peek_token_type() == ':'){
-				lexer->eat_token();
-				return parse_expr_literal_struct(t, scope);
-			} else {
-				return ast_create_expr_variable(t, scope, 0);
-			}
+			return parse_expr_literal_struct(t, scope);
+		} else {
+			return ast_create_expr_variable(t, scope, 0);
 		}
 	} else if(t->type == '(') {
 		// ( expr )
@@ -548,6 +536,27 @@ Ast* Parser::parse_expression_precedence9(Scope* scope) {
 			Ast* r = parse_expression(scope);
 			expr = ast_create_expr_binary(scope, expr, r, token_to_binary_op(op), op);
 			require_and_eat(']');
+		} else if(op->type == '(') {
+			// procedure call
+			Ast**  arguments = 0;
+			s32    args_count = 0;
+			
+			require_and_eat('(');
+			if (lexer->peek_token_type() != ')') {
+				arguments = array_create(Ast*, 4);
+				for (;;) {
+					if (args_count != 0)
+						require_and_eat(',');
+					Ast* argument = parse_expression(scope);
+					array_push(arguments, &argument);
+					++args_count;
+					if (lexer->peek_token_type() != ',')
+						break;
+				}
+			}
+			require_and_eat(')');
+
+			return ast_create_expr_proc_call(scope, expr, arguments, args_count);
 		} else {
 			break;
 		}
@@ -565,6 +574,27 @@ Ast* Parser::parse_expression_left_dot(Scope* scope){
 			Ast* r = parse_expression(scope);
 			expr = ast_create_expr_binary(scope, expr, r, token_to_binary_op(op), op);
 			require_and_eat(']');
+		} else if(op->type == '(') {
+			// procedure call
+			Ast**  arguments = 0;
+			s32    args_count = 0;
+			
+			require_and_eat('(');
+			if (lexer->peek_token_type() != ')') {
+				arguments = array_create(Ast*, 4);
+				for (;;) {
+					if (args_count != 0)
+						require_and_eat(',');
+					Ast* argument = parse_expression(scope);
+					array_push(arguments, &argument);
+					++args_count;
+					if (lexer->peek_token_type() != ',')
+						break;
+				}
+			}
+			require_and_eat(')');
+
+			return ast_create_expr_proc_call(scope, expr, arguments, args_count);
 		} else {
 			break;
 		}
@@ -882,7 +912,7 @@ Ast* Parser::parse_command(Scope* scope, bool eat_semicolon) {
 				command = parse_declaration(scope);
 			} else if (t == '(') {
 				// syntatic sugar void proc call
-				Ast* pcall = parse_expr_proc_call(scope);
+				Ast* pcall = parse_expression(scope);
 				command = ast_create_comm_variable_assignment(scope, 0, pcall);
 			} else {
 				command = parse_comm_variable_assignment(scope);

@@ -44,6 +44,8 @@ s32 get_alignment_from_type(Type_Instance* type){
 	return 0;
 }
 
+bool expr_is_constant(Ast* node, Type_Error* error, bool rep_undeclared, bool rep_error);
+
 // ---------------------------------------------
 // -------------- Declarations -----------------
 // ---------------------------------------------
@@ -241,28 +243,44 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				}
 			}
 		} break;
-		case AST_DECL_CONSTANT: {	// TODO(psv): only type aliases
-			if(!node->decl_constant.type_info){
-				// infer from exp
+		case AST_DECL_CONSTANT: {
+			Type_Error const_err = TYPE_OK;
+			bool is_constant = expr_is_constant(node->decl_constant.value, &const_err, false, true);
+			if(!is_constant) {
+				error |= const_err;
+				return error;
+			}
+			if (!node->decl_constant.type_info) {
+				// infer from expr
+				if (!node->decl_constant.value) {
+					error |= report_decl_error(DECL_ERROR_FATAL, node, "cannot infer constant type if value expression is given\n");
+					return error;
+				}
 				Type_Instance* type = infer_from_expression(node->decl_constant.value, &error, rep_undeclared);
-				if(error & DECL_ERROR_FATAL) return error;
-				if(!type || error & DECL_QUEUED_TYPE){
+				if (error & DECL_ERROR_FATAL) return error;
+				if (!type || error & DECL_QUEUED_TYPE) {
 					infer_queue_push(node);
 					error |= DECL_QUEUED_TYPE;
 					return error;
 				}
 				type->flags |= TYPE_FLAG_RESOLVED;
 				infer_queue_remove(node);
-				node->decl_variable.variable_type = internalize_type(&type, scope, true);
+				if (type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot assign a constant to an expression returning void\n");
+				}
 				return error;
 			}
-			if(node->decl_constant.type_info->flags & TYPE_FLAG_RESOLVED) {
+			if (node->decl_variable.variable_type->flags & TYPE_FLAG_RESOLVED) {
 				return error;
 			} else {
 				Type_Instance* type = resolve_type(scope, node->decl_constant.type_info, rep_undeclared);
 
 				if (type && type->flags & TYPE_FLAG_RESOLVED) {
 					node->decl_constant.type_info = type;
+					if (type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+						error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a constant of type void\n");
+					}
+
 					infer_queue_remove(node);
 				} else {
 					infer_queue_push(node);
@@ -499,26 +517,52 @@ Decl_Error decl_check_inner_decl(Ast* node) {
 				error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
 		}break;
 		case AST_DECL_CONSTANT: {
+			Type_Error type_error = TYPE_OK;
+
+			if(!expr_is_constant(node->decl_constant.value, &type_error, true, true)){
+				return type_error | error;
+			}
+
 			if (node->decl_constant.type_info) {
 				node->decl_constant.type_info = resolve_type(node->scope, node->decl_constant.type_info, true);
+				if (node->decl_constant.type_info == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a constant of type void\n");
+				}
 				if (error & DECL_ERROR_FATAL) return error;
 			}
 
-			if (node->decl_constant.value) {
-				Type_Error type_error = TYPE_OK;
-				Type_Instance* infered = infer_from_expression(node->decl_constant.value, &type_error, TYPE_INFER_REPORT_UNDECLARED);
-				if (type_error & TYPE_ERROR_FATAL) return type_error | error;
-				if (infered->flags & TYPE_FLAG_WEAK) {
-					type_propagate(node->decl_constant.type_info, node->decl_constant.value);
+			assert (node->decl_constant.value);
+
+			Type_Instance* infered = infer_from_expression(node->decl_constant.value, &type_error, TYPE_INFER_REPORT_UNDECLARED);
+			if (infered == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+				error |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a constant of type void\n");
+			}
+			if (type_error & TYPE_ERROR_FATAL) return type_error | error;
+			bool typechecked = false;
+			if (infered && infered->flags & TYPE_FLAG_WEAK) {
+				type_propagate(node->decl_constant.type_info, node->decl_constant.value);
+				if(!node->decl_constant.value->type_return){
+					type_error |= report_type_error(TYPE_ERROR_FATAL, node, "could not infer constant type from value expression\n");
+					return type_error | error;
+				}
+				if(infered->kind == KIND_ARRAY || infered->kind == KIND_STRUCT) {
+					infered = type_check_expr(node->decl_constant.value->type_return, node->decl_constant.value, &error);
+					typechecked = true;
+				} else {
 					infered = node->decl_constant.value->type_return;
 				}
-				if(!node->decl_constant.type_info){
-					node->decl_constant.type_info = infered;
-				} else {
-					node->decl_constant.value->type_return = type_check_expr(node->decl_constant.type_info, node->decl_constant.value, &type_error);
-				}
-				error |= type_error;
 			}
+			if(!node->decl_constant.type_info){
+				if(!infered){
+					type_error |= report_type_error(TYPE_ERROR_FATAL, node, "could not infer constant type from value expression\n");
+					return type_error | error;
+				}
+				node->decl_constant.type_info = infered;
+			} else {
+				if(!typechecked)
+					node->decl_constant.value->type_return = type_check_expr(node->decl_constant.type_info, node->decl_constant.value, &type_error);
+			}
+			error |= type_error;
 			
 			if (node->scope->level > 0)
 				error |= decl_insert_into_symbol_table(node, node->decl_constant.name, "constant");
@@ -728,6 +772,89 @@ Ast* decl_from_name(Scope* scope, Token* name) {
 		scope = scope->parent;
 	}
 	return 0;
+}
+
+bool expr_is_constant(Ast* node, Type_Error* error, bool rep_undeclared, bool rep_error) {
+	assert(node->flags & AST_FLAG_IS_EXPRESSION);
+
+	switch(node->node_type) {
+		case AST_EXPRESSION_BINARY:{
+			return(expr_is_constant(node->expr_binary.left, error, rep_undeclared, rep_error) && 
+				expr_is_constant(node->expr_binary.right, error, rep_undeclared, rep_error));
+		}break;
+		case AST_EXPRESSION_LITERAL:{
+			if(node->expr_literal.type == LITERAL_ARRAY) {
+				Ast** a = node->expr_literal.array_exprs;
+				size_t length = 0;
+				if(a) {
+					length = array_get_length(a);
+				}
+				bool res = true;
+				for(size_t i = 0; i < length; ++i) {
+					if(!expr_is_constant(a[i], error, rep_undeclared, rep_error)){
+						res = false;
+					}
+				}
+				return res;
+			} else if(node->expr_literal.type == LITERAL_STRUCT) {
+				Ast** a = node->expr_literal.struct_exprs;
+				size_t length = 0;
+				if(a) {
+					length = array_get_length(a);
+				}
+				bool res = true;
+				for(size_t i = 0; i < length; ++i) {
+					if(!expr_is_constant(a[i], error, rep_undeclared, rep_error)){
+						res = false;
+					}
+				}
+				return res;
+			}
+			return true;
+		}break;
+		case AST_EXPRESSION_PROCEDURE_CALL:{
+			if(rep_error){
+				*error |= report_type_error(TYPE_ERROR_FATAL, node, "procedure call expression is not a constant value\n");
+			}
+			return false;
+		}break;
+		case AST_EXPRESSION_UNARY:{
+			Operator_Unary op = node->expr_unary.op;
+			switch(op){
+				case OP_UNARY_DEREFERENCE:
+				case OP_UNARY_ADDRESSOF:{
+					return false;
+				}break;
+				case OP_UNARY_BITWISE_NOT:
+				case OP_UNARY_CAST:
+				case OP_UNARY_LOGIC_NOT:
+				case OP_UNARY_MINUS:
+				case OP_UNARY_PLUS:{
+					return expr_is_constant(node->expr_unary.operand, error, rep_undeclared, rep_error);
+				}break;
+			}
+		}break;
+		case AST_EXPRESSION_VARIABLE:{
+			Ast* decl = decl_from_name(node->scope, node->expr_variable.name);
+			if(!decl){
+				if(rep_undeclared){
+					*error |= report_undeclared(node->expr_variable.name);
+				} else {
+					*error |= DECL_QUEUED_TYPE;
+				}
+				return false;
+			} else {
+				if(decl->node_type == AST_DECL_CONSTANT || decl->node_type == AST_DECL_PROCEDURE){
+					return true;
+				} else {
+					if(rep_error){
+						*error |= report_type_error(TYPE_ERROR_FATAL, node, "'%.*s' is not a constant value\n", TOKEN_STR(node->expr_variable.name));
+					}
+					return false;
+				}
+			}
+		}break;
+	}
 }
 
 

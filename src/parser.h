@@ -60,7 +60,7 @@ struct Parser {
 	Ast* parse_expr_literal_struct(Token* name, Scope* scope);
 	Ast* parse_expr_literal_array(Scope* scope);
 	Ast* parse_expr_literal(Scope* scope);
-	Ast* parse_expr_proc_call(Scope* scope);
+	//Ast* parse_expr_proc_call(Scope* scope);
 
 	// Expression auxiliary
 	Precedence unary_op_precedence_level(Operator_Unary unop, bool prefixed);

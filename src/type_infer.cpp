@@ -275,40 +275,31 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 }
 
 Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags) {
-	Ast* decl = decl_from_name(expr->scope, expr->expr_proc_call.name);
-	if (!decl) {
-		// We cannot safely error here, this might be declared later on in the pipeline
-		if (flags & TYPE_INFER_REPORT_UNDECLARED) {
-			*error |= TYPE_ERROR_FATAL;
-			report_undeclared(expr->expr_proc_call.name);
-		} else {
-			*error |= DECL_QUEUED_TYPE;
-		}
+	Type_Instance* proc_type = 0;
+	
+	Type_Instance* caller_type = infer_from_expression(expr->expr_proc_call.caller, error, flags);
+	if(!caller_type){
+		assert(*error != 0);
 		return 0;
 	}
-	expr->expr_proc_call.decl = decl;
 
-	Type_Instance* proc_type = 0;
-
-	if (decl->node_type != AST_DECL_PROCEDURE) {
-		if(decl->node_type == AST_DECL_VARIABLE && decl->decl_variable.variable_type->kind != KIND_FUNCTION) {
-			*error |= report_type_error(TYPE_ERROR_FATAL, expr, "'%.*s' is not a procedure\n", TOKEN_STR(expr->expr_proc_call.name));
-			return 0;
-		}
-		proc_type = decl->decl_variable.variable_type;
+	if(caller_type->kind != KIND_FUNCTION){
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "expression is not a procedure\n");
 	} else {
-		proc_type = decl->decl_procedure.type_procedure;
+		assert_msg(type_strong(caller_type), "weak functional type in type inference pass");
 	}
+
+	proc_type = caller_type;
 	assert(proc_type->flags & TYPE_FLAG_INTERNALIZED);
 
 	size_t nargs = expr->expr_proc_call.args_count;
 	if(nargs < proc_type->function_desc.num_arguments) {
-		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "not enough arguments for '%.*s' procedure call, expected '%d' got '%d'\n",
-			TOKEN_STR(expr->expr_proc_call.name), proc_type->function_desc.num_arguments, nargs);
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "not enough arguments for procedure call, expected '%d' got '%d'\n", 
+			proc_type->function_desc.num_arguments, nargs);
 		return 0;
 	} else if(nargs > proc_type->function_desc.num_arguments) {
-		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "too many arguments for '%.*s' procedure call, expected '%d' got '%d'\n",
-			TOKEN_STR(expr->expr_proc_call.name), proc_type->function_desc.num_arguments, nargs);
+		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "too many arguments for procedure call, expected '%d' got '%d'\n",
+			proc_type->function_desc.num_arguments, nargs);
 		return 0;
 	}
 
@@ -368,9 +359,6 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 			return 0;
 		}
 
-		if(!type_strong(type)){
-			int x = 0;
-		}
 		assert(type_strong(type));
 		expr->flags |= AST_FLAG_LVALUE;
 		expr->type_return = type;
@@ -1065,6 +1053,8 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "'%.*s' is not a field of struct '%.*s'\n", 
 							TOKEN_STR(expr->expr_binary.right->expr_variable.name), TOKEN_STR(decl_struct->decl_struct.name));
 						return 0;
+					} else {
+						expr->expr_binary.right->scope = decl_struct->decl_struct.struct_scope;
 					}
 					assert(type_strong(decl->decl_variable.variable_type));
 

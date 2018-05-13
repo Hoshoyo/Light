@@ -304,8 +304,7 @@ struct Ast_Expr_Variable {
 	Ast*   decl;
 };
 struct Ast_Expr_ProcCall {
-	Token* name;
-	Ast*   decl;
+	Ast*   caller;
 	Ast**  args;		// EXPRESSIONS
 	s32    args_count;
 };
@@ -373,7 +372,7 @@ Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instan
 Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type);
 Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Token* token, u32 flags, Type_Instance* type);
 Ast* ast_create_expr_binary(Scope* scope, Ast* left, Ast* right, Operator_Binary op, Token* token_op);
-Ast* ast_create_expr_proc_call(Scope* scope, Token* name, Ast** arguments, s32 args_count);
+Ast* ast_create_expr_proc_call(Scope* scope, Ast* caller, Ast** arguments, s32 args_count);
 Ast* ast_create_expr_unary(Scope* scope, Ast* operand, Operator_Unary op, Token* token_op, Type_Instance* type_to_cast, u32 flags);
 
 Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** commands, Ast* creator, s32 command_count);

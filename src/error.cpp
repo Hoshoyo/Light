@@ -14,7 +14,7 @@ void report_error_location(Ast* node) {
 
 	case AST_EXPRESSION_BINARY:			report_error_location(node->expr_binary.token_op); break;
 	case AST_EXPRESSION_LITERAL:		report_error_location(node->expr_literal.token); break;
-	case AST_EXPRESSION_PROCEDURE_CALL:	report_error_location(node->expr_proc_call.name); break;
+	case AST_EXPRESSION_PROCEDURE_CALL:	report_error_location(node->expr_proc_call.caller); break;
 	case AST_EXPRESSION_UNARY:			report_error_location(node->expr_unary.token_op); break;
 	case AST_EXPRESSION_VARIABLE:		report_error_location(node->expr_variable.name); break;
 

@@ -163,7 +163,7 @@ Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instan
 }
 
 // Expressions
-Ast* ast_create_expr_proc_call(Scope* scope, Token* name, Ast** arguments, s32 args_count) {
+Ast* ast_create_expr_proc_call(Scope* scope, Ast* caller, Ast** arguments, s32 args_count) {
 	Ast* epc = ALLOC_AST();
 
 	epc->node_type = AST_EXPRESSION_PROCEDURE_CALL;
@@ -172,8 +172,7 @@ Ast* ast_create_expr_proc_call(Scope* scope, Token* name, Ast** arguments, s32 a
 	epc->flags = AST_FLAG_IS_EXPRESSION;
 	epc->infer_queue_index = -1;
 
-	epc->expr_proc_call.decl = 0;
-	epc->expr_proc_call.name = name;
+	epc->expr_proc_call.caller = caller;
 	epc->expr_proc_call.args = arguments;
 	epc->expr_proc_call.args_count = args_count;
 
@@ -724,7 +723,9 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 		if (node->expr_proc_call.args) {
 			num_args = array_get_length(node->expr_proc_call.args);
 		}
-		fprintf(out, "%.*s(", TOKEN_STR(node->expr_proc_call.name));
+		//fprintf(out, "%.*s(", TOKEN_STR(node->expr_proc_call.name));
+		DEBUG_print_expression(out, node->expr_proc_call.caller);
+
 		for (int i = 0; i < num_args; ++i) {
 			DEBUG_print_expression(out, node->expr_proc_call.args[i]);
 			if(i + 1 != num_args) fprintf(out, ", ");

@@ -1,6 +1,10 @@
-#import "linux/print.li"
+//#import "linux/print.li"
 
 main :: () -> s32 {
-	print_string("Hello World");
+	//a := bar;
+	//b := &a;
+	//c := (*b)();
+	a : ^()->void;
+
 	return 0;
 }
