@@ -1,0 +1,7 @@
+12/05/2018
+    - change cast to be [type]
+    - added 'for' init_commands ; condition ; defered_commands
+    - added while
+13/05/2018
+    - make includes in files from where they are
+    - make includes in files unique

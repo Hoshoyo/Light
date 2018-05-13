@@ -138,6 +138,8 @@ struct Token {
 struct Lexer
 {
 	string filename;
+	string filepath;
+	string path;
 	s64    file_size = 0;
 	char*  filedata  = 0;
 

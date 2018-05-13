@@ -3,6 +3,7 @@
 #include "ast.h"
 #include "lexer.h"
 #include "memory.h"
+#include "file_table.h"
 
 enum Parser_Error {
 	PARSER_OK = 0,

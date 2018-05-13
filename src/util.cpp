@@ -1,5 +1,5 @@
 #include "util.h"
-#include "string.h"
+#include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
 
@@ -21,6 +21,20 @@ void string_free(string* s) {
 	s->capacity = -1;
 }
 
+string string_new_append(string* s, char* s2, size_t s2_length){
+	string result = {0};
+	result.length = s2_length + s->length;
+
+	result.capacity = result.length;
+	u8* temp = (u8*)calloc(1, result.length);
+
+	memcpy(temp, s->data, s->length);
+	memcpy(temp + s->length, s2, s2_length);
+	result.data = temp;
+	
+	return result;
+}
+
 void string_append(string* s1, const char* s2){
 	s64 s2_length  = str_length(s2);
 	s64 res_length = s2_length + s1->length;
@@ -31,6 +45,38 @@ void string_append(string* s1, const char* s2){
 	}
 	memcpy((char*)s1->data + s1->length, s2, s2_length);
 	s1->length    = res_length;
+}
+
+string filename_from_path(char* path, s64 length){
+	return filename_from_path(string_make(path, length));
+}
+
+string filename_from_path(char* path) {
+	return filename_from_path(string_make(path));
+}
+
+string filename_from_path(string s) {
+    s64 index = 0;
+    for (s64 i = s.length - 1; i >= 0; --i){
+        if(s.data[i] == '/'){
+            index = i + 1;
+			break;
+        }
+    }
+    string result = string_make(s.data + index, s.length - index);
+    return result;
+}
+
+string path_from_fullpath(string s) {
+	s64 index = 0;
+    for (s64 i = s.length - 1; i >= 0; --i){
+        if(s.data[i] == '/'){
+            index = i + 1;
+			break;
+        }
+    }
+    string result = string_make(s.data, index);
+    return result;
 }
 
 string string_make(const char* v) {

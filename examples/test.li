@@ -1,51 +1,6 @@
+#import "/linux/print.li"
 
-/*
-#import "./examples/windows/windows.li"
-
-
-foo :: (str : string, str2 : string) -> s32 {
-	written : u32;
-	stdhandle := GetStdHandle(STD_OUTPUT_HANDLE);
-	WriteConsoleA(stdhandle, cast(^void)str.data, cast(u32)str.length, &written, cast(^void)0);
-	WriteConsoleA(stdhandle, cast(^void)str2.data, cast(u32)str2.length, &written, cast(^void)0);
-	return 23;
-}
-
-arr :: (a : [3]s32) -> s32 {
-	result : s32 = 0;
-	i := 0;
-	for i < 3 {
-		result += a[i];
-		i += 1;
-	}
-	return result;
-}
-
-hey :: struct {
-	foo : [3]s32;
-}
 main :: () -> s32 {
-	hello := 2 + foo("Hello", "bar");
-	world := 4 * arr(array{1, 2, 3});
-	
-    return hello + world;
-}
-*/
-
-string :: struct {
-	length   : s64;
-	capacity : s64;
-	data     : ^u8;
-}
-
-memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void {
-	i :u64= 0;
-	while i < size {
-		*[^u8](dest + i) = *[^u8](src + i);
-		i += 1;
-	}
-}
-main :: () -> s32 {
-	a := "Hello".data;
-	return [s32]a;
+	print_string("Hello World");
+	return 0;
 }

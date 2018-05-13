@@ -174,19 +174,32 @@ void Parser::parse_directive(Scope* scope) {
 		report_syntax_error(directive, "expected compiler directive but got '%.*s'\n", TOKEN_STR(directive));
 	}
 
+	// #import directive
 	if(directive->value.data == compiler_tags[COMPILER_TAG_IMPORT].data){
 		Token* import_str = lexer->eat_token();
 		if(import_str->type == TOKEN_LITERAL_STRING) {
-			char* b = make_c_string((char*)import_str->value.data, import_str->value.length);
+			//
+			// keep relative path to import other files from 
+			// relative path and not absolute
+			//
+			string solo_path = string_new_append(&lexer->path, import_str->value.data, import_str->value.length);
+			char* b = make_c_string(solo_path);
+
 			size_t size = 0;
 			char* ptr = ho_realpath(b, &size);
-			import_str->value.data = (const u8*)ptr;
-			import_str->value.length = size;
 			free(b);
+			string_free(&solo_path);
+
 			if(ptr) {
-				queue_file_for_parsing(import_str);
+				s64 file_index = file_table_push(ptr);
+				if(file_index != -1) {
+					import_str->value.data = (const u8*)ptr;
+					import_str->value.length = size;
+					queue_file_for_parsing(import_str);
+				} else {
+					// do nothing, since this file was already included
+				}
 			} else {
-				// TODO(psv): refactor this error to not be fatal
 				report_fatal_error(import_str, "import directive, file '%.*s' could not be found\n", TOKEN_STR(import_str));
 			}
 		} else {

@@ -40,10 +40,10 @@ Keyword keywords_info[] = {
 };
 
 string compiler_tags[] = {
-	{sizeof("foreign") - 1, (u8*)"foreign", -1},
-	{sizeof("main") - 1, (u8*)"main", -1},
-	{sizeof("string") - 1, (u8*)"string", -1},
-	{sizeof("import") - 1, (u8*)"import", -1}
+	{sizeof("foreign") - 1, -1, (u8*)"foreign"},
+	{sizeof("main")    - 1, -1, (u8*)"main"},
+	{sizeof("string")  - 1, -1, (u8*)"string"},
+	{sizeof("import")  - 1, -1, (u8*)"import"}
 };
 
 s32 Lexer::report_lexer_error(char* msg, ...)
@@ -90,6 +90,11 @@ void Lexer::init() {
 Lexer_Error Lexer::start(const char* filename)
 {
 	this->filename = string_make(filename);
+
+	size_t filepath_length = 0;
+	char* fullpath = ho_realpath(filename, &filepath_length);
+	this->filepath = string_make(fullpath, filepath_length);
+
 	file_size = ho_getfilesize(filename);
 	HANDLE filehandle = ho_openfile(filename, OPEN_EXISTING);
 	if (filehandle == INVALID_HANDLE_VALUE) {
@@ -100,6 +105,8 @@ Lexer_Error Lexer::start(const char* filename)
 	*((char*)file_memory + file_size) = 0;
 	filedata = (char*)ho_readentirefile(filehandle, file_size, file_memory);
 	ho_closefile(filehandle);
+
+	this->path = path_from_fullpath(this->filepath);
 
 	lex_file();
 	current_token = 0;

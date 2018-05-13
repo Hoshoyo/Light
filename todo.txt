@@ -1,7 +1,5 @@
 #bugs
 
-- make includes in files from where they are
-- make includes in files unique
 - make forward decls declarable more than once
 
 - this causes warning in the c backend
@@ -17,7 +15,6 @@ main :: () -> s32 {
 
 #changes
 
-- change cast to be [type]
 - dereference pointer on . operator
 - check return in all paths, proc with no return clause and other commands is ignored when returning any non-void
 - make array infer its size from expression
@@ -26,6 +23,7 @@ main :: () -> s32 {
 
 - type alias
 - file scope
+- switch
 
 #backlog
 

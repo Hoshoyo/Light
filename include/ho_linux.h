@@ -97,7 +97,10 @@ char* HO_API ho_realpath(const char* path, size_t* size)
 {
 	// this function uses malloc, should free after
 	char* result = realpath(path, 0);
-	*size = strlen(result);
+	if(result)
+		*size = strlen(result);
+	else
+		*size = 0;
 	return result;
 }
 

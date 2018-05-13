@@ -5,33 +5,39 @@
 #define MAX(X, Y) ((X > Y) ? (X) : (Y))
 #define MIN(X, Y) ((X < Y) ? (X) : (Y))
 
-#define MAKE_STRING(X) { sizeof(X) - 1, (u8*)(X) }
-
+#define MAKE_STRING(X) {sizeof(X) -1, -1, X}
 #define ARRAY_COUNT(X) (sizeof(X) / sizeof((X)[0]))
 
 
 struct string {
 	s64 length;
-	const u8* data;
 	s64 capacity;
+	const u8* data;
 };
 
 string string_new(const char* v, s64 length);
 void   string_free(string* s);
 void   string_append(string* s1, const char* s2);
-s64 align_delta(s64 offset, s64 align_to);
-s32 next_power2(s32 v);
+string string_new_append(string* s, char* s2, size_t s2_length);
 
 string string_make(const char* v);
 string string_make(const char* v, s64 length);
+
+string filename_from_path(string s);
+string filename_from_path(char* s);
+string filename_from_path(char* s, s64 length);
+string path_from_fullpath(string s);
 
 bool is_white_space(char str);
 bool is_number(char c);
 bool is_letter(char c);
 bool is_hex_digit(char c);
+s64 align_delta(s64 offset, s64 align_to);
+s32 next_power2(s32 v);
 
 s64  str_length(const char* str);
 char* make_c_string(char* str, size_t length);
+char* make_c_string(string& s);
 bool c_str_equal(const char* s1, const char* s2);
 bool str_equal(const char* s1, int s1_len, const char* s2, int s2_len);
 bool str_equal(const string& s1, const string& s2);

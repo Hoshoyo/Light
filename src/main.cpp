@@ -10,9 +10,11 @@
 #include "type_check.h"
 #include "llvm_backend.h"
 #include "c_backend.h"
+#include "file_table.h"
 
 void initialize() {
 	type_table_init();
+	file_table_init();
 	Lexer::init();
 	Parser::init();
 }
@@ -29,9 +31,9 @@ int main(int argc, char** argv) {
 
 	initialize();
 
-	Lexer lexer;
-	if (lexer.start(argv[1]) != LEXER_OK)
-		return EXIT_FAILURE;
+	//Lexer lexer;
+	//if (lexer.start(argv[1]) != LEXER_OK)
+	//	return EXIT_FAILURE;
 
 	// Global scope
 	Scope  global_scope = { 0 };
