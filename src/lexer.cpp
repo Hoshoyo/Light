@@ -43,7 +43,8 @@ string compiler_tags[] = {
 	{sizeof("foreign") - 1, -1, (u8*)"foreign"},
 	{sizeof("main")    - 1, -1, (u8*)"main"},
 	{sizeof("string")  - 1, -1, (u8*)"string"},
-	{sizeof("import")  - 1, -1, (u8*)"import"}
+	{sizeof("import")  - 1, -1, (u8*)"import"},
+	{sizeof("end")     - 1, -1, (u8*)"end"}
 };
 
 s32 Lexer::report_lexer_error(char* msg, ...)

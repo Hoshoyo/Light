@@ -1,5 +1,6 @@
 #bugs
 
+- use foreign library name to link
 - string escaping
 - assignment of arrays
 - constant in type definition

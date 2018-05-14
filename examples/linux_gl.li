@@ -1,0 +1,6 @@
+#import "x11/x11.li"
+
+main :: () -> s32 {
+    
+    return 0;
+}

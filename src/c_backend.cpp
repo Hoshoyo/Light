@@ -815,19 +815,31 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 #if defined(_WIN32) || defined(_WIN64)
 	sprint("u32 ExitProcess(u32 ret);\n");
 #endif
-    // emit all declarations of types
-	Ast** type_decl_arr = type_decl_array_get();
+
+    // forward declarations of types
+    Ast** type_decl_arr = type_decl_array_get();
     for(size_t i = 0; i < array_get_length(type_decl_arr); ++i){
         Ast* decl = type_decl_arr[i];
-        emit_decl(decl);
-        sprint(";\n");
+        if(decl->node_type == AST_DECL_STRUCT) {
+            sprint("typedef struct %.*s %.*s;\n", TOKEN_STR(decl->decl_struct.name), TOKEN_STR(decl->decl_struct.name));
+        }
     }
-	for (size_t i = 0; i < array_get_length(type_table); ++i) {
+
+    // emit all declarations of types
+    for (size_t i = 0; i < array_get_length(type_table); ++i) {
 		Type_Instance* type = type_table[i];
 		if (type->kind == KIND_FUNCTION) {
 			emit_function_typedef(type);
 		}
 	}
+    
+    // emit structs and proc declarations
+    for(size_t i = 0; i < array_get_length(type_decl_arr); ++i){
+        Ast* decl = type_decl_arr[i];
+        emit_decl(decl);
+        sprint(";\n");
+    }
+	
 	sprint("\n");
 
     size_t ndecls = array_get_length(toplevel);

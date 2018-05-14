@@ -205,6 +205,24 @@ void Parser::parse_directive(Scope* scope) {
 		} else {
 			report_syntax_error(directive, "expected filepath after import directive but got '%.*s'\n", TOKEN_STR(directive));	
 		}
+	} else if(directive->value.data == compiler_tags[COMPILER_TAG_FOREIGN].data) {
+		require_and_eat('(');
+		Token* libname = lexer->eat_token();
+		if(libname->type == TOKEN_LITERAL_STRING) {
+			if(!current_foreign) {
+				current_foreign = array_create(Token*, 4);
+			}
+			array_push(current_foreign, &libname);
+			require_and_eat(')');
+		} else {
+			report_syntax_error(libname, "expected library name after #foreign directive but got '%.*s'\n", TOKEN_STR(libname));
+		}
+	} else if(directive->value.data == compiler_tags[COMPILER_TAG_END].data){
+		if(current_foreign && array_get_length(current_foreign) > 0) {
+			array_pop(current_foreign);
+		} else {
+			report_syntax_error(directive, "#end directive is not ending any directive block\n");
+		}
 	} else {
 		report_syntax_error(directive, "unrecognized compiler directive '%.*s'\n", TOKEN_STR(directive));
 	}
@@ -310,8 +328,9 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 	u32  flags = 0;
 	Token* extern_library_name = 0;
 
+	Token* next = lexer->peek_token();
 	// TODO(psv): forward declared procs (foreign)
-	if (lexer->peek_token_type() == '#') {
+	if (next->type == '#') {
 		lexer->eat_token();
 		Token* tag = lexer->eat_token();
 		if (compiler_tags[COMPILER_TAG_FOREIGN].data == tag->value.data) {
@@ -325,10 +344,20 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 			}
 			require_and_eat(')');
 		} else {
-			report_syntax_error(tag, "expected compiler tag but got '%.*s'\n", TOKEN_STR(tag));
+			report_syntax_error(tag, "expected compiler directive but got '%.*s'\n", TOKEN_STR(tag));
 		}
 		require_and_eat(';');
 		flags |= DECL_PROC_FLAG_FOREIGN;
+	} else if(next->type == ';') {
+		// make sure this is inside a foreign block, or TODO:(psv): treat as a forward declaration
+		lexer->eat_token();
+		if(current_foreign && array_get_length(current_foreign) > 0) {
+			extern_library_name = current_foreign[array_get_length(current_foreign) - 1];
+			flags |= DECL_PROC_FLAG_FOREIGN;
+		} else {
+			// TODO(psv): temporary, this should be possible
+			report_syntax_error(next, "cannot forward declare outside a #foreign block\n");
+		}
 	} else {
 		if (arguments_scope)
 			body = parse_comm_block(arguments_scope, 0);

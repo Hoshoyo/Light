@@ -17,6 +17,8 @@ struct Parser {
 	Scope* global_scope;
 	Ast**  top_level;
 
+	Token** current_foreign = 0;
+
 	Parser(Lexer* lexer, Scope* global_scope) : lexer(lexer), global_scope(global_scope) {}
 
 	Ast** parse_top_level();

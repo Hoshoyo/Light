@@ -1,15 +1,12 @@
-print_s64::(v : s64) -> s64 #foreign("print_string.obj");
-println::() -> void #foreign("print_string.obj");
-
-#import "./examples/x11/x11.li"
+#import "./x11/x11.li"
 
 main :: () -> s32{
 	name := "Squiggly";
-	display := XOpenDisplay(cast(^s8)0);
+	display := XOpenDisplay([^s8]0);
 	screen := (*display).default_screen;
 	window : u64;
 
-	if(display == cast(^Display)0) {
+	if(display == [^Display]0) {
 		return -1;
 	}
 
@@ -17,7 +14,7 @@ main :: () -> s32{
 	root_screen := &(scrs[screen]);
 	root := (*root_screen).root;
 
-	window = XCreateSimpleWindow(display, cast(u64)root, 50, 50, 800, 600, 1, CopyFromParent, CopyFromParent);
+	window = XCreateSimpleWindow(display, [u64]root, 50, 50, 800, 600, 1, CopyFromParent, CopyFromParent);
 
 	if window == 0 {
 		return -1;
@@ -26,9 +23,9 @@ main :: () -> s32{
 	XSelectInput(display, window, 1 << 17);
 	XMapWindow(display, window);
 
-	for true {
+	while true {
 		e : XEvent;
-		XNextEvent(display, cast(^void)&e);
+		XNextEvent(display, [^void]&e);
 	}
 
     return 0;

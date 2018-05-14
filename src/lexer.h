@@ -183,6 +183,7 @@ enum Compiler_Tags {
 	COMPILER_TAG_MAIN_PROC = 1,
 	COMPILER_TAG_STRING = 2,
 	COMPILER_TAG_IMPORT = 3,
+	COMPILER_TAG_END = 4,
 };
 extern string compiler_tags[];
 
