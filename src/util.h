@@ -5,7 +5,7 @@
 #define MAX(X, Y) ((X > Y) ? (X) : (Y))
 #define MIN(X, Y) ((X < Y) ? (X) : (Y))
 
-#define MAKE_STRING(X) {sizeof(X) -1, -1, X}
+#define MAKE_STRING(X) {sizeof(X) -1, -1, (u8*)(X)}
 #define ARRAY_COUNT(X) (sizeof(X) / sizeof((X)[0]))
 
 

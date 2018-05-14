@@ -38,6 +38,7 @@ struct C_Code_Generator {
 	void emit_temp_assignment(Ast* expr);
 	void emit_default_value(Type_Instance* type);
 	void emit_typedef(Type_Instance* type, Token* name, char* prefix);
+	void emit_function_typedef(Type_Instance* type);
 
 	void emit_data_decl(Ast* decl);
 

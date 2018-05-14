@@ -1,10 +1,18 @@
 //#import "linux/print.li"
 
-main :: () -> s32 {
-	//a := bar;
-	//b := &a;
-	//c := (*b)();
-	a : ^()->void;
+bar :: () -> s32 {
+	return 45;
+}
 
-	return 0;
+foo :: () -> () -> s32 {
+	return bar;
+}
+
+FOO :: foo;
+
+main :: () -> s32 {
+	b := FOO;
+	a : ^()->()->s32 = &b;
+	c := ((*a)())();
+	return c;
 }

@@ -1,4 +1,4 @@
-#import "./examples/print.li"
+#import "examples/windows/print.li"
 /*
 /*
 handmade :: () {
@@ -86,6 +86,6 @@ literal :: () {
 main :: () -> s32 {
     //handmade();
     //literal();
-    a : [2]s32 = array {1, 2, 3};
+    a : [3]s32 = array {1, 2, 3};
     return 0;
 }

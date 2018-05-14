@@ -1,7 +1,7 @@
 #bugs
 
+- string escaping
 - assignment of arrays
-- pointer to proc emit in c backend
 - constant in type definition
 - make forward decls declarable more than once
 

@@ -15,7 +15,7 @@ u64 file_table_hash(void* data) {
 bool file_table_compare(void* e1, void* e2) {
     File_Table_Entry* e_1 = (File_Table_Entry*)e1;
     File_Table_Entry* e_2 = (File_Table_Entry*)e2;
-    str_equal(e_1->fullpath, e_2->fullpath);
+    return str_equal(e_1->fullpath, e_2->fullpath);
 }
 
 void file_table_init() {

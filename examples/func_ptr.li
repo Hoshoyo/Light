@@ -11,7 +11,7 @@ make_proc :: () -> (s32) -> s32 {
 
 map :: (arr : ^s32, length : s64, f : (s32)->s64, sq : (s32) -> s32) -> void {
     i := 0;
-    for i < length {
+    while i < length {
         if i != 0 {
             print_str(", ");
         }
@@ -25,7 +25,7 @@ main :: () -> s32 {
     a := make_proc();
     v : [5]s32 = array{0,1,2,3,4};
 
-    map(cast(^s32)v, 5, print_s32, a);
+    map([^s32]v, 5, print_s32, a);
 
     return 0;
 }

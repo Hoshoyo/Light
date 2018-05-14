@@ -182,7 +182,7 @@ void Parser::parse_directive(Scope* scope) {
 			// keep relative path to import other files from 
 			// relative path and not absolute
 			//
-			string solo_path = string_new_append(&lexer->path, import_str->value.data, import_str->value.length);
+			string solo_path = string_new_append(&lexer->path, (char*)import_str->value.data, import_str->value.length);
 			char* b = make_c_string(solo_path);
 
 			size_t size = 0;

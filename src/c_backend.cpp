@@ -62,7 +62,7 @@ void C_Code_Generator::emit_typedef(Type_Instance* type, Token* name, char* pref
             if(type->function_desc.return_type->kind == KIND_FUNCTION){
                 char p[64] = {0};
                 int rettype_id = id;
-                sprintf(p, "__typet_%d", prefix, id++);
+                sprintf(p, "%s__typet_%d", prefix, id++);
                 emit_typedef(type->function_desc.return_type, 0, p);
                 sprint("typedef __typet_%d ", rettype_id);
             } else {
@@ -124,7 +124,7 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
             }
         }break;
         case KIND_POINTER: {
-            emit_type(type->pointer_to);
+            emit_type(type->pointer_to, name);
             sprint("*");
         }break;
         case KIND_ARRAY:{
@@ -137,6 +137,12 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
             }
         }break;
         case KIND_FUNCTION:{
+			sprint("__func_type_%p* ", type);
+			if (name) {
+				sprint("%.*s", TOKEN_STR(name));
+			}
+
+			/*
             emit_type(type->function_desc.return_type);
             if(name){
                 sprint("(*%.*s)(", TOKEN_STR(name));
@@ -148,6 +154,7 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
                 emit_type(type->function_desc.arguments_type[i]);
             }
             sprint(")");
+			*/
         }break;
         case KIND_STRUCT: {
             if(!(type->flags & TYPE_FLAG_INTERNALIZED)) {
@@ -608,6 +615,7 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
             } else {
 				sprint("+ %lld * (", indexed_type->array_desc.array_of->type_size_bits / 8);
             }
+			// TODO(psv): array bounds check
             emit_expression(expr->expr_binary.right);
 			sprint("))");
         }break;
@@ -764,6 +772,29 @@ void C_Code_Generator::emit_proc(Ast* decl) {
 	sprint("\n\n");
 }
 
+void C_Code_Generator::emit_function_typedef(Type_Instance* type) {
+	assert(type->kind == KIND_FUNCTION);
+	assert(type->flags & TYPE_FLAG_INTERNALIZED);
+	sprint("typedef ");
+
+	Type_Instance* rettype = type->function_desc.return_type;
+	if (rettype->kind == KIND_FUNCTION) {
+		sprint("__func_type_%p*", rettype);
+	} else {
+		emit_type(rettype);
+	}
+	sprint(" __func_type_%p(", type);
+
+	size_t nargs = type->function_desc.num_arguments;
+
+	for (size_t i = 0; i < nargs; ++i) {
+		if (i != 0) sprint(", ");
+		emit_type(type->function_desc.arguments_type[i]);
+	}
+
+	sprint(");\n");
+}
+
 int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_table) {
     sprint("typedef char s8;\n");
     sprint("typedef short s16;\n");
@@ -791,6 +822,12 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
         emit_decl(decl);
         sprint(";\n");
     }
+	for (size_t i = 0; i < array_get_length(type_table); ++i) {
+		Type_Instance* type = type_table[i];
+		if (type->kind == KIND_FUNCTION) {
+			emit_function_typedef(type);
+		}
+	}
 	sprint("\n");
 
     size_t ndecls = array_get_length(toplevel);

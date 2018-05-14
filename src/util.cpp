@@ -63,7 +63,7 @@ string filename_from_path(string s) {
 			break;
         }
     }
-    string result = string_make(s.data + index, s.length - index);
+    string result = string_make((char*)s.data + index, s.length - index);
     return result;
 }
 
@@ -75,7 +75,7 @@ string path_from_fullpath(string s) {
 			break;
         }
     }
-    string result = string_make(s.data, index);
+    string result = string_make((char*)s.data, index);
     return result;
 }
 

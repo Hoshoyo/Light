@@ -230,7 +230,8 @@ Type_Instance* internalize_type(Type_Instance** type, Scope* scope, bool copy) {
 		} else {
 			index = hash_table_add(&type_table, *type, sizeof(*type), hash);
 		}
-		array_push(g_type_table, type);
+		void* type_data = type_table.entries[index].data;
+		array_push(g_type_table, &type_data);
 	}
 	*type = (Type_Instance*)type_table.entries[index].data;
 	(*type)->flags |= TYPE_FLAG_INTERNALIZED | TYPE_FLAG_STRONG;
