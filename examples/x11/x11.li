@@ -618,6 +618,7 @@ XCreateColormap :: (display : ^Display, w : u64, visual : ^Visual, alloc : s32) 
 XStoreName :: (display : ^Display, w : u64, window_name : ^u8) -> s32 #foreign("X11");
 XDestroyWindow :: (display : ^Display, w : u64) -> s32 #foreign("X11");
 XCloseDisplay :: (display : ^Display) -> s32 #foreign("X11");
+XGetWindowAttributes :: (dpy : ^Display, win : u64, window_attribs_return : ^XWindowAttributes) -> s32 #foreign("X11");
 
 glXChooseVisual :: (dpy : ^Display, screen : s32, attrib_list : ^s32) -> ^XVisualInfo #foreign("GL");
 glXCreateContext :: (dpy : ^Display, vis : ^XVisualInfo, share_list : ^void, direct : s32) -> ^void #foreign("GL");

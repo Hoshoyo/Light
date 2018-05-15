@@ -5,8 +5,31 @@ glClear :: (mask : u32) -> void;
 glClearColor :: (r : r32, g : r32, b : r32, a : r32) -> void;
 glViewport :: (x : s32, y : s32, width : s32, height : s32) -> void;
 
+glMatrixMode :: (mode : u32) -> void;
+glLoadIdentity :: () -> void;
+glBegin :: (mode : u32) -> void;
+glColor3f :: (r : r32, g : r32, b : r32) -> void;
+glVertex3f :: (x : r32, y : r32, z : r32) -> void;
+glEnd :: () -> void;
+
 GL_DEPTH_TEST : u32 : 0x0B71;
 GL_DEPTH_BUFFER_BIT : u32 : 0x00000100;
 GL_COLOR_BUFFER_BIT : u32 : 0x00004000;
+GL_PROJECTION : u32 : 0x1701;
+
+GL_MATRIX_MODE : u32 : 0x0BA0;
+GL_MODELVIEW : u32 : 0x1700;
+GL_TEXTURE : u32 : 0x1702;
+
+GL_POINTS         : u32 : 0x0000;
+GL_LINES          : u32 : 0x0001;
+GL_LINE_LOOP      : u32 : 0x0002;
+GL_LINE_STRIP     : u32 : 0x0003;
+GL_TRIANGLES      : u32 : 0x0004;
+GL_TRIANGLE_STRIP : u32 : 0x0005;
+GL_TRIANGLE_FAN   : u32 : 0x0006;
+GL_QUADS : u32    : 0x0007;
+GL_QUAD_STRIP     : u32 : 0x0008;
+GL_POLYGON        : u32 : 0x0009;
 
 #end
