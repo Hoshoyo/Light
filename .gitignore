@@ -1,4 +1,5 @@
 examples/*
+!examples/GL
 
 #Unignore files with extensions
 !examples/*.*
