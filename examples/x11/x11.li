@@ -514,10 +514,79 @@ XEvent :: struct {
 	pad               : [24]s64;
 }
 
-string :: struct {
-	length   : s64;
-	capacity : s64;
-	data     : ^u8;
+XExtData :: struct {
+	number : s32;					/* number returned by XRegisterExtension */
+	next : ^XExtData;					/* next item on list of data for structure */
+	free_private : (^XExtData) -> s32; 	/* called to free private storage */
+	private_data : ^s8;					/* data private to this extension. */
+}
+
+Visual :: struct {
+	ext_data     : ^XExtData;	/* hook for extension to hang data */
+	visualid     : u64;			/* visual id of this visual */
+	class        : s32;			/* class of screen (monochrome, etc.) */
+	red_mask     : u64;			/* mask values */
+	green_mask   : u64;
+	blue_mask    : u64;
+	bits_per_rgb : s32;			/* log base 2 of distinct color values */
+	map_entries  : s32;			/* color map entries */
+}
+
+XVisualInfo :: struct {
+	visual        : ^Visual;
+	visualid      : u64;
+	screen        : s32;
+	depth         : s32;
+	class         : s32;
+	red_mask      : u64;
+	green_mask    : u64;
+	blue_mask     : u64;
+	colormap_size : s32;
+	bits_per_rgb  : s32;
+}
+
+XSetWindowAttributes :: struct {
+	background_pixmap     : u64;	/* background or None or ParentRelative */
+	background_pixel      : u64;	/* background pixel */
+	border_pixmap         : u64;	/* border of the window */
+	border_pixel          : u64;	/* border pixel value */
+	bit_gravity           : s32;	/* one of bit gravity values */
+	win_gravity           : s32;	/* one of the window gravity values */
+	backing_store         : s32;	/* NotUseful, WhenMapped, Always */
+	backing_planes        : u64;	/* planes to be preseved if possible */
+	backing_pixel         : u64;	/* value to use in restoring planes */
+	save_under            : s32;	/* should bits under be saved? (popups) */
+	event_mask            : s64;	/* set of events that should be saved */
+	do_not_propagate_mask : s64;	/* set of events that should not propagate */
+	override_redirect     : s32;	/* boolean value for override-redirect */
+	colormap              : u64;	/* color map to be associated with window */
+	cursor                : u64;	/* cursor to be displayed (or None) */
+}
+
+XWindowAttributes :: struct {
+	x                     : s32;		/* location of window */
+	y                     : s32;
+	width                 : s32;		/* width and height of window */
+	height                : s32;
+	border_width          : s32;		/* border width of window */
+	depth                 : s32;		/* depth of window */
+    visual                : ^Visual;	/* the associated visual structure */
+    root                  : u64;       	/* root of screen containing window */
+    class                 : s32;		/* InputOutput, InputOnly*/
+    bit_gravity           : s32;		/* one of bit gravity values */
+    win_gravity           : s32;		/* one of the window gravity values */
+    backing_store         : s32;		/* NotUseful, WhenMapped, Always */
+    backing_planes        : u64;		/* planes to be preserved if possible */
+    backing_pixel         : u64;		/* value to be used when restoring planes */
+    save_under            : s32;		/* boolean, should bits under be saved? */
+    colormap              : u64;		/* color map to be associated with window */
+    map_installed         : s32;		/* boolean, is color map currently installed*/
+    map_state             : s32;		/* IsUnmapped, IsUnviewable, IsViewable */
+    all_event_masks       : s64;		/* set of events all people have interest in*/
+    your_event_mask       : s64;		/* my event mask */
+    do_not_propagate_mask : s64; 		/* set of events that should not propagate */
+    override_redirect     : s32;		/* boolean value for override-redirect */
+    screen                : ^Screen;	/* back pointer to correct screen */
 }
 
 XOpenDisplay :: (v : ^s8) -> ^Display #foreign("X11");
@@ -530,8 +599,124 @@ XCreateSimpleWindow :: (display : ^Display,
 	border_width : u32, 
 	border : u64, 
 	background : u64) -> u64 #foreign("X11");
+
+XCreateWindow :: (display : ^Display, 
+	parent : u64, 
+	x : s32, y : s32, 
+	width : u32, height : u32,
+	border_width : u32,
+	depth : s32,
+	class : u32,
+	visual : ^Visual,
+	valuemask : u64,
+	attribs : ^XSetWindowAttributes) -> u64 #foreign("X11");
+
 XSelectInput :: (dpy : ^Display, w : u64, event_mask : s64) -> s32 #foreign("X11");
 XMapWindow :: (dpy : ^Display, w : u64) -> s32 #foreign("X11");
 XNextEvent :: (dpy : ^Display, xevent : ^void) -> s32 #foreign("X11");
+XCreateColormap :: (display : ^Display, w : u64, visual : ^Visual, alloc : s32) -> u64 #foreign("X11");
+XStoreName :: (display : ^Display, w : u64, window_name : ^u8) -> s32 #foreign("X11");
+XDestroyWindow :: (display : ^Display, w : u64) -> s32 #foreign("X11");
+XCloseDisplay :: (display : ^Display) -> s32 #foreign("X11");
+
+glXChooseVisual :: (dpy : ^Display, screen : s32, attrib_list : ^s32) -> ^XVisualInfo #foreign("GL");
+glXCreateContext :: (dpy : ^Display, vis : ^XVisualInfo, share_list : ^void, direct : s32) -> ^void #foreign("GL");
+glXMakeCurrent :: (dpy : ^Display, drawable : u64, ctx : ^void) -> s32 #foreign("GL");
+glXSwapBuffers :: (dpy : ^Display, drawable : u64) -> void #foreign("GL");
+glXDestroyContext :: (dpy : ^Display, ctx : ^void) -> void #foreign("GL");
+
+GL_TRUE  : s32 : 1;
+GL_FALSE : s32 : 0;
 
 CopyFromParent : u64 : 0;	/* border pixmap in CreateWindow */
+
+InputOutput	: u32 : 1;
+InputOnly	: u32 : 2;
+
+AllocNone      : s32 : 0;	/* create map with no entries */
+AllocAll       : s32 : 1;	/* allocate entire map writeable */
+
+NoEventMask				: s64 : 0;
+KeyPressMask			: s64 : (1<<0);
+KeyReleaseMask			: s64 : (1<<1);
+ButtonPressMask			: s64 : (1<<2);
+ButtonReleaseMask		: s64 : (1<<3);
+EnterWindowMask			: s64 : (1<<4);
+LeaveWindowMask			: s64 : (1<<5);
+PointerMotionMask		: s64 : (1<<6);
+PointerMotionHintMask	: s64 : (1<<7);
+Button1MotionMask		: s64 : (1<<8);
+Button2MotionMask		: s64 : (1<<9);
+Button3MotionMask		: s64 : (1<<10);
+Button4MotionMask		: s64 : (1<<11);
+Button5MotionMask		: s64 : (1<<12);
+ButtonMotionMask		: s64 : (1<<13);
+KeymapStateMask			: s64 : (1<<14);
+ExposureMask			: s64 : (1<<15);
+VisibilityChangeMask	: s64 : (1<<16);
+StructureNotifyMask		: s64 : (1<<17);
+ResizeRedirectMask		: s64 : (1<<18);
+SubstructureNotifyMask	: s64 : (1<<19);
+SubstructureRedirectMask: s64 : (1<<20);
+FocusChangeMask			: s64 : (1<<21);
+PropertyChangeMask		: s64 : (1<<22);
+ColormapChangeMask		: s64 : (1<<23);
+OwnerGrabButtonMask		: s64 : (1<<24);
+
+/* Window attributes for CreateWindow and ChangeWindowAttributes */
+
+CWBackPixmap       : u64 : (1<<0);
+CWBackPixel        : u64 : (1<<1);
+CWBorderPixmap     : u64 : (1<<2);
+CWBorderPixel      : u64 : (1<<3);
+CWBitGravity       : u64 : (1<<4);
+CWWinGravity       : u64 : (1<<5);
+CWBackingStore     : u64 : (1<<6);
+CWBackingPlanes    : u64 : (1<<7);
+CWBackingPixel     : u64 : (1<<8);
+CWOverrideRedirect : u64 : (1<<9);
+CWSaveUnder        : u64 : (1<<10);
+CWEventMask        : u64 : (1<<11);
+CWDontPropagate    : u64 : (1<<12);
+CWColormap         : u64 : (1<<13);
+CWCursor           : u64 : (1<<14);
+
+/* Event names.  Used in "type" field in XEvent structures.  Not to be
+confused with event masks above.  They start from 2 because 0 and 1
+are reserved in the protocol for errors and replies. */
+
+KeyPress	     : s32 : 2;
+KeyRelease	     : s32 : 3;
+ButtonPress	     : s32 : 4;
+ButtonRelease	 : s32 : 5;
+MotionNotify	 : s32 : 6;
+EnterNotify	     : s32 : 7;
+LeaveNotify	     : s32 : 8;
+FocusIn	         : s32 : 9;
+FocusOut	     : s32 : 10;
+KeymapNotify	 : s32 : 11;
+Expose	         : s32 : 12;
+GraphicsExpose	 : s32 : 13;
+NoExpose	     : s32 : 14;
+VisibilityNotify : s32 : 15;
+CreateNotify	 : s32 : 16;
+DestroyNotify	 : s32 : 17;
+UnmapNotify	     : s32 : 18;
+MapNotify	     : s32 : 19;
+MapRequest	     : s32 : 20;
+ReparentNotify	 : s32 : 21;
+ConfigureNotify	 : s32 : 22;
+ConfigureRequest : s32 : 23;
+GravityNotify	 : s32 : 24;
+ResizeRequest	 : s32 : 25;
+CirculateNotify	 : s32 : 26;
+CirculateRequest : s32 : 27;
+PropertyNotify	 : s32 : 28;
+SelectionClear	 : s32 : 29;
+SelectionRequest : s32 : 30;
+SelectionNotify	 : s32 : 31;
+ColormapNotify	 : s32 : 32;
+ClientMessage	 : s32 : 33;
+MappingNotify	 : s32 : 34;
+GenericEvent	 : s32 : 35;
+LASTEvent	     : s32 : 36;	/* must be bigger than any event # */

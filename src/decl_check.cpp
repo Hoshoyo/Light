@@ -132,6 +132,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 					return 0;
 				}
 				type->flags |= TYPE_FLAG_RESOLVED;
+				type->pointer_to = resolve_type(scope, type->pointer_to, report_undeclared);
 				return internalize_type(&type, scope, true);
 			} else {
 				type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared);
@@ -205,6 +206,9 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 
 	switch (node->node_type) {
 		case AST_DECL_VARIABLE:{
+			if(node->decl_variable.variable_type == 0x673340){
+				int x = 0;
+			}
 			if (!node->decl_variable.variable_type) {
 				// infer from expr
 				if (!node->decl_variable.assignment) {
@@ -357,18 +361,18 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 			if (node->decl_procedure.name->value.data == compiler_tags[COMPILER_TAG_MAIN_PROC].data) {
 				node->decl_procedure.flags |= DECL_PROC_FLAG_MAIN;
 			}
+
 			if (!(node->decl_procedure.type_return->flags & TYPE_FLAG_RESOLVED)) {
-				node->decl_procedure.type_return = resolve_type(scope, node->decl_procedure.type_return, rep_undeclared);
-				if (!node->decl_procedure.type_return) {
-					// undeclared ident
-					error |= DECL_ERROR_FATAL;
+				Type_Instance* type = resolve_type(scope, node->decl_procedure.type_return, rep_undeclared);
+				if (error & TYPE_ERROR_FATAL) {
 					return error;
 				}
-				if (!(node->decl_procedure.type_return->flags & TYPE_FLAG_INTERNALIZED)) {
+				if (!node->decl_procedure.type_return || !(node->decl_procedure.type_return->flags & TYPE_FLAG_INTERNALIZED)) {
 					infer_queue_push(node);
 					error |= DECL_QUEUED_TYPE;
 					return error;
 				}
+				node->decl_procedure.type_return = type;
 			}
 			size_t nargs = node->decl_procedure.arguments_count;
 			for (size_t i = 0; i < nargs; ++i) {
@@ -738,6 +742,7 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 	size_t n = array_get_length(infer_queue);
 	while (error) {
 		error = DECL_OK;
+		size_t xx = array_get_length(infer_queue);
 		for (size_t i = 0; i < n; ++i) {
 			error |= resolve_types_decls(global_scope, infer_queue[i], true);
 			if (error & DECL_ERROR_FATAL) break;
@@ -747,6 +752,8 @@ Decl_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		if (infer_queue_end_size == n) {
 			report_dependencies_error(infer_queue);
 			return DECL_ERROR_FATAL;
+		} else {
+			n = infer_queue_end_size;
 		}
 	}
 

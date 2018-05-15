@@ -61,7 +61,9 @@ Ast** parse_files_in_queue(Scope* global_scope) {
 
 			Parser parser(&lexer, global_scope);
 			Ast** ast_top_level = parser.parse_top_level();
-			array_push(parsing_queue.files_toplevels, &ast_top_level);
+			if(ast_top_level){
+				array_push(parsing_queue.files_toplevels, &ast_top_level);
+			}
 		}
 	//} while(array_get_length(parsing_queue.queue_imports) > 0);
 	

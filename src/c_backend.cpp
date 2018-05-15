@@ -157,9 +157,7 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
 			*/
         }break;
         case KIND_STRUCT: {
-            if(!(type->flags & TYPE_FLAG_INTERNALIZED)) {
-                assert(0);
-            }
+            assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit uninternalized type\n");
             // TODO(psv): does this always work in C?
             sprint("struct ");
             if(name){
@@ -900,6 +898,8 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
                     }break;
                 }
 			} else {
+                /*
+                sprint("\t%.*s = ", TOKEN_STR(decl->decl_variable.name));
 				switch (decl->decl_variable.variable_type->kind) {
 					case KIND_PRIMITIVE:
 					case KIND_POINTER:
@@ -910,7 +910,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 					case KIND_STRUCT:
 						sprint("{0}");
 						break;
-				}
+				}*/
 			}
 			sprint(";\n");
 		}
@@ -965,7 +965,7 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lX11",
+	sprintf(cmdbuffer, "ld %.*s.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lX11 -lGL",
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #endif

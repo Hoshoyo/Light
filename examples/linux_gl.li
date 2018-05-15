@@ -1,6 +1,74 @@
 #import "x11/x11.li"
+#import "linux/print.li"
+#import "GL/gl.li"
+
+GLX_RGBA : s32 : 4;
+GLX_DEPTH_SIZE : s32 : 12;
+GLX_DOUBLEBUFFER : s32 : 5;
+
+dpy  : ^Display;
+root : Display;
+att  : [5]s32 = array{ GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, 0};
+vi   : ^XVisualInfo;
+cmap : u64;    // Colormap
+swa  : XSetWindowAttributes;
+win  : u64;
+glc  : ^void;
+gwa  : XWindowAttributes;
+xev  : XEvent;
 
 main :: () -> s32 {
-    
+
+    dpy = XOpenDisplay([^s8]0);
+
+    screen := (*dpy).default_screen;
+
+    // root = DefaultRootWindow(dpy);
+    scrs := (*dpy).screens;	
+	root_screen := &(scrs[screen]);
+	root := (*root_screen).root;
+
+    vi = glXChooseVisual(dpy, 0, [^s32]att);
+
+    if vi == [^XVisualInfo]0
+    {
+        print_string("\n\tno appropriate visual found\n\n");
+        return -1;
+    }
+
+    // Create color map
+    cmap = XCreateColormap(dpy, root, (*vi).visual, AllocNone);
+    swa.colormap = cmap;
+    swa.event_mask = ExposureMask | KeyPressMask;
+
+    win = XCreateWindow(dpy, root, 0, 0, 600, 600, 0, (*vi).depth, InputOutput, (*vi).visual, CWColormap | CWEventMask, &swa);
+
+    XMapWindow(dpy, win);
+    XStoreName(dpy, win, "VERY SIMPLE APPLICATION".data);
+
+    glc = glXCreateContext(dpy, vi, [^void]0, GL_TRUE);
+    glXMakeCurrent(dpy, win, glc);
+
+    glEnable(GL_DEPTH_TEST);
+
+    while true {
+        XNextEvent(dpy, [^void]&xev);
+        if xev.type == Expose {
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glViewport(0, 0, gwa.width, gwa.height);
+            glXSwapBuffers(dpy, win);
+        } else if xev.type == KeyPress {
+            k := [^XKeyEvent]&xev;
+            keycode := (*k).keycode;
+            if keycode == KEY_CODE_ESC break;
+        }
+    }
+    glXMakeCurrent(dpy, 0, [^void]0);
+    glXDestroyContext(dpy, glc);
+    XDestroyWindow(dpy, win);
+    XCloseDisplay(dpy);
+
     return 0;
 }
+
+KEY_CODE_ESC : u32 : 9;
