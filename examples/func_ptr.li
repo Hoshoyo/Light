@@ -1,5 +1,5 @@
-//#import "./examples/print.li"
-#import "./examples/windows/print.li"
+#import "linux/print.li"
+//#import "./examples/windows/print.li"
 
 square :: (v : s32) -> s32{
     return (v * v);
@@ -10,14 +10,12 @@ make_proc :: () -> (s32) -> s32 {
 }
 
 map :: (arr : ^s32, length : s64, f : (s32)->s64, sq : (s32) -> s32) -> void {
-    i := 0;
-    while i < length {
+    for i := 0; i < length; i += 1 {
         if i != 0 {
-            print_str(", ");
+            print_string(", ");
         }
 
         f(sq(arr[i]));
-        i += 1;
     }
 }
 

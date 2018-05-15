@@ -23,7 +23,8 @@ Type_Instance* scope_get_function_type(Scope* scope) {
 			assert(scope->creator_node->node_type == AST_COMMAND_BLOCK);
 			Ast* decl = scope->creator_node->comm_block.creator;
 			assert(decl);
-			return decl->decl_procedure.type_return;
+			//return decl->decl_procedure.type_return;
+			return decl->decl_procedure.type_procedure->function_desc.return_type;
 		}
 		scope = scope->parent;
 	}

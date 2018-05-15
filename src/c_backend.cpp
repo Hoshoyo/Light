@@ -974,10 +974,14 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2",// -lc -lX11 -lGL",
+	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
 		fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
 
-    for(size_t i = 0; i < array_get_length(libs_to_link); ++i) {
+    size_t libs_length = 0;
+    if(libs_to_link) {
+        libs_length = array_get_length(libs_to_link);
+    }
+    for(size_t i = 0; i < libs_length; ++i) {
         len += sprintf(cmdbuffer + len, " -l%.*s", libs_to_link[i].length, libs_to_link[i].data);
     }
 
