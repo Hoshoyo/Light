@@ -20,20 +20,24 @@ void initialize() {
 }
 
 int main(int argc, char** argv) {
+	bool verbose = false;
+
 	if (argc < 2) {
 		fprintf(stderr, "usage: %s filename", argv[0]);
 		return -1;
 	}
 
-	Timer timer;
+	// @Temporary: flag -v for verbose print out.
+	if(argc >= 3) {
+		if(c_str_equal(argv[2], "-v")) {
+			verbose = true;
+		}
+	}
 
+	Timer timer;
 	double start = timer.GetTime();
 
 	initialize();
-
-	//Lexer lexer;
-	//if (lexer.start(argv[1]) != LEXER_OK)
-	//	return EXIT_FAILURE;
 
 	// Global scope
 	Scope  global_scope = { 0 };
@@ -58,18 +62,21 @@ int main(int argc, char** argv) {
 	}
 
 	double end = timer.GetTime();
-	printf("Compiler elapsed: %fms\n", (end - start));
+	printf("Compiler     elapsed: %fms\n", (end - start));
 
-	// TODO(psv): make compiler options/flags to print this
-	DEBUG_print_ast(stdout, ast_top_level, true);
-	//DEBUG_print_scope_decls(&global_scope);
-	//DEBUG_print_type_table();
-	//DEBUG_print_type_table_structs();
+	if(verbose){
+		// TODO(psv): make compiler options/flags to print this
+		DEBUG_print_ast(stdout, ast_top_level, true);
+		//DEBUG_print_scope_decls(&global_scope);
+		//DEBUG_print_type_table();
+		//DEBUG_print_type_table_structs();
+	}
 	
 	double bend_start = timer.GetTime();
-	c_generate(ast_top_level, g_type_table, argv[1]);
+	c_generate(ast_top_level, g_type_table, argv[1], argv[0], g_lib_table);
 	double bend_end = timer.GetTime();
-	printf("Backend elapsed: %f\n", (bend_end - bend_start));
-	printf("Total elapsed: %f\n", ((end - start) + (bend_end - bend_start)));
+	
+	printf("Backend      elapsed: %fms\n", (bend_end - bend_start));
+	printf("Total        elapsed: %fms\n", ((end - start) + (bend_end - bend_start)));
 	return 0;
 }

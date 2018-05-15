@@ -1,5 +1,4 @@
-print_s32 :: (value : s32) -> s64 #foreign("print_string.obj");
-println :: () -> void #foreign("print_string.obj");
+#import "linux/print.li"
 
 List :: struct {
     elem : s32;
@@ -8,10 +7,9 @@ List :: struct {
 
 print_list :: (root : ^List) {
     aux := root;
-    for aux != cast(^List)0 {
+    for aux := root; aux != [^List]0; aux = (*aux).next {
         print_s32((*aux).elem);
-        println();
-        aux = (*aux).next;
+        print_string("\n");
     }
 }
 
@@ -26,7 +24,7 @@ main :: () -> s32{
 
     l1.next = &l2;
     l2.next = &l3;
-    l3.next = cast(^List)0;
+    l3.next = [^List]0;
 
     print_list(&l1);
 

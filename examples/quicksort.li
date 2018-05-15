@@ -1,4 +1,4 @@
-#import "./examples/print.li"
+#import "linux/print.li"
 
 quicksort :: (values : ^s32, start : s64, end : s64) {
 	i := start;
@@ -7,11 +7,11 @@ quicksort :: (values : ^s32, start : s64, end : s64) {
 	
 	aux : s32;
 	
-	for i <= j {
-		for values[i] < pivo && i < end {
+	while i <= j {
+		while values[i] < pivo && i < end {
 			i += 1;
 		}
-		for values[j] > pivo && j > start {
+		while values[j] > pivo && j > start {
 			j -= 1;
 		}
 		if i <= j {
@@ -30,12 +30,8 @@ quicksort :: (values : ^s32, start : s64, end : s64) {
 }
 
 print_array :: (values : ^s32, length : s64) {
-	{
-		i := 0;
-		for i < length {
-			print_s64(cast(s64)values[i]);
-			i += 1;
-		}
+	for i := 0; i < length; i += 1 {
+		print_s64([s64]values[i]);
 	}
 }
 
@@ -43,12 +39,12 @@ main :: () -> s32 {
 
 	arr : [10]s32 = array {5, 8, 1, 2, 7, 3, 6, 9, 4, 10};
 	
-	print_array(cast(^s32)arr, 10);
+	print_array([^s32]arr, 10);
 	
-	quicksort(cast(^s32)arr, 0, 10);
-	println("");
+	quicksort([^s32]arr, 0, 10);
+	print_string("\n");
 	
-	print_array(cast(^s32)arr, 10);
+	print_array([^s32]arr, 10);
 	
 	return 0;
 }

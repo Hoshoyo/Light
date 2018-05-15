@@ -45,4 +45,4 @@ struct C_Code_Generator {
     int  c_generate_top_level(Ast** toplevel, Type_Instance** type_table);
 };
 
-void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename);
+void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char* compiler_path, string* libs_to_link);

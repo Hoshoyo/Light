@@ -37,4 +37,4 @@ SIGUNUSED	: s32 : 31;
 _NSIG		: s32 : 65;	/* Biggest signal number + 1
                 (including real-time signals).  */
 
-signal :: (signum : s32, handler : (s32)->void) -> (s32)->void #foreign("libc");
+signal :: (signum : s32, handler : (s32)->void) -> (s32)->void #foreign("c");

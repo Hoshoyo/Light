@@ -1,4 +1,4 @@
-#import "./examples/print.li"
+#import "linux/print.li"
 
 main :: () -> s32 {
     // TODO: constants support for type declaration
@@ -7,19 +7,13 @@ main :: () -> s32 {
 
     matrix : [4][4]r32;
     
-    x := 0;
-    y := 0;
-
-    for y < MAXY {
-        x = 0;
-        for x < MAXX {
-            matrix[y][x] = cast(r32)(y * x);
-            x += 1;
+    for y := 0; y < MAXY; y += 1 {
+        for x := 0; x < MAXX; x += 1 {
+            matrix[y][x] = [r32](y * x);
         }
-        y += 1;
     }
 
-    print_s32(cast(s32)matrix[3][3]);
+    print_s32([s32]matrix[3][3]);
 
     return 0;
 }

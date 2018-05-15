@@ -95,6 +95,7 @@ struct Parse_Queue {
 	Token** queue_imports;	// array of filenames (fullpath) of files to be parsed
 	Ast***  files_toplevels;
 };
+extern string* g_lib_table;
 
 Ast** parse_files_in_queue(Scope* global_scope);
 void queue_file_for_parsing(Token* token);

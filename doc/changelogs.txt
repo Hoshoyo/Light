@@ -8,3 +8,8 @@
 	- pointer to proc emit in c backend
 14/05/2018
     - #foreign block added
+15/05/2018
+    - temp/c_entry.o not found when compiling outside compiler directory
+    - updated docs
+    - use foreign library name to link (linux)
+    - updated examples to new cast syntax

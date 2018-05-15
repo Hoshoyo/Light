@@ -1,4 +1,5 @@
 #import "./x11/x11.li"
+#import "linux/print.li"
 
 main :: () -> s32{
 	name := "Squiggly";

@@ -1,7 +1,6 @@
 #bugs
 
-- temp/c_entry.o not found when compiling outside compiler directory
-- use foreign library name to link
+- use foreign library name to link (windows)
 - string escaping
 - assignment of arrays
 - constant in type definition

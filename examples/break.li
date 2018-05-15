@@ -1,5 +1,5 @@
-#import "./examples/windows/print.li"
-//#import "./examples/linux/print.li"
+//#import "./examples/windows/print.li"
+#import "linux/print.li"
 
 main :: () -> s32 {
 	
@@ -9,7 +9,7 @@ main :: () -> s32 {
 			if(i == 4 && j == 5)
 				break 2;
 		}
-		print_str("\n");
+		print_string("\n");
 	}
 	
 	return 0;

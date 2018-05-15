@@ -2,8 +2,8 @@ STDIN_FILENO	: s32 : 0;	/* Standard input.  */
 STDOUT_FILENO	: s32 : 1;	/* Standard output.  */
 STDERR_FILENO	: s32 : 2;	/* Standard error output.  */
 
-memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void #foreign("libc");
-write :: (fd : s32, buf : ^void, count : u64) -> u64 #foreign("libc");
+memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void #foreign("c");
+write :: (fd : s32, buf : ^void, count : u64) -> u64 #foreign("c");
 
 string :: struct {
     length   : s64;

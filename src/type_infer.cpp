@@ -373,6 +373,12 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 void type_propagate(Type_Instance* strong, Ast* expr) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION || expr->node_type == AST_DATA);
 
+	if(!expr->type_return) {
+		// @TODO see what to do here
+		// @IMPORTANT
+		// This type can be null?
+		return;
+	}
 	if (expr->type_return->flags & TYPE_FLAG_STRONG)
 		return;
 

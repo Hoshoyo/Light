@@ -935,12 +935,21 @@ static size_t filename_length_strip_extension(char* f) {
 	return baselen;
 }
 
-void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
+void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char* compiler_path, string* libs_to_link) {
+    size_t compiler_fullpath_length = 0;
+    char* compiler_fullpath = ho_realpath(compiler_path, &compiler_fullpath_length);
+    string comp_path = path_from_fullpath(string_make(compiler_fullpath));
+
     C_Code_Generator code_generator = {};
 	code_generator.buffer = (char*)ho_bigalloc_rw(1 << 24);
 	code_generator.defer_buffer = (char*)ho_bigalloc_rw(1 << 20);
 
+    Timer timer;
+
+    double start = timer.GetTime();
     int err = code_generator.c_generate_top_level(toplevel, type_table);
+    double end = timer.GetTime();
+    printf("C generation elapsed: %fms\n", (end - start));
 
     size_t fname_len = filename_length_strip_extension(filename);
 	string out_obj = string_new(filename, fname_len);
@@ -963,10 +972,15 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename){
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 #elif defined(__linux__)
-    sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
+    sprintf(cmdbuffer, "gcc -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc -lX11 -lGL",
-		fname_len, out_obj.data, fname_len, out_obj.data);
+	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2",// -lc -lX11 -lGL",
+		fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
+
+    for(size_t i = 0; i < array_get_length(libs_to_link); ++i) {
+        len += sprintf(cmdbuffer + len, " -l%.*s", libs_to_link[i].length, libs_to_link[i].data);
+    }
+
 	system(cmdbuffer);
 #endif
 	ho_bigfree(code_generator.buffer, 1 << 20);

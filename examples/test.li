@@ -1,7 +1,7 @@
 #import "linux/print.li"
 #import "linux/signal.li"
 
-#foreign("libc")
+#foreign("c")
 
 	sleep  :: (secs : u32) -> u32;
 

@@ -6,6 +6,8 @@
 #include <ho_system.h>
 
 static Parse_Queue parsing_queue;
+static String_Hash_Table lib_table;
+string* g_lib_table = 0;
 
 void Parser::init() {
 	if(!parsing_queue.queue_imports) {
@@ -16,6 +18,21 @@ void Parser::init() {
 	}
 	if(!parsing_queue.queue_main) {
 		parsing_queue.queue_main = array_create(char*, 4);
+	}
+}
+
+void lib_table_push(Token* t) {
+	assert(t->type == TOKEN_LITERAL_STRING);
+
+	if(lib_table.entries_capacity == 0) {
+		hash_table_init(&lib_table, 4096 * 8);
+		g_lib_table = array_create(string, 1024);
+	}
+	string s = string_make(t->value.data, t->value.length);
+	s64 index = hash_table_entry_exist(&lib_table, s);
+	if(index == -1) {
+		hash_table_add(&lib_table, s);
+		array_push(g_lib_table, &s);
 	}
 }
 
@@ -341,6 +358,7 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 			// TODO(psv): still not used
 			if (libname->type == TOKEN_LITERAL_STRING) {
 				extern_library_name = libname;
+				lib_table_push(libname);
 			} else {
 				report_syntax_error(tag, "foreign compiler tag requires string literal as library path\n");
 			}

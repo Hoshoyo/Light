@@ -25,7 +25,7 @@ OPERATOR_UNARY_PREFIXED :=
 |	'&'
 |	'!'
 |	'~'
-|	cast '(' TYPE ')'
+|	'[' TYPE ']'
 ;
 
 OPERATOR_UNARY_POSTFIXED :=
