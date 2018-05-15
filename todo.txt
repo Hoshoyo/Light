@@ -1,5 +1,6 @@
 #bugs
 
+- temp/c_entry.o not found when compiling outside compiler directory
 - use foreign library name to link
 - string escaping
 - assignment of arrays
@@ -25,6 +26,8 @@ main :: () -> s32 {
 
 #features
 
+- enums
+- unions
 - type alias
 - file scope
 - switch
