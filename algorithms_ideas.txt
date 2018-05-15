@@ -1,0 +1,34 @@
+# Easy
+
+- Dijkstra
+- Boyer–Moore string search algorithm
+- Knuth substring search algorithm
+- Stack
+- Linked list
+- Sort
+- Binary search
+- md5
+- convert IP number to string
+
+# Medium
+
+- SHA-1
+- SHA-256
+- KNN
+- K-Means
+- Random Number Generator (good one)
+- Hash Table
+- Parse Bitmap file
+- Save Bitmap file
+- Convert Number to base 64
+- Convert utf8 to Unicode codepoints
+
+# Hard
+- print floats and doubles (r32 and r64)
+- regex parser
+- xml/json parser
+- GJK collision detection
+- Miller–Rabin Primality test
+- AES
+- Memory Arena allocator
+- General purpose allocator (malloc, realloc)
