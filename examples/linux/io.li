@@ -1,0 +1,6 @@
+STDIN_FILENO	: s32 : 0;	/* Standard input.  */
+STDOUT_FILENO	: s32 : 1;	/* Standard output.  */
+STDERR_FILENO	: s32 : 2;	/* Standard error output.  */
+
+write :: (fd : s32, buf : ^void, count : u64) -> u64;
+//read :: ()

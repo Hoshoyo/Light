@@ -1,0 +1,40 @@
+/* Signals.  */
+SIGHUP		: s32 : 1;	/* Hangup (POSIX).  */
+SIGINT		: s32 : 2;	/* Interrupt (ANSI).  */
+SIGQUIT		: s32 : 3;	/* Quit (POSIX).  */
+SIGILL		: s32 : 4;	/* Illegal instruction (ANSI).  */
+SIGTRAP		: s32 : 5;	/* Trace trap (POSIX).  */
+SIGABRT		: s32 : 6;	/* Abort (ANSI).  */
+SIGIOT		: s32 : 6;	/* IOT trap (4.2 BSD).  */
+SIGBUS		: s32 : 7;	/* BUS error (4.2 BSD).  */
+SIGFPE		: s32 : 8;	/* Floating-point exception (ANSI).  */
+SIGKILL		: s32 : 9;	/* Kill, unblockable (POSIX).  */
+SIGUSR1		: s32 : 10;	/* User-defined signal 1 (POSIX).  */
+SIGSEGV		: s32 : 11;	/* Segmentation violation (ANSI).  */
+SIGUSR2		: s32 : 12;	/* User-defined signal 2 (POSIX).  */
+SIGPIPE		: s32 : 13;	/* Broken pipe (POSIX).  */
+SIGALRM		: s32 : 14;	/* Alarm clock (POSIX).  */
+SIGTERM		: s32 : 15;	/* Termination (ANSI).  */
+SIGSTKFLT	: s32 : 16;	/* Stack fault.  */
+SIGCLD		: s32 : 17;	/* Same as SIGCHLD (System V).  */
+SIGCHLD		: s32 : 17;	/* Child status has changed (POSIX).  */
+SIGCONT		: s32 : 18;	/* Continue (POSIX).  */
+SIGSTOP		: s32 : 19;	/* Stop, unblockable (POSIX).  */
+SIGTSTP		: s32 : 20;	/* Keyboard stop (POSIX).  */
+SIGTTIN		: s32 : 21;	/* Background read from tty (POSIX).  */
+SIGTTOU		: s32 : 22;	/* Background write to tty (POSIX).  */
+SIGURG		: s32 : 23;	/* Urgent condition on socket (4.2 BSD).  */
+SIGXCPU		: s32 : 24;	/* CPU limit exceeded (4.2 BSD).  */
+SIGXFSZ		: s32 : 25;	/* File size limit exceeded (4.2 BSD).  */
+SIGVTALRM	: s32 : 26;	/* Virtual alarm clock (4.2 BSD).  */
+SIGPROF		: s32 : 27;	/* Profiling alarm clock (4.2 BSD).  */
+SIGWINCH	: s32 : 28;	/* Window size change (4.3 BSD, Sun).  */
+SIGPOLL		: s32 : 29;	/* Pollable event occurred (System V).  */
+SIGIO		: s32 : 29;	/* I/O now possible (4.2 BSD).  */
+SIGPWR		: s32 : 30;	/* Power failure restart (System V).  */
+SIGSYS		: s32 : 31;	/* Bad system call.  */
+SIGUNUSED	: s32 : 31;
+_NSIG		: s32 : 65;	/* Biggest signal number + 1
+                (including real-time signals).  */
+
+signal :: (signum : s32, handler : (s32)->void) -> (s32)->void #foreign("libc");
