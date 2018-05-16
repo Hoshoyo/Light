@@ -1,4 +1,8 @@
 #bugs
+- for ;true; {
+
+}
+return
 
 - use foreign library name to link (windows)
 - string escaping
@@ -38,4 +42,3 @@ main :: () -> s32 {
 - check for end of stream within comment
 - do better errors in parser stage and check for end of stream
 - do better errors in semantic stage
-

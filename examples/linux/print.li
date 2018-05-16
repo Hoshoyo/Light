@@ -78,6 +78,10 @@ s64_to_str :: (val : s64, buffer : [32]u8) -> s64 {
     return size;
 }
 
+r32_to_str :: (v : r32) -> s64 {
+    
+}
+
 print_bool :: (v : bool) -> s64 {
     buffer : [5]u8;
     len : s64;

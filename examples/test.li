@@ -1,22 +1,5 @@
 #import "linux/print.li"
-#import "linux/signal.li"
-
-#foreign("c")
-
-	sleep  :: (secs : u32) -> u32;
-
-#end
-
-sig_handler :: (sig_number : s32) -> void {
-	print_str("received SIGINT\n");
-}
 
 main :: () -> s32 {
-	a := signal(SIGINT, sig_handler);
-
-	// A long long wait so that we can easily issue a signal to this process
-	while true
-		sleep(1);
-	
 	return 0;
 }

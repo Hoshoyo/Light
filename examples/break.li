@@ -3,7 +3,7 @@
 
 main :: () -> s32 {
 	
-	for i := 0; i < 10; i += 1{
+	for i := 0, j := 0; i < 10; i += 1 {
 		for j := 0; j < 10; j += 1 {
 			print_s32([s32]j);
 			if(i == 4 && j == 5)
@@ -11,6 +11,6 @@ main :: () -> s32 {
 		}
 		print_string("\n");
 	}
-	
+
 	return 0;
 }
