@@ -1,5 +1,15 @@
 #import "linux/print.li"
 
+foo :: (a : [2]s32) {
+	a[0] = 1;
+	a[1] = 2;
+}
+
 main :: () -> s32 {
+	b : [2]s32 = array{4, 5};
+	foo(b);
+
+	print_s32(b[0]);
+	print_s32(b[1]);
 	return 0;
 }
