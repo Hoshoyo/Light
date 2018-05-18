@@ -1,15 +1,67 @@
 #import "linux/print.li"
 
-foo :: (a : [2]s32) {
-	a[0] = 1;
-	a[1] = 2;
+AF_INET : s32 : 2;
+
+SOCK_STREAM : s32 : 1;
+SOCK_DGRAM : s32 : 2;
+
+INADDR_ANY : u32 : 0;
+
+/* Structure describing an Internet socket address.  */
+in_addr :: struct {
+	s_addr : u32;
 }
 
-main :: () -> s32 {
-	b : [2]s32 = array{4, 5};
-	foo(b);
+sockaddr_in :: struct 
+{
+	sin_family : u16;
+    sin_port   : u16;			/* Port number.  */
+    sin_addr   : in_addr;		/* Internet address.  */
 
-	print_s32(b[0]);
-	print_s32(b[1]);
+    /* Pad to size of `struct sockaddr'.  */
+    sin_zero : [8]u8;
+}
+#foreign("c")
+
+socket :: (domain : s32, type : s32, protocol : s32) -> s32;
+bind   :: (fd : s32, addr : ^sockaddr_in, len : u32) -> s32;
+listen :: (fd : s32, n : s32) -> s32;
+accept :: (fd : s32, addr : ^sockaddr_in, addr_len : ^u32) -> s32;
+recv   :: (fd : s32, buf : ^void, n : u64, flags : s32) -> s64;
+send   :: (fd : s32, buf : ^void, n : u64, flags : s32) -> s64;
+
+#end
+
+htons :: (x : u16) -> u16 {
+	result := [u16]((((x) >> 8) & 0xff) | (((x) & 0xff) << 8));
+	return result;
+}
+
+main :: () -> s32 
+{
+	socket_desc : s32;
+	client_sock : s32;
+	c : s32;
+	read_size : s32;
+
+	server : sockaddr_in;
+	client : sockaddr_in;
+
+	client_message : [2048]s8;
+
+	 //Create socket
+    socket_desc = socket(AF_INET, SOCK_STREAM , 0);
+    if socket_desc == -1 {
+        print_string("Could not create socket");
+		return -1;
+    } else {
+    	print_string("Socket created");
+	}
+
+	//Prepare the sockaddr_in structure
+    server.sin_family = [u16]AF_INET;
+    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_port = htons(8888);
+
 	return 0;
 }
