@@ -37,7 +37,7 @@ string string_new_append(string* s, char* s2, size_t s2_length){
 
 void string_append(string* s1, const char* s2){
 	s64 s2_length  = str_length(s2);
-	s64 res_length = s2_length + s1->length;
+	s64 res_length = s2_length + s1->length + 1;
 
 	if(res_length > s1->capacity){
 		s1->capacity *= 2;
@@ -45,6 +45,7 @@ void string_append(string* s1, const char* s2){
 	}
 	memcpy((char*)s1->data + s1->length, s2, s2_length);
 	s1->length    = res_length;
+	s1->data[res_length - 1] = 0;
 }
 
 string filename_from_path(char* path, s64 length){
@@ -70,7 +71,11 @@ string filename_from_path(string s) {
 string path_from_fullpath(string s) {
 	s64 index = 0;
     for (s64 i = s.length - 1; i >= 0; --i){
-        if(s.data[i] == '/'){
+		if (s.data[i] == '/'
+#if defined (_WIN32) || defined(_WIN64)
+			|| s.data[i] == '\\'
+#endif
+			){
             index = i + 1;
 			break;
         }
@@ -82,7 +87,7 @@ string path_from_fullpath(string s) {
 string string_make(const char* v) {
 	string result;
 	s64 len = str_length(v);
-	result.data   = (const u8*)v;
+	result.data   = (u8*)v;
 	result.length = len;
 	result.capacity = -1;
 	return result;
@@ -90,7 +95,7 @@ string string_make(const char* v) {
 
 string string_make(const char* v, s64 length) {
 	string result;
-	result.data = (const u8*)v;
+	result.data = (u8*)v;
 	result.length = length;
 	result.capacity = -1;
 	return result;

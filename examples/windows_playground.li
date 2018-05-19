@@ -10,7 +10,7 @@ foo :: (exception_ptrs : ^void) -> s64 {
 	std_handle := GetStdHandle(STD_OUTPUT_HANDLE);
 	f := "Hello";
 	written : u32;
-	WriteConsoleA(std_handle, cast(^void)f.data, cast(u32)f.length, &written, cast(^void)0);
+	WriteConsoleA(std_handle, [^void]f.data, [u32]f.length, &written, [^void]0);
 	return 0;
 }
 

@@ -1,0 +1,5 @@
+GetStdHandle :: (stdhandle : u32) -> ^void #foreign("Kernel32.lib");
+
+main :: () -> s32 {
+	return 0;
+}

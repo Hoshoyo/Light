@@ -206,9 +206,6 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 
 	switch (node->node_type) {
 		case AST_DECL_VARIABLE:{
-			if(node->decl_variable.variable_type == 0x673340){
-				int x = 0;
-			}
 			if (!node->decl_variable.variable_type) {
 				// infer from expr
 				if (!node->decl_variable.assignment) {

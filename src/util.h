@@ -12,7 +12,7 @@
 struct string {
 	s64 length;
 	s64 capacity;
-	const u8* data;
+	u8* data;
 };
 
 string string_new(const char* v, s64 length);

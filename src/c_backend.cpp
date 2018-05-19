@@ -966,26 +966,23 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 	// Execute commands to compile .c
 	char cmdbuffer[1024];
 #if defined(_WIN32) || defined(_WIN64)
-	sprintf(cmdbuffer, "gcc -c -g %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
+	sprintf(cmdbuffer, "gcc -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe lib/kernel32.lib lib/msvcrt.lib",
-		fname_len, out_obj.data, fname_len, out_obj.data);
-	system(cmdbuffer);
+	int len = sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe -L%.*s..\\..\\lib",
+		fname_len, out_obj.data, fname_len, out_obj.data, comp_path.length, comp_path.data);
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
 		fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
-
-    size_t libs_length = 0;
-    if(libs_to_link) {
-        libs_length = array_get_length(libs_to_link);
-    }
-    for(size_t i = 0; i < libs_length; ++i) {
-        len += sprintf(cmdbuffer + len, " -l%.*s", libs_to_link[i].length, libs_to_link[i].data);
-    }
-
-	system(cmdbuffer);
 #endif
+	size_t libs_length = 0;
+	if (libs_to_link) {
+		libs_length = array_get_length(libs_to_link);
+	}
+	for (size_t i = 0; i < libs_length; ++i) {
+		len += sprintf(cmdbuffer + len, " -l%.*s", libs_to_link[i].length, libs_to_link[i].data);
+	}
+	system(cmdbuffer);
 	ho_bigfree(code_generator.buffer, 1 << 20);
 }

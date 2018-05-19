@@ -28,7 +28,7 @@ void lib_table_push(Token* t) {
 		hash_table_init(&lib_table, 4096 * 8);
 		g_lib_table = array_create(string, 1024);
 	}
-	string s = string_make(t->value.data, t->value.length);
+	string s = string_make((char*)t->value.data, t->value.length);
 	s64 index = hash_table_entry_exist(&lib_table, s);
 	if(index == -1) {
 		hash_table_add(&lib_table, s);
@@ -212,7 +212,7 @@ void Parser::parse_directive(Scope* scope) {
 			if(ptr) {
 				s64 file_index = file_table_push(ptr);
 				if(file_index != -1) {
-					import_str->value.data = (const u8*)ptr;
+					import_str->value.data = (u8*)ptr;
 					import_str->value.length = size;
 					queue_file_for_parsing(import_str);
 				} else {
