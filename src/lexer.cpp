@@ -47,6 +47,22 @@ string compiler_tags[] = {
 	{sizeof("end")     - 1, -1, (u8*)"end"}
 };
 
+s32 Lexer::report_error_location(Token* tok) {
+	return fprintf(stderr, "%.*s:%d:%d ", tok->filename.length, tok->filename.data, tok->line, tok->column);
+}
+
+s32 Lexer::report_lexer_error(Token* location, char* msg, ...)
+{
+	if (location) {
+		report_error_location(location);
+	}
+	va_list args;
+	va_start(args, msg);
+	s32 num_written = fprintf(stderr, "Lexer Error: ");
+	num_written += vfprintf(stderr, msg, args);
+	va_end(args);
+	return num_written;
+}
 s32 Lexer::report_lexer_error(char* msg, ...)
 {
 	va_list args;
@@ -88,7 +104,7 @@ void Lexer::init() {
 	}
 }
 
-Lexer_Error Lexer::start(const char* filename)
+Lexer_Error Lexer::start(const char* filename, Token* location)
 {
 	this->filename = string_make(filename);
 
@@ -99,7 +115,7 @@ Lexer_Error Lexer::start(const char* filename)
 	file_size = ho_getfilesize(filename);
 	HANDLE filehandle = ho_openfile(filename, OPEN_EXISTING);
 	if (filehandle == INVALID_HANDLE_VALUE) {
-		report_lexer_error("Could not open file %s.\n", filename);
+		report_lexer_error(location, "Could not open file %s.\n", filename);
 		return LEXER_ERROR_FATAL;
 	}
 	void* file_memory = malloc(file_size + 1);

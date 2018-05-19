@@ -73,7 +73,7 @@ Ast** parse_files_in_queue(Scope* global_scope) {
 			// TODO(psv): Make lexer accept my style of string for filename so
 			// we dont need to allocate a name for this
 			char* c_filename = make_c_string((char*)file->value.data, file->value.length);
-			if (lexer.start(c_filename) != LEXER_OK)
+			if (lexer.start(c_filename, file) != LEXER_OK)
 				return 0;
 
 			Parser parser(&lexer, global_scope);

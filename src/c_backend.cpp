@@ -9,7 +9,6 @@ static void report_fatal_error(char* msg, ...) {
 	va_start(args, msg);
 	vfprintf(stderr, msg, args);
 	va_end(args);
-	//assert(0);
 	exit(-1);
 }
 
@@ -141,20 +140,6 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
 			if (name) {
 				sprint("%.*s", TOKEN_STR(name));
 			}
-
-			/*
-            emit_type(type->function_desc.return_type);
-            if(name){
-                sprint("(*%.*s)(", TOKEN_STR(name));
-            } else {
-                sprint("(*)(");
-            }
-            for(s32 i = 0; i < type->function_desc.num_arguments; ++i) {
-                if(i != 0) sprint(", ");
-                emit_type(type->function_desc.arguments_type[i]);
-            }
-            sprint(")");
-			*/
         }break;
         case KIND_STRUCT: {
             assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit uninternalized type\n");
@@ -305,13 +290,19 @@ void C_Code_Generator::emit_array_assignment(Ast* decl) {
     Ast* expr = decl->decl_variable.assignment;
 
     assert(indexed_type->kind == KIND_ARRAY);
-    assert(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY);
-
-    sprint("{\n");
-    sprint("char* __t_base = (char*)%.*s;\n", TOKEN_STR(decl->decl_variable.name));
-    sprint("char* __struct_base = __t_base;\n");
-    emit_array_assignment_from_base(0, expr);
-    sprint("}\n");
+	if (expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY) {
+		sprint("{\n");
+		sprint("char* __t_base = (char*)%.*s;\n", TOKEN_STR(decl->decl_variable.name));
+		sprint("char* __struct_base = __t_base;\n");
+		emit_array_assignment_from_base(0, expr);
+		sprint("}\n");
+	} else {
+		sprint("{\nchar* __arr_res = (char*)(");
+		emit_expression(decl->decl_variable.assignment);
+		sprint(");\n");
+		sprint("__memory_copy(%.*s, __arr_res, %lld);\n", TOKEN_STR(decl->decl_variable.name), decl->decl_variable.variable_type->type_size_bits / 8);
+		sprint("}\n");
+	}
 }
 
 void C_Code_Generator::emit_array_assignment_to_temp(Ast* expr) {
@@ -426,14 +417,7 @@ void C_Code_Generator::emit_command(Ast* comm) {
                             }
                         }
 					} else if (cm->node_type == AST_DECL_CONSTANT) {
-						//deferring = true;
-						//sprint("const ");
-						//emit_decl(cm);
-						//sprint(" = ");
-						//emit_expression(cm->decl_constant.value);
-						//sprint(";");
-						//deferring = false;
-						//defer_flush();
+						// a declaration of a constant does not generate any code
 					} else {
                         assert_msg(0, "scoped declaration of procedure, enum and union not yet implemented");
                     }
@@ -529,7 +513,20 @@ void C_Code_Generator::emit_command(Ast* comm) {
                     sprint(");\n");
                     emit_array_assignment_from_base(0, rval);
                     sprint("}\n");
-                } else {
+				} else if (rval->type_return->kind == KIND_ARRAY) {
+					// dst
+					sprint("{\nchar* __arr_dst = (char*)(");
+					emit_expression(comm->comm_var_assign.lvalue);
+					sprint(");\n");
+
+					// src
+					sprint("char* __arr_src = (char*)(");
+					emit_expression(rval);
+					sprint(");\n");
+
+					sprint("__memory_copy(__arr_dst, __arr_src, %llu);\n", rval->type_return->type_size_bits / 8);
+					sprint("}\n");
+				} else {
 				    assert_msg(0, "assignment of type not recognized");
                 }
 			}
@@ -587,16 +584,14 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
         case OP_BINARY_VECTOR_ACCESS:{
             Type_Instance* indexed_type = expr->expr_binary.left->type_return;
 			if (indexed_type->kind == KIND_ARRAY) {
-				if(indexed_type->array_desc.array_of->kind != KIND_ARRAY)
-					sprint("*");
+				// @TODO check why this was here
+				//if(indexed_type->array_desc.array_of->kind != KIND_ARRAY)
+				sprint("*");
 			}
 			if (indexed_type->kind == KIND_POINTER) {
 				// @TODO check if this causes a bug anywhere?
 				// why is this here ?
-
-				//if (indexed_type->pointer_to->kind != KIND_POINTER) {
-					sprint("*");
-				//}
+				sprint("*");
 			}
 
 			sprint("(");
@@ -814,6 +809,10 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	sprint("u32 ExitProcess(u32 ret);\n");
 #endif
 
+	sprint("void __memory_copy(void* dest, void* src, u64 size) {\n");
+	sprint("\tfor(u64 i = 0; i < size; ++i) ((char*)dest)[i] = ((char*)src)[i];\n");
+	sprint("}\n");
+
     // forward declarations of types
     Ast** type_decl_arr = type_decl_array_get();
     for(size_t i = 0; i < array_get_length(type_decl_arr); ++i){
@@ -849,10 +848,6 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 		{
 			deferring = true;
 			emit_decl(decl, true);
-            //if(decl->node_type == AST_DECL_CONSTANT){
-            //    sprint(" = ");
-            //    emit_expression(decl->decl_constant.value);
-            //}
 			sprint(";\n");
 			deferring = false;
 			defer_flush();
@@ -898,19 +893,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
                     }break;
                 }
 			} else {
-                /*
-                sprint("\t%.*s = ", TOKEN_STR(decl->decl_variable.name));
-				switch (decl->decl_variable.variable_type->kind) {
-					case KIND_PRIMITIVE:
-					case KIND_POINTER:
-					case KIND_ARRAY:
-					case KIND_FUNCTION:
-						sprint("0");
-						break;
-					case KIND_STRUCT:
-						sprint("{0}");
-						break;
-				}*/
+				// default value is assigned later
 			}
 			sprint(";\n");
 		}
@@ -968,7 +951,7 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 #if defined(_WIN32) || defined(_WIN64)
 	sprintf(cmdbuffer, "gcc -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	int len = sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe -L%.*s..\\..\\lib",
+	int len = sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe -L%.*s..\\..\\lib -lKernel32",
 		fname_len, out_obj.data, fname_len, out_obj.data, comp_path.length, comp_path.data);
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);

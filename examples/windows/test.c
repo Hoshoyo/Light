@@ -15,11 +15,15 @@ typedef double r64;
 
 // Forward declarations
 u32 ExitProcess(u32 ret);
-typedef s32 __func_type_0000029A0B060510();
-typedef void* __func_type_0000029A0B060568(u32);
+void __memory_copy(void* dest, void* src, u64 size) {
+	for(u64 i = 0; i < size; ++i) ((char*)dest)[i] = ((char*)src)[i];
+}
+typedef s32 __func_type_000001EA88CC0580();
+typedef void* __func_type_000001EA88CC05D8(u32);
 
-void* GetStdHandle(u32 stdhandle);
+void* stdhandle;
 s32 __main();
+void* GetStdHandle(u32 stdhandle);
 
 s32 __main(){
 return 0x0;
@@ -27,5 +31,6 @@ return 0x0;
 
 
 void __entry() {
+	stdhandle = (GetStdHandle)(((u32)(-0xb)));
 	ExitProcess(__main());
 }

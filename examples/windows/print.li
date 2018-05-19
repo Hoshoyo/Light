@@ -1,4 +1,4 @@
-#import "./examples/windows/windows.li"
+#import "windows.li"
 stdout := GetStdHandle(STD_OUTPUT_HANDLE);
 
 string :: struct {

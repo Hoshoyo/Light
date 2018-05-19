@@ -1,4 +1,4 @@
-#import "examples/windows/print.li"
+#import "windows/print.li"
 /*
 /*
 handmade :: () {
