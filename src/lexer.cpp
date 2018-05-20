@@ -229,6 +229,7 @@ bool Lexer::read_token(char** begin)
 	s64 keyword_index = -1;	// needs to be -1
 	int skip = 0;
 	int length = 1;
+	int real_str_len = 0;
 	Token_Type type = TOKEN_UNKNOWN;
 	u32 flags = 0;
 
@@ -435,12 +436,61 @@ bool Lexer::read_token(char** begin)
 		current_col++;
 		for (; at[i] != '"'; ++i) {
 			if (at[i] == 0) {
-				type = TOKEN_UNKNOWN;
-				break;
+				fprintf(stderr, "%.*s: ", filepath.length, filepath.data);
+
+				system_exit(-1);
+			} else if (at[i] == '\\') {
+				real_str_len -= 1;
+				if (at[i + 1] == '"') {
+					i++;
+					length++;
+				} else {
+					switch (at[i + 1]) {
+						case 'a':
+						case 'b':
+						case 'f':
+						case 'n':
+						case 'r':
+						case 't':
+						case 'v':
+						case 'e':
+						case '\\':
+						case '\'':
+						case '"':
+						case '?':
+							i++;
+							length++;
+							break;
+						case 0:
+							report_lexer_error("end of stream within a string\n");
+							break;
+						case 'x':
+							real_str_len -= 1;
+							i++;
+							length++;
+							if (is_hex_digit(at[i + 1]) || is_number(at[i + 1])) {
+								i++;
+								length++;
+								if (is_hex_digit(at[i + 1]) || is_number(at[i + 1])) {
+									real_str_len -= 1;
+									i++;
+									length++;
+								}
+							} else {
+								fprintf(stderr, "%.*s:%d:%d: Lexer error: invalid escape sequence '\\x%c",
+									filepath.length, filepath.data, line_count, current_col, at[i + 1]);
+							}
+						default: {
+							fprintf(stderr, "%.*s:%d:%d: Lexer error: invalid escape sequence '\\%c",
+								filepath.length, filepath.data, line_count, current_col, at[i + 1]);
+						}break;
+					}
+				}
 			}
 			length++;
 		}
 		length--;
+		real_str_len += length;
 		skip++;
 	}break;
 
@@ -524,6 +574,7 @@ bool Lexer::read_token(char** begin)
 	token.column = current_col;
 	token.flags = flags;
 	token.offset_in_file = at - filedata;
+	token.real_string_length = real_str_len;
 
 	// This makes all the identifiers and keywords resolve to the same pointer
 	if (keyword_index != -1) {

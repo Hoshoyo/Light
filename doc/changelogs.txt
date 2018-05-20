@@ -15,3 +15,6 @@
     - updated examples to new cast syntax
 19/05/2018
 	- use foreign library name to link (windows)
+	- assignment of arrays
+    - string escaping
+    - internal definitions

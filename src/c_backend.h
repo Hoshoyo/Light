@@ -16,6 +16,7 @@ struct C_Code_Generator {
 	s64 alloc_loop_id();
 
 	int sprint(char* msg, ...);
+	int sprint_data(Ast_Data* data);
 	bool deferring;
 
 	void defer_flush();

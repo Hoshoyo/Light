@@ -177,6 +177,10 @@ bool is_hex_digit(char c) {
 	return (is_number(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
 }
 
+bool is_alphanumeric(char c) {
+	return is_number(c) || is_letter(c);
+}
+
 bool is_number(char c) {
 	return (c >= '0' && c <= '9');
 }

@@ -49,7 +49,7 @@ main :: () -> s32
 
 	client_message : [2048]s8;
 
-	 //Create socket
+	//Create socket
     socket_desc = socket(AF_INET, SOCK_STREAM , 0);
     if socket_desc == -1 {
         print_string("Could not create socket");

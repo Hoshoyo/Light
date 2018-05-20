@@ -1,7 +1,7 @@
-stdhandle := GetStdHandle([u32]-11);
+#import "print.li"
 
 main :: () -> s32 {
+	a := "Helloあ\"\n\n\n";
+	print_string(a);
 	return 0;
 }
-
-GetStdHandle :: (stdhandle : u32) -> ^void #foreign("Kernel32");

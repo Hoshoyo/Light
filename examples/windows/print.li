@@ -1,12 +1,6 @@
 #import "windows.li"
 stdout := GetStdHandle(STD_OUTPUT_HANDLE);
 
-string :: struct {
-	length   : s64;
-	capacity : s64;
-	data     : ^u8;
-}
-
 string_length :: (s : ^u8) -> s64 {
     c := 0;
     while *s != 0 {
@@ -72,7 +66,7 @@ print_cstr :: (data : ^u8) -> s64 {
 	return [s64]written;
 }
 
-print_str :: (s : string) -> s32 {
+print_string :: (s : string) -> s32 {
 	written : u32;
 	WriteConsoleA(stdout, [^void]s.data, [u32]s.length, &written, [^void]0);
 	return [s32]written;

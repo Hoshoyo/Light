@@ -129,6 +129,7 @@ struct Token {
 	s32 line;
 	s32 column;
 	s32 offset_in_file;
+	s32 real_string_length;
 	u32 flags = 0;
 
 	string filename;

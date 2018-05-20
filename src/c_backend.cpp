@@ -746,10 +746,78 @@ void C_Code_Generator::emit_expression(Ast* expr){
     }
 }
 
+int C_Code_Generator::sprint_data(Ast_Data* data) {
+	u32 aux_len = ptr;
+	s64 length_reduced = 0;
+	for (s64 i = 0; i < data->length_bytes; ++i) {
+		u8 d = data->data[i];
+		switch (d) {
+		case '\\': {
+			buffer[aux_len++] = '\\';
+			d = data->data[++i];
+			length_reduced += 1;
+			switch (d) {
+			case 'a':
+			case 'b':
+			case 'f':
+			case 'n':
+			case 'r':
+			case 't':
+			case 'v':
+			case 'e':
+			case '\\':
+			case '\'':
+			case '"':
+			case '?':
+				buffer[aux_len++] = d;
+				break;
+			case 'x': {
+				length_reduced += 1;
+				if (is_hex_digit(d) || is_number(d)) {
+					buffer[aux_len++] = d;
+					if (is_hex_digit(data->data[i + 1]) || is_number(data->data[i + 1])) {
+						d = data->data[++i];
+						length_reduced += 1;
+						buffer[aux_len++] = d;
+					}
+				}
+				else {
+					assert_msg(0, "invalid escape sequence in code generation");
+				}
+			} break;
+			default: {
+				assert_msg(0, "invalid escape sequence in code generation");
+			}break;
+			}
+		}break;
+
+		default: {
+			// ' ' to '~'
+			if (d >= 0x20 && d <= 0x7e) {
+				// normal ascii characters
+				buffer[aux_len++] = d;
+			}
+			else {
+				buffer[aux_len++] = '\\';
+				buffer[aux_len++] = 'x';
+				buffer[aux_len++] = CHAR_HIGH_HEX(d);
+				buffer[aux_len++] = CHAR_LOW_HEX(d);
+			}
+		}break;
+		}
+	}
+	data->length_bytes -= length_reduced;
+	int bytes_written = aux_len - ptr;
+	ptr += bytes_written;
+	return bytes_written;
+}
+
 void C_Code_Generator::emit_data_decl(Ast* decl) {
     if(decl->data_global.type == GLOBAL_STRING) {
         sprint("char* __string_data_%d = \"", decl->data_global.id);
-        sprint("%.*s\";\n", decl->data_global.length_bytes, decl->data_global.data);
+		sprint_data(&decl->data_global);
+		sprint("\";\n");
+        //sprint("%.*s\";\n", decl->data_global.length_bytes, decl->data_global.data);
     } else {
         assert_msg(0, "trying to generate code for undefined data node");
     }

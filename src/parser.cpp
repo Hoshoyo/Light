@@ -889,7 +889,7 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 
 				// Length
 				Ast* length_expr = ast_create_expr_literal(scope, LITERAL_HEX_INT, first, 0, type_primitive_get(TYPE_PRIMITIVE_S64));
-				length_expr->expr_literal.value_s64 = g_data->data_global.length_bytes;
+				length_expr->expr_literal.value_s64 = first->real_string_length;
 
 				Ast* capacity_expr = ast_create_expr_literal(scope, LITERAL_HEX_INT, first, 0, type_primitive_get(TYPE_PRIMITIVE_S64));
 				capacity_expr->expr_literal.value_s64 = -1;	// start immutable
