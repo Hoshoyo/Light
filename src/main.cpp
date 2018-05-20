@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
 	Scope  global_scope = { 0 };
 
 	// TODO(psv): multiple input files
+	queue_file_for_parsing("internal/definitions.li");
 	queue_file_for_parsing(argv[1]);
 
 	Ast** ast_top_level = parse_files_in_queue(&global_scope);

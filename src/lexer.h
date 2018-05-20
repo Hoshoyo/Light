@@ -129,6 +129,7 @@ struct Token {
 	s32 line;
 	s32 column;
 	s32 offset_in_file;
+	s32 real_string_length;
 	u32 flags = 0;
 
 	string filename;
@@ -151,7 +152,7 @@ struct Lexer
 	s64    current_col   = 0;
 	Token* token_array   = 0;
 
-	Lexer_Error start(const char* filename);
+	Lexer_Error start(const char* filename, Token* location = 0);
 
 	void rewind();
 	Token* peek_token();
@@ -165,6 +166,8 @@ struct Lexer
 	char* get_token_string(Token_Type);
 
 	s32 report_lexer_error(char* msg, ...);
+	s32 report_lexer_error(Token* location, char* msg, ...);
+	s32 report_error_location(Token* tok);
 
 	void lex_file();
 	bool read_token(char** at);

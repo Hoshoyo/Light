@@ -1,0 +1,73 @@
+#import "windows.li"
+stdout := GetStdHandle(STD_OUTPUT_HANDLE);
+
+string_length :: (s : ^u8) -> s64 {
+    c := 0;
+    while *s != 0 {
+        c += 1;
+        s += 1;
+    }
+    return c;
+}
+
+memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void {
+	i :u64= 0;
+	while i < size {
+		*[^u8](dest + i) = *[^u8](src + i);
+		i += 1;
+	}
+}
+
+s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
+    b : [16]u8;
+    sum : s32;
+    
+    if val == 0 {
+        buffer[0] = '0';
+        return 1;
+    }
+
+    if val < 0 {
+        val = -val;
+        buffer[0] = '-';
+        sum = 1;
+    }
+    auxbuffer := &b[15];
+    start := auxbuffer;
+
+    while val != 0 {
+        rem := val % 10;
+        val /= 10;
+        *auxbuffer = '0' + [u8]rem;
+        auxbuffer -= 1;
+    }
+
+    size := start - auxbuffer;
+    memcpy([^void](&buffer[sum]), [^void](auxbuffer + 1), [u64]size);
+    return size;
+}
+
+print_s32 :: (v : s32) -> s64 {
+    buffer : [16]u8;
+    len := s32_to_str(v, buffer);
+    return print_cstr_length([^u8]buffer, len);
+}
+
+print_cstr_length :: (data : ^u8, length : s64) -> s64 {
+	written : u32;
+	WriteConsoleA(stdout, [^void]data, [u32]length, &written, [^void]0);
+	return [s64]written;
+}
+
+print_cstr :: (data : ^u8) -> s64 {
+	length := [u32]string_length(data);
+	written : u32;
+	WriteConsoleA(stdout, [^void]data, length, &written, [^void]0);
+	return [s64]written;
+}
+
+print_string :: (s : string) -> s32 {
+	written : u32;
+	WriteConsoleA(stdout, [^void]s.data, [u32]s.length, &written, [^void]0);
+	return [s32]written;
+}

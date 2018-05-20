@@ -8,11 +8,13 @@
 #define MAKE_STRING(X) {sizeof(X) -1, -1, (u8*)(X)}
 #define ARRAY_COUNT(X) (sizeof(X) / sizeof((X)[0]))
 
+#define CHAR_HIGH_HEX(X) ((((X) & 0xf0) >> 4) >= 0xA) ? (((X) & 0xf0) >> 4) + 0x37 : (((X) & 0xf0) >> 4) + '0'
+#define CHAR_LOW_HEX(X) (((X) & 0x0f) >= 0xA) ? ((X) & 0x0f) + 0x37 : ((X) & 0x0f) + '0'
 
 struct string {
 	s64 length;
 	s64 capacity;
-	const u8* data;
+	u8* data;
 };
 
 string string_new(const char* v, s64 length);
@@ -32,6 +34,7 @@ bool is_white_space(char str);
 bool is_number(char c);
 bool is_letter(char c);
 bool is_hex_digit(char c);
+bool is_alphanumeric(char c);
 s64 align_delta(s64 offset, s64 align_to);
 s32 next_power2(s32 v);
 

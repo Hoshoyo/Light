@@ -28,7 +28,7 @@ void lib_table_push(Token* t) {
 		hash_table_init(&lib_table, 4096 * 8);
 		g_lib_table = array_create(string, 1024);
 	}
-	string s = string_make(t->value.data, t->value.length);
+	string s = string_make((char*)t->value.data, t->value.length);
 	s64 index = hash_table_entry_exist(&lib_table, s);
 	if(index == -1) {
 		hash_table_add(&lib_table, s);
@@ -73,7 +73,7 @@ Ast** parse_files_in_queue(Scope* global_scope) {
 			// TODO(psv): Make lexer accept my style of string for filename so
 			// we dont need to allocate a name for this
 			char* c_filename = make_c_string((char*)file->value.data, file->value.length);
-			if (lexer.start(c_filename) != LEXER_OK)
+			if (lexer.start(c_filename, file) != LEXER_OK)
 				return 0;
 
 			Parser parser(&lexer, global_scope);
@@ -212,7 +212,7 @@ void Parser::parse_directive(Scope* scope) {
 			if(ptr) {
 				s64 file_index = file_table_push(ptr);
 				if(file_index != -1) {
-					import_str->value.data = (const u8*)ptr;
+					import_str->value.data = (u8*)ptr;
 					import_str->value.length = size;
 					queue_file_for_parsing(import_str);
 				} else {
@@ -889,7 +889,7 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 
 				// Length
 				Ast* length_expr = ast_create_expr_literal(scope, LITERAL_HEX_INT, first, 0, type_primitive_get(TYPE_PRIMITIVE_S64));
-				length_expr->expr_literal.value_s64 = g_data->data_global.length_bytes;
+				length_expr->expr_literal.value_s64 = first->real_string_length;
 
 				Ast* capacity_expr = ast_create_expr_literal(scope, LITERAL_HEX_INT, first, 0, type_primitive_get(TYPE_PRIMITIVE_S64));
 				capacity_expr->expr_literal.value_s64 = -1;	// start immutable

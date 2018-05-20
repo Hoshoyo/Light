@@ -1,0 +1,5 @@
+string :: struct {
+    length   : s64;
+    capacity : s64;
+    data     : ^u8;
+}

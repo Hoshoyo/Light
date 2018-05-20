@@ -206,9 +206,6 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 
 	switch (node->node_type) {
 		case AST_DECL_VARIABLE:{
-			if(node->decl_variable.variable_type == 0x673340){
-				int x = 0;
-			}
 			if (!node->decl_variable.variable_type) {
 				// infer from expr
 				if (!node->decl_variable.assignment) {
@@ -367,12 +364,12 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				if (error & TYPE_ERROR_FATAL) {
 					return error;
 				}
+				if (type) node->decl_procedure.type_return = type;
 				if (!node->decl_procedure.type_return || !(node->decl_procedure.type_return->flags & TYPE_FLAG_INTERNALIZED)) {
 					infer_queue_push(node);
 					error |= DECL_QUEUED_TYPE;
 					return error;
 				}
-				node->decl_procedure.type_return = type;
 			}
 			size_t nargs = node->decl_procedure.arguments_count;
 			for (size_t i = 0; i < nargs; ++i) {

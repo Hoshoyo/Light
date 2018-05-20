@@ -276,30 +276,33 @@ TRUNCATE_EXISTING : u32 : 5;
 ERROR_ALREADY_EXISTS : u32 : 183;
 ERROR_PATH_NOT_FOUND : u32 : 3;
 
-GetStdHandle  :: (std_handle : u32) -> ^void #foreign("Kernel32.lib");
-SetStdHandle  :: (std_handle : u32, handle : ^void) -> bool #foreign("Kernel32.lib");
+#foreign("Kernel32")
+GetStdHandle  :: (std_handle : u32) -> ^void;
+SetStdHandle  :: (std_handle : u32, handle : ^void) -> bool;
 
-WriteConsoleA :: (handle_console_output : ^void, buffer : ^void, number_chars_to_write : u32, number_chars_written : ^u32, reserved : ^void) -> bool #foreign("Kernel32.lib");
-WriteConsoleW :: (handle_console_output : ^void, buffer : ^void, number_chars_to_write : u32, number_chars_written : ^u32, reserved : ^void) -> bool #foreign("Kernel32.lib");
-ReadConsole   :: (console_input : ^void, buffer : ^void, number_chars_to_read : u32, number_chars_read : ^u32, input_control : ^void) -> bool #foreign("Kernel32.lib");
+WriteConsoleA :: (handle_console_output : ^void, buffer : ^void, number_chars_to_write : u32, number_chars_written : ^u32, reserved : ^void) -> bool;
+WriteConsoleW :: (handle_console_output : ^void, buffer : ^void, number_chars_to_write : u32, number_chars_written : ^u32, reserved : ^void) -> bool;
+ReadConsole   :: (console_input : ^void, buffer : ^void, number_chars_to_read : u32, number_chars_read : ^u32, input_control : ^void) -> bool;
 
-GetCommandLineA :: () -> ^u8 #foreign("Kernel32.lib");
+GetCommandLineA :: () -> ^u8;
 
-GetLastError :: () -> u32 #foreign("kernel32.lib");
+GetLastError :: () -> u32;
 //ExitProcess  :: (exit_code : u32) -> void #foreign("kernel32.lib");
 
-ReadFile    :: (handle_file : ^void, buffer : ^void, number_bytes_to_read : u32, number_bytes_read : ^u32, overlapped : ^OVERLAPPED) -> bool #foreign("Kernel32.lib");
-WriteFile   :: (handle_file : ^void, buffer : ^void, number_bytes_to_write : u32, number_bytes_written : ^u32, overlapped : ^OVERLAPPED) -> bool #foreign("Kernel32.lib");
-OpenFile    :: (filename : ^u8, reopen_buff : ^OFSTRUCT, ustyle : u32) -> s32 #foreign("Kernel32.lib");
-CloseHandle :: (handle_object : ^void) -> bool #foreign("Kernel32.lib");
-CreateFile  :: (filename : ^u8, desired_access : u32, share_mode : u32, security_attribs : ^SECURITY_ATTRIBUTES, creation_disposition : u32, flags_and_attribs : u32, handle_template_file : ^void) -> ^void #foreign("Kernel32.lib");
-CreateDirectory :: (pathname : ^u8, security_attribs : ^SECURITY_ATTRIBUTES) -> bool #foreign("Kernel32.lib");
-CreateDirectoryEx :: (template_directory : ^u8, new_directory : ^u8, security_attribs : ^SECURITY_ATTRIBUTES) -> bool #foreign("Kernel32.lib");
+ReadFile    :: (handle_file : ^void, buffer : ^void, number_bytes_to_read : u32, number_bytes_read : ^u32, overlapped : ^OVERLAPPED) -> bool;
+WriteFile   :: (handle_file : ^void, buffer : ^void, number_bytes_to_write : u32, number_bytes_written : ^u32, overlapped : ^OVERLAPPED) -> bool;
+OpenFile    :: (filename : ^u8, reopen_buff : ^OFSTRUCT, ustyle : u32) -> s32;
+CloseHandle :: (handle_object : ^void) -> bool;
+CreateFile  :: (filename : ^u8, desired_access : u32, share_mode : u32, security_attribs : ^SECURITY_ATTRIBUTES, creation_disposition : u32, flags_and_attribs : u32, handle_template_file : ^void) -> ^void;
+CreateDirectory :: (pathname : ^u8, security_attribs : ^SECURITY_ATTRIBUTES) -> bool;
+CreateDirectoryEx :: (template_directory : ^u8, new_directory : ^u8, security_attribs : ^SECURITY_ATTRIBUTES) -> bool;
 
-VirtualAlloc :: (address : ^void, size : u64, allocation_type : u32, protect : u32) -> ^void #foreign("Kernel32.lib");
-VirtualFree  :: (address : ^void, size : u64, free_type : u32) -> bool #foreign("Kernel32.lib");
-MoveMemory   :: (destination : ^void, source : ^void, length : u64) -> void #foreign("Kernel32.lib");
-CopyMemory   :: (destination : ^void, source : ^void, length : u64) -> void #foreign("Kernel32.lib");
-SecureZeroMemory :: (ptr : ^void, count : u64) -> ^void #foreign("Kernel32.lib");
+VirtualAlloc :: (address : ^void, size : u64, allocation_type : u32, protect : u32) -> ^void;
+VirtualFree  :: (address : ^void, size : u64, free_type : u32) -> bool;
+MoveMemory   :: (destination : ^void, source : ^void, length : u64) -> void;
+CopyMemory   :: (destination : ^void, source : ^void, length : u64) -> void;
+SecureZeroMemory :: (ptr : ^void, count : u64) -> ^void;
 
-SetUnhandledExceptionFilter :: (top_level_exception_filter : (^void) -> s64) -> (^void) -> s64 #foreign("Kernel32.lib");
+SetUnhandledExceptionFilter :: (top_level_exception_filter : (^void) -> s64) -> (^void) -> s64;
+
+#end

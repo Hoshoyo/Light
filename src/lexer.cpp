@@ -47,6 +47,22 @@ string compiler_tags[] = {
 	{sizeof("end")     - 1, -1, (u8*)"end"}
 };
 
+s32 Lexer::report_error_location(Token* tok) {
+	return fprintf(stderr, "%.*s:%d:%d ", tok->filename.length, tok->filename.data, tok->line, tok->column);
+}
+
+s32 Lexer::report_lexer_error(Token* location, char* msg, ...)
+{
+	if (location) {
+		report_error_location(location);
+	}
+	va_list args;
+	va_start(args, msg);
+	s32 num_written = fprintf(stderr, "Lexer Error: ");
+	num_written += vfprintf(stderr, msg, args);
+	va_end(args);
+	return num_written;
+}
 s32 Lexer::report_lexer_error(char* msg, ...)
 {
 	va_list args;
@@ -88,7 +104,7 @@ void Lexer::init() {
 	}
 }
 
-Lexer_Error Lexer::start(const char* filename)
+Lexer_Error Lexer::start(const char* filename, Token* location)
 {
 	this->filename = string_make(filename);
 
@@ -99,7 +115,7 @@ Lexer_Error Lexer::start(const char* filename)
 	file_size = ho_getfilesize(filename);
 	HANDLE filehandle = ho_openfile(filename, OPEN_EXISTING);
 	if (filehandle == INVALID_HANDLE_VALUE) {
-		report_lexer_error("Could not open file %s.\n", filename);
+		report_lexer_error(location, "Could not open file %s.\n", filename);
 		return LEXER_ERROR_FATAL;
 	}
 	void* file_memory = malloc(file_size + 1);
@@ -213,6 +229,7 @@ bool Lexer::read_token(char** begin)
 	s64 keyword_index = -1;	// needs to be -1
 	int skip = 0;
 	int length = 1;
+	int real_str_len = 0;
 	Token_Type type = TOKEN_UNKNOWN;
 	u32 flags = 0;
 
@@ -419,12 +436,61 @@ bool Lexer::read_token(char** begin)
 		current_col++;
 		for (; at[i] != '"'; ++i) {
 			if (at[i] == 0) {
-				type = TOKEN_UNKNOWN;
-				break;
+				fprintf(stderr, "%.*s: ", filepath.length, filepath.data);
+
+				system_exit(-1);
+			} else if (at[i] == '\\') {
+				real_str_len -= 1;
+				if (at[i + 1] == '"') {
+					i++;
+					length++;
+				} else {
+					switch (at[i + 1]) {
+						case 'a':
+						case 'b':
+						case 'f':
+						case 'n':
+						case 'r':
+						case 't':
+						case 'v':
+						case 'e':
+						case '\\':
+						case '\'':
+						case '"':
+						case '?':
+							i++;
+							length++;
+							break;
+						case 0:
+							report_lexer_error("end of stream within a string\n");
+							break;
+						case 'x':
+							real_str_len -= 1;
+							i++;
+							length++;
+							if (is_hex_digit(at[i + 1]) || is_number(at[i + 1])) {
+								i++;
+								length++;
+								if (is_hex_digit(at[i + 1]) || is_number(at[i + 1])) {
+									real_str_len -= 1;
+									i++;
+									length++;
+								}
+							} else {
+								fprintf(stderr, "%.*s:%d:%d: Lexer error: invalid escape sequence '\\x%c",
+									filepath.length, filepath.data, line_count, current_col, at[i + 1]);
+							}
+						default: {
+							fprintf(stderr, "%.*s:%d:%d: Lexer error: invalid escape sequence '\\%c",
+								filepath.length, filepath.data, line_count, current_col, at[i + 1]);
+						}break;
+					}
+				}
 			}
 			length++;
 		}
 		length--;
+		real_str_len += length;
 		skip++;
 	}break;
 
@@ -508,6 +574,7 @@ bool Lexer::read_token(char** begin)
 	token.column = current_col;
 	token.flags = flags;
 	token.offset_in_file = at - filedata;
+	token.real_string_length = real_str_len;
 
 	// This makes all the identifiers and keywords resolve to the same pointer
 	if (keyword_index != -1) {

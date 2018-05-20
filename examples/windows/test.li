@@ -1,0 +1,7 @@
+#import "print.li"
+
+main :: () -> s32 {
+	a := "Helloあ\"\n\n\n";
+	print_string(a);
+	return 0;
+}
