@@ -5,12 +5,6 @@ STDERR_FILENO	: s32 : 2;	/* Standard error output.  */
 memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void #foreign("c");
 write :: (fd : s32, buf : ^void, count : u64) -> u64 #foreign("c");
 
-string :: struct {
-    length   : s64;
-    capacity : s64;
-    data     : ^u8;
-}
-
 string_length :: (s : ^u8) -> s64 {
     c := 0;
     while *s != 0 {

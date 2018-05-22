@@ -18,3 +18,6 @@
 	- assignment of arrays
     - string escaping
     - internal definitions
+22/05/2018
+    - verify if main is declared before compiling
+	if not, then compile a .obj file (for now)

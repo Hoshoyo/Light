@@ -163,6 +163,24 @@ Type_Error type_check(Scope* scope, Ast** ast) {
 	size_t ndecl = array_get_length(ast);
 	Type_Error error = TYPE_OK;
 
+	if(scope->level == 0) {
+		Token main_token;
+		main_token.value = compiler_tags[COMPILER_TAG_MAIN_PROC];
+		Ast* decl = decl_from_name(scope, &main_token);
+		if(!decl) {
+			return report_type_error(TYPE_ERROR_FATAL, "main procedure is not declared, library creation still unsupported\n");
+		} else {
+			if(decl->node_type == AST_DECL_PROCEDURE) {
+				Type_Instance* maintyperet = decl->decl_procedure.type_return;
+				if(!(maintyperet == type_primitive_get(TYPE_PRIMITIVE_S32) && decl->decl_procedure.arguments_count == 0)) {
+					return report_type_error(TYPE_ERROR_FATAL, "main procedure must have signature main :: () -> s32\n");
+				}
+			} else {
+				return report_type_error(TYPE_ERROR_FATAL, "main is not a procedure declaration\n");
+			}
+		}
+	}
+
 	for (size_t i = 0; i < ndecl; ++i) {
 		Ast* node = ast[i];
 		error |= type_check(node);

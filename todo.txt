@@ -1,8 +1,6 @@
 - constant in type definition
 - make forward decls declarable more than once
 - check constants
-- verify if main is declared before compiling
-	if not, then compile a .obj file (for now)
 
 - this causes warning in the c backend
 main :: () -> s32 {
