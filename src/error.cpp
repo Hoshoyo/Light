@@ -10,7 +10,7 @@ void report_error_location(Ast* node) {
 	case AST_DECL_PROCEDURE:			report_error_location(node->decl_procedure.name); break;
 	case AST_DECL_ENUM:					report_error_location(node->decl_enum.name); break;
 	case AST_DECL_STRUCT:				report_error_location(node->decl_struct.name); break;
-	case AST_DECL_UNION:				report_error_location(node->decl_union.name); break;
+	//case AST_DECL_UNION:				report_error_location(node->decl_union.name); break;  // @DEPRECATED
 
 	case AST_EXPRESSION_BINARY:			report_error_location(node->expr_binary.token_op); break;
 	case AST_EXPRESSION_LITERAL:		report_error_location(node->expr_literal.token); break;
@@ -138,11 +138,16 @@ static void print_name_of_decl(FILE* out, Ast* decl) {
 		case AST_DECL_ENUM: {
 			fprintf(out, "enum %.*s", TOKEN_STR(decl->decl_enum.name));
 		}break;
-		case AST_DECL_UNION: {
-			fprintf(out, "union %.*s", TOKEN_STR(decl->decl_union.name));
-		}break;
+		// @DEPRECATED
+		//case AST_DECL_UNION: {
+		//	fprintf(out, "union %.*s", TOKEN_STR(decl->decl_union.name));
+		//}break;
 		case AST_DECL_STRUCT: {
-			fprintf(out, "struct %.*s", TOKEN_STR(decl->decl_struct.name));
+			if(decl->decl_struct.flags & STRUCT_FLAG_IS_UNION) {
+				fprintf(out, "union %.*s", TOKEN_STR(decl->decl_struct.name));
+			} else {
+				fprintf(out, "struct %.*s", TOKEN_STR(decl->decl_struct.name));
+			}
 		}break;
 	}
 }

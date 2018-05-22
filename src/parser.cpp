@@ -270,6 +270,8 @@ Ast* Parser::parse_declaration(Scope* scope) {
 				return parse_decl_proc(name, scope);
 			} else if (next->type == TOKEN_KEYWORD_STRUCT) {
 				return parse_decl_struct(name, scope);
+			} else if(next->type == TOKEN_KEYWORD_UNION) {
+				return parse_decl_struct(name, scope, true);
 			} else if (next->type == TOKEN_KEYWORD_ENUM) {
 				return parse_decl_enum(name, scope, 0);
 			} else {
@@ -424,19 +426,29 @@ Ast* Parser::parse_decl_variable(Token* name, Scope* scope) {
 	return parse_decl_variable(name, scope, var_type);
 }
 
-Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
-	require_and_eat(TOKEN_KEYWORD_STRUCT);
+Ast* Parser::parse_decl_struct(Token* name, Scope* scope, bool is_union) {
+	if(is_union){
+		require_and_eat(TOKEN_KEYWORD_UNION);
+	} else {
+		require_and_eat(TOKEN_KEYWORD_STRUCT);
+	}
 
 	s32    fields_count = 0;
 	Ast**  fields = array_create(Ast*, 8);
-	Scope* scope_struct = scope_create(0, scope, SCOPE_STRUCTURE);
+	Scope* scope_struct = scope_create(0, scope, (is_union) ? SCOPE_UNION : SCOPE_STRUCTURE);
 
 	require_and_eat('{');
 
 	for (;;) {
 		Token* field_name = lexer->eat_token();
 		if (field_name->type != TOKEN_IDENTIFIER) {
-			report_syntax_error(field_name, "expected struct field declaration, but got '%.*s'\n", TOKEN_STR(field_name));
+			char* construct = 0;
+			if(is_union){
+				construct = "union";
+			} else {
+				construct = "struct";
+			}
+			report_syntax_error(field_name, "expected %s field declaration, but got '%.*s'\n", construct, TOKEN_STR(field_name));
 		}
 		Ast* field = parse_decl_variable(field_name, scope_struct);
 		require_and_eat(';');
@@ -466,7 +478,7 @@ Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
 
 	scope->decl_count += 1;
 
-	Ast* node = ast_create_decl_struct(name, scope, scope_struct, struct_type, fields, 0, fields_count);
+	Ast* node = ast_create_decl_struct(name, scope, scope_struct, struct_type, fields, (is_union) ? STRUCT_FLAG_IS_UNION : 0, fields_count);
 	scope_struct->creator_node = node;
 	return node;
 }

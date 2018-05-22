@@ -1,4 +1,18 @@
-#import "linux/print.li"
+//#import "linux/print.li"
+
+foo :: struct {
+	s : s32;
+	y : s32;
+}
+
+Bitmap_Header :: union {
+	magic      : [2]u8;
+	size_bytes : u32;
+	reserved1  : u16;
+	reserved2  : u16;
+	offset_img : u32;
+	f : foo;
+}
 
 main :: () -> s32 {
 	return 0;

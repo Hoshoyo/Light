@@ -869,7 +869,7 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 		case AST_DECL_PROCEDURE:				DEBUG_print_proc_decl(out, node); break;
 		case AST_DECL_VARIABLE:					DEBUG_print_var_decl(out, node); break;
 		case AST_DECL_STRUCT:					DEBUG_print_struct_decl(out, node); break;
-		case AST_DECL_UNION:					assert(0);
+		//case AST_DECL_UNION:					assert(0); // @DEPRECATED
 		case AST_DECL_ENUM:						DEBUG_print_enum_decl(out, node); break;
 		case AST_DECL_CONSTANT:					DEBUG_print_constant_decl(out, node); break;
 

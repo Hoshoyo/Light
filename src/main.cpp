@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
 		DEBUG_print_ast(stdout, ast_top_level, true);
 		//DEBUG_print_scope_decls(&global_scope);
 		//DEBUG_print_type_table();
-		//DEBUG_print_type_table_structs();
+		DEBUG_print_type_table_structs();
 	}
 	
 	double bend_start = timer.GetTime();

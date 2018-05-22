@@ -249,9 +249,10 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
             }
             sprint("} %.*s", TOKEN_STR(decl->decl_struct.name));
         }break;
-        case AST_DECL_UNION: {
-            assert_msg(0, "union C codegen not yet implemented");
-        }break;
+		// @DEPRECATED
+        //case AST_DECL_UNION: {
+        //    assert_msg(0, "union C codegen not yet implemented");
+        //}break;
         case AST_DECL_ENUM:{
             assert_msg(0, "enum C codegen not yet implemented");
         }break;
