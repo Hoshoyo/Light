@@ -41,4 +41,3 @@ main :: () -> s32 {
 	print_vec4(v);
 
 	return 0;
-}

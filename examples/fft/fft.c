@@ -19,26 +19,26 @@ void __memory_copy(void* dest, void* src, u64 size) {
 }
 typedef struct string string;
 typedef struct Complex Complex;
-typedef void* __func_type_0x1a74ca0(u64, u64);
-typedef void __func_type_0x1a74d08(void*);
-typedef r32 __func_type_0x1a74d68(r32);
-typedef void __func_type_0x1a74e70(struct Complex*, s64);
-typedef struct Complex __func_type_0x1a74ed8(struct Complex, struct Complex);
-typedef s32 __func_type_0x1a74f40();
-typedef void* __func_type_0x1a74f98(void*, void*, u64);
-typedef u64 __func_type_0x1a75008(s32, void*, u64);
-typedef s64 __func_type_0x1a75078(u8*);
-typedef s64 __func_type_0x1a75118(s32, u8*);
-typedef s64 __func_type_0x1a751c0(s64, u8*);
-typedef s64 __func_type_0x1a75228(r32, u8*);
-typedef s64 __func_type_0x1a752d0(r64, u8*);
-typedef s64 __func_type_0x1a75338(bool);
-typedef s64 __func_type_0x1a75398(s32);
-typedef s64 __func_type_0x1a753f8(s64);
-typedef s64 __func_type_0x1a75458(r32);
-typedef s64 __func_type_0x1a754b8(r64);
-typedef s64 __func_type_0x1a75518(u8*, s64);
-typedef s64 __func_type_0x1a75580(struct string);
+typedef void* __func_type_0x1a68ca0(u64, u64);
+typedef void __func_type_0x1a68d08(void*);
+typedef r32 __func_type_0x1a68d68(r32);
+typedef void __func_type_0x1a68e70(struct Complex*, s64);
+typedef struct Complex __func_type_0x1a68ed8(struct Complex, struct Complex);
+typedef s32 __func_type_0x1a68f40();
+typedef void* __func_type_0x1a68f98(void*, void*, u64);
+typedef u64 __func_type_0x1a69008(s32, void*, u64);
+typedef s64 __func_type_0x1a69078(u8*);
+typedef s64 __func_type_0x1a69118(s32, u8*);
+typedef s64 __func_type_0x1a691c0(s64, u8*);
+typedef s64 __func_type_0x1a69228(r32, u8*);
+typedef s64 __func_type_0x1a692d0(r64, u8*);
+typedef s64 __func_type_0x1a69338(bool);
+typedef s64 __func_type_0x1a69398(s32);
+typedef s64 __func_type_0x1a693f8(s64);
+typedef s64 __func_type_0x1a69458(r32);
+typedef s64 __func_type_0x1a694b8(r64);
+typedef s64 __func_type_0x1a69518(u8*, s64);
+typedef s64 __func_type_0x1a69580(struct string);
 typedef struct string{s64 length;s64 capacity;u8* data;} string;
 typedef struct Complex{r32 r;r32 i;} Complex;
 
@@ -197,9 +197,9 @@ __t_base += 8;
 }
 
 (fft2)(((struct Complex*)matrix),((0x2)*0x2));
-struct Complex* x;
-x = ((struct Complex*)matrix);
-(print_r32)(((*(struct Complex*)(((char*)x)+ 8 * (0x0))).r));
+r32* x;
+x = ((r32*)matrix);
+(print_r32)(*(r32*)(((char*)x)+ 4 * (0x0)));
 struct string __temp_v_0;
 {
 char* __t_base = (char*)&(__temp_v_0);
@@ -209,7 +209,7 @@ char* __array_base = __t_base;
 *(u8**)((char*)__t_base + 16) = __string_data_0;
 }
 (print_string)(__temp_v_0);
-(print_r32)(((*(struct Complex*)(((char*)x)+ 8 * (0x1))).r));
+(print_r32)(*(r32*)(((char*)x)+ 4 * (0x1)));
 struct string __temp_v_1;
 {
 char* __t_base = (char*)&(__temp_v_1);
@@ -219,7 +219,7 @@ char* __array_base = __t_base;
 *(u8**)((char*)__t_base + 16) = __string_data_1;
 }
 (print_string)(__temp_v_1);
-(print_r32)(((*(struct Complex*)(((char*)x)+ 8 * (0x2))).r));
+(print_r32)(*(r32*)(((char*)x)+ 4 * (0x2)));
 struct string __temp_v_2;
 {
 char* __t_base = (char*)&(__temp_v_2);
@@ -229,7 +229,7 @@ char* __array_base = __t_base;
 *(u8**)((char*)__t_base + 16) = __string_data_2;
 }
 (print_string)(__temp_v_2);
-(print_r32)(((*(struct Complex*)(((char*)x)+ 8 * (0x3))).r));
+(print_r32)(*(r32*)(((char*)x)+ 4 * (0x3)));
 return 0x0;
 }
 

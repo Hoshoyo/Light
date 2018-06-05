@@ -154,7 +154,11 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
         case KIND_STRUCT: {
             assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit uninternalized type\n");
             // TODO(psv): does this always work in C?
-            sprint("struct ");
+			if (type->flags & TYPE_FLAG_UNION) {
+				sprint("union ");
+			} else {
+				sprint("struct ");
+			}
             if(name){
                 sprint("%.*s", TOKEN_STR(name));
             } else {
@@ -259,6 +263,7 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
 				sprint("typedef union %.*s{", TOKEN_STR(decl->decl_struct.name));
 			} else {
             	sprint("typedef struct %.*s{", TOKEN_STR(decl->decl_struct.name));
+
 			}
             size_t nfields = decl->decl_struct.fields_count;
             for(size_t i = 0; i < nfields; ++i){

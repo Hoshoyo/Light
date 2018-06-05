@@ -72,6 +72,7 @@ const u32 TYPE_FLAG_SIZE_RESOLVED = FLAG(2);
 //const u32 TYPE_FLAG_LVALUE = FLAG(3);
 const u32 TYPE_FLAG_WEAK   = FLAG(4);
 const u32 TYPE_FLAG_STRONG = FLAG(5);
+const u32 TYPE_FLAG_UNION  = FLAG(6);
 struct Type_Instance {
 	Type_Kind kind;
 	u32 flags;

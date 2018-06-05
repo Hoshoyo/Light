@@ -357,7 +357,8 @@ Decl_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 						type_size_bits += delta * 8;
 					}
 					node->decl_struct.type_info->type_size_bits = type_size_bits;
-					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+					u32 is_union_flag = (is_union) ? TYPE_FLAG_UNION : 0;
+					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED | is_union_flag;
 					node->decl_struct.type_info = internalize_type(&tinfo, scope, true);
 					infer_queue_remove(node);
 					//printf("struct %.*s done\n", TOKEN_STR(node->decl_struct.name));
