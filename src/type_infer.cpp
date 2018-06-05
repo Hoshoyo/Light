@@ -1042,7 +1042,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					}
 				} break;
 				case OP_BINARY_DOT:
-					if(lt->kind != KIND_STRUCT){
+					if(lt->kind != KIND_STRUCT && lt->kind != KIND_UNION){
 						// @IMPLEMENT namespaces
 						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot access field from a non structure type\n");
 						return 0;

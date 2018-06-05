@@ -1,0 +1,100 @@
+#import "../linux/print.li"
+
+calloc :: (count : u64, size : u64) -> ^void #foreign("c");
+free :: (block : ^void) -> void #foreign("c");
+cosf :: (v : r32) -> r32 #foreign("m");
+sinf :: (v : r32) -> r32 #foreign("m");
+
+Complex :: struct {
+    r : r32;
+    i : r32;
+}
+
+separate :: (a : ^Complex, n : s64) {
+    b : ^Complex = [^Complex]calloc([u64](n / 2), 8);   // TODO: #size(Complex)
+    
+    for i := 0; i < n / 2; i += 1 {
+        b[i] = a[i * 2 + 1];
+    }
+
+    for i := 0; i < n / 2; i += 1 {
+        a[i] = a[i * 2];
+    }
+    
+    for i := 0; i < n / 2; i += 1 {
+        a[i + n / 2] = b[i];
+    }
+
+    free([^void]b);
+}
+
+complex_mul :: (l : Complex, r : Complex) -> Complex {
+    result : Complex;
+
+    result.r = l.r * r.r - l.i * r.i;
+	result.i = l.r * r.i + l.i * r.r;
+
+    return result;
+}
+
+complex_sum :: (l : Complex, r : Complex) -> Complex {
+    result : Complex;
+
+    result.r = l.r + r.r;
+    result.i = l.i + r.i;
+
+    return result;
+}
+
+complex_sub :: (l : Complex, r : Complex) -> Complex {
+    result : Complex;
+
+    result.r = l.r - r.r;
+    result.i = l.i - r.i;
+
+    return result;
+}
+
+fft2 :: (data : ^Complex, length : s64) {
+    PI_32 : r32 : 3.14159265359;
+
+    if length >= 2 {
+        separate(data, length);
+        fft2(data, length / 2);                 // Even
+        fft2(data + length / 2, length / 2);    // Odd
+
+        for k := 0; k < length / 2; k += 1 {
+            e : Complex = data[k];
+            o : Complex = data[k + length / 2];
+
+            w : Complex;
+
+            w.r = cosf(2.0 * PI_32 * [r32](k / length));
+            w.i = -sinf(2.0 * PI_32 * [r32](k / length));
+
+            data[k] = complex_sum(e, complex_mul(w, o));//e + w * o;
+            data[k + length / 2] = complex_sub(e, complex_mul(w, o));//e - w * o;
+        }
+    }
+}
+
+main :: () -> s32 {
+    
+    matrix : [2][2]Complex = array{
+        array{Complex:{2.0, 0.0}, Complex:{3.0, 0.0}},
+        array{Complex:{4.0, 0.0}, Complex:{5.0, 0.0}}
+    };
+
+    fft2([^Complex]matrix, 2 * 2);
+
+    x := [^Complex]matrix;
+    print_r32(x[0].r);
+    print_string("\n");
+    print_r32(x[1].r);
+    print_string("\n");
+    print_r32(x[2].r);
+    print_string("\n");
+    print_r32(x[3].r);
+
+    return 0;
+}

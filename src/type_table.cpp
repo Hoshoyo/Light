@@ -113,7 +113,13 @@ u64 type_hash(Type_Instance* type) {
 		case KIND_POINTER:
 			hash = fnv_1_hash_from_start(type_hash(type->pointer_to), (const u8*)"pointer", sizeof("pointer") - 1); break;
 		case KIND_STRUCT:
-			hash = fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length); break;
+			hash = fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length); 
+			hash = fnv_1_hash_from_start(hash, (const u8*)"struct", sizeof("struct") - 1);
+			break;
+		case KIND_UNION:
+			hash = fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length); 
+			hash = fnv_1_hash_from_start(hash, (const u8*)"union", sizeof("union") - 1);
+			break;
 		case KIND_FUNCTION: {
 			u64 return_type_hash = type_hash(type->function_desc.return_type);
 			size_t n_args = 0;
@@ -182,6 +188,7 @@ Type_Instance* type_copy_internal(Type_Instance* type, Scope* scope) {
 		}
 		//result->pointer_to = type_copy_internal(type->pointer_to);
 		break;
+	case KIND_UNION:
 	case KIND_STRUCT: {
 		size_t num_args = array_get_length(type->struct_desc.fields_types);
 		result->struct_desc.fields_types = (Type_Instance**)types_internal.allocate(array_get_header_size() + num_args * sizeof(Type_Instance*));

@@ -1,19 +1,44 @@
-//#import "linux/print.li"
+#import "linux/print.li"
 
-foo :: struct {
-	s : s32;
-	y : s32;
+vec4_color :: struct {
+	r : r32;
+	g : r32;
+	b : r32;
+	a : r32;
 }
 
-Bitmap_Header :: union {
-	magic      : [2]u8;
-	size_bytes : u32;
-	reserved1  : u16;
-	reserved2  : u16;
-	offset_img : u32;
-	f : foo;
+vec4_position :: struct {
+	x : r32;
+	y : r32;
+	z : r32;
+	w : r32;
+}
+
+vec4 :: union {
+	color : vec4_color;
+	position : vec4_position;
+}
+
+print_vec4 :: (v : vec4) {
+	print_string("{ ");
+	print_r32(v.position.x);
+	print_string(", ");
+	print_r32(v.position.y);
+	print_string(", ");
+	print_r32(v.position.z);
+	print_string(", ");
+	print_r32(v.position.w);
+	print_string(" }");
 }
 
 main :: () -> s32 {
+	v : vec4;
+	v.color.r = 1.0;
+	v.color.g = 0.8;
+	v.color.b = 0.5;
+	v.color.a = 1.0;
+
+	print_vec4(v);
+
 	return 0;
 }

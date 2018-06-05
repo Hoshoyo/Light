@@ -461,7 +461,7 @@ Ast* Parser::parse_decl_struct(Token* name, Scope* scope, bool is_union) {
 	require_and_eat('}');
 
 	Type_Instance* struct_type = type_new_temporary();
-	struct_type->kind = KIND_STRUCT;
+	struct_type->kind = (is_union) ? KIND_UNION : KIND_STRUCT;
 	struct_type->struct_desc.fields_names = array_create(string, fields_count);
 	struct_type->struct_desc.fields_types = array_create(Type_Instance*, fields_count);
 	struct_type->struct_desc.offset_bits  = array_create(s64, fields_count);
