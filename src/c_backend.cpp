@@ -26,6 +26,18 @@ int C_Code_Generator::sprint(char* msg, ...) {
 	}
 
 	va_end(args);
+#if DEBUG
+	{
+		va_list args;
+		va_start(args, msg);
+		int num_written = 0;
+
+		num_written = vfprintf(stdout, msg, args);
+		fflush(stdout);
+
+		va_end(args);
+	}
+#endif
 	return num_written;
 }
 
@@ -614,34 +626,29 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
         }break;
         case OP_BINARY_VECTOR_ACCESS:{
             Type_Instance* indexed_type = expr->expr_binary.left->type_return;
-			if (indexed_type->kind == KIND_ARRAY) {
-				// @TODO check why this was here
-				//if(indexed_type->array_desc.array_of->kind != KIND_ARRAY)
-				sprint("*");
-			}
-			if (indexed_type->kind == KIND_POINTER) {
-				// @TODO check if this causes a bug anywhere?
-				// why is this here ?
-				sprint("*");
+
+			if(expr->type_return->kind != KIND_ARRAY && expr->type_return->kind != KIND_POINTER){
+				sprint("*(");
+				emit_type(indexed_type);
+				sprint(")");
 			}
 
 			sprint("(");
-			emit_type(indexed_type);
-			sprint(")");
 
-			sprint("((");
-            assert(indexed_type->kind == KIND_POINTER || indexed_type->kind == KIND_ARRAY);
 			sprint("(char*)");
-            emit_expression(expr->expr_binary.left);
-			sprint(")");
-            if(indexed_type->kind == KIND_POINTER){
-				sprint("+ %lld * (", indexed_type->pointer_to->type_size_bits / 8);
+			emit_expression(expr->expr_binary.left);
+			sprint(" + ");
+
+			emit_expression(expr->expr_binary.right);
+			sprint(" * ");
+
+			if(indexed_type->kind == KIND_POINTER){
+				sprint(" %lld ", indexed_type->pointer_to->type_size_bits / 8);
             } else {
-				sprint("+ %lld * (", indexed_type->array_desc.array_of->type_size_bits / 8);
+				sprint(" %lld ", indexed_type->array_desc.array_of->type_size_bits / 8);
             }
-			// TODO(psv): array bounds check
-            emit_expression(expr->expr_binary.right);
-			sprint("))");
+
+			sprint(")");
         }break;
     }
 }

@@ -78,6 +78,27 @@ fft2 :: (data : ^Complex, length : s64) {
     }
 }
 
+dft :: (data : ^Complex, width : s64, height : s64) -> ^Complex {
+    result := [^Complex]calloc([u64](width * height), 8);
+
+    //TAU_32 : r32 : 6.283185307179;
+    
+    for v := 0; v < height; v += 1 {
+		for u := 0; u < width; u += 1 {
+			for y := 0; y < height; y += 1 {
+				for x := 0; x < width; x += 1 {
+					f := data[y * width + x];
+					c := 6.283185307179 * [r32](([r32](x * u) / [r32]width) + ([r32](y * v) / [r32]height));
+					result[v * width + u].r += f * cosf(c);
+					result[v * width + u].i -= f * sinf(c);
+				}
+			}
+		}
+	}
+
+    return result;
+}
+
 main :: () -> s32 {
     
     matrix : [2][2]Complex = array{
@@ -95,6 +116,13 @@ main :: () -> s32 {
     print_r32(x[2]);
     print_string("\n");
     print_r32(x[3]);
-
+    print_string("\n");
+    print_r32(x[4]);
+    print_string("\n");
+    print_r32(x[5]);
+    print_string("\n");
+    print_r32(x[6]);
+    print_string("\n");
+    print_r32(x[7]);
     return 0;
 }

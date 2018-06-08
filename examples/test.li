@@ -1,43 +1,56 @@
 #import "linux/print.li"
 
-vec4_color :: struct {
+Complex :: struct {
 	r : r32;
-	g : r32;
-	b : r32;
-	a : r32;
+	i : r32;
 }
 
-vec4_position :: struct {
-	x : r32;
-	y : r32;
-	z : r32;
-	w : r32;
+cosf :: (v : r32) -> r32 {
+	return 0.0;
 }
 
-vec4 :: union {
-	color : vec4_color;
-	position : vec4_position;
+sinf :: (v : r32) -> r32 {
+	return 0.0;
 }
 
-print_vec4 :: (v : vec4) {
-	print_string("{ ");
-	print_r32(v.position.x);
-	print_string(", ");
-	print_r32(v.position.y);
-	print_string(", ");
-	print_r32(v.position.z);
-	print_string(", ");
-	print_r32(v.position.w);
-	print_string(" }");
+dft :: (data : ^Complex, width : s64, height : s64) -> ^Complex {
+    result := [^Complex]calloc([u64](width * height), 8);
+
+    //TAU_32 : r32 : 6.283185307179;
+    
+    for v := 0; v < height; v += 1 {
+		for u := 0; u < width; u += 1 {
+			for y := 0; y < height; y += 1 {
+				for x := 0; x < width; x += 1 {
+					f := data[y * width + x];
+					c := 6.283185307179 * [r32](([r32](x * u) / [r32]width) + ([r32](y * v) / [r32]height));
+					result[v * width + u].r += f * cosf(c);
+					result[v * width + u].i -= f * sinf(c);
+				}
+			}
+		}
+	}
+
+    return result;
 }
 
 main :: () -> s32 {
-	v : vec4;
-	v.color.r = 1.0;
-	v.color.g = 0.8;
-	v.color.b = 0.5;
-	v.color.a = 1.0;
+	c :[4]Complex;
+	c[0].r = 1.0;
+	c[0].i = 2.0;
+/*
+	v := array{
+		array{Complex:{1.0, 0.0},Complex:{2.0, 0.0}},
+		array{Complex:{3.0, 0.0},Complex:{4.0, 0.0}}
+	};
 
-	print_vec4(v);
-
+	for i := 0; i < 2; i += 1 {
+		for j := 0; j < 2; j += 1 {
+			print_r32(v[i][j].r);
+			print_string(" ");
+		}
+		print_string("\n");
+	}
+*/
 	return 0;
+}
