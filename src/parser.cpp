@@ -62,28 +62,24 @@ Ast** parse_files_in_queue(Scope* global_scope) {
 		array_push(parsing_queue.files_toplevels, &ast_top_level);
 	}
 
-	//do {
-		// Imports
-		while(array_get_length(parsing_queue.queue_imports) > 0) {
-			Token* file = parsing_queue.queue_imports[0];
-			// remove the first of the array
-			array_remove(parsing_queue.queue_imports, 0);
+	while(array_get_length(parsing_queue.queue_imports) > 0) {
+		Token* file = parsing_queue.queue_imports[0];
+		// remove the first of the array
+		array_remove(parsing_queue.queue_imports, 0);
 
-			Lexer lexer;
-			// TODO(psv): Make lexer accept my style of string for filename so
-			// we dont need to allocate a name for this
-			char* c_filename = make_c_string((char*)file->value.data, file->value.length);
-			if (lexer.start(c_filename, file) != LEXER_OK)
-				return 0;
+		Lexer lexer;
+		// TODO(psv): Make lexer accept my style of string for filename so
+		// we dont need to allocate a name for this
+		char* c_filename = make_c_string((char*)file->value.data, file->value.length);
+		if (lexer.start(c_filename, file) != LEXER_OK)
+			return 0;
 
-			Parser parser(&lexer, global_scope);
-			Ast** ast_top_level = parser.parse_top_level();
-			if(ast_top_level){
-				array_push(parsing_queue.files_toplevels, &ast_top_level);
-			}
+		Parser parser(&lexer, global_scope);
+		Ast** ast_top_level = parser.parse_top_level();
+		if(ast_top_level){
+			array_push(parsing_queue.files_toplevels, &ast_top_level);
 		}
-	//} while(array_get_length(parsing_queue.queue_imports) > 0);
-	
+	}
 
 	size_t num_files = array_get_length(parsing_queue.files_toplevels);
 	size_t num_top_level_decls = 0;
@@ -375,6 +371,7 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 		lexer->eat_token();
 		if(current_foreign && array_get_length(current_foreign) > 0) {
 			extern_library_name = current_foreign[array_get_length(current_foreign) - 1];
+			lib_table_push(extern_library_name);
 			flags |= DECL_PROC_FLAG_FOREIGN;
 		} else {
 			// TODO(psv): temporary, this should be possible
@@ -1121,7 +1118,7 @@ Ast* Parser::parse_comm_for(Scope* scope) {
 		size_t def_count = array_get_length(deferred);
 		body->comm_block.command_count += def_count;
 		if (body->comm_block.commands) {
-			array_append(body->comm_block.commands, deferred);
+			body->comm_block.commands = (Ast**)array_append(body->comm_block.commands, deferred);
 			array_release(deferred);
 		} else {
 			comm_for->comm_block.commands = deferred;

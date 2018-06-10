@@ -18,6 +18,35 @@ memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void {
 	}
 }
 
+s64_to_str :: (val : s64, buffer : [32]u8) -> s64 {
+    b : [32]u8;
+    sum : s32;
+    
+    if val == 0 {
+        buffer[0] = '0';
+        return 1;
+    }
+
+    if val < 0 {
+        val = -val;
+        buffer[0] = [u8]'-';
+        sum = 1;
+    }
+    auxbuffer := &b[32];
+    start := auxbuffer + sum;
+
+    while val != 0 {
+        rem := val % 10;
+        val /= 10;
+        *auxbuffer = '0' + [u8]rem;
+        auxbuffer -= 1;
+    }
+
+    size := start - auxbuffer;
+    memcpy([^void](&buffer[sum]), [^void](auxbuffer + 1), [u64]size);
+    return size;
+}
+
 s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
     b : [16]u8;
     sum : s32;
@@ -33,7 +62,7 @@ s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
         sum = 1;
     }
     auxbuffer := &b[15];
-    start := auxbuffer;
+    start := auxbuffer + sum;
 
     while val != 0 {
         rem := val % 10;
@@ -47,13 +76,83 @@ s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
     return size;
 }
 
+r32_to_str :: (v : r32, buffer : [32]u8) -> s64 {
+    l : s64 = s32_to_str([s32]v, [[16]u8][^u8]buffer);
+    precision := 15;
+
+    if v < 0.0 {
+        v = -v;
+    }
+
+    fractional_part := v - [r32][s32]v;
+
+    buffer[l] = '.';
+    l += 1;
+
+    if fractional_part == 0.0 {
+        buffer[l] = '0';
+        l += 1;
+        return l;
+    }
+
+    while precision > 0 && fractional_part > 0.0 {
+        fractional_part *= 10.0;
+        buffer[l] = [u8]fractional_part + '0';
+        fractional_part = fractional_part - [r32][s32]fractional_part;
+        l += 1;
+    }
+
+    return l;
+}
+
+r64_to_str :: (v : r64, buffer : [64]u8) -> s64 {
+    l : s64 = s64_to_str([s64]v, [[32]u8][^u8]buffer);
+    precision := 31;
+
+	if v < 0.0 {
+		v = -v;
+    }
+	
+    fractional_part := v - [r64][s64]v;
+
+    buffer[l] = '.';
+    l += 1;
+
+    if fractional_part == 0.0 {
+        buffer[l] = '0';
+        l += 1;
+        return l;
+    }
+
+    while precision > 0 && fractional_part > 0.0 {
+        fractional_part *= 10.0;
+        buffer[l] = [u8]fractional_part + '0';
+        fractional_part = fractional_part - [r64][s64]fractional_part;
+        l += 1;
+    }
+
+    return l;
+}
+
+print_r32 :: (v : r32) -> s64 {
+	buffer : [32]u8;
+    len := r32_to_str(v, buffer);
+    return print_string_l([^u8]buffer, len);
+}
+
+print_r64 :: (v : r64) -> s64 {
+	buffer : [64]u8;
+    len := r64_to_str(v, buffer);
+    return print_string_l([^u8]buffer, len);
+}
+
 print_s32 :: (v : s32) -> s64 {
     buffer : [16]u8;
     len := s32_to_str(v, buffer);
-    return print_cstr_length([^u8]buffer, len);
+    return print_string_l([^u8]buffer, len);
 }
 
-print_cstr_length :: (data : ^u8, length : s64) -> s64 {
+print_string_l :: (data : ^u8, length : s64) -> s64 {
 	written : u32;
 	WriteConsoleA(stdout, [^void]data, [u32]length, &written, [^void]0);
 	return [s64]written;

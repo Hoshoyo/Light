@@ -1,31 +1,30 @@
-#import "linux/print.li"
+//#import "linux/print.li"
+#import "windows/print.li"
+
+#foreign("msvcrt")
+calloc :: (count : u64, length : u64) -> ^void;
+cosf :: (v : r32) -> r32;
+sinf :: (v : r32) -> r32;
+#end
 
 Complex :: struct {
 	r : r32;
 	i : r32;
 }
 
-cosf :: (v : r32) -> r32 {
-	return 0.0;
-}
-
-sinf :: (v : r32) -> r32 {
-	return 0.0;
-}
-
 dft :: (data : ^Complex, width : s64, height : s64) -> ^Complex {
     result := [^Complex]calloc([u64](width * height), 8);
 
-    //TAU_32 : r32 : 6.283185307179;
+    TAU_32 : r32 : 6.283185307179;
     
     for v := 0; v < height; v += 1 {
 		for u := 0; u < width; u += 1 {
 			for y := 0; y < height; y += 1 {
 				for x := 0; x < width; x += 1 {
 					f := data[y * width + x];
-					c := 6.283185307179 * [r32](([r32](x * u) / [r32]width) + ([r32](y * v) / [r32]height));
-					result[v * width + u].r += f * cosf(c);
-					result[v * width + u].i -= f * sinf(c);
+					c := TAU_32 * [r32](([r32](x * u) / [r32]width) + ([r32](y * v) / [r32]height));
+					result[v * width + u].r += f.r * cosf(c);
+					result[v * width + u].i -= f.r * sinf(c);
 				}
 			}
 		}
@@ -35,22 +34,21 @@ dft :: (data : ^Complex, width : s64, height : s64) -> ^Complex {
 }
 
 main :: () -> s32 {
-	c :[4]Complex;
-	c[0].r = 1.0;
-	c[0].i = 2.0;
-/*
 	v := array{
-		array{Complex:{1.0, 0.0},Complex:{2.0, 0.0}},
-		array{Complex:{3.0, 0.0},Complex:{4.0, 0.0}}
+		array{Complex:{2.0, 0.0},Complex:{3.0, 0.0}},
+		array{Complex:{4.0, 0.0},Complex:{5.0, 0.0}}
 	};
-
+	
+	res := dft([^Complex]v, 2, 2);
+	
 	for i := 0; i < 2; i += 1 {
 		for j := 0; j < 2; j += 1 {
-			print_r32(v[i][j].r);
+			print_r32(res[i * 2 + j].r);
+			//print_r32(v[i][j].r);
 			print_string(" ");
 		}
 		print_string("\n");
 	}
-*/
+
 	return 0;
 }
