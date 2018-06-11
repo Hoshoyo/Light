@@ -1,9 +1,6 @@
-STDIN_FILENO	: s32 : 0;	/* Standard input.  */
-STDOUT_FILENO	: s32 : 1;	/* Standard output.  */
-STDERR_FILENO	: s32 : 2;	/* Standard error output.  */
+#import "io.li"
 
 memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void #foreign("c");
-write :: (fd : s32, buf : ^void, count : u64) -> u64 #foreign("c");
 
 string_length :: (s : ^u8) -> s64 {
     c := 0;
@@ -29,7 +26,7 @@ s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
         sum = 1;
     }
     auxbuffer := &b[16];
-    start := auxbuffer;
+    start := auxbuffer + sum;
 
     while val != 0 {
         rem := val % 10;
@@ -41,6 +38,40 @@ s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
     size := start - auxbuffer;
     memcpy([^void](&buffer[sum]), [^void](auxbuffer + 1), [u64]size);
     return size;
+}
+
+u32_to_str_base16 :: (val : u32, leading_zeros : bool, buffer : ^s8) -> s64
+{
+	numbuffer : ^s8 = [^s8]malloc(64);
+	at : ^s8=  numbuffer + 63;
+	count : u32 = 0;
+
+	if (val == 0) {
+		*buffer = '0';
+		count += 1;
+		return [s64]count + 1;
+	}
+
+	mask : u32 = 0x0000000f;
+	auxmask : u32 = 0xffffffff;
+	
+	while count < 8 {
+		if (![bool](auxmask & val) && !leading_zeros) break;
+		v : u32 = (val & (mask << (count * 4))) >> (count * 4);
+		if (v >= 10) v += 55;
+		else v += 48;
+		*at = [s8]v;
+		at -= 1;
+		auxmask &= ~mask << (count * 4);
+		count += 1;
+	}
+	i : u32 = 0;
+	for i :u32= 0; i < count; i += 1{
+		at += 1;
+		*buffer = *at;
+		buffer += 1;
+	}
+	return [s64]count;
 }
 
 s64_to_str :: (val : s64, buffer : [32]u8) -> s64 {
@@ -58,7 +89,7 @@ s64_to_str :: (val : s64, buffer : [32]u8) -> s64 {
         sum = 1;
     }
     auxbuffer := &b[32];
-    start := auxbuffer;
+    start := auxbuffer + sum;
 
     while val != 0 {
         rem := val % 10;
@@ -137,6 +168,13 @@ print_bool :: (v : bool) -> s64 {
         buffer = array {'f', 'a', 'l', 's', 'e'};
         len = 5;
     }
+    return print_string_l([^u8]buffer, len);
+}
+
+print_u32 :: (v : u32) -> s64 {
+    buffer : [16]u8;
+    print_string("0x");
+    len := u32_to_str_base16(v, true, [^s8]buffer);
     return print_string_l([^u8]buffer, len);
 }
 

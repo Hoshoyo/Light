@@ -14,7 +14,6 @@ typedef double r64;
 
 
 // Forward declarations
-u32 ExitProcess(u32 ret);
 void __memory_copy(void* dest, void* src, u64 size) {
 	for(u64 i = 0; i < size; ++i) ((char*)dest)[i] = ((char*)src)[i];
 }
@@ -27,43 +26,43 @@ typedef struct EXCEPTION_POINTERS EXCEPTION_POINTERS;
 typedef struct OVERLAPPED OVERLAPPED;
 typedef struct SECURITY_ATTRIBUTES SECURITY_ATTRIBUTES;
 typedef struct OFSTRUCT OFSTRUCT;
-typedef void* __func_type_000002F4D6FC3AC0(u64, u64);
-typedef void __func_type_000002F4D6FC3B28(void*);
-typedef r32 __func_type_000002F4D6FC3B88(r32);
-typedef void __func_type_000002F4D6FC3C90(struct Complex*, s64);
-typedef struct Complex __func_type_000002F4D6FC3CF8(struct Complex, struct Complex);
-typedef struct Complex* __func_type_000002F4D6FC3D60(struct Complex*, s64, s64);
-typedef s32 __func_type_000002F4D6FC3DD0();
-typedef s32 __func_type_000002F4D6FC3E28(u8*);
-typedef void* __func_type_000002F4D6FC45E0(u32);
-typedef bool __func_type_000002F4D6FC4640(u32, void*);
-typedef bool __func_type_000002F4D6FC46A8(void*, void*, u32, u32*, void*);
-typedef u8* __func_type_000002F4D6FC4728();
-typedef u32 __func_type_000002F4D6FC4780();
-typedef bool __func_type_000002F4D6FC4818(void*, void*, u32, u32*, struct OVERLAPPED*);
-typedef s32 __func_type_000002F4D6FC48D8(u8*, struct OFSTRUCT*, u32);
-typedef bool __func_type_000002F4D6FC4948(void*);
-typedef void* __func_type_000002F4D6FC49E8(u8*, u32, u32, struct SECURITY_ATTRIBUTES*, u32, u32, void*);
-typedef bool __func_type_000002F4D6FC4A78(u8*, struct SECURITY_ATTRIBUTES*);
-typedef bool __func_type_000002F4D6FC4AE0(u8*, u8*, struct SECURITY_ATTRIBUTES*);
-typedef void* __func_type_000002F4D6FC4B50(void*, u64, u32, u32);
-typedef bool __func_type_000002F4D6FC4BC8(void*, u64, u32);
-typedef void __func_type_000002F4D6FC4C38(void*, void*, u64);
-typedef void* __func_type_000002F4D6FC4CA8(void*, u64);
-typedef s64 __func_type_000002F4D6FC4D10(void*);
-typedef __func_type_000002F4D6FC4D10* __func_type_000002F4D6FC4D70(__func_type_000002F4D6FC4D10* );
-typedef s64 __func_type_000002F4D6FC4DD0(u8*);
-typedef void* __func_type_000002F4D6FC4E30(void*, void*, u64);
-typedef s64 __func_type_000002F4D6FC4EE0(s64, u8*);
-typedef s64 __func_type_000002F4D6FC4F88(s32, u8*);
-typedef s64 __func_type_000002F4D6FC4FF0(r32, u8*);
-typedef s64 __func_type_000002F4D6FC5098(r64, u8*);
-typedef s64 __func_type_000002F4D6FC5100(r32);
-typedef s64 __func_type_000002F4D6FC5160(r64);
-typedef s64 __func_type_000002F4D6FC51C0(s32);
-typedef s64 __func_type_000002F4D6FC5220(s64);
-typedef s64 __func_type_000002F4D6FC5280(u8*, s64);
-typedef s32 __func_type_000002F4D6FC52E8(struct string);
+typedef void* __func_type_0xb8fca0(u64, u64);
+typedef void __func_type_0xb8fd08(void*);
+typedef r32 __func_type_0xb8fd68(r32);
+typedef void __func_type_0xb8fe70(struct Complex*, s64);
+typedef struct Complex __func_type_0xb8fed8(struct Complex, struct Complex);
+typedef struct Complex* __func_type_0xb8ff40(struct Complex*, s64, s64);
+typedef s32 __func_type_0xb8ffb0();
+typedef s32 __func_type_0xb90008(u8*);
+typedef void* __func_type_0xb907c0(u32);
+typedef bool __func_type_0xb90820(u32, void*);
+typedef bool __func_type_0xb90888(void*, void*, u32, u32*, void*);
+typedef u8* __func_type_0xb90908();
+typedef u32 __func_type_0xb90960();
+typedef bool __func_type_0xb909f8(void*, void*, u32, u32*, struct OVERLAPPED*);
+typedef s32 __func_type_0xb90ab8(u8*, struct OFSTRUCT*, u32);
+typedef bool __func_type_0xb90b28(void*);
+typedef void* __func_type_0xb90bc8(u8*, u32, u32, struct SECURITY_ATTRIBUTES*, u32, u32, void*);
+typedef bool __func_type_0xb90c58(u8*, struct SECURITY_ATTRIBUTES*);
+typedef bool __func_type_0xb90cc0(u8*, u8*, struct SECURITY_ATTRIBUTES*);
+typedef void* __func_type_0xb90d30(void*, u64, u32, u32);
+typedef bool __func_type_0xb90da8(void*, u64, u32);
+typedef void __func_type_0xb90e18(void*, void*, u64);
+typedef void* __func_type_0xb90e88(void*, u64);
+typedef s64 __func_type_0xb90ef0(void*);
+typedef __func_type_0xb90ef0* __func_type_0xb90f50(__func_type_0xb90ef0* );
+typedef s64 __func_type_0xb90fb0(u8*);
+typedef void* __func_type_0xb91010(void*, void*, u64);
+typedef s64 __func_type_0xb910c0(s64, u8*);
+typedef s64 __func_type_0xb91168(s32, u8*);
+typedef s64 __func_type_0xb911d0(r32, u8*);
+typedef s64 __func_type_0xb91278(r64, u8*);
+typedef s64 __func_type_0xb912e0(r32);
+typedef s64 __func_type_0xb91340(r64);
+typedef s64 __func_type_0xb913a0(s32);
+typedef s64 __func_type_0xb91400(s64);
+typedef s64 __func_type_0xb91460(u8*, s64);
+typedef s32 __func_type_0xb914c8(struct string);
 typedef struct string{s64 length;s64 capacity;u8* data;} string;
 typedef struct Complex{r32 r;r32 i;} Complex;
 typedef struct M128A{u64 Low;s64 High;} M128A;
@@ -117,7 +116,7 @@ void MoveMemory(void* destination, void* source, u64 length);
 void CopyMemory(void* destination, void* source, u64 length);
 void* SecureZeroMemory(void* ptr, u64 count);
 typedef s64 __ret_SetUnhandledExceptionFilter(void*);
-__ret_SetUnhandledExceptionFilter* SetUnhandledExceptionFilter(__func_type_000002F4D6FC4D10* top_level_exception_filter);
+__ret_SetUnhandledExceptionFilter* SetUnhandledExceptionFilter(__func_type_0xb90ef0* top_level_exception_filter);
 void* stdout;
 s64 string_length(u8* s);
 void* memcpy(void* dest, void* src, u64 size);
@@ -750,8 +749,8 @@ return ((s32)written);
 }
 
 
-void __entry() {
+int __entry() {
 ;
 	stdout = (GetStdHandle)((-0xb));
-	ExitProcess(__main());
+	return __main();
 }
