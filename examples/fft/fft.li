@@ -1,9 +1,16 @@
-#import "../linux/print.li"
+//#import "../linux/print.li"
+#import "../windows/windows.li"
+#import "../windows/print.li"
 
-calloc :: (count : u64, size : u64) -> ^void #foreign("c");
-free :: (block : ^void) -> void #foreign("c");
-cosf :: (v : r32) -> r32 #foreign("m");
-sinf :: (v : r32) -> r32 #foreign("m");
+//calloc :: (count : u64, size : u64) -> ^void #foreign("c");
+//free :: (block : ^void) -> void #foreign("c");
+//cosf :: (v : r32) -> r32 #foreign("m");
+//sinf :: (v : r32) -> r32 #foreign("m");
+
+calloc :: (count : u64, size : u64) -> ^void #foreign("msvcrt");
+free :: (block : ^void) -> void #foreign("msvcrt");
+cosf :: (v : r32) -> r32 #foreign("msvcrt");
+sinf :: (v : r32) -> r32 #foreign("msvcrt");
 
 Complex :: struct {
     r : r32;
@@ -69,8 +76,15 @@ fft2 :: (data : ^Complex, length : s64) {
 
             w : Complex;
 
-            w.r = cosf(2.0 * PI_32 * [r32](k / length));
-            w.i = -sinf(2.0 * PI_32 * [r32](k / length));
+            w.r = cosf(2.0 * PI_32 * ([r32]k / [r32]length));
+            w.i = -sinf(2.0 * PI_32 * ([r32]k / [r32]length));
+
+            /*
+            print_r32(w.r);
+            print_string(", ");
+            print_r32(w.i);
+            print_string("\n");
+            */
 
             data[k] = complex_sum(e, complex_mul(w, o));//e + w * o;
             data[k + length / 2] = complex_sub(e, complex_mul(w, o));//e - w * o;
@@ -81,16 +95,16 @@ fft2 :: (data : ^Complex, length : s64) {
 dft :: (data : ^Complex, width : s64, height : s64) -> ^Complex {
     result := [^Complex]calloc([u64](width * height), 8);
 
-    //TAU_32 : r32 : 6.283185307179;
+    TAU_32 : r32 : 6.283185307179;
     
     for v := 0; v < height; v += 1 {
 		for u := 0; u < width; u += 1 {
 			for y := 0; y < height; y += 1 {
 				for x := 0; x < width; x += 1 {
 					f := data[y * width + x];
-					c := 6.283185307179 * [r32](([r32](x * u) / [r32]width) + ([r32](y * v) / [r32]height));
-					result[v * width + u].r += f * cosf(c);
-					result[v * width + u].i -= f * sinf(c);
+					c := TAU_32 * [r32](([r32](x * u) / [r32]width) + ([r32](y * v) / [r32]height));
+					result[v * width + u].r += f.r * cosf(c);
+					result[v * width + u].i -= f.r * sinf(c);
 				}
 			}
 		}
@@ -99,30 +113,84 @@ dft :: (data : ^Complex, width : s64, height : s64) -> ^Complex {
     return result;
 }
 
-main :: () -> s32 {
+foo :: () -> s32 {
     
-    matrix : [2][2]Complex = array{
-        array{Complex:{2.0, 0.0}, Complex:{3.0, 0.0}},
-        array{Complex:{4.0, 0.0}, Complex:{5.0, 0.0}}
+    matrix := array{
+        array{Complex:{2.0, 0.0}, Complex:{3.0, 0.0}, Complex:{4.0, 0.0}, Complex:{5.0, 0.0}},
+        array{Complex:{6.0, 0.0}, Complex:{7.0, 0.0}, Complex:{8.0, 0.0}, Complex:{9.0, 0.0}},
+        array{Complex:{10.0, 0.0}, Complex:{11.0, 0.0}, Complex:{12.0, 0.0}, Complex:{13.0, 0.0}},
+        array{Complex:{14.0, 0.0}, Complex:{15.0, 0.0}, Complex:{16.0, 0.0}, Complex:{17.0, 0.0}}
     };
 
-    fft2([^Complex]matrix, 2 * 2);
+    fft2([^Complex]matrix, 4 * 4);
+/*
+    for y := 0; y < 4; y +=1 {
+        for x := 0; x < 4; x +=1 {
+            print_string("{ ");
+            print_r32(result[y * 4 + x].r);
+            print_string(", ");
+            print_r32(result[y * 4 + x].i);
+            print_string(" } ");
+        }
+        print_string("\n");
+    }
+*/
 
-    x := [^r32]matrix;
-    print_r32(x[0]);
-    print_string("\n");
-    print_r32(x[1]);
-    print_string("\n");
-    print_r32(x[2]);
-    print_string("\n");
-    print_r32(x[3]);
-    print_string("\n");
-    print_r32(x[4]);
-    print_string("\n");
-    print_r32(x[5]);
-    print_string("\n");
-    print_r32(x[6]);
-    print_string("\n");
-    print_r32(x[7]);
+    for y := 0; y < 4; y +=1 {
+        for x := 0; x < 4; x +=1 {
+            print_string("{ ");
+            print_r32(matrix[y][x].r);
+            print_string(", ");
+            print_r32(matrix[y][x].i);
+            print_string(" } ");
+        }
+        print_string("\n");
+    }
+
+    return 0;
+}
+
+system :: (command : ^u8) -> s32 #foreign("msvcrt");
+
+buffer : [256][256]u8;
+
+main :: () -> s32 {
+    file := CreateFileA("examples/fft/cameraman.bin".data, GENERIC_READ, FILE_SHARE_READ, [^SECURITY_ATTRIBUTES]0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, [^void]0);
+    if GetLastError() != 0 {
+        print_string("Could not open file\n");
+        return -1;
+    }
+
+    width    : u32 = 256;
+    height   : u32 = 256;
+    channels : u32 = 1;
+
+    read : u32;
+
+    if ReadFile(file, [^void]buffer, width * height * channels, &read, [^OVERLAPPED]0) == false {
+        print_string("Could not read file\n");
+        return -1;
+    }
+
+    image := [^Complex]calloc([u64](width * height * channels), 8);
+
+    for y : u32 = 0; y < height; y += 1 {
+        for x : u32 = 0; x < width; x +=1 {
+           image[y * width + x].r = [r32]buffer[x][y];
+        }
+    }
+
+    fft2(image, [s64](width * height * channels));
+    //image = dft(image, [s64]width, [s64]height);
+
+    out_handle := CreateFileA("resultfft.out".data, GENERIC_WRITE, 0, [^SECURITY_ATTRIBUTES]0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, [^void]0);
+    written : u32;
+    if WriteFile(out_handle, [^void]image, width * height * 8, &written, [^OVERLAPPED]0) == false {
+        print_string("Could not write file\n");
+        return -1;
+    }
+
+    CloseHandle(out_handle);
+    CloseHandle(file);
     return 0;
 }
