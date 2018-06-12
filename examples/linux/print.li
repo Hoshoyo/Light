@@ -42,7 +42,8 @@ s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
 
 u32_to_str_base16 :: (val : u32, leading_zeros : bool, buffer : ^s8) -> s64
 {
-	numbuffer : ^s8 = [^s8]malloc(64);
+    temp_buffer : [64]s8;
+	numbuffer : ^s8 = [^s8]temp_buffer;
 	at : ^s8=  numbuffer + 63;
 	count : u32 = 0;
 
