@@ -1,0 +1,32 @@
+#import "../x11/x11.li"
+
+Window_Info :: struct {
+	width : s32;
+	height : s32;
+	display : ^Display;
+	window_handle : u64;
+	vi : ^XVisualInfo;
+	swa : XSetWindowAttributes;
+}
+
+init_opengl :: (window_info : ^Window_Info) -> s32 {
+    visual_attribs := array{
+		GLX_X_RENDERABLE, GL_TRUE,
+		GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
+		GLX_RENDER_TYPE, GLX_RGBA_BIT,
+		GLX_X_VISUAL_TYPE, GLX_TRUE_COLOR,
+		GLX_RED_SIZE, 8,
+		GLX_GREEN_SIZE, 8,
+		GLX_BLUE_SIZE, 8,
+		GLX_ALPHA_SIZE, 8,
+		GLX_DEPTH_SIZE, 24,
+		GLX_STENCIL_SIZE, 8,
+		GLX_DOUBLEBUFFER, GL_TRUE,
+		0
+	};
+
+}
+
+main :: () -> s32 {
+    return 0;
+}
