@@ -1,4 +1,5 @@
 #import "../x11/x11.li"
+#import "../linux/print.li"
 
 Window_Info :: struct {
 	width : s32;
@@ -9,9 +10,27 @@ Window_Info :: struct {
 	swa : XSetWindowAttributes;
 }
 
-init_opengl :: (window_info : ^Window_Info) -> s32 {
+GLX_X_RENDERABLE : u32 : 0x8012;
+GLX_DRAWABLE_TYPE : u32 : 0x8010;
+GLX_RENDER_TYPE : u32 : 0x8011;
+GLX_RGBA_BIT : u32 : 0x1;
+GLX_X_VISUAL_TYPE : u32 : 0x22;
+GLX_TRUE_COLOR : u32 : 0x8002;
+GLX_RED_SIZE : u32 : 8;
+GLX_GREEN_SIZE : u32 : 9;
+GLX_BLUE_SIZE : u32 : 10;
+GLX_ALPHA_SIZE : u32 : 11;
+GLX_DEPTH_SIZE : u32 : 12;
+GLX_STENCIL_SIZE : u32 : 13;
+GLX_DOUBLEBUFFER : u32 : 5;
+GLX_WINDOW_BIT : u32 : 1;
+True : u32 : 1;
+
+glXQueryVersion :: (dpy : ^Display, major : ^s32, minor : ^s32) -> bool #foreign("X11");
+
+init_opengl :: (info : ^Window_Info) -> s32 {
     visual_attribs := array{
-		GLX_X_RENDERABLE, GL_TRUE,
+		GLX_X_RENDERABLE, True,
 		GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
 		GLX_RENDER_TYPE, GLX_RGBA_BIT,
 		GLX_X_VISUAL_TYPE, GLX_TRUE_COLOR,
@@ -21,12 +40,37 @@ init_opengl :: (window_info : ^Window_Info) -> s32 {
 		GLX_ALPHA_SIZE, 8,
 		GLX_DEPTH_SIZE, 24,
 		GLX_STENCIL_SIZE, 8,
-		GLX_DOUBLEBUFFER, GL_TRUE,
+		GLX_DOUBLEBUFFER, True,
 		0
 	};
+	glx_minor : s32;
+	glx_major : s32;
+
+	if !glXQueryVersion((*info).display, &glx_major, &glx_minor) || ((glx_major == 1) && (glx_minor < 3)) || (glx_major < 1){
+		print_string("invalid glx version!\n");
+		return -1;
+	}
+	// Getting framebuffer config
+	fbcount : s32;
+	fbc := glXChooseFBConfig((*info).display, DefaultScreen((*info).display), visual_attribs, &fbcount);
+	if(!fbc){
+		printf("Failed to get framebuffer configuration\n");
+		return -1;
+	}
+}
+
+glXChooseFBConfig :: (dpy : ^Display, screen : s32, attrib_list : ^u32, nelements : ^s32) -> ^GLXFBConfig {
 
 }
 
+DefaultScreen :: (dpy : ^Display) -> s32 {
+	return (*dpy).default_screen;
+}
+
 main :: () -> s32 {
+	info : Window_Info;
+	info.display = XOpenDisplay([^s8]0);
+
+	init_opengl(&info);
     return 0;
 }
