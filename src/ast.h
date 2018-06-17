@@ -16,6 +16,7 @@ enum Ast_NodeType {
 	AST_DECL_UNION,
 	AST_DECL_ENUM,
 	AST_DECL_CONSTANT,
+	AST_DECL_TYPEDEF,
 
 	// Commands
 	AST_COMMAND_BLOCK,
@@ -220,6 +221,13 @@ struct Ast_Decl_Constant {
 	u32 flags;
 };
 
+struct Ast_Decl_Typedef {
+	Token*         name;
+	Type_Instance* type;
+
+	Site site;
+};
+
 // ----------------------------------------
 // -------------- Commands ----------------
 // ----------------------------------------
@@ -324,6 +332,7 @@ const u32 AST_FLAG_IS_EXPRESSION  = FLAG(2);
 const u32 AST_FLAG_IS_DATA        = FLAG(3);
 const u32 AST_FLAG_QUEUED         = FLAG(4);
 const u32 AST_FLAG_LVALUE         = FLAG(5);
+//const u32 AST_FLAG_FAILED_TYPE_CHECK = FLAG(6);
 
 struct Ast {
 	Ast_NodeType   node_type;
@@ -340,6 +349,7 @@ struct Ast {
 		Ast_Decl_Union          decl_union;
 		Ast_Decl_Enum           decl_enum;
 		Ast_Decl_Constant       decl_constant;
+		Ast_Decl_Typedef		decl_typedef;
 
 		Ast_Comm_Block          comm_block;
 		Ast_Comm_VariableAssign comm_var_assign;
@@ -368,6 +378,7 @@ Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_I
 Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Type_Instance* stype, Ast** fields, u32 flags, s32 field_count);
 Ast* ast_create_decl_enum(Token* name, Scope* scope, Scope* enum_scope, Ast** fields, Type_Instance* type_hint, u32 flags, s32 field_count);
 Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instance* type, u32 flags);
+Ast* ast_create_decl_typedef(Token* name, Scope* scope, Type_Instance* type);
 
 Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type);
 Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Token* token, u32 flags, Type_Instance* type);

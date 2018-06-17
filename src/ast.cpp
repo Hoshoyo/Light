@@ -162,6 +162,24 @@ Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instan
 	return dc;
 }
 
+Ast* ast_create_decl_typedef(Token* name, Scope* scope, Type_Instance* type) {
+	Ast* dt = ALLOC_AST();
+	dt->node_type = AST_DECL_TYPEDEF;
+	dt->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	dt->scope = scope;
+	dt->flags = AST_FLAG_IS_DECLARATION;
+	dt->infer_queue_index = -1;
+
+	dt->decl_typedef.name = name;
+	dt->decl_typedef.type = type;
+
+	dt->decl_typedef.site.filename = name->filename;
+	dt->decl_typedef.site.line = name->line;
+	dt->decl_typedef.site.column = name->column;
+
+	return dt;
+}
+
 // Expressions
 Ast* ast_create_expr_proc_call(Scope* scope, Ast* caller, Ast** arguments, s32 args_count) {
 	Ast* epc = ALLOC_AST();
@@ -426,12 +444,16 @@ void DEBUG_print_indent_level() {
 void quick_type(FILE* out, Type_Instance* type) {
 	if (!print_types)  return;
 	fprintf(out, "<");
-	if(type->flags & TYPE_FLAG_INTERNALIZED){
-		fprintf(out, "%s", KGRN);
+	if (!type) {
+		fprintf(out, "%snull", KRED);
 	} else {
-		fprintf(out, "%s", KRED);
+		if(type->flags & TYPE_FLAG_INTERNALIZED){
+			fprintf(out, "%s", KGRN);
+		} else {
+			fprintf(out, "%s", KRED);
+		}
+		DEBUG_print_type(out, type, true);
 	}
-	DEBUG_print_type(out, type, true);
 	fprintf(out, KNRM);
 	fprintf(out, ">");
 }

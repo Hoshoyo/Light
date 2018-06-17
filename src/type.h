@@ -8,8 +8,11 @@ enum Type_Kind {
 	KIND_PRIMITIVE,
 	KIND_POINTER,
 	KIND_STRUCT,
+	KIND_UNION,
 	KIND_ARRAY,
 	KIND_FUNCTION,
+
+	KIND_ALIAS,
 };
 
 enum Type_Primitive {
@@ -56,9 +59,9 @@ struct Type_Function {
 	s32             num_arguments;
 };
 
-// Auxiliary for a single node, while is not resolved can't internalize only the node itself 
-// can change this flag. Inferring nodes should not read nor write this flag.
-const u32 TYPE_FLAG_RESOLVED = FLAG(0);
+struct Type_Alias {
+	Token* name;
+};
 
 // Expected state of node from the outside, another node can only infer its type from this
 // instance if the type is internalized, otherwise wait and depend on it in the infer queue.
@@ -82,6 +85,7 @@ struct Type_Instance {
 		Type_Array     array_desc;
 		Type_Struct    struct_desc;
 		Type_Function  function_desc;
+		Type_Alias     alias;
 	};
 };
 

@@ -1,4 +1,9 @@
-#import "linux/print.li"
+//#import "linux/print.li"
+//#import "windows/windows.li"
+
+foo : typedef : u32;
+
+memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void #foreign("msvcrt");
 
 main :: () -> s32 {
 	return 0;

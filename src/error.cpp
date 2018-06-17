@@ -63,7 +63,7 @@ Type_Error report_type_error(Type_Error e, Ast* location, char* fmt, ...){
 	Declaration Errors
 */
 
-Decl_Error report_decl_error(Decl_Error e, char* fmt, ...){
+Type_Error report_decl_error(Type_Error e, char* fmt, ...){
     va_list args;
 	va_start(args, fmt);
 	fprintf(stderr, "Declaration Error: ");
@@ -71,7 +71,7 @@ Decl_Error report_decl_error(Decl_Error e, char* fmt, ...){
 	va_end(args);
 	return e;
 }
-Decl_Error report_decl_error(Decl_Error e, Token* location, char* fmt, ...){
+Type_Error report_decl_error(Type_Error e, Token* location, char* fmt, ...){
     report_error_location(location);
     va_list args;
 	va_start(args, fmt);
@@ -80,7 +80,7 @@ Decl_Error report_decl_error(Decl_Error e, Token* location, char* fmt, ...){
 	va_end(args);
 	return e;
 }
-Decl_Error report_decl_error(Decl_Error e, Ast* location, char* fmt, ...){
+Type_Error report_decl_error(Type_Error e, Ast* location, char* fmt, ...){
     report_error_location(location);
     va_list args;
 	va_start(args, fmt);
@@ -90,7 +90,7 @@ Decl_Error report_decl_error(Decl_Error e, Ast* location, char* fmt, ...){
 	return e;
 }
 
-Decl_Error report_semantic_error(Decl_Error e, char* fmt, ...){
+Type_Error report_semantic_error(Type_Error e, char* fmt, ...){
     va_list args;
 	va_start(args, fmt);
 	fprintf(stderr, "Semantic Error: ");
@@ -98,7 +98,7 @@ Decl_Error report_semantic_error(Decl_Error e, char* fmt, ...){
 	va_end(args);
 	return e;
 }
-Decl_Error report_semantic_error(Decl_Error e, Token* location, char* fmt, ...){
+Type_Error report_semantic_error(Type_Error e, Token* location, char* fmt, ...){
     report_error_location(location);
     va_list args;
 	va_start(args, fmt);
@@ -107,7 +107,7 @@ Decl_Error report_semantic_error(Decl_Error e, Token* location, char* fmt, ...){
 	va_end(args);
 	return e;
 }
-Decl_Error report_semantic_error(Decl_Error e, Ast* location, char* fmt, ...){
+Type_Error report_semantic_error(Type_Error e, Ast* location, char* fmt, ...){
     report_error_location(location);
     va_list args;
 	va_start(args, fmt);

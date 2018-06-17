@@ -52,11 +52,17 @@ int main(int argc, char** argv) {
 	}
 
 	// TODO(psv): Fuse type checking, and also refactor it
-	Decl_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
+	Type_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
 	
-	if (decl_err & (~DECL_ERROR_WARNING)) {
+#if 1
+	DEBUG_print_ast(stdout, ast_top_level, true);
+	return 0;
+#endif
+
+	if (decl_err & TYPE_ERROR_FATAL) {
 		return -1;
 	}
+
 	Type_Error type_error = type_check(&global_scope, ast_top_level);
 	if (type_error) {
 		return -1;

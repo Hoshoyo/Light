@@ -35,6 +35,7 @@ struct Parser {
 	Type_Instance* parse_type_struct(Token* name);
 	Type_Instance* parse_type_array();
 	Type_Instance* parse_type_function();
+	Type_Instance* parse_type_alias(Token* name);
 
 	// Declaration parsing
 	Ast* parse_declaration(Scope* scope);
@@ -44,6 +45,7 @@ struct Parser {
 	Ast* parse_decl_struct(Token* name, Scope* scope);
 	Ast* parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint);
 	Ast* parse_decl_constant(Token* name, Scope* scope, Type_Instance* type);
+	Ast* parse_decl_typedef(Token* name, Scope* scope);
 
 	// Expression parsing
 	Ast* parse_expression(Scope* scope);

@@ -113,7 +113,13 @@ u64 type_hash(Type_Instance* type) {
 		case KIND_POINTER:
 			hash = fnv_1_hash_from_start(type_hash(type->pointer_to), (const u8*)"pointer", sizeof("pointer") - 1); break;
 		case KIND_STRUCT:
-			hash = fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length); break;
+			hash = fnv_1_hash_from_start(fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length), 
+				(const u8*)"struct", sizeof("struct" - 1));
+			break;
+		case KIND_UNION:
+			hash = fnv_1_hash_from_start(fnv_1_hash(type->struct_desc.name->value.data, type->struct_desc.name->value.length),
+				(const u8*)"union", sizeof("union" - 1));
+			break;
 		case KIND_FUNCTION: {
 			u64 return_type_hash = type_hash(type->function_desc.return_type);
 			size_t n_args = 0;
@@ -243,7 +249,7 @@ inline Type_Instance* type_setup_ptr(Type_Instance* p) {
 	assert(p->flags & TYPE_FLAG_INTERNALIZED);
 	Type_Instance* res = ALLOC_TYPE(types_internal);
 	res->kind = KIND_POINTER;
-	res->flags = TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+	res->flags = TYPE_FLAG_SIZE_RESOLVED;
 	res->type_size_bits = type_pointer_size_bits();
 	res->pointer_to = p;
 	internalize_type(&res, false);
@@ -253,7 +259,7 @@ inline Type_Instance* type_setup_ptr(Type_Instance* p) {
 inline Type_Instance* type_setup_primitive(Type_Primitive p) {
 	Type_Instance* res = ALLOC_TYPE(types_internal);
 	res->kind = KIND_PRIMITIVE;
-	res->flags = TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+	res->flags = TYPE_FLAG_SIZE_RESOLVED;
 	res->primitive = p;
 	switch (p) {
 		case TYPE_PRIMITIVE_S64:  res->type_size_bits = 64; break;

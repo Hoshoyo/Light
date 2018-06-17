@@ -275,6 +275,9 @@ Ast* Parser::parse_declaration(Scope* scope) {
 			} else {
 				return parse_decl_constant(name, scope, 0);
 			}
+		} else if (next->value.data == compiler_tags[COMPILER_TAG_TYPEDEF].data) {
+			// this is a type alias
+			return parse_decl_typedef(name, scope);
 		} else {
 			// type for a variable, enum or constant declaration
 			Type_Instance* declaration_type = 0;
@@ -297,6 +300,16 @@ Ast* Parser::parse_declaration(Scope* scope) {
 		report_syntax_error(decl, "invalid declaration of '%.*s', declaration requires ':'\n", TOKEN_STR(name));
 	}
 	return 0;
+}
+
+Ast* Parser::parse_decl_typedef(Token* name, Scope* scope) {
+	Token* tdef = lexer->eat_token();
+	assert(tdef->value.data == compiler_tags[COMPILER_TAG_TYPEDEF].data);
+	require_and_eat(':');
+
+	Type_Instance* type = parse_type();
+	require_and_eat(';');
+	return ast_create_decl_typedef(name, scope, type);
 }
 
 Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
@@ -1216,7 +1229,8 @@ Type_Instance* Parser::parse_type() {
 			return parse_type_pointer();
 
 		case TOKEN_IDENTIFIER:
-			return parse_type_struct(tok);
+			//return parse_type_struct(tok);
+			return parse_type_alias(tok);
 
 		case '[':
 			return parse_type_array();
@@ -1256,6 +1270,17 @@ Type_Instance* Parser::parse_type_pointer() {
 	t->pointer_to = parse_type();
 	return t;
 }
+Type_Instance* Parser::parse_type_alias(Token* name) {
+	Type_Instance* t = type_new_temporary();
+	t->kind = KIND_ALIAS;
+	t->flags = 0;
+	t->type_size_bits = 0;
+	t->struct_desc.fields_names = 0;
+	t->struct_desc.fields_types = 0;
+	t->struct_desc.name = name;
+	return t;
+}
+
 Type_Instance* Parser::parse_type_struct(Token* name) {
 	Type_Instance* t = type_new_temporary();
 	t->kind = KIND_STRUCT;
