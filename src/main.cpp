@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
 	if(ast_top_level == 0) {
 		return -1;
 	}
+	//DEBUG_print_ast(stdout, ast_top_level, false);
 
 	// TODO(psv): Fuse type checking, and also refactor it
 	Type_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
@@ -76,7 +77,7 @@ int main(int argc, char** argv) {
 		DEBUG_print_ast(stdout, ast_top_level, true);
 		//DEBUG_print_scope_decls(&global_scope);
 		//DEBUG_print_type_table();
-		//DEBUG_print_type_table_structs();
+		DEBUG_print_type_table_structs();
 	}
 	
 	double bend_start = timer.GetTime();

@@ -13,8 +13,8 @@ enum Ast_NodeType {
 	AST_DECL_PROCEDURE,
 	AST_DECL_VARIABLE,
 	AST_DECL_STRUCT,
-	AST_DECL_UNION,
 	AST_DECL_ENUM,
+	AST_DECL_UNION,
 	AST_DECL_CONSTANT,
 	AST_DECL_TYPEDEF,
 
@@ -118,10 +118,11 @@ struct Type_Instance;
 const u32 SCOPE_PROCEDURE_ARGUMENTS = FLAG(0);
 const u32 SCOPE_PROCEDURE_BODY      = FLAG(1);
 const u32 SCOPE_STRUCTURE           = FLAG(2);
-const u32 SCOPE_ENUM                = FLAG(3);
-const u32 SCOPE_FILESCOPE           = FLAG(4);
-const u32 SCOPE_BLOCK               = FLAG(5);
-const u32 SCOPE_LOOP                = FLAG(6);
+const u32 SCOPE_UNION               = FLAG(3);
+const u32 SCOPE_ENUM                = FLAG(4);
+const u32 SCOPE_FILESCOPE           = FLAG(5);
+const u32 SCOPE_BLOCK               = FLAG(6);
+const u32 SCOPE_LOOP                = FLAG(7);
 struct Scope {
 	s32           id;
 	s32           level;
@@ -175,23 +176,14 @@ struct Ast_Decl_Variable {
 	s32 alignment;
 	u32 temporary_register;
 };
+
+const u32 STRUCT_FLAG_IS_UNION = FLAG(0);
+const u32 STRUCT_FLAG_PACKED = FLAG(1);
 struct Ast_Decl_Struct {
 	Token*         name;
 	Ast**          fields;			// DECL_VARIABLE
 	Type_Instance* type_info;
 	Scope*         struct_scope;
-
-	Site site;
-
-	u32 flags;
-	s32 fields_count;
-	s32 alignment;
-	s64 size_bytes;
-};
-struct Ast_Decl_Union {
-	Token*         name;
-	Ast**          fields;			// DECL_VARIABLE
-	Type_Instance* type_info;
 
 	Site site;
 
@@ -346,7 +338,6 @@ struct Ast {
 		Ast_Decl_Procedure      decl_procedure;
 		Ast_Decl_Variable       decl_variable;
 		Ast_Decl_Struct         decl_struct;
-		Ast_Decl_Union          decl_union;
 		Ast_Decl_Enum           decl_enum;
 		Ast_Decl_Constant       decl_constant;
 		Ast_Decl_Typedef		decl_typedef;

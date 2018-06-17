@@ -1046,7 +1046,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					}
 				} break;
 				case OP_BINARY_DOT:
-					if(lt->kind != KIND_STRUCT){
+					if(lt->kind != KIND_STRUCT && lt->kind != KIND_UNION){
 						// @IMPLEMENT namespaces
 						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot access field from a non structure type\n");
 						return 0;
@@ -1109,34 +1109,48 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 				// @TODO set check_against here to 0
 				// @BUG
 				// using the struct name as variable i think this crashes, maybe?
-				if(expr->expr_literal.struct_exprs) {
-					size_t check_against_num_fields = 0;
-					if(check_against->struct_desc.fields_types) {
-						check_against_num_fields = array_get_length(check_against->struct_desc.fields_types);
-					}
-					size_t nexpr = array_get_length(expr->expr_literal.struct_exprs);
-					if(nexpr == check_against_num_fields){
-						for(size_t i = 0; i < nexpr; ++i) {
-							Ast* e = expr->expr_literal.struct_exprs[i];
-							if(type_weak(e->type_return)){
-								type_propagate(0, e);
-							}
-							Type_Instance* type = type_check_expr(check_against->struct_desc.fields_types[i], e, error);
-							if(*error) return 0;
-						}
-					} else if(nexpr > check_against_num_fields) {
-						*error |= report_type_error(TYPE_ERROR_FATAL, expr, "too many fields for %.*s struct literal\n", TOKEN_STR(expr->expr_literal.token));
-						return 0;
-					} else if(nexpr < check_against_num_fields) {
-						size_t nmissing = check_against_num_fields - nexpr; 
-						if(nmissing == 1) {
-							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "missing '%d' field in %.*s struct literal\n", 
-								nmissing, TOKEN_STR(expr->expr_literal.token));
+
+				// Could be a union, if so, accept only 1 field
+				if (check_against->flags & TYPE_FLAG_UNION) {
+					if (expr->expr_literal.struct_exprs) {
+						size_t nexpr = array_get_length(expr->expr_literal.struct_exprs);
+						if (nexpr == 1) {
+							
 						} else {
-							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "missing '%d' fields in %.*s struct literal\n", 
-								nmissing, TOKEN_STR(expr->expr_literal.token));
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "union literal can only have 1 value\n");
+							return 0;
 						}
-						return 0;
+					}
+				} else {
+					if (expr->expr_literal.struct_exprs) {
+						size_t check_against_num_fields = 0;
+						if (check_against->struct_desc.fields_types) {
+							check_against_num_fields = array_get_length(check_against->struct_desc.fields_types);
+						}
+						size_t nexpr = array_get_length(expr->expr_literal.struct_exprs);
+						if (nexpr == check_against_num_fields) {
+							for (size_t i = 0; i < nexpr; ++i) {
+								Ast* e = expr->expr_literal.struct_exprs[i];
+								if (type_weak(e->type_return)) {
+									type_propagate(0, e);
+								}
+								Type_Instance* type = type_check_expr(check_against->struct_desc.fields_types[i], e, error);
+								if (*error) return 0;
+							}
+						} else if (nexpr > check_against_num_fields) {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "too many fields for %.*s struct literal\n", TOKEN_STR(expr->expr_literal.token));
+							return 0;
+						} else if (nexpr < check_against_num_fields) {
+							size_t nmissing = check_against_num_fields - nexpr;
+							if (nmissing == 1) {
+								*error |= report_type_error(TYPE_ERROR_FATAL, expr, "missing '%d' field in %.*s struct literal\n",
+									nmissing, TOKEN_STR(expr->expr_literal.token));
+							} else {
+								*error |= report_type_error(TYPE_ERROR_FATAL, expr, "missing '%d' fields in %.*s struct literal\n",
+									nmissing, TOKEN_STR(expr->expr_literal.token));
+							}
+							return 0;
+						}
 					}
 				}
 			} else {

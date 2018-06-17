@@ -1,0 +1,60 @@
+#import "../windows/print.li"
+
+calloc :: (count : u64, size : u64) -> ^void #foreign("msvcrt");
+
+example1 :: () {
+    print_string("Example1\n\n");
+
+    matrix : [4][4]s32 = array{
+        array{1,2,3,4},
+        array{5,6,7,8},
+        array{9,10,11,12},
+        array{13,14,15,16}
+    };
+
+    for y := 0; y < 4; y += 1 {
+        for x := 0; x < 4; x += 1 {
+            print_s32(matrix[y][x]);
+            print_string(" ");
+        }
+        print_string("\n");
+    }
+
+    for x := 0; x < 4 * 4; x += 1 {
+        print_s32(([^s32]matrix)[x]);
+        print_string(" ");
+    }
+    print_string("\n");
+
+    foo := matrix[2];
+
+    for x := 0; x < 4; x += 1 {
+        print_s32(foo[x]);
+        print_string(" ");
+    }
+}
+
+example2 :: () {
+    print_string("\n\nExample2\n\n");
+    ptr : ^s32 = [^s32]calloc(4 * 4, 4);
+    for y := 0; y < 4; y += 1 {
+        for x := 0; x < 4; x += 1 {
+            ptr[y * 4 + x] = [s32](y * x);
+        }
+    }
+    bar := [[4][4]s32]ptr;
+    for y := 0; y < 4; y += 1 {
+        for x := 0; x < 4; x += 1 {
+            print_s32(bar[y][x]);
+            print_string(" ");
+        }
+        print_string("\n");
+    }
+}
+
+main :: () -> s32 {
+    example1();
+    example2();
+
+    return 0;
+}

@@ -188,6 +188,7 @@ Type_Instance* type_copy_internal(Type_Instance* type, Scope* scope) {
 		}
 		//result->pointer_to = type_copy_internal(type->pointer_to);
 		break;
+	case KIND_UNION:
 	case KIND_STRUCT: {
 		size_t num_args = array_get_length(type->struct_desc.fields_types);
 		result->struct_desc.fields_types = (Type_Instance**)types_internal.allocate(array_get_header_size() + num_args * sizeof(Type_Instance*));

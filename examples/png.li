@@ -1,0 +1,111 @@
+#import "linux/print.li"
+
+malloc :: (size : u64) -> ^void #foreign("c");
+free :: (block : ^void) -> void #foreign("c");
+
+memory_compare :: (block1 : ^void, block2 : ^void, size : u64) -> bool {
+    for i :u64= 0; i < size; i += 1 {
+        if ([^u8]block1)[i] != ([^u8]block2)[i] {
+            return false;
+        }
+    }
+    return true;
+}
+
+endian_reverse :: (v : u32) -> u32 {
+    result := ((v & 0xff) << 24) | ((v & 0xff00) << 8) | ((v & 0xff0000) >> 8) | ((v & 0xff000000) >> 24);
+    return result;
+}
+
+PNG_Datastream :: struct {
+    header : [8]u8;
+}
+
+PNG_ChunkHeader :: struct {
+    length : u32;
+    chunk_type : u32;
+}
+
+PNG_ChunkFooter :: struct {
+    crc : u32;
+}
+
+PNG_IHDR :: struct {
+    width              : u32;
+    height             : u32;
+    bit_depth          : u8;
+    color_type         : u8;
+    compression_method : u8;
+    filter_method      : u8;
+    interlaced_method  : u8;
+}
+
+parse_png_file :: (stream : ^u8, size : u64) -> bool {
+    at := stream;
+
+    signature := array{
+        [u8]137, 80, 78, 71, 13, 10, 26, 10
+    };
+
+    if memory_compare([^void]stream, [^void]signature, 8) {
+        // The magic bits are valid, read all the chunks next
+        at += 8;
+        while at - stream < [s64]size {
+            header := [^PNG_ChunkHeader]at;
+            at += 8; // sizeof header
+
+            print_s32([s32]endian_reverse((*header).length));
+            print_string("\n");
+            print_string_l([^u8]&(*header).chunk_type, 4);
+            print_string("\n");
+
+            if (*header).chunk_type == 0x52444849 {
+                ihdr := [^PNG_IHDR]at;
+                print_string("\nwidth: ");
+                print_s32([s32]endian_reverse((*ihdr).width));
+                print_string("\nheight: ");
+                print_s32([s32]endian_reverse((*ihdr).height));
+                print_string("\nbit_depth: ");
+                print_s32([s32](*ihdr).bit_depth);
+                print_string("\ncolor_type: ");
+                print_s32([s32](*ihdr).color_type);
+                print_string("\ncompression_method: ");
+                print_s32([s32](*ihdr).compression_method);
+                print_string("\nfilter_method: ");
+                print_s32([s32](*ihdr).filter_method);
+                print_string("\ninterlaced_method: ");
+                print_s32([s32](*ihdr).interlaced_method);
+                print_string("\n\n");
+            }
+
+            at += endian_reverse((*header).length);
+
+            at += 4; // chunk footer
+        }
+
+    } else {
+        print_string("Not equal");
+        return false;
+    }
+
+    return true;
+}
+
+main :: () -> s32 {
+
+    file_size : u64;
+    file_data := read_entire_file("/home/mconf/Pictures/road.png", malloc, &file_size);
+
+    if file_data == [^void]0 {
+        print_string("Could not read file\n");
+    } else {
+        if parse_png_file([^u8]file_data, file_size) {
+            print_string("Success parsing PNG\n");
+        } else {
+            print_string("Failed parsing PNG\n");
+        }
+    }
+    free(file_data);
+
+    return 0;
+}

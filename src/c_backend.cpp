@@ -26,6 +26,18 @@ int C_Code_Generator::sprint(char* msg, ...) {
 	}
 
 	va_end(args);
+#if DEBUG
+	{
+		va_list args;
+		va_start(args, msg);
+		int num_written = 0;
+
+		num_written = vfprintf(stdout, msg, args);
+		fflush(stdout);
+
+		va_end(args);
+	}
+#endif
 	return num_written;
 }
 
@@ -141,10 +153,24 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
 				sprint("%.*s", TOKEN_STR(name));
 			}
         }break;
+		case KIND_UNION: {
+			assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit uninternalized type\n");
+            // TODO(psv): does this always work in C?
+            sprint("union ");
+            if(name){
+                sprint("%.*s", TOKEN_STR(name));
+            } else {
+                sprint("%.*s", TOKEN_STR(type->struct_desc.name));
+            }
+		}break;
         case KIND_STRUCT: {
             assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit uninternalized type\n");
             // TODO(psv): does this always work in C?
-            sprint("struct ");
+			if (type->flags & TYPE_FLAG_UNION) {
+				sprint("union ");
+			} else {
+				sprint("struct ");
+			}
             if(name){
                 sprint("%.*s", TOKEN_STR(name));
             } else {
@@ -190,6 +216,10 @@ void C_Code_Generator::emit_default_value(Type_Instance* type) {
 		case KIND_ARRAY:
 			sprint("{0}");
 			break;
+		case KIND_UNION:
+			sprint("{0}");
+			break;
+		default: assert_msg(0, "invalid default value"); break;
 	}
 }
 
@@ -241,7 +271,12 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
             //sprint(" %.*s", TOKEN_STR(decl->decl_constant.name));
         }break;
         case AST_DECL_STRUCT:{
-            sprint("typedef struct %.*s{", TOKEN_STR(decl->decl_struct.name));
+			if(decl->decl_struct.flags & STRUCT_FLAG_IS_UNION){
+				sprint("typedef union %.*s{", TOKEN_STR(decl->decl_struct.name));
+			} else {
+            	sprint("typedef struct %.*s{", TOKEN_STR(decl->decl_struct.name));
+
+			}
             size_t nfields = decl->decl_struct.fields_count;
             for(size_t i = 0; i < nfields; ++i){
                 emit_decl(decl->decl_struct.fields[i]);
@@ -249,9 +284,10 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
             }
             sprint("} %.*s", TOKEN_STR(decl->decl_struct.name));
         }break;
-        case AST_DECL_UNION: {
-            assert_msg(0, "union C codegen not yet implemented");
-        }break;
+		// @DEPRECATED
+        //case AST_DECL_UNION: {
+        //    assert_msg(0, "union C codegen not yet implemented");
+        //}break;
         case AST_DECL_ENUM:{
             assert_msg(0, "enum C codegen not yet implemented");
         }break;
@@ -492,7 +528,14 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			}
 			// bigger than regsize
 			else {
-                if(rval->node_type == AST_EXPRESSION_VARIABLE && rval->type_return->kind == KIND_STRUCT){
+				if(rval->node_type == AST_EXPRESSION_BINARY || rval->node_type == AST_EXPRESSION_PROCEDURE_CALL){
+					if (comm->comm_var_assign.lvalue) {
+                        emit_expression(comm->comm_var_assign.lvalue);
+                        sprint(" = ");
+                    }
+                    emit_expression(comm->comm_var_assign.rvalue);
+                    sprint(";");
+				} else if(rval->node_type == AST_EXPRESSION_VARIABLE && rval->type_return->kind == KIND_STRUCT){
                     if (comm->comm_var_assign.lvalue) {
                         emit_expression(comm->comm_var_assign.lvalue);
                         sprint(" = ");
@@ -583,34 +626,29 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
         }break;
         case OP_BINARY_VECTOR_ACCESS:{
             Type_Instance* indexed_type = expr->expr_binary.left->type_return;
-			if (indexed_type->kind == KIND_ARRAY) {
-				// @TODO check why this was here
-				//if(indexed_type->array_desc.array_of->kind != KIND_ARRAY)
-				sprint("*");
-			}
-			if (indexed_type->kind == KIND_POINTER) {
-				// @TODO check if this causes a bug anywhere?
-				// why is this here ?
-				sprint("*");
+
+			if(expr->type_return->kind != KIND_ARRAY && expr->type_return->kind != KIND_POINTER){
+				sprint("*(");
+				emit_type(indexed_type);
+				sprint(")");
 			}
 
 			sprint("(");
-			emit_type(indexed_type);
-			sprint(")");
 
-			sprint("((");
-            assert(indexed_type->kind == KIND_POINTER || indexed_type->kind == KIND_ARRAY);
 			sprint("(char*)");
-            emit_expression(expr->expr_binary.left);
-			sprint(")");
-            if(indexed_type->kind == KIND_POINTER){
-				sprint("+ %lld * (", indexed_type->pointer_to->type_size_bits / 8);
+			emit_expression(expr->expr_binary.left);
+			sprint(" + ");
+
+			emit_expression(expr->expr_binary.right);
+			sprint(" * ");
+
+			if(indexed_type->kind == KIND_POINTER){
+				sprint(" %lld ", indexed_type->pointer_to->type_size_bits / 8);
             } else {
-				sprint("+ %lld * (", indexed_type->array_desc.array_of->type_size_bits / 8);
+				sprint(" %lld ", indexed_type->array_desc.array_of->type_size_bits / 8);
             }
-			// TODO(psv): array bounds check
-            emit_expression(expr->expr_binary.right);
-			sprint("))");
+
+			sprint(")");
         }break;
     }
 }
@@ -886,7 +924,11 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
     for(size_t i = 0; i < array_get_length(type_decl_arr); ++i){
         Ast* decl = type_decl_arr[i];
         if(decl->node_type == AST_DECL_STRUCT) {
-            sprint("typedef struct %.*s %.*s;\n", TOKEN_STR(decl->decl_struct.name), TOKEN_STR(decl->decl_struct.name));
+			if(decl->decl_struct.flags & STRUCT_FLAG_IS_UNION) {
+				sprint("typedef union %.*s %.*s;\n", TOKEN_STR(decl->decl_struct.name), TOKEN_STR(decl->decl_struct.name));
+			} else {
+            	sprint("typedef struct %.*s %.*s;\n", TOKEN_STR(decl->decl_struct.name), TOKEN_STR(decl->decl_struct.name));
+			}
         }
     }
 

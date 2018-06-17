@@ -37,6 +37,7 @@ static bool scope_inside_loop(Scope* scope) {
 		if (scope->flags & SCOPE_PROCEDURE_BODY) return false;
 		if (scope->flags & SCOPE_ENUM) return false;
 		if (scope->flags & SCOPE_STRUCTURE) return false;
+		if (scope->flags & SCOPE_UNION) return false;
 		scope = scope->parent;
 	}
 	return false;
@@ -77,11 +78,6 @@ Type_Error type_check(Ast* node) {
 	case AST_DECL_STRUCT: {
 		for (size_t i = 0; i < node->decl_struct.fields_count; ++i) {
 			error |= type_check(node->decl_struct.fields[i]);
-		}
-	}break;
-	case AST_DECL_UNION: {
-		for (size_t i = 0; i < node->decl_union.fields_count; ++i) {
-			error |= type_check(node->decl_union.fields[i]);
 		}
 	}break;
 

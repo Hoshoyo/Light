@@ -154,7 +154,7 @@ Type_Error decl_check_redefinition(Scope* scope, Ast* node) {
 		}break;
 
 		// TODO(psv): unions
-		case AST_DECL_UNION: assert(0); break;
+		//case AST_DECL_UNION: assert(0); break; // @DEPRECATED
 		default:             assert(0); break;
 	}
 	return error;
@@ -600,12 +600,13 @@ Type_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 				return error;
 			} else {
 				bool packed = false;
+				bool is_union = node->decl_struct.flags & STRUCT_FLAG_IS_UNION;
 				size_t nfields = node->decl_struct.fields_count;
 				Type_Instance* tinfo = node->decl_struct.type_info;
 				s64 offset = 0;
 				s32 alignment = 0;
 				size_t type_size_bits = 0;
-
+				size_t max_size_bits = 0;
 
 				for (size_t i = 0; i < nfields; ++i) {
 					Type_Error e = resolve_types_decls(node->decl_struct.struct_scope, node->decl_struct.fields[i], rep_undeclared);
@@ -615,12 +616,22 @@ Type_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 					} else {
 						tinfo->struct_desc.fields_types[i] = node->decl_struct.fields[i]->decl_variable.variable_type;
 						s64 field_type_size = tinfo->struct_desc.fields_types[i]->type_size_bits;
-						tinfo->struct_desc.offset_bits[i] = offset;
+						if(field_type_size > max_size_bits) {
+							max_size_bits = field_type_size;
+						}
+						if(is_union) {
+							// for unions offset of all fields is 0
+							// and the type size is always the max
+							tinfo->struct_desc.offset_bits[i] = 0;
+							type_size_bits = max_size_bits;
+						} else {
+							tinfo->struct_desc.offset_bits[i] = offset;
+							type_size_bits += field_type_size;
+						}
 
-						type_size_bits += field_type_size;
 						if(field_type_size == 0) continue;
 
-						if(!packed){
+						if(!packed && !is_union){
 							// align type to its boundary
 							s64 offset_bytes = offset / 8;
 							s64 field_type_size_bytes = field_type_size / 8;
@@ -645,14 +656,15 @@ Type_Error resolve_types_decls(Scope* scope, Ast* node, bool rep_undeclared) {
 					infer_queue_push(node);
 					error |= DECL_QUEUED_TYPE;
 				} else {
-					if(!packed){
+					if(!packed && !is_union){
 						// adjust for the alignment of the first element
 						s64 first_alignment = tinfo->struct_desc.alignment;
 						s64 delta = align_delta(type_size_bits / 8, first_alignment);
 						type_size_bits += delta * 8;
 					}
 					node->decl_struct.type_info->type_size_bits = type_size_bits;
-					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+					u32 is_union_flag = (is_union) ? TYPE_FLAG_UNION : 0;
+					node->decl_struct.type_info->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED | is_union_flag;
 					node->decl_struct.type_info = internalize_type(&tinfo, scope, true);
 					infer_queue_remove(node);
 					//printf("struct %.*s done\n", TOKEN_STR(node->decl_struct.name));
@@ -844,7 +856,7 @@ Type_Error decl_check_inner_decl(Ast* node) {
 		}break;
 		case AST_DECL_STRUCT: break; // should not have struct inner decl yet
 		case AST_DECL_ENUM: break; // should not have enum inner decl yet
-		case AST_DECL_UNION: break; // should not have union inner decl yet
+		//case AST_DECL_UNION: break; // should not have union inner decl yet @DEPRECATED
 		case AST_DATA: break;		// no need to check is just raw data
 		default: assert(0); break; // TODO(psv): internal error
 	}

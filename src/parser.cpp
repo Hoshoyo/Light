@@ -62,28 +62,24 @@ Ast** parse_files_in_queue(Scope* global_scope) {
 		array_push(parsing_queue.files_toplevels, &ast_top_level);
 	}
 
-	//do {
-		// Imports
-		while(array_get_length(parsing_queue.queue_imports) > 0) {
-			Token* file = parsing_queue.queue_imports[0];
-			// remove the first of the array
-			array_remove(parsing_queue.queue_imports, 0);
+	while(array_get_length(parsing_queue.queue_imports) > 0) {
+		Token* file = parsing_queue.queue_imports[0];
+		// remove the first of the array
+		array_remove(parsing_queue.queue_imports, 0);
 
-			Lexer lexer;
-			// TODO(psv): Make lexer accept my style of string for filename so
-			// we dont need to allocate a name for this
-			char* c_filename = make_c_string((char*)file->value.data, file->value.length);
-			if (lexer.start(c_filename, file) != LEXER_OK)
-				return 0;
+		Lexer lexer;
+		// TODO(psv): Make lexer accept my style of string for filename so
+		// we dont need to allocate a name for this
+		char* c_filename = make_c_string((char*)file->value.data, file->value.length);
+		if (lexer.start(c_filename, file) != LEXER_OK)
+			return 0;
 
-			Parser parser(&lexer, global_scope);
-			Ast** ast_top_level = parser.parse_top_level();
-			if(ast_top_level){
-				array_push(parsing_queue.files_toplevels, &ast_top_level);
-			}
+		Parser parser(&lexer, global_scope);
+		Ast** ast_top_level = parser.parse_top_level();
+		if(ast_top_level){
+			array_push(parsing_queue.files_toplevels, &ast_top_level);
 		}
-	//} while(array_get_length(parsing_queue.queue_imports) > 0);
-	
+	}
 
 	size_t num_files = array_get_length(parsing_queue.files_toplevels);
 	size_t num_top_level_decls = 0;
@@ -270,6 +266,8 @@ Ast* Parser::parse_declaration(Scope* scope) {
 				return parse_decl_proc(name, scope);
 			} else if (next->type == TOKEN_KEYWORD_STRUCT) {
 				return parse_decl_struct(name, scope);
+			} else if(next->type == TOKEN_KEYWORD_UNION) {
+				return parse_decl_struct(name, scope, true);
 			} else if (next->type == TOKEN_KEYWORD_ENUM) {
 				return parse_decl_enum(name, scope, 0);
 			} else {
@@ -386,6 +384,7 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 		lexer->eat_token();
 		if(current_foreign && array_get_length(current_foreign) > 0) {
 			extern_library_name = current_foreign[array_get_length(current_foreign) - 1];
+			lib_table_push(extern_library_name);
 			flags |= DECL_PROC_FLAG_FOREIGN;
 		} else {
 			// TODO(psv): temporary, this should be possible
@@ -437,19 +436,29 @@ Ast* Parser::parse_decl_variable(Token* name, Scope* scope) {
 	return parse_decl_variable(name, scope, var_type);
 }
 
-Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
-	require_and_eat(TOKEN_KEYWORD_STRUCT);
+Ast* Parser::parse_decl_struct(Token* name, Scope* scope, bool is_union) {
+	if(is_union){
+		require_and_eat(TOKEN_KEYWORD_UNION);
+	} else {
+		require_and_eat(TOKEN_KEYWORD_STRUCT);
+	}
 
 	s32    fields_count = 0;
 	Ast**  fields = array_create(Ast*, 8);
-	Scope* scope_struct = scope_create(0, scope, SCOPE_STRUCTURE);
+	Scope* scope_struct = scope_create(0, scope, (is_union) ? SCOPE_UNION : SCOPE_STRUCTURE);
 
 	require_and_eat('{');
 
 	for (;;) {
 		Token* field_name = lexer->eat_token();
 		if (field_name->type != TOKEN_IDENTIFIER) {
-			report_syntax_error(field_name, "expected struct field declaration, but got '%.*s'\n", TOKEN_STR(field_name));
+			char* construct = 0;
+			if(is_union){
+				construct = "union";
+			} else {
+				construct = "struct";
+			}
+			report_syntax_error(field_name, "expected %s field declaration, but got '%.*s'\n", construct, TOKEN_STR(field_name));
 		}
 		Ast* field = parse_decl_variable(field_name, scope_struct);
 		require_and_eat(';');
@@ -462,7 +471,7 @@ Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
 	require_and_eat('}');
 
 	Type_Instance* struct_type = type_new_temporary();
-	struct_type->kind = KIND_STRUCT;
+	struct_type->kind = (is_union) ? KIND_UNION : KIND_STRUCT;
 	struct_type->struct_desc.fields_names = array_create(string, fields_count);
 	struct_type->struct_desc.fields_types = array_create(Type_Instance*, fields_count);
 	struct_type->struct_desc.offset_bits  = array_create(s64, fields_count);
@@ -479,7 +488,7 @@ Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
 
 	scope->decl_count += 1;
 
-	Ast* node = ast_create_decl_struct(name, scope, scope_struct, struct_type, fields, 0, fields_count);
+	Ast* node = ast_create_decl_struct(name, scope, scope_struct, struct_type, fields, (is_union) ? STRUCT_FLAG_IS_UNION : 0, fields_count);
 	scope_struct->creator_node = node;
 	return node;
 }
@@ -1122,7 +1131,7 @@ Ast* Parser::parse_comm_for(Scope* scope) {
 		size_t def_count = array_get_length(deferred);
 		body->comm_block.command_count += def_count;
 		if (body->comm_block.commands) {
-			array_append(body->comm_block.commands, deferred);
+			body->comm_block.commands = (Ast**)array_append(body->comm_block.commands, deferred);
 			array_release(deferred);
 		} else {
 			comm_for->comm_block.commands = deferred;

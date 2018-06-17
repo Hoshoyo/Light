@@ -1,9 +1,6 @@
-STDIN_FILENO	: s32 : 0;	/* Standard input.  */
-STDOUT_FILENO	: s32 : 1;	/* Standard output.  */
-STDERR_FILENO	: s32 : 2;	/* Standard error output.  */
+#import "io.li"
 
 memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void #foreign("c");
-write :: (fd : s32, buf : ^void, count : u64) -> u64 #foreign("c");
 
 string_length :: (s : ^u8) -> s64 {
     c := 0;
@@ -29,7 +26,7 @@ s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
         sum = 1;
     }
     auxbuffer := &b[16];
-    start := auxbuffer;
+    start := auxbuffer + sum;
 
     while val != 0 {
         rem := val % 10;
@@ -41,6 +38,41 @@ s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
     size := start - auxbuffer;
     memcpy([^void](&buffer[sum]), [^void](auxbuffer + 1), [u64]size);
     return size;
+}
+
+u32_to_str_base16 :: (val : u32, leading_zeros : bool, buffer : ^s8) -> s64
+{
+    temp_buffer : [64]s8;
+	numbuffer : ^s8 = [^s8]temp_buffer;
+	at : ^s8=  numbuffer + 63;
+	count : u32 = 0;
+
+	if (val == 0) {
+		*buffer = '0';
+		count += 1;
+		return [s64]count + 1;
+	}
+
+	mask : u32 = 0x0000000f;
+	auxmask : u32 = 0xffffffff;
+	
+	while count < 8 {
+		if (![bool](auxmask & val) && !leading_zeros) break;
+		v : u32 = (val & (mask << (count * 4))) >> (count * 4);
+		if (v >= 10) v += 55;
+		else v += 48;
+		*at = [s8]v;
+		at -= 1;
+		auxmask &= ~mask << (count * 4);
+		count += 1;
+	}
+	i : u32 = 0;
+	for i :u32= 0; i < count; i += 1{
+		at += 1;
+		*buffer = *at;
+		buffer += 1;
+	}
+	return [s64]count;
 }
 
 s64_to_str :: (val : s64, buffer : [32]u8) -> s64 {
@@ -58,7 +90,7 @@ s64_to_str :: (val : s64, buffer : [32]u8) -> s64 {
         sum = 1;
     }
     auxbuffer := &b[32];
-    start := auxbuffer;
+    start := auxbuffer + sum;
 
     while val != 0 {
         rem := val % 10;
@@ -72,8 +104,58 @@ s64_to_str :: (val : s64, buffer : [32]u8) -> s64 {
     return size;
 }
 
-r32_to_str :: (v : r32) -> s64 {
-    
+r32_to_str :: (v : r32, buffer : [32]u8) -> s64 {
+    l : s64 = s32_to_str([s32]v, [[16]u8][^u8]buffer);
+    precision := 15;
+
+    if v < 0.0 {
+        v = -v;
+    }
+
+    fractional_part := v - [r32][s32]v;
+
+    buffer[l] = '.';
+    l += 1;
+
+    if fractional_part == 0.0 {
+        buffer[l] = '0';
+        l += 1;
+        return l;
+    }
+
+    while precision > 0 && fractional_part > 0.0 {
+        fractional_part *= 10.0;
+        buffer[l] = [u8]fractional_part + '0';
+        fractional_part = fractional_part - [r32][s32]fractional_part;
+        l += 1;
+    }
+
+    return l;
+}
+
+r64_to_str :: (v : r64, buffer : [64]u8) -> s64 {
+    l : s64 = s64_to_str([s64]v, [[32]u8][^u8]buffer);
+    precision := 31;
+
+    fractional_part := v - [r64][s64]v;
+
+    buffer[l] = '.';
+    l += 1;
+
+    if fractional_part == 0.0 {
+        buffer[l] = '0';
+        l += 1;
+        return l;
+    }
+
+    while precision > 0 && fractional_part > 0.0 {
+        fractional_part *= 10.0;
+        buffer[l] = [u8]fractional_part + '0';
+        fractional_part = fractional_part - [r64][s64]fractional_part;
+        l += 1;
+    }
+
+    return l;
 }
 
 print_bool :: (v : bool) -> s64 {
@@ -90,6 +172,13 @@ print_bool :: (v : bool) -> s64 {
     return print_string_l([^u8]buffer, len);
 }
 
+print_u32 :: (v : u32) -> s64 {
+    buffer : [16]u8;
+    print_string("0x");
+    len := u32_to_str_base16(v, true, [^s8]buffer);
+    return print_string_l([^u8]buffer, len);
+}
+
 print_s32 :: (v : s32) -> s64 {
     buffer : [16]u8;
     len := s32_to_str(v, buffer);
@@ -99,6 +188,18 @@ print_s32 :: (v : s32) -> s64 {
 print_s64 :: (v : s64) -> s64 {
     buffer : [32]u8;
     len := s64_to_str(v, buffer);
+    return print_string_l([^u8]buffer, len);
+}
+
+print_r32 :: (v : r32) -> s64 {
+    buffer : [32]u8;
+    len := r32_to_str(v, buffer);
+    return print_string_l([^u8]buffer, len);
+}
+
+print_r64 :: (v : r64) -> s64 {
+    buffer : [64]u8;
+    len := r64_to_str(v, buffer);
     return print_string_l([^u8]buffer, len);
 }
 
