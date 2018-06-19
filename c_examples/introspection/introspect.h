@@ -1,5 +1,8 @@
 typedef struct {
-    float x, y, z;
+    //float x, y, z;
+    float x;
+    float y;
+    float z;    
 } vec3;
 
 typedef struct {
