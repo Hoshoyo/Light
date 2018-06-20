@@ -1,9 +1,23 @@
 foo : typedef : u32;
+foozle : typedef : foo;
 
 memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void #foreign("msvcrt");
 
 bar := main;
 
+PI :: 3.1415;
+
+var : Person = Person:{2};
+
+test : foo;
+test2 : foo = 3;
+test3 : foozle;
+test4 : foozle = 4;
+
 main :: () -> s32 {
 	return 0;
+}
+
+Person :: struct {
+	age : s32;
 }

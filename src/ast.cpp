@@ -886,6 +886,13 @@ void DEBUG_print_enum_decl(FILE* out, Ast* node) {
 	fprintf(out, "}\n");
 }
 
+void DEBUG_print_typedef(FILE* out, Ast* node) {
+	Ast_Decl_Typedef* td = &node->decl_typedef;
+	fprintf(out, "%.*s : typedef : ", TOKEN_STR(td->name));
+	DEBUG_print_type(out, td->type);
+	fprintf(out, "\n");
+}
+
 void DEBUG_print_node(FILE* out, Ast* node) {
 	switch (node->node_type) {
 		case AST_DECL_PROCEDURE:				DEBUG_print_proc_decl(out, node); break;
@@ -894,6 +901,7 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 		//case AST_DECL_UNION:					assert(0); // @DEPRECATED
 		case AST_DECL_ENUM:						DEBUG_print_enum_decl(out, node); break;
 		case AST_DECL_CONSTANT:					DEBUG_print_constant_decl(out, node); break;
+		case AST_DECL_TYPEDEF:					DEBUG_print_typedef(out, node); break;
 
 		// Commands
 		case AST_COMMAND_BLOCK:					DEBUG_print_block(out, node); break;

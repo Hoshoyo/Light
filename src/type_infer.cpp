@@ -245,6 +245,7 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 			Ast* struct_decl = decl_from_name(expr->scope, result->struct_desc.name);
 			if(!struct_decl){
 				*error |= TYPE_QUEUED;
+				return 0;
 			}
 
 			size_t nexpr = 0;

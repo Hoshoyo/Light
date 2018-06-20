@@ -160,8 +160,19 @@ Type_Error decl_check_redefinition(Scope* scope, Ast* node) {
 	return error;
 }
 
-Type_Instance* type_from_alias(Scope* scope, Type_Instance* type) {
+Type_Instance* type_from_alias(Scope* scope, Type_Instance* type, bool rep_undeclared) {
 	assert(type->kind == KIND_ALIAS);
+	Ast* d = decl_from_name(scope, type->alias.name);
+	if (!d) {
+		if (rep_undeclared) {
+			report_undeclared(type->alias.name);
+		}
+		return 0;
+	} else if(d->node_type == AST_DECL_TYPEDEF){
+		return resolve_type(scope, d->decl_typedef.type, rep_undeclared);
+	} else {
+		// TODO: error here?
+	}
 
 	return 0;
 }
@@ -175,7 +186,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 
 	switch (type->kind) {
 	case KIND_ALIAS: {
-		Type_Instance* t = type_from_alias(scope, type);
+		Type_Instance* t = type_from_alias(scope, type, rep_undeclared);
 		if (!t) {
 			if (rep_undeclared) {
 				report_undeclared(type->alias.name);
@@ -438,18 +449,22 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 
 				// Propagate the variable type to the expression, type checking is performed here
 				// TODO(psv): type check
+				if(node->decl_variable.variable_type && node->decl_variable.assignment) {
+					assert(node->decl_variable.variable_type->flags & TYPE_FLAG_INTERNALIZED);
+					type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &error_code);
+				}
+
 				if (node->decl_variable.assignment) {
 					error_code |= type_propagate(type_var, node->decl_variable.assignment);
 					if (error_code & TYPE_ERROR_FATAL) return error_code;
 				}
-
 			} else {
 				if (expr_type->flags & TYPE_FLAG_INTERNALIZED) {
 					node->decl_variable.variable_type = expr_type;
 				} else {
 					error_code |= type_propagate(0, node->decl_variable.assignment);
 					if (error_code & TYPE_ERROR_FATAL) return error_code;
-					node->decl_variable.variable_type = expr_type;
+					node->decl_variable.variable_type = node->decl_variable.assignment->type_return;
 				}
 
 				if (expr_type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
@@ -463,7 +478,68 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 			assert(node->decl_variable.variable_type->flags & TYPE_FLAG_INTERNALIZED);
 		}break;
 		case AST_DECL_CONSTANT: {
-			//assert_msg(0, "constant type information pass not implemented");
+			Type_Instance* expr_type = 0;
+			if (node->decl_constant.value) {
+				expr_type = infer_from_expression(node->decl_constant.value, &error_code, 0);
+				if (error_code & TYPE_ERROR_FATAL) return error_code;
+				if (error_code & TYPE_QUEUED) {
+					infer_queue_push(node);
+					error_code |= TYPE_QUEUED;
+					return error_code;
+				}
+				if (expr_type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error_code |= report_type_error(TYPE_ERROR_FATAL, node, "cannot assign a constant to an expression returning void\n");
+				}
+			} else if(!node->decl_constant.type_info) {
+				error_code |= report_decl_error(TYPE_ERROR_FATAL, node, "cannot infer constant type if no assignment expression is given\n");
+				return error_code;
+			}
+			
+			if (node->decl_constant.type_info) {
+				Type_Instance* type_var = resolve_type(node->scope, node->decl_constant.type_info, false);
+				if (!type_var || !(type_var->flags & TYPE_FLAG_INTERNALIZED)) {
+					error_code |= TYPE_QUEUED;
+					return error_code;
+				}
+
+				node->decl_constant.type_info = type_var;
+
+				// Cannot declare a variable void
+				if (node->decl_constant.type_info == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error_code |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a constant of type void\n");
+					return error_code;
+				}
+
+				// Propagate the variable type to the expression, type checking is performed here
+				// TODO(psv): type check
+				if(node->decl_constant.type_info && node->decl_constant.value) {
+					assert(node->decl_constant.type_info->flags & TYPE_FLAG_INTERNALIZED);
+					type_check_expr(node->decl_constant.type_info, node->decl_constant.value, &error_code);
+				}
+
+				if (node->decl_constant.value) {
+					error_code |= type_propagate(type_var, node->decl_constant.value);
+					if (error_code & TYPE_ERROR_FATAL) return error_code;
+				}
+
+			} else {
+				if (expr_type->flags & TYPE_FLAG_INTERNALIZED) {
+					node->decl_constant.type_info = expr_type;
+				} else {
+					error_code |= type_propagate(0, node->decl_constant.value);
+					if (error_code & TYPE_ERROR_FATAL) return error_code;
+					node->decl_constant.type_info = node->decl_constant.value->type_return;
+				}
+
+				if (expr_type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error_code |= report_type_error(TYPE_ERROR_FATAL, node, "cannot assign a constant to an expression returning void\n");
+					return error_code;
+				}
+			}
+
+			infer_queue_remove(node);
+
+			assert(node->decl_constant.type_info->flags & TYPE_FLAG_INTERNALIZED);
 		}break;
 		case AST_DECL_ENUM: {
 			assert_msg(0, "enum type information pass not implemented");
@@ -472,6 +548,74 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 			assert_msg(0, "invalid declaration in top level type information pass");
 		}break;
 	}
+	return error_code;
+}
+
+Type_Error type_checking_pass(Scope* scope, Ast* node) {
+	Type_Error error_code = TYPE_OK;
+
+	switch(node) {
+		case AST_DECL_CONSTANT:
+		case AST_DECL_VARIABLE:
+		case AST_DECL_TYPEDEF:
+		case AST_DECL_PROCEDURE:
+		case AST_DECL_STRUCT:
+		case AST_DECL_UNION: assert_msg(0, "union not yet implemented on type checking pass"); break;
+		case AST_DECL_ENUM: assert_msg(0, "enum not yet implemented on type checking pass"); break;
+
+		case AST_COMMAND_BLOCK:{
+			size_t ncomm = array_get_length(node->comm_block.commands);
+			for(size_t i = 0; i < ncomm; ++i) {
+				error_code |= type_checking_pass(node->comm_block.block_scope, node->comm_block.commands[i]);
+			}
+		}break;
+		case AST_COMMAND_BREAK:{
+			if (!node->comm_break.level) {
+				node->comm_break.level = ast_create_expr_literal(node->scope, LITERAL_HEX_INT, 0, 0, type_primitive_get(TYPE_PRIMITIVE_U64));
+				node->comm_break.level->expr_literal.value_u64 = 1;
+			}
+			if (node->comm_break.level->node_type == AST_EXPRESSION_LITERAL) {
+				node->comm_break.level->type_return = infer_from_expression(node->comm_break.level, &error, TYPE_INFER_REPORT_UNDECLARED);
+				if (error & TYPE_ERROR_FATAL) return error;
+				if(node->comm_break.level->type_return->flags & TYPE_FLAG_WEAK){
+					type_propagate(0, node->comm_break.level);
+				}
+
+				if (type_primitive_int(node->comm_break.level->type_return)) {
+					// check if it is inside a loop
+					u64 loop_level = node->comm_break.level->expr_literal.value_u64;
+					if (scope_inside_loop(node->scope, loop_level)) {
+						return error;
+					} else {
+						report_error_location(node);
+						error |= report_semantic_error(TYPE_ERROR_FATAL, "break command is not inside an iterative loop nested '%lld' deep\n", loop_level);
+					}
+				} else {
+					report_error_location(node);
+					error |= report_semantic_error(TYPE_ERROR_FATAL, "break command must have an integer as a target\n");
+				}
+			} else {
+				report_error_location(node);
+				error |= report_semantic_error(TYPE_ERROR_FATAL, "break command must have an integer literal as a target\n");
+			}
+		}break;
+		case AST_COMMAND_CONTINUE:
+		case AST_COMMAND_FOR:
+		case AST_COMMAND_IF:
+		case AST_COMMAND_RETURN:
+		case AST_COMMAND_VARIABLE_ASSIGNMENT:
+
+		case AST_EXPRESSION_BINARY:
+		case AST_EXPRESSION_LITERAL:
+		case AST_EXPRESSION_PROCEDURE_CALL:
+		case AST_EXPRESSION_UNARY:
+		case AST_EXPRESSION_VARIABLE:
+
+		default: {
+
+		}break;
+	}
+
 	return error_code;
 }
 
@@ -498,6 +642,42 @@ Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		if (error_code & TYPE_ERROR_FATAL) continue;
 		error_code |= type_information_pass(global_scope, node);
 	}
+
+	if(error_code & TYPE_ERROR_FATAL) {
+		return error_code;
+	}
+
+	size_t infer_queue_length = array_get_length(g_infer_queue);
+	while(infer_queue_length > 0) {
+		error_code = TYPE_OK;
+
+		size_t n = array_get_length(g_infer_queue);
+		for (size_t i = 0; i < n; ++i) {
+			Ast* node = g_infer_queue[i];
+
+			assert(node->flags & AST_FLAG_IS_DECLARATION);
+			if (node->node_type == AST_DATA) continue;
+
+			error_code |= type_information_pass(global_scope, node);
+		}
+
+		// dependency detection
+		if(infer_queue_length == array_get_length(g_infer_queue)) {
+			return report_type_error(TYPE_ERROR_FATAL, "dependencied unresolved detected, stopping");
+		}
+		infer_queue_length = array_get_length(g_infer_queue);
+
+		if(error_code & TYPE_ERROR_FATAL) {
+			return error_code;
+		}
+	}
+
+	if(error_code & TYPE_ERROR_FATAL) {
+		return error_code;
+	}
+
+	//type_checking_pass();
+
 	return error_code;
 }
 
