@@ -1,5 +1,5 @@
-//#import "linux/print.li"
-#import "windows/print.li"
+#import "linux/print.li"
+//#import "windows/print.li"
 
 foo :: struct {
 	s : s32;
@@ -36,11 +36,11 @@ vec3 :: union {
 }
 
 print_vec3 :: (v : vec3) {
-	print_s32([s32]v.coord.x);
+	print_r32(v.coord.x);
 	print_string(", ");
-	print_s32([s32]v.coord.y);
+	print_r32(v.coord.y);
 	print_string(", ");
-	print_s32([s32]v.coord.z);
+	print_r32(v.coord.z);
 }
 
 float_int :: union {
@@ -72,6 +72,5 @@ main :: () -> s32 {
 	u.f = 2.0;
 	print_s32(u.i);
 	print_string("\n");
-
 	return 0;
 }

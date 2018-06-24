@@ -84,11 +84,14 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 		case OP_UNARY_ADDRESSOF:{
 			if (expr->expr_unary.operand->flags & AST_FLAG_LVALUE) {
 				// that means right side is strong because it is lvalue
+				if(!type_strong(infered)){
+					int x = 0;
+				}
 				assert(type_strong(infered));
 				Type_Instance* ptrtype = type_new_temporary();
 				ptrtype->kind = KIND_POINTER;
 				ptrtype->type_size_bits = type_pointer_size_bits();
-				ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED | TYPE_FLAG_RESOLVED;
+				ptrtype->flags = TYPE_FLAG_SIZE_RESOLVED;
 				ptrtype->pointer_to = infered;
 				expr->type_return = internalize_type(&ptrtype, expr->scope, true);
 				return expr->type_return;
@@ -229,7 +232,7 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 					type_propagate(expr->expr_literal.array_strong_type, expr->expr_literal.array_exprs[i]);
 				}
 				result->array_desc.array_of = expr->expr_literal.array_strong_type;
-				result->flags |= TYPE_FLAG_RESOLVED | TYPE_FLAG_SIZE_RESOLVED;
+				result->flags |= TYPE_FLAG_SIZE_RESOLVED;
 				result->type_size_bits = nexpr * expr->expr_literal.array_strong_type->type_size_bits;
 				internalize_type(&result->array_desc.array_of, expr->scope, true);
 			} else if(expr->expr_literal.array_exprs) {
@@ -244,7 +247,8 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 			result->struct_desc.name = expr->expr_literal.token;
 			Ast* struct_decl = decl_from_name(expr->scope, result->struct_desc.name);
 			if(!struct_decl){
-				*error |= DECL_QUEUED_TYPE;
+				*error |= TYPE_QUEUED;
+				return 0;
 			}
 
 			size_t nexpr = 0;
@@ -286,7 +290,10 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 	if(caller_type->kind != KIND_FUNCTION){
 		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "expression is not a procedure\n");
 	} else {
-		assert_msg(type_strong(caller_type), "weak functional type in type inference pass");
+		//assert_msg(type_strong(caller_type), "weak functional type in type inference pass");
+		if(!type_strong(caller_type)){
+			int xx = 0;
+		}
 	}
 
 	proc_type = caller_type;
@@ -328,7 +335,7 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 			*error |= TYPE_ERROR_FATAL;
 			*error |= report_undeclared(expr->expr_variable.name);
 		} else {
-			*error |= DECL_QUEUED_TYPE;
+			*error |= TYPE_QUEUED;
 		}
 		return 0;
 	}
@@ -370,17 +377,19 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 	return type;
 }
 
-void type_propagate(Type_Instance* strong, Ast* expr) {
+Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION || expr->node_type == AST_DATA);
+
+	Type_Error error_code = TYPE_OK;
 
 	if(!expr->type_return) {
 		// @TODO see what to do here
 		// @IMPORTANT
 		// This type can be null?
-		return;
+		return error_code;
 	}
 	if (expr->type_return->flags & TYPE_FLAG_STRONG)
-		return;
+		return error_code;
 
 	switch(expr->node_type){
 		// @PROPAGATE LITERAL
@@ -417,7 +426,7 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 						type_propagate(strong->struct_desc.fields_types[i], expr->expr_literal.struct_exprs[i]);
 						expr->type_return->struct_desc.fields_types[i] = expr->expr_literal.struct_exprs[i]->type_return;
 					}
-					expr->type_return->flags |= TYPE_FLAG_RESOLVED;
+					expr->type_return->flags |= TYPE_FLAG_INTERNALIZED;
 					internalize_type(&expr->type_return, expr->scope, true);
 				}
 			} else {
@@ -435,7 +444,7 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 					}
 					strong = expr->type_return = resolve_type(expr->scope, expr->type_return, true);
 					if(!strong) {
-						return;
+						return error_code;
 					}
 					size_t strong_dim = 0;
 					if(strong->kind == KIND_STRUCT) {
@@ -534,6 +543,8 @@ void type_propagate(Type_Instance* strong, Ast* expr) {
 			assert(type_strong(expr->type_return));
 		}break;
 	}
+
+	return error_code;
 }
 
 static Type_Instance* defer_check_against(Ast* expr, Type_Instance* check_against, Type_Instance* type, Type_Error* error) {
@@ -1107,7 +1118,9 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 				// using the struct name as variable i think this crashes, maybe?
 
 				// Could be a union, if so, accept only 1 field
-				if (check_against->flags & TYPE_FLAG_UNION) {
+				if (check_against->kind & KIND_UNION) {
+					assert_msg(0, "union literal not yet implemented");
+					// TODO(psv): not yet implemented
 					if (expr->expr_literal.struct_exprs) {
 						size_t nexpr = array_get_length(expr->expr_literal.struct_exprs);
 						if (nexpr == 1) {

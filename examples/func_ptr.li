@@ -19,7 +19,9 @@ map :: (arr : ^s32, length : s64, f : (s32)->s64, sq : (s32) -> s32) -> void {
     }
 }
 
-main :: () -> s32 {
+int : typedef : s32;
+
+main :: () -> int {
     a := make_proc();
     v : [5]s32 = array{0,1,2,3,4};
 

@@ -187,6 +187,7 @@ enum Compiler_Tags {
 	COMPILER_TAG_STRING = 2,
 	COMPILER_TAG_IMPORT = 3,
 	COMPILER_TAG_END = 4,
+	COMPILER_TAG_TYPEDEF = 5,
 };
 extern string compiler_tags[];
 

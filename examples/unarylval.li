@@ -3,7 +3,7 @@ main :: () -> s32{
     s : s8;
     buffer : ^s8;
     buffer = &s;
-    buffer = *cast(^^s8)2;
+    buffer = *[^^s8]2;
     a : vec2;
     b := *a.y;
     t1 := ~2;

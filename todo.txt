@@ -18,7 +18,6 @@ main :: () -> s32 {
 
 - enums
 - unions
-- type alias
 - file scope
 - switch
 - scoped functions

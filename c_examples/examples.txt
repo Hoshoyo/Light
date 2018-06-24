@@ -1,0 +1,8 @@
+introspection
+    - generate code from marks
+code generation
+    - repetitive tasks
+    - data from code
+    - code from data
+performance
+    - generate const code

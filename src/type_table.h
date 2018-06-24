@@ -13,6 +13,7 @@ s64            type_pointer_size_bits();
 Type_Instance* internalize_type(Type_Instance** type, Scope* scope, bool copy = true);
 int resolve_type_internalize_queue();
 
+// Type table - all types in here are unique and should be internalized
 extern Type_Instance** g_type_table;
 
 void DEBUG_print_type_table();

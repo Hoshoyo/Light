@@ -1,5 +1,5 @@
 #import "../x11/x11.li"
-#import "../linux/print.li"
+//#import "../linux/print.li"
 
 Window_Info :: struct {
 	width : s32;
@@ -9,6 +9,7 @@ Window_Info :: struct {
 	vi : ^XVisualInfo;
 	swa : XSetWindowAttributes;
 }
+/*
 
 GLX_X_RENDERABLE : u32 : 0x8012;
 GLX_DRAWABLE_TYPE : u32 : 0x8010;
@@ -27,7 +28,6 @@ GLX_WINDOW_BIT : u32 : 1;
 True : u32 : 1;
 
 glXQueryVersion :: (dpy : ^Display, major : ^s32, minor : ^s32) -> bool #foreign("X11");
-
 init_opengl :: (info : ^Window_Info) -> s32 {
     visual_attribs := array{
 		GLX_X_RENDERABLE, True,
@@ -52,25 +52,25 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	}
 	// Getting framebuffer config
 	fbcount : s32;
-	fbc := glXChooseFBConfig((*info).display, DefaultScreen((*info).display), visual_attribs, &fbcount);
-	if(!fbc){
-		printf("Failed to get framebuffer configuration\n");
-		return -1;
-	}
+	//fbc := glXChooseFBConfig((*info).display, DefaultScreen((*info).display), visual_attribs, &fbcount);
+	//if(!fbc){
+	//	printf("Failed to get framebuffer configuration\n");
+	//	return -1;
+	//}
 }
-
+*/
 glXChooseFBConfig :: (dpy : ^Display, screen : s32, attrib_list : ^u32, nelements : ^s32) -> ^GLXFBConfig {
 
 }
 
-DefaultScreen :: (dpy : ^Display) -> s32 {
-	return (*dpy).default_screen;
-}
+//DefaultScreen :: (dpy : ^Display) -> s32 {
+//	return (*dpy).default_screen;
+//}
 
 main :: () -> s32 {
-	info : Window_Info;
-	info.display = XOpenDisplay([^s8]0);
+	//info : Window_Info;
+	//info.display = XOpenDisplay([^s8]0);
 
-	init_opengl(&info);
+	//init_opengl(&info);
     return 0;
 }

@@ -50,18 +50,21 @@ int main(int argc, char** argv) {
 	if(ast_top_level == 0) {
 		return -1;
 	}
-	//DEBUG_print_ast(stdout, ast_top_level, false);
 
 	// TODO(psv): Fuse type checking, and also refactor it
-	Decl_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
-	
-	if (decl_err & (~DECL_ERROR_WARNING)) {
+	Type_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
+
+	if (decl_err & TYPE_ERROR_FATAL) {
 		return -1;
 	}
+
 	Type_Error type_error = type_check(&global_scope, ast_top_level);
 	if (type_error) {
 		return -1;
 	}
+
+	DEBUG_print_ast(stdout, ast_top_level, true);
+	return;
 
 	double end = timer.GetTime();
 	printf("Compiler     elapsed: %fms\n", (end - start));

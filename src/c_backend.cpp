@@ -160,17 +160,13 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
             if(name){
                 sprint("%.*s", TOKEN_STR(name));
             } else {
-                sprint("%.*s", TOKEN_STR(type->struct_desc.name));
+                sprint("%.*s", TOKEN_STR(type->union_desc.name));
             }
 		}break;
         case KIND_STRUCT: {
             assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit uninternalized type\n");
             // TODO(psv): does this always work in C?
-			if (type->flags & TYPE_FLAG_UNION) {
-				sprint("union ");
-			} else {
-				sprint("struct ");
-			}
+			sprint("struct ");
             if(name){
                 sprint("%.*s", TOKEN_STR(name));
             } else {
@@ -271,12 +267,7 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
             //sprint(" %.*s", TOKEN_STR(decl->decl_constant.name));
         }break;
         case AST_DECL_STRUCT:{
-			if(decl->decl_struct.flags & STRUCT_FLAG_IS_UNION){
-				sprint("typedef union %.*s{", TOKEN_STR(decl->decl_struct.name));
-			} else {
-            	sprint("typedef struct %.*s{", TOKEN_STR(decl->decl_struct.name));
-
-			}
+			sprint("typedef struct %.*s{", TOKEN_STR(decl->decl_struct.name));
             size_t nfields = decl->decl_struct.fields_count;
             for(size_t i = 0; i < nfields; ++i){
                 emit_decl(decl->decl_struct.fields[i]);
@@ -284,10 +275,15 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
             }
             sprint("} %.*s", TOKEN_STR(decl->decl_struct.name));
         }break;
-		// @DEPRECATED
-        //case AST_DECL_UNION: {
-        //    assert_msg(0, "union C codegen not yet implemented");
-        //}break;
+        case AST_DECL_UNION: {
+			sprint("typedef union %.*s{", TOKEN_STR(decl->decl_union.name));
+            size_t nfields = decl->decl_union.fields_count;
+            for(size_t i = 0; i < nfields; ++i){
+                emit_decl(decl->decl_union.fields[i]);
+				sprint(";");
+            }
+            sprint("} %.*s", TOKEN_STR(decl->decl_union.name));
+        }break;
         case AST_DECL_ENUM:{
             assert_msg(0, "enum C codegen not yet implemented");
         }break;
@@ -535,7 +531,8 @@ void C_Code_Generator::emit_command(Ast* comm) {
                     }
                     emit_expression(comm->comm_var_assign.rvalue);
                     sprint(";");
-				} else if(rval->node_type == AST_EXPRESSION_VARIABLE && rval->type_return->kind == KIND_STRUCT){
+				} else if(rval->node_type == AST_EXPRESSION_VARIABLE && 
+					(rval->type_return->kind == KIND_STRUCT || rval->type_return->kind == KIND_UNION)){
                     if (comm->comm_var_assign.lvalue) {
                         emit_expression(comm->comm_var_assign.lvalue);
                         sprint(" = ");
@@ -924,12 +921,11 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
     for(size_t i = 0; i < array_get_length(type_decl_arr); ++i){
         Ast* decl = type_decl_arr[i];
         if(decl->node_type == AST_DECL_STRUCT) {
-			if(decl->decl_struct.flags & STRUCT_FLAG_IS_UNION) {
-				sprint("typedef union %.*s %.*s;\n", TOKEN_STR(decl->decl_struct.name), TOKEN_STR(decl->decl_struct.name));
-			} else {
-            	sprint("typedef struct %.*s %.*s;\n", TOKEN_STR(decl->decl_struct.name), TOKEN_STR(decl->decl_struct.name));
-			}
+			sprint("typedef struct %.*s %.*s;\n", TOKEN_STR(decl->decl_struct.name), TOKEN_STR(decl->decl_struct.name));
         }
+		if(decl->node_type == AST_DECL_UNION) {
+			sprint("typedef union %.*s %.*s;\n", TOKEN_STR(decl->decl_union.name), TOKEN_STR(decl->decl_union.name));
+		}
     }
 
     // emit all declarations of types

@@ -118,6 +118,31 @@ Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Type
 	return ds;
 }
 
+Ast* ast_create_decl_union(Token* name, Scope* scope, Scope* union_scope, Type_Instance* utype, Ast** fields, u32 flags, s32 field_count) {
+	Ast* du = ALLOC_AST();
+
+	du->node_type = AST_DECL_UNION;
+	du->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	du->scope = scope;
+	du->flags = AST_FLAG_IS_DECLARATION;
+	du->infer_queue_index = -1;
+
+	du->decl_union.name = name;
+	du->decl_union.fields = fields;
+	du->decl_union.fields_count = field_count;
+	du->decl_union.flags = flags;
+	du->decl_union.size_bytes = 0;
+	du->decl_union.alignment = 8;		// @TEMPORARY
+	du->decl_union.type_info = utype;
+	du->decl_union.union_scope = union_scope;
+
+	du->decl_union.site.filename = name->filename;
+	du->decl_union.site.line = name->line;
+	du->decl_union.site.column = name->column;
+
+	return du;
+}
+
 Ast* ast_create_decl_enum(Token* name, Scope* scope, Scope* enum_scope, Ast** fields, Type_Instance* type_hint, u32 flags, s32 field_count) {
 	Ast* de = ALLOC_AST();
 
@@ -160,6 +185,24 @@ Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instan
 	dc->decl_constant.site.column = name->column;
 
 	return dc;
+}
+
+Ast* ast_create_decl_typedef(Token* name, Scope* scope, Type_Instance* type) {
+	Ast* dt = ALLOC_AST();
+	dt->node_type = AST_DECL_TYPEDEF;
+	dt->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	dt->scope = scope;
+	dt->flags = AST_FLAG_IS_DECLARATION;
+	dt->infer_queue_index = -1;
+
+	dt->decl_typedef.name = name;
+	dt->decl_typedef.type = type;
+
+	dt->decl_typedef.site.filename = name->filename;
+	dt->decl_typedef.site.line = name->line;
+	dt->decl_typedef.site.column = name->column;
+
+	return dt;
 }
 
 // Expressions
@@ -426,12 +469,16 @@ void DEBUG_print_indent_level() {
 void quick_type(FILE* out, Type_Instance* type) {
 	if (!print_types)  return;
 	fprintf(out, "<");
-	if(type->flags & TYPE_FLAG_INTERNALIZED){
-		fprintf(out, "%s", KGRN);
+	if (!type) {
+		fprintf(out, "%snull", KRED);
 	} else {
-		fprintf(out, "%s", KRED);
+		if(type->flags & TYPE_FLAG_INTERNALIZED){
+			fprintf(out, "%s", KGRN);
+		} else {
+			fprintf(out, "%s", KRED);
+		}
+		DEBUG_print_type(out, type, true);
 	}
-	DEBUG_print_type(out, type, true);
 	fprintf(out, KNRM);
 	fprintf(out, ">");
 }
@@ -864,6 +911,13 @@ void DEBUG_print_enum_decl(FILE* out, Ast* node) {
 	fprintf(out, "}\n");
 }
 
+void DEBUG_print_typedef(FILE* out, Ast* node) {
+	Ast_Decl_Typedef* td = &node->decl_typedef;
+	fprintf(out, "%.*s : typedef : ", TOKEN_STR(td->name));
+	DEBUG_print_type(out, td->type);
+	fprintf(out, "\n");
+}
+
 void DEBUG_print_node(FILE* out, Ast* node) {
 	switch (node->node_type) {
 		case AST_DECL_PROCEDURE:				DEBUG_print_proc_decl(out, node); break;
@@ -872,6 +926,7 @@ void DEBUG_print_node(FILE* out, Ast* node) {
 		//case AST_DECL_UNION:					assert(0); // @DEPRECATED
 		case AST_DECL_ENUM:						DEBUG_print_enum_decl(out, node); break;
 		case AST_DECL_CONSTANT:					DEBUG_print_constant_decl(out, node); break;
+		case AST_DECL_TYPEDEF:					DEBUG_print_typedef(out, node); break;
 
 		// Commands
 		case AST_COMMAND_BLOCK:					DEBUG_print_block(out, node); break;

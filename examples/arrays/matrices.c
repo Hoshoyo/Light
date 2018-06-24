@@ -14,7 +14,6 @@ typedef double r64;
 
 
 // Forward declarations
-u32 ExitProcess(u32 ret);
 void __memory_copy(void* dest, void* src, u64 size) {
 	for(u64 i = 0; i < size; ++i) ((char*)dest)[i] = ((char*)src)[i];
 }
@@ -26,38 +25,38 @@ typedef struct EXCEPTION_POINTERS EXCEPTION_POINTERS;
 typedef struct OVERLAPPED OVERLAPPED;
 typedef struct SECURITY_ATTRIBUTES SECURITY_ATTRIBUTES;
 typedef struct OFSTRUCT OFSTRUCT;
-typedef void* __func_type_00000146CAF93D70(u64, u64);
-typedef void __func_type_00000146CAF93DD8();
-typedef s32 __func_type_00000146CAF93E30();
-typedef s64 __func_type_00000146CAF93E88(u8*);
-typedef void* __func_type_00000146CAF93EE8(void*, void*, u64);
-typedef s64 __func_type_00000146CAF93F98(s64, u8*);
-typedef s64 __func_type_00000146CAF94040(s32, u8*);
-typedef s64 __func_type_00000146CAF940A8(r32, u8*);
-typedef s64 __func_type_00000146CAF94150(r64, u8*);
-typedef s64 __func_type_00000146CAF941B8(r32);
-typedef s64 __func_type_00000146CAF94218(r64);
-typedef s64 __func_type_00000146CAF94278(s32);
-typedef s64 __func_type_00000146CAF942D8(s64);
-typedef s64 __func_type_00000146CAF94338(u8*, s64);
-typedef s32 __func_type_00000146CAF943A0(struct string);
-typedef void* __func_type_00000146CAF94AD8(u32);
-typedef bool __func_type_00000146CAF94B38(u32, void*);
-typedef bool __func_type_00000146CAF94BA0(void*, void*, u32, u32*, void*);
-typedef u8* __func_type_00000146CAF94C20();
-typedef u32 __func_type_00000146CAF94C78();
-typedef bool __func_type_00000146CAF94D10(void*, void*, u32, u32*, struct OVERLAPPED*);
-typedef s32 __func_type_00000146CAF94DD0(u8*, struct OFSTRUCT*, u32);
-typedef bool __func_type_00000146CAF94E40(void*);
-typedef void* __func_type_00000146CAF94EE0(u8*, u32, u32, struct SECURITY_ATTRIBUTES*, u32, u32, void*);
-typedef bool __func_type_00000146CAF94F70(u8*, struct SECURITY_ATTRIBUTES*);
-typedef bool __func_type_00000146CAF94FD8(u8*, u8*, struct SECURITY_ATTRIBUTES*);
-typedef void* __func_type_00000146CAF95048(void*, u64, u32, u32);
-typedef bool __func_type_00000146CAF950C0(void*, u64, u32);
-typedef void __func_type_00000146CAF95130(void*, void*, u64);
-typedef void* __func_type_00000146CAF951A0(void*, u64);
-typedef s64 __func_type_00000146CAF95208(void*);
-typedef __func_type_00000146CAF95208* __func_type_00000146CAF95268(__func_type_00000146CAF95208* );
+typedef void* __func_type_0x110dca0(u64, u64);
+typedef void __func_type_0x110dd08();
+typedef s32 __func_type_0x110dd60();
+typedef s64 __func_type_0x110ddb8(u8*);
+typedef void* __func_type_0x110de18(void*, void*, u64);
+typedef s64 __func_type_0x110dec8(s64, u8*);
+typedef s64 __func_type_0x110df70(s32, u8*);
+typedef s64 __func_type_0x110dfd8(r32, u8*);
+typedef s64 __func_type_0x110e080(r64, u8*);
+typedef s64 __func_type_0x110e0e8(r32);
+typedef s64 __func_type_0x110e148(r64);
+typedef s64 __func_type_0x110e1a8(s32);
+typedef s64 __func_type_0x110e208(s64);
+typedef s64 __func_type_0x110e268(u8*, s64);
+typedef s32 __func_type_0x110e2d0(struct string);
+typedef void* __func_type_0x110ea08(u32);
+typedef bool __func_type_0x110ea68(u32, void*);
+typedef bool __func_type_0x110ead0(void*, void*, u32, u32*, void*);
+typedef u8* __func_type_0x110eb50();
+typedef u32 __func_type_0x110eba8();
+typedef bool __func_type_0x110ec40(void*, void*, u32, u32*, struct OVERLAPPED*);
+typedef s32 __func_type_0x110ed00(u8*, struct OFSTRUCT*, u32);
+typedef bool __func_type_0x110ed70(void*);
+typedef void* __func_type_0x110ee10(u8*, u32, u32, struct SECURITY_ATTRIBUTES*, u32, u32, void*);
+typedef bool __func_type_0x110eea0(u8*, struct SECURITY_ATTRIBUTES*);
+typedef bool __func_type_0x110ef08(u8*, u8*, struct SECURITY_ATTRIBUTES*);
+typedef void* __func_type_0x110ef78(void*, u64, u32, u32);
+typedef bool __func_type_0x110eff0(void*, u64, u32);
+typedef void __func_type_0x110f060(void*, void*, u64);
+typedef void* __func_type_0x110f0d0(void*, u64);
+typedef s64 __func_type_0x110f138(void*);
+typedef __func_type_0x110f138* __func_type_0x110f198(__func_type_0x110f138* );
 typedef struct string{s64 length;s64 capacity;u8* data;} string;
 typedef struct M128A{u64 Low;s64 High;} M128A;
 typedef struct CONTEXT{u64 P1Home;u64 P2Home;u64 P3Home;u64 P4Home;u64 P5Home;u64 P6Home;u32 ContextFlags;u32 MxCsr;u16 SegCs;u16 SegDs;u16 SegEs;u16 SegFs;u16 SegGs;u16 SegSs;u32 EFlags;u64 Dr0;u64 Dr1;u64 Dr2;u64 Dr3;u64 Dr6;u64 Dr7;u64 Rax;u64 Rcx;u64 Rdx;u64 Rbx;u64 Rsp;u64 Rbp;u64 Rsi;u64 Rdi;u64 R8;u64 R9;u64 R10;u64 R11;u64 R12;u64 R13;u64 R14;u64 R15;u64 Rip;char Header[32];char Legacy[128];struct M128A Xmm0;struct M128A Xmm1;struct M128A Xmm2;struct M128A Xmm3;struct M128A Xmm4;struct M128A Xmm5;struct M128A Xmm6;struct M128A Xmm7;struct M128A Xmm8;struct M128A Xmm9;struct M128A Xmm10;struct M128A Xmm11;struct M128A Xmm12;struct M128A Xmm13;struct M128A Xmm14;struct M128A Xmm15;char VectorRegister[416];u64 VectorControl;u64 DebugControl;u64 LastBranchToRip;u64 LastBranchFromRip;u64 LastExceptionToRip;u64 LastExceptionFromRip;} CONTEXT;
@@ -114,7 +113,7 @@ void MoveMemory(void* destination, void* source, u64 length);
 void CopyMemory(void* destination, void* source, u64 length);
 void* SecureZeroMemory(void* ptr, u64 count);
 typedef s64 __ret_SetUnhandledExceptionFilter(void*);
-__ret_SetUnhandledExceptionFilter* SetUnhandledExceptionFilter(__func_type_00000146CAF95208* top_level_exception_filter);
+__ret_SetUnhandledExceptionFilter* SetUnhandledExceptionFilter(__func_type_0x110f138* top_level_exception_filter);
 
 void example1(){
 struct string __temp_v_0;
@@ -540,7 +539,7 @@ return ((s32)written);
 }
 
 
-void __entry() {
+int __entry() {
 	stdout = (GetStdHandle)((-0xb));
-	ExitProcess(__main());
+	return __main();
 }

@@ -267,12 +267,15 @@ Ast* Parser::parse_declaration(Scope* scope) {
 			} else if (next->type == TOKEN_KEYWORD_STRUCT) {
 				return parse_decl_struct(name, scope);
 			} else if(next->type == TOKEN_KEYWORD_UNION) {
-				return parse_decl_struct(name, scope, true);
+				return parse_decl_union(name, scope);
 			} else if (next->type == TOKEN_KEYWORD_ENUM) {
 				return parse_decl_enum(name, scope, 0);
 			} else {
 				return parse_decl_constant(name, scope, 0);
 			}
+		} else if (next->value.data == compiler_tags[COMPILER_TAG_TYPEDEF].data) {
+			// this is a type alias
+			return parse_decl_typedef(name, scope);
 		} else {
 			// type for a variable, enum or constant declaration
 			Type_Instance* declaration_type = 0;
@@ -295,6 +298,16 @@ Ast* Parser::parse_declaration(Scope* scope) {
 		report_syntax_error(decl, "invalid declaration of '%.*s', declaration requires ':'\n", TOKEN_STR(name));
 	}
 	return 0;
+}
+
+Ast* Parser::parse_decl_typedef(Token* name, Scope* scope) {
+	Token* tdef = lexer->eat_token();
+	assert(tdef->value.data == compiler_tags[COMPILER_TAG_TYPEDEF].data);
+	require_and_eat(':');
+
+	Type_Instance* type = parse_type();
+	require_and_eat(';');
+	return ast_create_decl_typedef(name, scope, type);
 }
 
 Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
@@ -423,29 +436,64 @@ Ast* Parser::parse_decl_variable(Token* name, Scope* scope) {
 	return parse_decl_variable(name, scope, var_type);
 }
 
-Ast* Parser::parse_decl_struct(Token* name, Scope* scope, bool is_union) {
-	if(is_union){
-		require_and_eat(TOKEN_KEYWORD_UNION);
-	} else {
-		require_and_eat(TOKEN_KEYWORD_STRUCT);
-	}
+Ast* Parser::parse_decl_union(Token* name, Scope* scope) {
+	require_and_eat(TOKEN_KEYWORD_UNION);
 
 	s32    fields_count = 0;
 	Ast**  fields = array_create(Ast*, 8);
-	Scope* scope_struct = scope_create(0, scope, (is_union) ? SCOPE_UNION : SCOPE_STRUCTURE);
+	Scope* scope_union = scope_create(0, scope, SCOPE_UNION);
 
 	require_and_eat('{');
 
 	for (;;) {
 		Token* field_name = lexer->eat_token();
 		if (field_name->type != TOKEN_IDENTIFIER) {
-			char* construct = 0;
-			if(is_union){
-				construct = "union";
-			} else {
-				construct = "struct";
-			}
-			report_syntax_error(field_name, "expected %s field declaration, but got '%.*s'\n", construct, TOKEN_STR(field_name));
+			report_syntax_error(field_name, "expected union field declaration, but got '%.*s'\n", TOKEN_STR(field_name));
+		}
+		Ast* field = parse_decl_variable(field_name, scope_union);
+		require_and_eat(';');
+		array_push(fields, &field);
+		++fields_count;
+		if (lexer->peek_token_type() == '}')
+			break;
+	}
+
+	require_and_eat('}');
+
+	Type_Instance* union_type = type_new_temporary();
+	union_type->kind = KIND_UNION;
+	union_type->union_desc.fields_names = array_create(string, fields_count);
+	union_type->union_desc.fields_types = array_create(Type_Instance*, fields_count);
+	union_type->union_desc.fields_count = fields_count;
+	union_type->union_desc.alignment    = 0;
+	union_type->union_desc.name = name;
+	array_allocate(union_type->union_desc.fields_names, fields_count);
+	array_allocate(union_type->union_desc.fields_types, fields_count);
+	for (s32 i = 0; i < fields_count; ++i) {
+		union_type->union_desc.fields_names[i] = fields[i]->decl_variable.name->value;
+		union_type->union_desc.fields_types[i] = fields[i]->decl_variable.variable_type;
+	}
+
+	scope->decl_count += 1;
+
+	Ast* node = ast_create_decl_union(name, scope, scope_union, union_type, fields, 0, fields_count);
+	scope_union->creator_node = node;
+	return node;
+}
+
+Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
+	require_and_eat(TOKEN_KEYWORD_STRUCT);
+
+	s32    fields_count = 0;
+	Ast**  fields = array_create(Ast*, 8);
+	Scope* scope_struct = scope_create(0, scope, SCOPE_STRUCTURE);
+
+	require_and_eat('{');
+
+	for (;;) {
+		Token* field_name = lexer->eat_token();
+		if (field_name->type != TOKEN_IDENTIFIER) {
+			report_syntax_error(field_name, "expected struct field declaration, but got '%.*s'\n", TOKEN_STR(field_name));
 		}
 		Ast* field = parse_decl_variable(field_name, scope_struct);
 		require_and_eat(';');
@@ -458,7 +506,7 @@ Ast* Parser::parse_decl_struct(Token* name, Scope* scope, bool is_union) {
 	require_and_eat('}');
 
 	Type_Instance* struct_type = type_new_temporary();
-	struct_type->kind = (is_union) ? KIND_UNION : KIND_STRUCT;
+	struct_type->kind = KIND_STRUCT;
 	struct_type->struct_desc.fields_names = array_create(string, fields_count);
 	struct_type->struct_desc.fields_types = array_create(Type_Instance*, fields_count);
 	struct_type->struct_desc.offset_bits  = array_create(s64, fields_count);
@@ -475,7 +523,7 @@ Ast* Parser::parse_decl_struct(Token* name, Scope* scope, bool is_union) {
 
 	scope->decl_count += 1;
 
-	Ast* node = ast_create_decl_struct(name, scope, scope_struct, struct_type, fields, (is_union) ? STRUCT_FLAG_IS_UNION : 0, fields_count);
+	Ast* node = ast_create_decl_struct(name, scope, scope_struct, struct_type, fields, 0, fields_count);
 	scope_struct->creator_node = node;
 	return node;
 }
@@ -1225,7 +1273,8 @@ Type_Instance* Parser::parse_type() {
 			return parse_type_pointer();
 
 		case TOKEN_IDENTIFIER:
-			return parse_type_struct(tok);
+			//return parse_type_struct(tok);
+			return parse_type_alias(tok);
 
 		case '[':
 			return parse_type_array();
@@ -1265,6 +1314,17 @@ Type_Instance* Parser::parse_type_pointer() {
 	t->pointer_to = parse_type();
 	return t;
 }
+Type_Instance* Parser::parse_type_alias(Token* name) {
+	Type_Instance* t = type_new_temporary();
+	t->kind = KIND_ALIAS;
+	t->flags = 0;
+	t->type_size_bits = 0;
+	t->struct_desc.fields_names = 0;
+	t->struct_desc.fields_types = 0;
+	t->struct_desc.name = name;
+	return t;
+}
+
 Type_Instance* Parser::parse_type_struct(Token* name) {
 	Type_Instance* t = type_new_temporary();
 	t->kind = KIND_STRUCT;
