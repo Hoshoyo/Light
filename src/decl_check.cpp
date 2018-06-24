@@ -22,8 +22,11 @@ inline void infer_queue_push(Ast* node) {
 }
 inline void infer_queue_remove(Ast* node) {
 	if (node->flags & AST_FLAG_QUEUED) {
-		if(node->infer_queue_index != -1)
+		if (node->infer_queue_index != -1) {
+			s64 index = node->infer_queue_index;
 			array_remove(g_infer_queue, node->infer_queue_index);
+			g_infer_queue[index]->infer_queue_index = index;
+		}
 	}
 }
 

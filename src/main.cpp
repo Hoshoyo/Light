@@ -63,9 +63,6 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	DEBUG_print_ast(stdout, ast_top_level, true);
-	return;
-
 	double end = timer.GetTime();
 	printf("Compiler     elapsed: %fms\n", (end - start));
 
