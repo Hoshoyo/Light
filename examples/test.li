@@ -1,3 +1,4 @@
+/*
 foo : typedef : u32;
 foozle : typedef : foo;
 
@@ -20,4 +21,18 @@ main :: () -> s32 {
 
 Person :: struct {
 	age : s32;
+}
+*/
+#import "linux/print.li"
+
+Foo :: union {
+	integer  : u32;
+	floating : r32;
+}
+
+main :: () -> s32 {
+	v : Foo;
+	v.floating = 1.0;
+	print_u32(v.integer);
+	return 0;
 }

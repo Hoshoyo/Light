@@ -21,3 +21,8 @@
 22/05/2018
     - verify if main is declared before compiling
 	if not, then compile a .obj file (for now)
+
+* unions
+
+23/06/2018
+    - type alias

@@ -118,6 +118,31 @@ Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Type
 	return ds;
 }
 
+Ast* ast_create_decl_union(Token* name, Scope* scope, Scope* union_scope, Type_Instance* utype, Ast** fields, u32 flags, s32 field_count) {
+	Ast* du = ALLOC_AST();
+
+	du->node_type = AST_DECL_UNION;
+	du->type_return = type_primitive_get(TYPE_PRIMITIVE_VOID);
+	du->scope = scope;
+	du->flags = AST_FLAG_IS_DECLARATION;
+	du->infer_queue_index = -1;
+
+	du->decl_union.name = name;
+	du->decl_union.fields = fields;
+	du->decl_union.fields_count = field_count;
+	du->decl_union.flags = flags;
+	du->decl_union.size_bytes = 0;
+	du->decl_union.alignment = 8;		// @TEMPORARY
+	du->decl_union.type_info = utype;
+	du->decl_union.union_scope = union_scope;
+
+	du->decl_union.site.filename = name->filename;
+	du->decl_union.site.line = name->line;
+	du->decl_union.site.column = name->column;
+
+	return du;
+}
+
 Ast* ast_create_decl_enum(Token* name, Scope* scope, Scope* enum_scope, Ast** fields, Type_Instance* type_hint, u32 flags, s32 field_count) {
 	Ast* de = ALLOC_AST();
 

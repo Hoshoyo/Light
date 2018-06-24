@@ -43,6 +43,14 @@ struct Type_Array {
 	};
 };
 
+struct Type_Union {
+	Token*          name;
+	Type_Instance** fields_types;
+	string*         fields_names;
+	s32             fields_count;
+	s32             alignment;
+};
+
 struct Type_Struct {
 	Token*          name;
 	Type_Instance** fields_types;
@@ -74,7 +82,6 @@ const u32 TYPE_FLAG_SIZE_RESOLVED = FLAG(2);
 //const u32 TYPE_FLAG_LVALUE = FLAG(3);
 const u32 TYPE_FLAG_WEAK   = FLAG(4);
 const u32 TYPE_FLAG_STRONG = FLAG(5);
-const u32 TYPE_FLAG_UNION  = FLAG(6);
 struct Type_Instance {
 	Type_Kind kind;
 	u32 flags;
@@ -85,6 +92,7 @@ struct Type_Instance {
 		Type_Instance* pointer_to;
 		Type_Array     array_desc;
 		Type_Struct    struct_desc;
+		Type_Union     union_desc;
 		Type_Function  function_desc;
 		Type_Alias     alias;
 	};

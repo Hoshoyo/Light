@@ -149,12 +149,17 @@ Type_Error decl_check_redefinition(Scope* scope, Ast* node) {
 					node->decl_struct.fields[i]->decl_variable.name, "struct field");
 			}
 		}break;
+		case AST_DECL_UNION: {
+			error |= decl_insert_into_symbol_table(node, node->decl_union.name, "union");
+
+			for (size_t i = 0; i < node->decl_union.fields_count; ++i) {
+				error |= decl_insert_into_symbol_table(node->decl_union.fields[i],
+					node->decl_union.fields[i]->decl_variable.name, "union field");
+			}
+		}break;
 		case AST_DECL_VARIABLE: {
 			error |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
 		}break;
-
-		// TODO(psv): unions
-		//case AST_DECL_UNION: assert(0); break; // @DEPRECATED
 		default:             assert(0); break;
 	}
 	return error;
@@ -172,6 +177,8 @@ Type_Instance* type_from_alias(Scope* scope, Type_Instance* type, bool rep_undec
 		return resolve_type(scope, d->decl_typedef.type, rep_undeclared);
 	} else if(d->node_type == AST_DECL_STRUCT){
 		return resolve_type(scope, d->decl_struct.type_info, rep_undeclared);
+	} else if(d->node_type == AST_DECL_UNION) {
+		return resolve_type(scope, d->decl_union.type_info, rep_undeclared);
 	} else {
 		// TODO(psv): error here
 	}
@@ -217,17 +224,24 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 				}
 				return 0;
 			}
-			type->pointer_to = resolve_type(scope, type->pointer_to, report_undeclared);
+			//type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared);
+			type->pointer_to = resolve_type(scope, struct_decl->decl_struct.type_info, rep_undeclared);
 			return internalize_type(&type, scope, true);
-		}
-		else {
+		} else if(type->pointer_to->kind == KIND_ALIAS) {
+			Type_Instance* tpf = type_from_alias(scope, type->pointer_to, rep_undeclared);
+			if(!tpf) {
+				if(rep_undeclared) {
+					report_undeclared(type->pointer_to->alias.name);
+				}
+				return 0;
+			}
+			type->pointer_to = resolve_type(scope, tpf, rep_undeclared);
+			if(!type->pointer_to) return 0;
+			return internalize_type(&type, scope, true);
+		} else {
 			type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared);
 			if (!type->pointer_to) return 0;
-			if (type->pointer_to->flags & TYPE_FLAG_INTERNALIZED) {
-				return internalize_type(&type, scope, true);
-			} else {
-				return type;
-			}
+			return internalize_type(&type, scope, true);
 		}
 	} break;
 	case KIND_STRUCT: {
@@ -302,6 +316,11 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 				node->decl_procedure.flags |= DECL_PROC_FLAG_MAIN;
 			}
 
+			if(node->decl_procedure.type_procedure->flags & TYPE_FLAG_INTERNALIZED){
+				infer_queue_remove(node);
+				return error_code;
+			}
+
 			// Try to internalize the return type of the procedure
 			if (!(node->decl_procedure.type_return->flags & TYPE_FLAG_INTERNALIZED)) {
 				Type_Instance* type = resolve_type(scope, node->decl_procedure.type_return, false);
@@ -353,6 +372,7 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 
 		case AST_DECL_STRUCT: {
 			if (node->decl_struct.type_info->flags & TYPE_FLAG_INTERNALIZED) {
+				infer_queue_remove(node);
 				return error_code;
 			} else {
 				bool           packed = false;
@@ -411,9 +431,50 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 				type_decl_push(node);
 			}
 		}break;
-		case AST_DECL_UNION:
-			assert(0);
-			break;
+		case AST_DECL_UNION:{
+			if (node->decl_union.type_info->flags & TYPE_FLAG_INTERNALIZED) {
+				infer_queue_remove(node);
+				return error_code;
+			} else {
+				bool packed = false;
+				size_t nfields = node->decl_union.fields_count;
+				Type_Instance* tinfo = node->decl_union.type_info;
+				s32 alignment = 0;
+				size_t type_size_bits = 0;
+				size_t max_size_bits = 0;
+
+				for (size_t i = 0; i < nfields; ++i) {
+					error_code |= type_information_pass(node->decl_union.union_scope, node->decl_union.fields[i]);
+					if (error_code & TYPE_ERROR_FATAL) {
+						return error_code;
+					} else if (error_code & TYPE_QUEUED) {
+						infer_queue_push(node);
+						return error_code;
+					} else {
+						tinfo->union_desc.fields_types[i] = node->decl_union.fields[i]->decl_variable.variable_type;
+						s64 field_type_size = tinfo->union_desc.fields_types[i]->type_size_bits;
+						if(field_type_size > max_size_bits) {
+							max_size_bits = field_type_size;
+						}
+						// for unions offset of all fields is 0
+						// and the type size is always the max
+						type_size_bits = max_size_bits;
+
+						if(field_type_size == 0) continue;
+
+						if(i == 0 || alignment == 0){
+							tinfo->union_desc.alignment = alignment;
+						}
+					}
+				}
+
+				node->decl_union.type_info->type_size_bits = type_size_bits;
+				node->decl_union.type_info->flags |= TYPE_FLAG_SIZE_RESOLVED;
+				node->decl_union.type_info = internalize_type(&tinfo, scope, true);
+				infer_queue_remove(node);
+				type_decl_push(node);
+			}
+		} break;
 		case AST_DECL_VARIABLE: {
 			Type_Instance* expr_type = 0;
 			if (node->decl_variable.assignment) {
@@ -449,14 +510,13 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 
 				// Propagate the variable type to the expression, type checking is performed here
 				// TODO(psv): type check
-				if(node->decl_variable.variable_type && node->decl_variable.assignment) {
-					assert(node->decl_variable.variable_type->flags & TYPE_FLAG_INTERNALIZED);
-					type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &error_code);
-				}
-
 				if (node->decl_variable.assignment) {
 					error_code |= type_propagate(type_var, node->decl_variable.assignment);
 					if (error_code & TYPE_ERROR_FATAL) return error_code;
+				}
+				if(node->decl_variable.variable_type && node->decl_variable.assignment) {
+					assert(node->decl_variable.variable_type->flags & TYPE_FLAG_INTERNALIZED);
+					type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &error_code);
 				}
 			} else {
 				if (expr_type->flags & TYPE_FLAG_INTERNALIZED) {
@@ -512,16 +572,14 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 
 				// Propagate the variable type to the expression, type checking is performed here
 				// TODO(psv): type check
-				if(node->decl_constant.type_info && node->decl_constant.value) {
-					assert(node->decl_constant.type_info->flags & TYPE_FLAG_INTERNALIZED);
-					type_check_expr(node->decl_constant.type_info, node->decl_constant.value, &error_code);
-				}
-
 				if (node->decl_constant.value) {
 					error_code |= type_propagate(type_var, node->decl_constant.value);
 					if (error_code & TYPE_ERROR_FATAL) return error_code;
 				}
-
+				if(node->decl_constant.type_info && node->decl_constant.value) {
+					assert(node->decl_constant.type_info->flags & TYPE_FLAG_INTERNALIZED);
+					type_check_expr(node->decl_constant.type_info, node->decl_constant.value, &error_code);
+				}
 			} else {
 				if (expr_type->flags & TYPE_FLAG_INTERNALIZED) {
 					node->decl_constant.type_info = expr_type;
@@ -878,9 +936,12 @@ Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		}
 	}
 
+	error_code |= resolve_type_internalize_queue();
+
 	if(error_code & TYPE_ERROR_FATAL) {
 		return error_code;
 	}
+
 
 	ndecls = array_get_length(ast_top_level);
 	for (size_t i = 0; i < ndecls; ++i) {

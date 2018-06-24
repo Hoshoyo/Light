@@ -42,7 +42,8 @@ struct Parser {
 	Ast* parse_decl_proc(Token* name, Scope* scope);
 	Ast* parse_decl_variable(Token* name, Scope* scope);
 	Ast* parse_decl_variable(Token* name, Scope* scope, Type_Instance* type);
-	Ast* parse_decl_struct(Token* name, Scope* scope, bool is_union = false);
+	Ast* parse_decl_struct(Token* name, Scope* scope);
+	Ast* parse_decl_union(Token* name, Scope* scope);
 	Ast* parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint);
 	Ast* parse_decl_constant(Token* name, Scope* scope, Type_Instance* type);
 	Ast* parse_decl_typedef(Token* name, Scope* scope);

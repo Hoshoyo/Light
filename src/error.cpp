@@ -138,16 +138,11 @@ static void print_name_of_decl(FILE* out, Ast* decl) {
 		case AST_DECL_ENUM: {
 			fprintf(out, "enum %.*s", TOKEN_STR(decl->decl_enum.name));
 		}break;
-		// @DEPRECATED
-		//case AST_DECL_UNION: {
-		//	fprintf(out, "union %.*s", TOKEN_STR(decl->decl_union.name));
-		//}break;
+		case AST_DECL_UNION:{
+			fprintf(out, "union %.*s", TOKEN_STR(decl->decl_union.name));
+		}break;
 		case AST_DECL_STRUCT: {
-			if(decl->decl_struct.flags & STRUCT_FLAG_IS_UNION) {
-				fprintf(out, "union %.*s", TOKEN_STR(decl->decl_struct.name));
-			} else {
-				fprintf(out, "struct %.*s", TOKEN_STR(decl->decl_struct.name));
-			}
+			fprintf(out, "struct %.*s", TOKEN_STR(decl->decl_struct.name));
 		}break;
 	}
 }

@@ -84,6 +84,9 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 		case OP_UNARY_ADDRESSOF:{
 			if (expr->expr_unary.operand->flags & AST_FLAG_LVALUE) {
 				// that means right side is strong because it is lvalue
+				if(!type_strong(infered)){
+					int x = 0;
+				}
 				assert(type_strong(infered));
 				Type_Instance* ptrtype = type_new_temporary();
 				ptrtype->kind = KIND_POINTER;
@@ -1112,7 +1115,9 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 				// using the struct name as variable i think this crashes, maybe?
 
 				// Could be a union, if so, accept only 1 field
-				if (check_against->flags & TYPE_FLAG_UNION) {
+				if (check_against->kind & KIND_UNION) {
+					assert_msg(0, "union literal not yet implemented");
+					// TODO(psv): not yet implemented
 					if (expr->expr_literal.struct_exprs) {
 						size_t nexpr = array_get_length(expr->expr_literal.struct_exprs);
 						if (nexpr == 1) {
