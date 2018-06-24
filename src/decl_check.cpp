@@ -170,11 +170,11 @@ Type_Instance* type_from_alias(Scope* scope, Type_Instance* type, bool rep_undec
 		return 0;
 	} else if(d->node_type == AST_DECL_TYPEDEF){
 		return resolve_type(scope, d->decl_typedef.type, rep_undeclared);
+	} else if(d->node_type == AST_DECL_STRUCT){
+		return resolve_type(scope, d->decl_struct.type_info, rep_undeclared);
 	} else {
-		// TODO: error here?
+		// TODO(psv): error here
 	}
-
-	return 0;
 }
 
 // resolves and internalizes type if it can, if the type was resolved set TYPE_FLAG_INTERNALIZE
@@ -551,33 +551,28 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 	return error_code;
 }
 
-Type_Error type_checking_pass(Scope* scope, Ast* node) {
+Type_Error type_checking_pass(Scope* scope, Ast* node);
+
+Type_Error type_checking_command(Scope* scope, Ast* node) {
+	assert(node->flags & AST_FLAG_IS_COMMAND);
 	Type_Error error_code = TYPE_OK;
-
-	switch(node) {
-		case AST_DECL_CONSTANT:
-		case AST_DECL_VARIABLE:
-		case AST_DECL_TYPEDEF:
-		case AST_DECL_PROCEDURE:
-		case AST_DECL_STRUCT:
-		case AST_DECL_UNION: assert_msg(0, "union not yet implemented on type checking pass"); break;
-		case AST_DECL_ENUM: assert_msg(0, "enum not yet implemented on type checking pass"); break;
-
-		case AST_COMMAND_BLOCK:{
+	switch (node->node_type) {
+		case AST_COMMAND_BLOCK: {
 			size_t ncomm = array_get_length(node->comm_block.commands);
-			for(size_t i = 0; i < ncomm; ++i) {
+			for (size_t i = 0; i < ncomm; ++i) {
 				error_code |= type_checking_pass(node->comm_block.block_scope, node->comm_block.commands[i]);
+				//type_checking_command(node->comm_block.block_scope, node->comm_block.commands[i]);
 			}
 		}break;
-		case AST_COMMAND_BREAK:{
+		case AST_COMMAND_BREAK: {
 			if (!node->comm_break.level) {
 				node->comm_break.level = ast_create_expr_literal(node->scope, LITERAL_HEX_INT, 0, 0, type_primitive_get(TYPE_PRIMITIVE_U64));
 				node->comm_break.level->expr_literal.value_u64 = 1;
 			}
 			if (node->comm_break.level->node_type == AST_EXPRESSION_LITERAL) {
-				node->comm_break.level->type_return = infer_from_expression(node->comm_break.level, &error, TYPE_INFER_REPORT_UNDECLARED);
-				if (error & TYPE_ERROR_FATAL) return error;
-				if(node->comm_break.level->type_return->flags & TYPE_FLAG_WEAK){
+				node->comm_break.level->type_return = infer_from_expression(node->comm_break.level, &error_code, TYPE_INFER_REPORT_UNDECLARED);
+				if (error_code & TYPE_ERROR_FATAL) return error_code;
+				if (node->comm_break.level->type_return->flags & TYPE_FLAG_WEAK) {
 					type_propagate(0, node->comm_break.level);
 				}
 
@@ -585,34 +580,245 @@ Type_Error type_checking_pass(Scope* scope, Ast* node) {
 					// check if it is inside a loop
 					u64 loop_level = node->comm_break.level->expr_literal.value_u64;
 					if (scope_inside_loop(node->scope, loop_level)) {
-						return error;
-					} else {
-						report_error_location(node);
-						error |= report_semantic_error(TYPE_ERROR_FATAL, "break command is not inside an iterative loop nested '%lld' deep\n", loop_level);
+						return error_code;
 					}
-				} else {
-					report_error_location(node);
-					error |= report_semantic_error(TYPE_ERROR_FATAL, "break command must have an integer as a target\n");
+					else {
+						report_error_location(node);
+						error_code |= report_semantic_error(TYPE_ERROR_FATAL, "break command is not inside an iterative loop nested '%lld' deep\n", loop_level);
+					}
 				}
-			} else {
+				else {
+					report_error_location(node);
+					error_code |= report_semantic_error(TYPE_ERROR_FATAL, "break command must have an integer as a target\n");
+				}
+			}
+			else {
 				report_error_location(node);
-				error |= report_semantic_error(TYPE_ERROR_FATAL, "break command must have an integer literal as a target\n");
+				error_code |= report_semantic_error(TYPE_ERROR_FATAL, "break command must have an integer literal as a target\n");
 			}
 		}break;
+		case AST_COMMAND_CONTINUE: {
+			if (scope_inside_loop(node->scope)) {
+				return error_code;
+			}
+			else {
+				report_error_location(node);
+				error_code |= report_semantic_error(TYPE_ERROR_FATAL, "continue command is not inside an iterative loop\n");
+			}
+		}break;
+		case AST_COMMAND_RETURN: {
+			if (!scope_inside_proc(node->scope)) {
+				report_error_location(node);
+				error_code |= report_semantic_error(TYPE_ERROR_FATAL, "return command is not inside a procedure\n");
+			}
+			if (node->comm_return.expression) {
+				node->comm_return.expression->type_return = infer_from_expression(node->comm_return.expression, &error_code, TYPE_INFER_REPORT_UNDECLARED);
+			}
+		}break;
+		case AST_COMMAND_FOR: {
+			if (node->comm_for.body->comm_block.block_scope) {
+				assert(node->comm_for.body->comm_block.block_scope->flags & SCOPE_LOOP);
+			}
+			node->comm_for.condition->type_return = infer_from_expression(node->comm_for.condition, &error_code, TYPE_INFER_REPORT_UNDECLARED);
+			error_code |= type_checking_command(scope, node->comm_for.body);
+		}break;
+		case AST_COMMAND_IF: {
+			node->comm_if.condition->type_return = infer_from_expression(node->comm_if.condition, &error_code, TYPE_INFER_REPORT_UNDECLARED);
+			error_code |= type_checking_command(scope, node->comm_if.body_true);
+			if (node->comm_if.body_false)
+				error_code |= type_checking_command(scope, node->comm_if.body_false);
+		}break;
+		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
+			// TODO(psv): lvalue not distinguished
+			Type_Instance* ltype = 0;
+			if (node->comm_var_assign.lvalue) {
+				//error |= decl_check_inner_expr_lassign(node->comm_var_assign.lvalue);
+				ltype = infer_from_expression(node->comm_var_assign.lvalue, &error_code, TYPE_INFER_REPORT_UNDECLARED | TYPE_INFER_LVALUE);
+				if (error_code & TYPE_ERROR_FATAL) return error_code;
+				assert(ltype->flags & TYPE_FLAG_STRONG);
+			}
+			else if (node->comm_var_assign.lvalue && node->comm_var_assign.lvalue->type_return != type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+				error_code |= report_type_error(TYPE_ERROR_FATAL, "left side of assignment is not an addressable value\n");
+			}
+			//error |= decl_check_inner_expr(node->comm_var_assign.rvalue);
+			Type_Instance* rtype = infer_from_expression(node->comm_var_assign.rvalue, &error_code, TYPE_INFER_REPORT_UNDECLARED);
+			if (error_code & TYPE_ERROR_FATAL) return error_code;
+			if (rtype->flags & TYPE_FLAG_WEAK) {
+				type_propagate(ltype, node->comm_var_assign.rvalue);
+			}
+			node->comm_var_assign.rvalue->type_return = type_check_expr(ltype, node->comm_var_assign.rvalue, &error_code);
+
+			if (node->comm_var_assign.rvalue->type_return) {
+				// if the rvalue is weak, transform it
+				if (node->comm_var_assign.rvalue->type_return && node->comm_var_assign.rvalue->type_return->flags & TYPE_FLAG_WEAK) {
+					//error |= type_update_weak(node->comm_var_assign.rvalue, node->comm_var_assign.lvalue->type_return->pointer_to);
+					type_propagate(node->comm_var_assign.lvalue->type_return, node->comm_var_assign.rvalue);
+					node->comm_var_assign.rvalue->type_return = type_check_expr(node->comm_var_assign.lvalue->type_return, node->comm_var_assign.rvalue, &error_code);
+				}
+			}
+		}break;
+		default: assert_msg(0, "invalid command in type checking");
+	}
+
+	return error_code;
+}
+
+Type_Error type_checking_decl(Scope* scope, Ast* node) {
+	assert(node->flags & AST_FLAG_IS_DECLARATION);
+	Type_Error error_code = TYPE_OK;
+	switch (node->node_type) {
+		case AST_DECL_VARIABLE: {
+			if (node->decl_variable.variable_type) {
+				node->decl_variable.variable_type = resolve_type(node->scope, node->decl_variable.variable_type, true);
+				if (node->decl_variable.variable_type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error_code |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a variable of type void\n");
+				}
+				if (error_code & TYPE_ERROR_FATAL) return error_code;
+			}
+
+			if (node->decl_variable.assignment) {
+				Type_Error type_error = TYPE_OK;
+				Type_Instance* infered = infer_from_expression(node->decl_variable.assignment, &type_error, TYPE_INFER_REPORT_UNDECLARED);
+				if (infered == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error_code |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a variable of type void\n");
+				}
+				if (type_error & TYPE_ERROR_FATAL) return type_error | error_code;
+				bool typechecked = false;
+				if (infered && infered->flags & TYPE_FLAG_WEAK) {
+					type_propagate(node->decl_variable.variable_type, node->decl_variable.assignment);
+					if (!node->decl_variable.assignment->type_return) {
+						type_error |= report_type_error(TYPE_ERROR_FATAL, node, "could not infer variable type from assignment expression\n");
+						return type_error | error_code;
+					}
+					if (infered->kind == KIND_ARRAY || infered->kind == KIND_STRUCT) {
+						infered = type_check_expr(node->decl_variable.assignment->type_return, node->decl_variable.assignment, &error_code);
+						typechecked = true;
+					}
+					else {
+						infered = node->decl_variable.assignment->type_return;
+					}
+				}
+				if (!node->decl_variable.variable_type) {
+					if (!infered) {
+						type_error |= report_type_error(TYPE_ERROR_FATAL, node, "could not infer variable type from assignment expression\n");
+						return type_error | error_code;
+					}
+					node->decl_variable.variable_type = infered;
+				}
+				else {
+					if (!typechecked)
+						node->decl_variable.assignment->type_return = type_check_expr(node->decl_variable.variable_type, node->decl_variable.assignment, &type_error);
+				}
+				error_code |= type_error;
+			}
+
+			if (node->scope->level > 0)
+				error_code |= decl_insert_into_symbol_table(node, node->decl_variable.name, "variable");
+		}break;
+		case AST_DECL_CONSTANT: {
+			Type_Error type_error = TYPE_OK;
+
+			if (!expr_is_constant(node->decl_constant.value, &type_error, true, true)) {
+				return type_error | error_code;
+			}
+
+			if (node->decl_constant.type_info) {
+				node->decl_constant.type_info = resolve_type(node->scope, node->decl_constant.type_info, true);
+				if (node->decl_constant.type_info == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+					error_code |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a constant of type void\n");
+				}
+				if (error_code & TYPE_ERROR_FATAL) return error_code;
+			}
+
+			assert(node->decl_constant.value);
+
+			Type_Instance* infered = infer_from_expression(node->decl_constant.value, &type_error, TYPE_INFER_REPORT_UNDECLARED);
+			if (infered == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+				error_code |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a constant of type void\n");
+			}
+			if (type_error & TYPE_ERROR_FATAL) return type_error | error_code;
+			bool typechecked = false;
+			if (infered && infered->flags & TYPE_FLAG_WEAK) {
+				type_propagate(node->decl_constant.type_info, node->decl_constant.value);
+				if (!node->decl_constant.value->type_return) {
+					type_error |= report_type_error(TYPE_ERROR_FATAL, node, "could not infer constant type from value expression\n");
+					return type_error | error_code;
+				}
+				if (infered->kind == KIND_ARRAY || infered->kind == KIND_STRUCT) {
+					infered = type_check_expr(node->decl_constant.value->type_return, node->decl_constant.value, &error_code);
+					typechecked = true;
+				}
+				else {
+					infered = node->decl_constant.value->type_return;
+				}
+			}
+			if (!node->decl_constant.type_info) {
+				if (!infered) {
+					type_error |= report_type_error(TYPE_ERROR_FATAL, node, "could not infer constant type from value expression\n");
+					return type_error | error_code;
+				}
+				node->decl_constant.type_info = infered;
+			}
+			else {
+				if (!typechecked)
+					node->decl_constant.value->type_return = type_check_expr(node->decl_constant.type_info, node->decl_constant.value, &type_error);
+			}
+			error_code |= type_error;
+
+			if (node->scope->level > 0)
+				error_code |= decl_insert_into_symbol_table(node, node->decl_constant.name, "constant");
+		}break;
+		case AST_DECL_PROCEDURE: {
+			//for (size_t i = 0; i < node->decl_procedure.arguments_count; ++i) {
+			//	Ast* arg = node->decl_procedure.arguments[i];
+			//	error |= decl_check_inner_decl(arg);
+			//}
+			if (!(node->decl_procedure.flags & DECL_PROC_FLAG_FOREIGN)) {
+				error_code |= type_checking_command(scope, node->decl_procedure.body);
+				if (node->scope->level > 0)
+					error_code |= decl_insert_into_symbol_table(node, node->decl_procedure.name, "procedure");
+			}
+		}break;
+		case AST_DECL_STRUCT:
+		case AST_DECL_UNION:
+		case AST_DECL_TYPEDEF:
+			break;
+		default: {
+			assert_msg(0, "invalid declaration in type checking");
+		}break;
+	}
+
+	return error_code;
+}
+
+Type_Error type_checking_pass(Scope* scope, Ast* node) {
+	Type_Error error_code = TYPE_OK;
+
+	switch(node->node_type) {
+		case AST_DECL_CONSTANT:
+		case AST_DECL_VARIABLE:
+		case AST_DECL_TYPEDEF:
+		case AST_DECL_PROCEDURE:
+		case AST_DECL_STRUCT:
+		case AST_DECL_UNION: //assert_msg(0, "union not yet implemented on type checking pass"); break;
+		case AST_DECL_ENUM:  //assert_msg(0, "enum not yet implemented on type checking pass"); break;
+			error_code |= type_checking_decl(scope, node);
+			break;
+
+		case AST_COMMAND_BLOCK:
+		case AST_COMMAND_BREAK:
 		case AST_COMMAND_CONTINUE:
 		case AST_COMMAND_FOR:
 		case AST_COMMAND_IF:
 		case AST_COMMAND_RETURN:
 		case AST_COMMAND_VARIABLE_ASSIGNMENT:
+			error_code |= type_checking_command(scope, node);
+			break;
 
-		case AST_EXPRESSION_BINARY:
-		case AST_EXPRESSION_LITERAL:
-		case AST_EXPRESSION_PROCEDURE_CALL:
-		case AST_EXPRESSION_UNARY:
-		case AST_EXPRESSION_VARIABLE:
-
+		case AST_DATA:
+			break;
 		default: {
-
+			assert_msg(0, "invalid node in type checking");
 		}break;
 	}
 
@@ -676,7 +882,10 @@ Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 		return error_code;
 	}
 
-	//type_checking_pass();
+	ndecls = array_get_length(ast_top_level);
+	for (size_t i = 0; i < ndecls; ++i) {
+		error_code |= type_checking_pass(global_scope, ast_top_level[i]);
+	}
 
 	return error_code;
 }
