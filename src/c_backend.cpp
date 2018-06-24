@@ -531,7 +531,8 @@ void C_Code_Generator::emit_command(Ast* comm) {
                     }
                     emit_expression(comm->comm_var_assign.rvalue);
                     sprint(";");
-				} else if(rval->node_type == AST_EXPRESSION_VARIABLE && rval->type_return->kind == KIND_STRUCT){
+				} else if(rval->node_type == AST_EXPRESSION_VARIABLE && 
+					(rval->type_return->kind == KIND_STRUCT || rval->type_return->kind == KIND_UNION)){
                     if (comm->comm_var_assign.lvalue) {
                         emit_expression(comm->comm_var_assign.lvalue);
                         sprint(" = ");
