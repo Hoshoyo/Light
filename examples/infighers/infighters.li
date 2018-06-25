@@ -1,5 +1,5 @@
 #import "../x11/x11.li"
-//#import "../linux/print.li"
+#import "../linux/print.li"
 
 Window_Info :: struct {
 	width : s32;
@@ -9,7 +9,6 @@ Window_Info :: struct {
 	vi : ^XVisualInfo;
 	swa : XSetWindowAttributes;
 }
-/*
 
 GLX_X_RENDERABLE : u32 : 0x8012;
 GLX_DRAWABLE_TYPE : u32 : 0x8010;
@@ -25,9 +24,12 @@ GLX_DEPTH_SIZE : u32 : 12;
 GLX_STENCIL_SIZE : u32 : 13;
 GLX_DOUBLEBUFFER : u32 : 5;
 GLX_WINDOW_BIT : u32 : 1;
+GLX_SAMPLE_BUFFERS : s32 : 100000;
+GLX_SAMPLES : s32 : 100001;
 True : u32 : 1;
 
 glXQueryVersion :: (dpy : ^Display, major : ^s32, minor : ^s32) -> bool #foreign("X11");
+
 init_opengl :: (info : ^Window_Info) -> s32 {
     visual_attribs := array{
 		GLX_X_RENDERABLE, True,
@@ -52,25 +54,71 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	}
 	// Getting framebuffer config
 	fbcount : s32;
-	//fbc := glXChooseFBConfig((*info).display, DefaultScreen((*info).display), visual_attribs, &fbcount);
-	//if(!fbc){
-	//	printf("Failed to get framebuffer configuration\n");
-	//	return -1;
-	//}
-}
-*/
-glXChooseFBConfig :: (dpy : ^Display, screen : s32, attrib_list : ^u32, nelements : ^s32) -> ^GLXFBConfig {
+	fbc := glXChooseFBConfig((*info).display, DefaultScreen((*info).display), [^u32]visual_attribs, &fbcount);
+	if fbc == [^GLXFBConfig]0 {
+		print_string("Failed to get framebuffer configuration\n");
+		return -1;
+	}
 
+	print_string("Found matching FB configs: ");
+	print_s32(fbcount);
+	print_string("\n");
+
+	best_fbc : s32 = -1;
+	worst_fbc : s32 = -1;
+	best_num_samp : s32 = -1;
+	worst_num_samp : s32 = 999;
+
+	for i :s32= 0; i < fbcount; i += 1 {
+		vi : ^XVisualInfo = glXGetVisualFromFBConfig((*info).display, fbc[i]);
+		if vi != [^XVisualInfo]0 {
+			samp_buf : s32;
+			samples : s32;
+			glXGetFBConfigAttrib((*info).display, fbc[i], GLX_SAMPLE_BUFFERS, &samp_buf);
+			glXGetFBConfigAttrib((*info).display, fbc[i], GLX_SAMPLES       , &samples);
+			
+			print_string("Matching fbconfig: ");
+			print_s64([s64](*vi).visualid);
+			print_string("\n");
+
+			if best_fbc < 0 || samp_buf != 0 && samples > best_num_samp {
+				best_fbc = i;
+				best_num_samp = samples;
+			}
+			if worst_fbc < 0 || samp_buf == 0 || samples < worst_num_samp {
+				worst_fbc = i;
+				worst_num_samp = samples;
+			}
+		}
+		XFree([^void]vi);
+	}
+
+	bestFbc := fbc[best_fbc];
+	XFree([^void]fbc);
+
+	print_string("best fbc: ");
+	print_s64([s64]bestFbc);
+	print_string("\n");
+
+	vi := glXGetVisualFromFBConfig((*info).display, bestFbc);
+	print_string("Chosen visual ID = 0x");
+	print_s64([s64]vi);
 }
 
-//DefaultScreen :: (dpy : ^Display) -> s32 {
-//	return (*dpy).default_screen;
-//}
+GLXFBConfig : typedef : ^void;
+glXChooseFBConfig :: (dpy : ^Display, screen : s32, attrib_list : ^u32, nelements : ^s32) -> ^GLXFBConfig #foreign("GL");
+glXGetVisualFromFBConfig :: (dpy : ^Display, config : GLXFBConfig) -> ^XVisualInfo #foreign("GL");
+glXGetFBConfigAttrib :: (dpy : ^Display, config : GLXFBConfig, attribute : s32, value : ^s32) -> s32 #foreign("GL");
+XFree :: (data : ^void) -> s32 #foreign("X11");
+
+DefaultScreen :: (dpy : ^Display) -> s32 {
+	return (*dpy).default_screen;
+}
 
 main :: () -> s32 {
-	//info : Window_Info;
-	//info.display = XOpenDisplay([^s8]0);
+	info : Window_Info;
+	info.display = XOpenDisplay([^s8]0);
 
-	//init_opengl(&info);
+	if init_opengl(&info) == -1 return -1;
     return 0;
 }

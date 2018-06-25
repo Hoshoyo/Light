@@ -1,45 +1,17 @@
-/*
-foo : typedef : u32;
-foozle : typedef : foo;
+bar : s32 = 4;
+foo : ^s32 = &bar;
 
-memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void #foreign("msvcrt");
-
-bar := main;
-
-PI :: 3.1415;
-
-var : Person = Person:{2};
-
-test : foo;
-test2 : foo = 3;
-test3 : foozle;
-test4 : foozle = 4;
-
-main :: () -> s32 {
-	return 0;
-}
-
-Person :: struct {
-	age : s32;
-}
-
-Foo :: union {
-	integer  : u32;
-	floating : r32;
+alloc :: () -> ^^void {
+	return [^^void]&foo;
 }
 
 main :: () -> s32 {
-	v : Foo;
-	v.floating = 1.0;
-	print_u32(v.integer);
+	x := alloc();
+	y := x[0];
+
+	//print_s32(*[^s32]y);
+
 	return 0;
 }
-*/
 
-foo :: () -> ^bar {
-	
-}
-
-main :: () -> s32 {}
-
-#import "linux/print.li"
+//#import "linux/print.li"
