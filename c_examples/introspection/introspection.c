@@ -190,6 +190,9 @@ void require_next(Tokenized* tokens, Token_Type type) {
 Type_Info* parse_type(Tokenized* tokens, Type_Info* subtype) {
     Token* n = token_next(tokens);
     Type_Info* type_info = (Type_Info*)calloc(1, sizeof(Type_Info));
+    if(n->type == TOKEN_STRUCT) {
+        n = token_next(tokens);
+    }
     switch(n->type) {
         case TOKEN_INT:
             type_info->kind = KIND_PRIMITIVE;
@@ -250,6 +253,9 @@ Ast** parse(Tokenized* tokens) {
         if(t->type == TOKEN_TYPEDEF){
             Ast* node = (Ast*)calloc(1, sizeof(Ast));
             require_next(tokens, TOKEN_STRUCT);
+            if(token_peek(tokens)->type == TOKEN_IDENTIFIER) {
+                token_next(tokens);
+            }
             require_next(tokens, '{');
 
             Field* fields = array_new(Field);
@@ -283,8 +289,8 @@ void generate_indent_level(FILE* out, char* var_name) {
     fprintf(out, "{ for(int i = 0; i < %s; ++i) printf(\"\\t\"); }\n", var_name);
 }
 
+#define STRUCT_STR(T) T->name_length, T->struct_name
 void generate_introspection_code(Ast** decls){
-    #define STRUCT_STR(T) T->name_length, T->struct_name
     FILE* out = fopen("introspection_generated.h", "w");
     //out = stdout;
     fprintf(out, "#include <stdio.h>\n");
@@ -295,10 +301,9 @@ void generate_introspection_code(Ast** decls){
         if(true || strncmp(node->struct_name, "Entity", sizeof("Entity") - 1) == 0) {
             fprintf(out, "void print_%.*s(%.*s *e, int indent_level) {\n", STRUCT_STR(node), STRUCT_STR(node));
             generate_indent_level(out, "indent_level");
-            fprintf(out, "printf(\"I'm an %.*s\\n\");\n", STRUCT_STR(node));
+            fprintf(out, "printf(\"%.*s\\n\");\n", STRUCT_STR(node));
             for(int f = 0; f < array_length(node->fields); ++f) {
                 Field* field = &node->fields[f];
-                //fprintf(out, "\t%.*s\n", node->fields[f].name_length, node->fields[f].name);
                 switch(field->type_info->kind){
                     case KIND_PRIMITIVE:{
                         char* specifier = 0;
@@ -314,12 +319,20 @@ void generate_introspection_code(Ast** decls){
 
                     case KIND_POINTER:{
                         generate_indent_level(out, "indent_level");
-                        if(field->type_info->ptr_to->kind == KIND_PRIMITIVE && field->type_info->ptr_to->primitive == TYPE_PRIMITIVE_CHAR){
-                            fprintf(out, "printf(\"%.*s -> %%s\\n\", ", field->name_length, field->name);
+                        if(field->type_info->ptr_to->kind == KIND_STRUCT) {
+                            fprintf(out, "if(e->%.*s) {\n", field->name_length, field->name);
+                            fprintf(out, "print_%.*s(", field->type_info->ptr_to->struct_desc.name_length, field->type_info->ptr_to->struct_desc.name);
+                            fprintf(out, "e->%.*s, indent_level + 1);\n", field->name_length, field->name);
+                            fprintf(out, "}\n");
                         } else {
-                            fprintf(out, "printf(\"%.*s -> %%p\\n\", ", field->name_length, field->name);
+                            if(field->type_info->ptr_to->kind == KIND_PRIMITIVE && field->type_info->ptr_to->primitive == TYPE_PRIMITIVE_CHAR){
+                                fprintf(out, "printf(\"%.*s -> %%s\\n\", ", field->name_length, field->name);
+                                fprintf(out, "e->%.*s);\n", field->name_length, field->name);
+                            } else {
+                                fprintf(out, "printf(\"%.*s -> %%p\\n\", ", field->name_length, field->name);
+                                fprintf(out, "e->%.*s);\n", field->name_length, field->name);
+                            }
                         }
-                        fprintf(out, "e->%.*s);\n", field->name_length, field->name);
                     }break;
                     case KIND_STRUCT:{
                         generate_indent_level(out, "indent_level");
@@ -338,6 +351,56 @@ void generate_introspection_code(Ast** decls){
     fclose(out);
 }
 
+void generate_introspection_graph_code(Ast** decls) {
+    FILE* out = fopen("introspection_generated.h", "w");
+    //out = stdout;
+    fprintf(out, "#include <stdio.h>\n");
+    fprintf(out, "#include \"introspect.h\"\n");
+    for(int i = 0; i < array_length(decls); ++i) {
+        Ast* node = decls[i];
+        // If the struct being read starts with entity generate the code
+        if(true || strncmp(node->struct_name, "Entity", sizeof("Entity") - 1) == 0) {
+            fprintf(out, "void print_%.*s(%.*s *e, int indent_level) {\n", STRUCT_STR(node), STRUCT_STR(node));
+            for(int f = 0; f < array_length(node->fields); ++f) {
+                Field* field = &node->fields[f];
+                switch(field->type_info->kind){
+                    case KIND_PRIMITIVE:{
+                        char* specifier = 0;
+                        switch(field->type_info->primitive) {
+                            case TYPE_PRIMITIVE_INT:   specifier = "d"; break;
+                            case TYPE_PRIMITIVE_CHAR:  specifier = "c"; break;
+                            case TYPE_PRIMITIVE_FLOAT: specifier = "f"; break;
+                        }
+                        fprintf(out, "printf(\"%.*s -> %.*s\\n\");\n", STRUCT_STR(node), field->name_length, field->name);
+                        fprintf(out, "printf(\"%.*s -> %%%s\\n\", ", field->name_length, field->name, specifier);
+                        fprintf(out, "e->%.*s);\n", field->name_length, field->name);
+                    }break;
+
+                    case KIND_POINTER:{
+                        if(field->type_info->ptr_to->kind == KIND_STRUCT) {
+                        } else {
+                            if(field->type_info->ptr_to->kind == KIND_PRIMITIVE && field->type_info->ptr_to->primitive == TYPE_PRIMITIVE_CHAR){
+                                fprintf(out, "printf(\"%.*s -> %.*s\\n\");\n", STRUCT_STR(node), field->name_length, field->name);
+                                fprintf(out, "printf(\"%.*s -> %%s\\n\", ", field->name_length, field->name);
+                                fprintf(out, "e->%.*s);\n", field->name_length, field->name);
+                            } else {
+
+                            }
+                        }
+                    }break;
+
+                    case KIND_STRUCT:{
+
+                    }break;
+                }
+            }
+            fprintf(out, "\tprintf(\"\\n\");\n");
+            fprintf(out, "}\n");
+        }
+    }
+    fclose(out);
+}
+
 int main(int argc, char** argv) {
     int file_size = 0;
     char* data = read_entire_file("introspect.h", &file_size);
@@ -346,6 +409,7 @@ int main(int argc, char** argv) {
 
     Ast** decls = parse(&tokens);
     generate_introspection_code(decls);
+    //generate_introspection_graph_code(decls);
 
     free(tokens.tokens);
     return 0;

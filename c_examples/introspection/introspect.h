@@ -24,3 +24,9 @@ typedef struct {
     int    bpp;
     char*  pixels;
 } Entity_2D_Sprite;
+
+typedef struct Person{
+    char* name;
+    int age;
+    struct Person* child;
+} Person;

@@ -2,7 +2,7 @@
 #include "introspect.h"
 void print_vec3(vec3 *e, int indent_level) {
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
-printf("I'm an vec3\n");
+printf("vec3\n");
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
 printf("x -> %f\n", e->x);
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
@@ -13,7 +13,7 @@ printf("z -> %f\n", e->z);
 }
 void print_Entity(Entity *e, int indent_level) {
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
-printf("I'm an Entity\n");
+printf("Entity\n");
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
 printf("name -> %s\n", e->name);
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
@@ -26,7 +26,7 @@ print_vec3(&e->momentum, indent_level + 1);
 }
 void print_Entity_3D_Model(Entity_3D_Model *e, int indent_level) {
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
-printf("I'm an Entity_3D_Model\n");
+printf("Entity_3D_Model\n");
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
 printf("e -> ");
 print_Entity(&e->e, indent_level + 1);
@@ -38,7 +38,7 @@ printf("num_vertices -> %d\n", e->num_vertices);
 }
 void print_Entity_2D_Sprite(Entity_2D_Sprite *e, int indent_level) {
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
-printf("I'm an Entity_2D_Sprite\n");
+printf("Entity_2D_Sprite\n");
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
 printf("e -> ");
 print_Entity(&e->e, indent_level + 1);
@@ -54,10 +54,14 @@ printf("pixels -> %s\n", e->pixels);
 }
 void print_Person(Person *e, int indent_level) {
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
-printf("I'm an Person\n");
+printf("Person\n");
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
 printf("name -> %s\n", e->name);
 { for(int i = 0; i < indent_level; ++i) printf("\t"); }
 printf("age -> %d\n", e->age);
+{ for(int i = 0; i < indent_level; ++i) printf("\t"); }
+if(e->child) {
+print_Person(e->child, indent_level + 1);
+}
 	printf("\n");
 }

@@ -19,10 +19,14 @@ int main(int argc, char** argv) {
 
     print_Entity_2D_Sprite(&sprite, 0);
 
-    Person p = {
-        "Pedro", 26,
-    };
+    Person p = {"Joao", 70, 0};
     print_Person(&p, 0);
+
+    Person f = {"Paulo", 40, &p};
+    print_Person(&f, 0);
+
+    Person m = {"Maria", 40, &f};
+    print_Person(&m, 0);
     
     return 0;
 }
