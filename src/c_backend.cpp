@@ -624,7 +624,7 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
         case OP_BINARY_VECTOR_ACCESS:{
             Type_Instance* indexed_type = expr->expr_binary.left->type_return;
 
-			if(expr->type_return->kind != KIND_ARRAY && expr->type_return->kind != KIND_POINTER){
+			if(expr->type_return->kind != KIND_ARRAY){
 				sprint("*(");
 				emit_type(indexed_type);
 				sprint(")");

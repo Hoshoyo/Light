@@ -1,6 +1,6 @@
-#import "../windows/print.li"
+#import "../linux/print.li"
 
-calloc :: (count : u64, size : u64) -> ^void #foreign("msvcrt");
+calloc :: (count : u64, size : u64) -> ^void #foreign("c");
 
 example1 :: () {
     print_string("Example1\n\n");

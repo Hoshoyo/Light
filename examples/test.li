@@ -9,9 +9,9 @@ main :: () -> s32 {
 	x := alloc();
 	y := x[0];
 
-	//print_s32(*[^s32]y);
+	print_s32(*[^s32]y);
 
 	return 0;
 }
 
-//#import "linux/print.li"
+#import "linux/print.li"

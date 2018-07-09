@@ -18,53 +18,36 @@ void __memory_copy(void* dest, void* src, u64 size) {
 	for(u64 i = 0; i < size; ++i) ((char*)dest)[i] = ((char*)src)[i];
 }
 typedef struct string string;
-typedef struct M128A M128A;
-typedef struct CONTEXT CONTEXT;
-typedef struct EXCEPTION_RECORD EXCEPTION_RECORD;
-typedef struct EXCEPTION_POINTERS EXCEPTION_POINTERS;
-typedef struct OVERLAPPED OVERLAPPED;
-typedef struct SECURITY_ATTRIBUTES SECURITY_ATTRIBUTES;
-typedef struct OFSTRUCT OFSTRUCT;
-typedef void* __func_type_0x110dca0(u64, u64);
-typedef void __func_type_0x110dd08();
-typedef s32 __func_type_0x110dd60();
-typedef s64 __func_type_0x110ddb8(u8*);
-typedef void* __func_type_0x110de18(void*, void*, u64);
-typedef s64 __func_type_0x110dec8(s64, u8*);
-typedef s64 __func_type_0x110df70(s32, u8*);
-typedef s64 __func_type_0x110dfd8(r32, u8*);
-typedef s64 __func_type_0x110e080(r64, u8*);
-typedef s64 __func_type_0x110e0e8(r32);
-typedef s64 __func_type_0x110e148(r64);
-typedef s64 __func_type_0x110e1a8(s32);
-typedef s64 __func_type_0x110e208(s64);
-typedef s64 __func_type_0x110e268(u8*, s64);
-typedef s32 __func_type_0x110e2d0(struct string);
-typedef void* __func_type_0x110ea08(u32);
-typedef bool __func_type_0x110ea68(u32, void*);
-typedef bool __func_type_0x110ead0(void*, void*, u32, u32*, void*);
-typedef u8* __func_type_0x110eb50();
-typedef u32 __func_type_0x110eba8();
-typedef bool __func_type_0x110ec40(void*, void*, u32, u32*, struct OVERLAPPED*);
-typedef s32 __func_type_0x110ed00(u8*, struct OFSTRUCT*, u32);
-typedef bool __func_type_0x110ed70(void*);
-typedef void* __func_type_0x110ee10(u8*, u32, u32, struct SECURITY_ATTRIBUTES*, u32, u32, void*);
-typedef bool __func_type_0x110eea0(u8*, struct SECURITY_ATTRIBUTES*);
-typedef bool __func_type_0x110ef08(u8*, u8*, struct SECURITY_ATTRIBUTES*);
-typedef void* __func_type_0x110ef78(void*, u64, u32, u32);
-typedef bool __func_type_0x110eff0(void*, u64, u32);
-typedef void __func_type_0x110f060(void*, void*, u64);
-typedef void* __func_type_0x110f0d0(void*, u64);
-typedef s64 __func_type_0x110f138(void*);
-typedef __func_type_0x110f138* __func_type_0x110f198(__func_type_0x110f138* );
+typedef struct timespec timespec;
+typedef struct stat stat;
+typedef void* __func_type_0x1a4fca0(u64, u64);
+typedef void __func_type_0x1a4fd08();
+typedef s32 __func_type_0x1a4fd60();
+typedef void* __func_type_0x1a4fdb8(void*, void*, u64);
+typedef s64 __func_type_0x1a4fe28(u8*);
+typedef s64 __func_type_0x1a4fec8(s32, u8*);
+typedef s64 __func_type_0x1a4ff30(u32, bool, s8*);
+typedef s64 __func_type_0x1a4ffe0(s64, u8*);
+typedef s64 __func_type_0x1a50048(r32, u8*);
+typedef s64 __func_type_0x1a500f0(r64, u8*);
+typedef s64 __func_type_0x1a50158(bool);
+typedef s64 __func_type_0x1a501b8(u32);
+typedef s64 __func_type_0x1a50218(s32);
+typedef s64 __func_type_0x1a50278(s64);
+typedef s64 __func_type_0x1a502d8(r32);
+typedef s64 __func_type_0x1a50338(r64);
+typedef s64 __func_type_0x1a50398(u8*, s64);
+typedef s64 __func_type_0x1a50400(struct string);
+typedef u64 __func_type_0x1a505d0(s32, void*, u64);
+typedef s64 __func_type_0x1a50640(s32, void*, u64);
+typedef s32 __func_type_0x1a506b0(u8*, s32);
+typedef s32 __func_type_0x1a50718(s32);
+typedef s32 __func_type_0x1a507b8(s32, struct stat*);
+typedef void* __func_type_0x1a50820(u64);
+typedef void* __func_type_0x1a50880(struct string, __func_type_0x1a50820* , u64*);
 typedef struct string{s64 length;s64 capacity;u8* data;} string;
-typedef struct M128A{u64 Low;s64 High;} M128A;
-typedef struct CONTEXT{u64 P1Home;u64 P2Home;u64 P3Home;u64 P4Home;u64 P5Home;u64 P6Home;u32 ContextFlags;u32 MxCsr;u16 SegCs;u16 SegDs;u16 SegEs;u16 SegFs;u16 SegGs;u16 SegSs;u32 EFlags;u64 Dr0;u64 Dr1;u64 Dr2;u64 Dr3;u64 Dr6;u64 Dr7;u64 Rax;u64 Rcx;u64 Rdx;u64 Rbx;u64 Rsp;u64 Rbp;u64 Rsi;u64 Rdi;u64 R8;u64 R9;u64 R10;u64 R11;u64 R12;u64 R13;u64 R14;u64 R15;u64 Rip;char Header[32];char Legacy[128];struct M128A Xmm0;struct M128A Xmm1;struct M128A Xmm2;struct M128A Xmm3;struct M128A Xmm4;struct M128A Xmm5;struct M128A Xmm6;struct M128A Xmm7;struct M128A Xmm8;struct M128A Xmm9;struct M128A Xmm10;struct M128A Xmm11;struct M128A Xmm12;struct M128A Xmm13;struct M128A Xmm14;struct M128A Xmm15;char VectorRegister[416];u64 VectorControl;u64 DebugControl;u64 LastBranchToRip;u64 LastBranchFromRip;u64 LastExceptionToRip;u64 LastExceptionFromRip;} CONTEXT;
-typedef struct EXCEPTION_RECORD{u32 ExceptionCode;u32 ExceptionFlags;struct EXCEPTION_RECORD* ExceptionRecord;void* ExceptionAddress;u32 NumberParameters;char ExceptionInformation[120];} EXCEPTION_RECORD;
-typedef struct EXCEPTION_POINTERS{struct EXCEPTION_RECORD* ExceptionRecord;struct CONTEXT* ContextRecord;} EXCEPTION_POINTERS;
-typedef struct OVERLAPPED{u64* Internal;u64* InternalHigh;void* Pointer;void* hEvent;} OVERLAPPED;
-typedef struct SECURITY_ATTRIBUTES{u32 nLength;void* lpSecurityDescriptor;bool bInheritHandle;} SECURITY_ATTRIBUTES;
-typedef struct OFSTRUCT{u8 cBytes;u8 fFixedDisk;u16 nErrCode;u16 Reserved1;u16 Reserved2;char szPathName[128];} OFSTRUCT;
+typedef struct timespec{s64 tv_sec;s64 tv_nsec;} timespec;
+typedef struct stat{u64 st_dev;u64 st_ino;u64 st_nlink;u32 st_mode;u32 st_uid;u32 st_gid;u64 st_rdev;s64 st_size;s64 st_blksize;s64 st_blocks;struct timespec st_atim;struct timespec st_mtim;struct timespec st_ctim;char __glibc_reserved[24];} stat;
 
 void* calloc(u64 count, u64 size);
 char* __string_data_0 = "Example1\n\n";
@@ -79,41 +62,29 @@ char* __string_data_7 = " ";
 char* __string_data_8 = "\n";
 void example2();
 s32 __main();
-void* stdout;
-s64 string_length(u8* s);
 void* memcpy(void* dest, void* src, u64 size);
-s64 s64_to_str(s64 val, char buffer[32]);
+s64 string_length(u8* s);
 s64 s32_to_str(s32 val, char buffer[16]);
+s64 u32_to_str_base16(u32 val, bool leading_zeros, s8* buffer);
+s64 s64_to_str(s64 val, char buffer[32]);
 s64 r32_to_str(r32 v, char buffer[32]);
 s64 r64_to_str(r64 v, char buffer[64]);
-s64 print_r32(r32 v);
-s64 print_r64(r64 v);
+s64 print_bool(bool v);
+char* __string_data_9 = "0x";
+s64 print_u32(u32 v);
 s64 print_s32(s32 v);
 s64 print_s64(s64 v);
-s64 print_string_l(u8* data, s64 length);
-s64 print_cstr(u8* data);
-s32 print_string(struct string s);
-void* GetStdHandle(u32 std_handle);
-bool SetStdHandle(u32 std_handle, void* handle);
-bool WriteConsoleA(void* handle_console_output, void* buffer, u32 number_chars_to_write, u32* number_chars_written, void* reserved);
-bool WriteConsoleW(void* handle_console_output, void* buffer, u32 number_chars_to_write, u32* number_chars_written, void* reserved);
-bool ReadConsole(void* console_input, void* buffer, u32 number_chars_to_read, u32* number_chars_read, void* input_control);
-u8* GetCommandLineA();
-u32 GetLastError();
-bool ReadFile(void* handle_file, void* buffer, u32 number_bytes_to_read, u32* number_bytes_read, struct OVERLAPPED* overlapped);
-bool WriteFile(void* handle_file, void* buffer, u32 number_bytes_to_write, u32* number_bytes_written, struct OVERLAPPED* overlapped);
-s32 OpenFileA(u8* filename, struct OFSTRUCT* reopen_buff, u32 ustyle);
-bool CloseHandle(void* handle_object);
-void* CreateFileA(u8* filename, u32 desired_access, u32 share_mode, struct SECURITY_ATTRIBUTES* security_attribs, u32 creation_disposition, u32 flags_and_attribs, void* handle_template_file);
-bool CreateDirectory(u8* pathname, struct SECURITY_ATTRIBUTES* security_attribs);
-bool CreateDirectoryEx(u8* template_directory, u8* new_directory, struct SECURITY_ATTRIBUTES* security_attribs);
-void* VirtualAlloc(void* address, u64 size, u32 allocation_type, u32 protect);
-bool VirtualFree(void* address, u64 size, u32 free_type);
-void MoveMemory(void* destination, void* source, u64 length);
-void CopyMemory(void* destination, void* source, u64 length);
-void* SecureZeroMemory(void* ptr, u64 count);
-typedef s64 __ret_SetUnhandledExceptionFilter(void*);
-__ret_SetUnhandledExceptionFilter* SetUnhandledExceptionFilter(__func_type_0x110f138* top_level_exception_filter);
+s64 print_r32(r32 v);
+s64 print_r64(r64 v);
+s64 print_string_c(u8* s);
+s64 print_string_l(u8* s, s64 length);
+s64 print_string(struct string s);
+u64 write(s32 fd, void* buf, u64 count);
+s64 read(s32 fd, void* buf, u64 count);
+s32 open(u8* pathname, s32 flags);
+s32 close(s32 fd);
+s32 fstat(s32 fd, struct stat* buf);
+void* read_entire_file(struct string filename, __func_type_0x1a50820* allocator, u64* out_file_size);
 
 void example1(){
 struct string __temp_v_0;
@@ -349,15 +320,84 @@ loop_8:;
 return c;
 }
 
-void* memcpy(void* dest, void* src, u64 size){
-u64 i;
-i = 0x0;
-while(((i)<size)){
-(*((u8*)((dest)+i))) = (*((u8*)((src)+i)));
-i = ((i)+0x1);
+s64 s32_to_str(s32 val, char buffer[16]){
+char b[16] = {0};
+
+s32 sum = 0;
+
+if(((val)==0x0)){
+*(u8*)((char*)buffer + 0x0 *  1 ) = 0x30;
+return 0x1;
+}
+if(((val)<0x0)){
+val = (-val);
+*(u8*)((char*)buffer + 0x0 *  1 ) = ((u8)0x2d);
+sum = 0x1;
+}
+u8* auxbuffer;
+auxbuffer = (&*(u8*)((char*)b + 0x10 *  1 ));
+u8* start;
+start = ((auxbuffer)+sum);
+while(((val)!=0x0)){
+s32 rem;
+rem = ((val)%0xa);
+val = ((val)/0xa);
+(*auxbuffer) = ((0x30)+((u8)rem));
+auxbuffer = ((auxbuffer)-0x1);
 }
 loop_9:;
 
+s64 size;
+size = ((start)-auxbuffer);
+(memcpy)(((void*)(&*(u8*)((char*)buffer + sum *  1 ))),((void*)((auxbuffer)+0x1)),((u64)size));
+return size;
+}
+
+s64 u32_to_str_base16(u32 val, bool leading_zeros, s8* buffer){
+char temp_buffer[64] = {0};
+
+s8* numbuffer;
+numbuffer = ((s8*)temp_buffer);
+s8* at;
+at = ((numbuffer)+0x3f);
+u32 count;
+count = 0x0;
+if(((val)==0x0)){
+(*buffer) = 0x30;
+count = ((count)+0x1);
+return ((((s64)count))+0x1);
+}
+u32 mask;
+mask = 0xf;
+u32 auxmask;
+auxmask = 0xffffffff;
+while(((count)<0x8)){
+if((((!((bool)((auxmask)&val))))&&(!leading_zeros)))goto loop_10;
+u32 v;
+v = ((((val)&((mask)<<((count)*0x4))))>>((count)*0x4));
+if(((v)>=0xa))v = ((v)+0x37); else v = ((v)+0x30);
+(*at) = ((s8)v);
+at = ((at)-0x1);
+auxmask = ((auxmask)&(((~mask))<<((count)*0x4)));
+count = ((count)+0x1);
+}
+loop_10:;
+
+u32 i;
+i = 0x0;
+{
+u32 i;
+i = 0x0;
+while(((i)<count)){
+at = ((at)+0x1);
+(*buffer) = (*at);
+buffer = ((buffer)+0x1);
+i = ((i)+0x1);
+}
+loop_11:;
+
+}
+return ((s64)count);
 }
 
 s64 s64_to_str(s64 val, char buffer[32]){
@@ -385,40 +425,7 @@ val = ((val)/0xa);
 (*auxbuffer) = ((0x30)+((u8)rem));
 auxbuffer = ((auxbuffer)-0x1);
 }
-loop_10:;
-
-s64 size;
-size = ((start)-auxbuffer);
-(memcpy)(((void*)(&*(u8*)((char*)buffer + sum *  1 ))),((void*)((auxbuffer)+0x1)),((u64)size));
-return size;
-}
-
-s64 s32_to_str(s32 val, char buffer[16]){
-char b[16] = {0};
-
-s32 sum = 0;
-
-if(((val)==0x0)){
-*(u8*)((char*)buffer + 0x0 *  1 ) = 0x30;
-return 0x1;
-}
-if(((val)<0x0)){
-val = (-val);
-*(u8*)((char*)buffer + 0x0 *  1 ) = 0x2d;
-sum = 0x1;
-}
-u8* auxbuffer;
-auxbuffer = (&*(u8*)((char*)b + 0xf *  1 ));
-u8* start;
-start = ((auxbuffer)+sum);
-while(((val)!=0x0)){
-s32 rem;
-rem = ((val)%0xa);
-val = ((val)/0xa);
-(*auxbuffer) = ((0x30)+((u8)rem));
-auxbuffer = ((auxbuffer)-0x1);
-}
-loop_11:;
+loop_12:;
 
 s64 size;
 size = ((start)-auxbuffer);
@@ -430,7 +437,7 @@ s64 r32_to_str(r32 v, char buffer[32]){
 s64 l;
 l = (s32_to_str)(((s32)v),((u8*)((u8*)buffer)));
 s64 precision;
-precision = 0x4;
+precision = 0xf;
 if(((v)<0.000000)){
 v = (-v);
 }
@@ -448,9 +455,8 @@ fractional_part = ((fractional_part)*10.000000);
 *(u8*)((char*)buffer + l *  1 ) = ((((u8)fractional_part))+0x30);
 fractional_part = ((fractional_part)-((r32)((s32)fractional_part)));
 l = ((l)+0x1);
-precision = ((precision)-0x1);
 }
-loop_12:;
+loop_13:;
 
 return l;
 }
@@ -460,9 +466,6 @@ s64 l;
 l = (s64_to_str)(((s64)v),((u8*)((u8*)buffer)));
 s64 precision;
 precision = 0x1f;
-if(((v)<0.000000)){
-v = (-v);
-}
 r64 fractional_part;
 fractional_part = ((v)-((r64)((s64)v)));
 *(u8*)((char*)buffer + l *  1 ) = 0x2e;
@@ -478,24 +481,66 @@ fractional_part = ((fractional_part)*10.000000);
 fractional_part = ((fractional_part)-((r64)((s64)fractional_part)));
 l = ((l)+0x1);
 }
-loop_13:;
+loop_14:;
 
 return l;
 }
 
-s64 print_r32(r32 v){
-char buffer[32] = {0};
+s64 print_bool(bool v){
+char buffer[5] = {0};
 
-s64 len;
-len = (r32_to_str)(v,buffer);
+s64 len = 0;
+
+if(v){
+{
+char* __t_base = (char*)(buffer);
+*(u8*)__t_base = 0x74;
+__t_base += 1;
+*(u8*)__t_base = 0x72;
+__t_base += 1;
+*(u8*)__t_base = 0x75;
+__t_base += 1;
+*(u8*)__t_base = 0x65;
+__t_base += 1;
+*(u8*)__t_base = 0x0;
+__t_base += 1;
+}
+
+len = 0x4;
+} else {
+{
+char* __t_base = (char*)(buffer);
+*(u8*)__t_base = 0x66;
+__t_base += 1;
+*(u8*)__t_base = 0x61;
+__t_base += 1;
+*(u8*)__t_base = 0x6c;
+__t_base += 1;
+*(u8*)__t_base = 0x73;
+__t_base += 1;
+*(u8*)__t_base = 0x65;
+__t_base += 1;
+}
+
+len = 0x5;
+}
 return (print_string_l)(((u8*)buffer),len);
 }
 
-s64 print_r64(r64 v){
-char buffer[64] = {0};
+s64 print_u32(u32 v){
+char buffer[16] = {0};
 
+struct string __temp_v_9;
+{
+char* __t_base = (char*)&(__temp_v_9);
+char* __array_base = __t_base;
+*(s64*)((char*)__t_base + 0) = 0x2;
+*(s64*)((char*)__t_base + 8) = 0xffffffffffffffff;
+*(u8**)((char*)__t_base + 16) = __string_data_9;
+}
+(print_string)(__temp_v_9);
 s64 len;
-len = (r64_to_str)(v,buffer);
+len = (u32_to_str_base16)(v,true,((s8*)buffer));
 return (print_string_l)(((u8*)buffer),len);
 }
 
@@ -515,31 +560,64 @@ len = (s64_to_str)(v,buffer);
 return (print_string_l)(((u8*)buffer),len);
 }
 
-s64 print_string_l(u8* data, s64 length){
-u32 written = 0;
+s64 print_r32(r32 v){
+char buffer[32] = {0};
 
-(WriteConsoleA)(stdout,((void*)data),((u32)length),(&written),((void*)0x0));
-return ((s64)written);
+s64 len;
+len = (r32_to_str)(v,buffer);
+return (print_string_l)(((u8*)buffer),len);
 }
 
-s64 print_cstr(u8* data){
-u32 length;
-length = ((u32)(string_length)(data));
-u32 written = 0;
+s64 print_r64(r64 v){
+char buffer[64] = {0};
 
-(WriteConsoleA)(stdout,((void*)data),length,(&written),((void*)0x0));
-return ((s64)written);
+s64 len;
+len = (r64_to_str)(v,buffer);
+return (print_string_l)(((u8*)buffer),len);
 }
 
-s32 print_string(struct string s){
-u32 written = 0;
+s64 print_string_c(u8* s){
+(write)(0x1,((void*)s),((u64)(string_length)(s)));
+}
 
-(WriteConsoleA)(stdout,((void*)((s).data)),((u32)((s).length)),(&written),((void*)0x0));
-return ((s32)written);
+s64 print_string_l(u8* s, s64 length){
+(write)(0x1,((void*)s),((u64)length));
+}
+
+s64 print_string(struct string s){
+(write)(0x1,((void*)((s).data)),((u64)((s).length)));
+}
+
+void* read_entire_file(struct string filename, __func_type_0x1a50820* allocator, u64* out_file_size){
+s32 descriptor;
+descriptor = (open)(((filename).data),0x0);
+if(((descriptor)==(-0x1))){
+{
+return ((void*)0x0);
+}
+}
+struct stat file_info = {0};
+
+(fstat)(descriptor,(&file_info));
+void* memory;
+memory = (allocator)(((u64)((file_info).st_size)));
+if(((memory)==((void*)0x0))){
+{
+return memory;
+}
+}
+s64 rd;
+rd = (read)(descriptor,memory,((u64)((file_info).st_size)));
+(close)(descriptor);
+if(((out_file_size)!=((u64*)0x0))){
+{
+(*out_file_size) = ((u64)((file_info).st_size));
+}
+}
+return memory;
 }
 
 
 int __entry() {
-	stdout = (GetStdHandle)((-0xb));
 	return __main();
 }
