@@ -60,10 +60,6 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 		return -1;
 	}
 
-	print_string("Found matching FB configs: ");
-	print_s32(fbcount);
-	print_string("\n");
-
 	best_fbc : s32 = -1;
 	worst_fbc : s32 = -1;
 	best_num_samp : s32 = -1;
@@ -77,10 +73,6 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 			glXGetFBConfigAttrib((*info).display, fbc[i], GLX_SAMPLE_BUFFERS, &samp_buf);
 			glXGetFBConfigAttrib((*info).display, fbc[i], GLX_SAMPLES       , &samples);
 			
-			print_string("Matching fbconfig: ");
-			print_s64([s64](*vi).visualid);
-			print_string("\n");
-
 			if best_fbc < 0 || samp_buf != 0 && samples > best_num_samp {
 				best_fbc = i;
 				best_num_samp = samples;
@@ -103,16 +95,74 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	vi := glXGetVisualFromFBConfig((*info).display, bestFbc);
 	print_string("Chosen visual ID = 0x");
 	print_s64([s64]vi);
+	
+	swa : XSetWindowAttributes;
+	cmap : Colormap;
+
+	cmap = XCreateColormap((*info).display, RootWindow((*info).display, (*vi).screen), (*vi).visual, 0);
+	swa.background_pixmap = 0;
+	swa.border_pixel      = 0;
+	swa.event_mask        = StructureNotifyMask;
+
+	print_string("Creating window\n");
+	win := XCreateWindow((*info).display, RootWindow((*info).display, (*vi).screen),
+		0, 0, 800, 600, 0, (*vi).depth, InputOutput, (*vi).visual,
+		CWBorderPixel|CWColormap|CWEventMask, &swa);
+
+	if win == 0 {
+		print_string("Failed to create window.\n");
+		return -1;
+	}
+
+	XFree([^void]vi);
+
+	XStoreName((*info).display, win, "GL 3.0 Window".data);
+	
+	print_string("Mapping window\n");
+	XMapWindow((*info).display, win);
+
+	glXCreateContextAttribsARB := [(^Display, GLXFBConfig, GLXContext, bool, ^s32) -> GLXContext]glXGetProcAddressARB("glXCreateContextAttribsARB".data);
+	ctx : GLXContext;
+
+	ctxErrorHandler : (^Display, ^XErrorEvent) -> s32;
+	XSetErrorHandler(&ctxErrorHandler);
+
+	context_attribs := array {
+		GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
+		GLX_CONTEXT_MINOR_VERSION_ARB, 5,
+		GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+		//GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+		0
+	};
+	ctx = glXCreateContextAttribsARB((*info).display, bestFbc, [^void]0, true, [^s32]context_attribs);
+
+	XSync((*info).display, false);
 }
+
+GLX_CONTEXT_MAJOR_VERSION_ARB : s32 : 0x2091;
+GLX_CONTEXT_MINOR_VERSION_ARB : s32 : 0x2092;
+GLX_CONTEXT_FLAGS_ARB : s32 : 0x2094;
+GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB : s32 : 0x00000002;
 
 GLXFBConfig : typedef : ^void;
 glXChooseFBConfig :: (dpy : ^Display, screen : s32, attrib_list : ^u32, nelements : ^s32) -> ^GLXFBConfig #foreign("GL");
 glXGetVisualFromFBConfig :: (dpy : ^Display, config : GLXFBConfig) -> ^XVisualInfo #foreign("GL");
 glXGetFBConfigAttrib :: (dpy : ^Display, config : GLXFBConfig, attribute : s32, value : ^s32) -> s32 #foreign("GL");
+glXGetProcAddressARB :: (name : ^u8) -> ^void #foreign("X11");
+XSetErrorHandler :: (errorHandler : (^Display, ^XErrorEvent) -> s32) -> (^Display, ^XErrorEvent) -> s32 #foreign("X11");
 XFree :: (data : ^void) -> s32 #foreign("X11");
+XSync :: (display : ^Display, discard : bool) -> s32 #foreign("X11");
+
+Window : typedef : u64;
+Colormap : typedef : u64;
+GLXContext : typedef : ^void;
 
 DefaultScreen :: (dpy : ^Display) -> s32 {
 	return (*dpy).default_screen;
+}
+
+RootWindow :: (dpy : ^Display, screen : s32) -> Window {
+	return (((*dpy).screens)[screen]).root;
 }
 
 main :: () -> s32 {

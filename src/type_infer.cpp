@@ -219,7 +219,7 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 			for(size_t i = 0; i < nexpr; ++i){
 				Type_Instance* type = infer_from_expression(expr->expr_literal.array_exprs[i], error, flags);
 				expr->expr_literal.array_exprs[i]->type_return = type;
-				if(type_strong(type)){
+				if(type && type_strong(type)){
 					expr->expr_literal.array_strong_type = type;
 				}
 			}
