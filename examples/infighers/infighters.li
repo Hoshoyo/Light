@@ -125,7 +125,7 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	ctx : GLXContext;
 
 	ctxErrorHandler : (^Display, ^XErrorEvent) -> s32;
-	XSetErrorHandler(&ctxErrorHandler);
+	XSetErrorHandler(ctxErrorHandler);
 
 	context_attribs := array {
 		GLX_CONTEXT_MAJOR_VERSION_ARB, 4,

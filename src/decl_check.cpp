@@ -286,6 +286,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 			for (size_t i = 0; i < nargs; ++i) {
 				Type_Instance* t = type->function_desc.arguments_type[i];
 				t = resolve_type(scope, type->function_desc.arguments_type[i], rep_undeclared);
+				if (!t) return type;
 				type->function_desc.arguments_type[i] = t;
 				if (!(t->flags & TYPE_FLAG_INTERNALIZED)) {
 					return type;

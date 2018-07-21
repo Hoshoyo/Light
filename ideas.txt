@@ -1,3 +1,6 @@
+// procedural programming is back
+https://www.youtube.com/watch?v=eEBOvqMfPoI
+
 // No rtti yet? hack to get it
 // Has templates
 // Has exceptions
