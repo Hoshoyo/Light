@@ -705,6 +705,9 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 						fprintf(out, "false");
 					}
 				}break;
+				case LITERAL_POINTER: {
+					fprintf(out, "null");
+				}break;
 				default:				fprintf(out, "<UNSUPPORTED literal>"); break;
 			}
 		}

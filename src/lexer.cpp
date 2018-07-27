@@ -33,6 +33,7 @@ Keyword keywords_info[] = {
 	{ MAKE_STRING("enum"),		TOKEN_KEYWORD_ENUM,			TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("union"),		TOKEN_KEYWORD_UNION,		TOKEN_FLAG_RESERVED_WORD },
 	{ MAKE_STRING("array"),		TOKEN_KEYWORD_ARRAY,		TOKEN_FLAG_RESERVED_WORD },
+	{ MAKE_STRING("null"),		TOKEN_KEYWORD_NULL,			TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL},
 	//{ MAKE_STRING("cast"),		TOKEN_KEYWORD_CAST,			TOKEN_FLAG_RESERVED_WORD },
 
 	{ MAKE_STRING("true"),   TOKEN_LITERAL_BOOL_TRUE,		TOKEN_FLAG_RESERVED_WORD | TOKEN_FLAG_LITERAL },
@@ -799,6 +800,7 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_KEYWORD_ENUM:		return ("enum"); break;
 	case TOKEN_KEYWORD_UNION:		return ("union"); break;
 	case TOKEN_KEYWORD_ARRAY:		return ("array"); break;
+	case TOKEN_KEYWORD_NULL:		return ("null"); break;
 	default: {
 		//assert(0);
 		return ("UNKNOWN"); break;

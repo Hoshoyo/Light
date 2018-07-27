@@ -5,13 +5,20 @@ alloc :: () -> ^^void {
 	return [^^void]&foo;
 }
 
+// TODO: pointer arithmetic needs sized type
+foozle :: () -> ^void {
+	return null;
+}
+
 main :: () -> s32 {
 	x := alloc();
 	y := x[0];
 
-	print_s32(*[^s32]y);
+	//print_s32(*[^s32]y);
+
+	a : ^s32 = [^s32]foozle() + 1;
 
 	return 0;
 }
 
-#import "linux/print.li"
+//#import "linux/print.li"

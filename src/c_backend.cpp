@@ -706,6 +706,9 @@ void C_Code_Generator::emit_expression(Ast* expr){
 						sprint("false");
                     }
                 }break;
+				case LITERAL_POINTER: {
+					sprint("(void*)0");
+				}break;
 				case LITERAL_ARRAY: {
 					if (deferring) {
 						emit_temp_assignment(expr);

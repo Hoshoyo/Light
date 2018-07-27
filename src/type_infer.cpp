@@ -270,6 +270,9 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 			}
 			result = type_check_expr(struct_decl->decl_struct.type_info, expr, error);
 		}break;
+		case LITERAL_POINTER: {
+			result = type_pointer_get(TYPE_PRIMITIVE_VOID);
+		}break;
 		default: {
 			assert_msg(0, "tried to infer type of undefined literal");
 		}break;
@@ -553,6 +556,10 @@ static Type_Instance* defer_check_against(Ast* expr, Type_Instance* check_agains
 	if (check_against == type) {
 		return type;
 	} else {
+		if(check_against->kind == KIND_POINTER && type == type_pointer_get(TYPE_PRIMITIVE_VOID)){
+			assert(check_against->flags & TYPE_FLAG_INTERNALIZED);
+			return check_against;
+		}
 		*error |= report_type_mismatch(expr, check_against, type);
 	}
 	return type;
@@ -570,7 +577,11 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					if (type_strong(lt) && type_strong(rt)) {
 						// pointer arithmetic ^T(strong) + INT(strong) |-> ^T(strong)
 						if (lt->kind == KIND_POINTER && type_primitive_int(rt)) {
-							return defer_check_against(expr, check_against, lt, error);
+							if(lt == type_pointer_get(TYPE_PRIMITIVE_VOID) || rt == type_pointer_get(TYPE_PRIMITIVE_VOID)){
+								*error |= report_type_error(TYPE_ERROR_FATAL, expr, "pointer arithmetic requires a sized type\n");
+							} else {
+								return defer_check_against(expr, check_against, lt, error);
+							}
 						} 
 						// NUMTYPE(strong) + NUMTYPE(strong) |-> NUMTYPE(strong)
 						else if (type_primitive_numeric(lt) && type_primitive_numeric(rt)) {
@@ -588,7 +599,11 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 							rt = resolve_type(expr->scope, rt, false);
 							assert(rt->flags & TYPE_FLAG_INTERNALIZED);
 							type_propagate(rt, expr->expr_binary.right);
-							return defer_check_against(expr, check_against, lt, error);
+							if(lt == type_pointer_get(TYPE_PRIMITIVE_VOID)){
+								*error |= report_type_error(TYPE_ERROR_FATAL, expr, "pointer arithmetic requires a sized type\n");
+							} else {
+								return defer_check_against(expr, check_against, lt, error);
+							}
 						} 
 						// INT(strong) + INT(weak) |-> INT(strong) , propagete(INT(strong) -> INT(weak))
 						// or

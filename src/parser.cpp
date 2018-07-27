@@ -957,6 +957,10 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 				array_push(exprs, &capacity_expr);
 				array_push(exprs, &data_expr);
 			} break;
+			case TOKEN_KEYWORD_NULL: {
+				node->expr_literal.type = LITERAL_POINTER;
+				node->expr_literal.value_s64 = 0;
+			}break;
 			default: {
 				report_syntax_error(first, "expected literal expression but got '%.*s'\n", TOKEN_STR(first));
 			}break;
