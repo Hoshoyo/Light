@@ -73,6 +73,16 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 			glXGetFBConfigAttrib((*info).display, fbc[i], GLX_SAMPLE_BUFFERS, &samp_buf);
 			glXGetFBConfigAttrib((*info).display, fbc[i], GLX_SAMPLES       , &samples);
 			
+			print_string( "  Matching fbconfig ");
+			print_s32(i);
+			print_string(", visual ID 0x");
+			print_u32([u32](*vi).visualid);
+			print_string(": SAMPLE_BUFFERS = ");
+			print_s32(samp_buf);
+			print_string(", SAMPLES = ");
+			print_s32(samples);
+			print_string("\n");
+
 			if best_fbc < 0 || samp_buf != 0 && samples > best_num_samp {
 				best_fbc = i;
 				best_num_samp = samples;
@@ -92,14 +102,18 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	print_s64([s64]bestFbc);
 	print_string("\n");
 
+
 	vi := glXGetVisualFromFBConfig((*info).display, bestFbc);
 	print_string("Chosen visual ID = 0x");
-	print_s64([s64]vi);
+	print_u32([u32](*vi).visualid);
+	print_string("\n");
 	
+
 	swa : XSetWindowAttributes;
 	cmap : Colormap;
 
 	cmap = XCreateColormap((*info).display, RootWindow((*info).display, (*vi).screen), (*vi).visual, 0);
+	swa.colormap = cmap;
 	swa.background_pixmap = 0;
 	swa.border_pixel      = 0;
 	swa.event_mask        = StructureNotifyMask;
@@ -124,8 +138,8 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	glXCreateContextAttribsARB := [(^Display, GLXFBConfig, GLXContext, bool, ^s32) -> GLXContext]glXGetProcAddressARB("glXCreateContextAttribsARB".data);
 	ctx : GLXContext;
 
-	ctxErrorHandler : (^Display, ^XErrorEvent) -> s32;
-	XSetErrorHandler(ctxErrorHandler);
+	//ctxErrorHandler : (^Display, ^XErrorEvent) -> s32;
+	//XSetErrorHandler(ctxErrorHandler);
 
 	context_attribs := array {
 		GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
@@ -134,28 +148,61 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 		//GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
 		0
 	};
+
 	ctx = glXCreateContextAttribsARB((*info).display, bestFbc, [^void]0, true, [^s32]context_attribs);
 
 	XSync((*info).display, false);
+
+	glXMakeCurrent((*info).display, win, ctx);
+
+	// Verifying that context is a direct context
+	if (!glXIsDirect((*info).display, ctx)) {
+		print_string( "Indirect GLX rendering context obtained\n" );
+	} else {
+		print_string( "Direct GLX rendering context obtained\n" );
+	}
+
+	{
+		glClearColor(0.0, 0.5, 1.0, 1.0);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glXSwapBuffers ((*info).display, win);
+		sleep(1);
+
+		glXMakeCurrent((*info).display, 0, [^void]0);
+		glXDestroyContext((*info).display, ctx);
+
+		XDestroyWindow((*info).display, win);
+		XFreeColormap((*info).display, cmap);
+		XCloseDisplay((*info).display);
+	}
 }
 
+GL_COLOR_BUFFER_BIT : u32 : 0x00004000;
 GLX_CONTEXT_MAJOR_VERSION_ARB : s32 : 0x2091;
 GLX_CONTEXT_MINOR_VERSION_ARB : s32 : 0x2092;
 GLX_CONTEXT_FLAGS_ARB : s32 : 0x2094;
 GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB : s32 : 0x00000002;
 
-GLXFBConfig : typedef : ^void;
 glXChooseFBConfig :: (dpy : ^Display, screen : s32, attrib_list : ^u32, nelements : ^s32) -> ^GLXFBConfig #foreign("GL");
 glXGetVisualFromFBConfig :: (dpy : ^Display, config : GLXFBConfig) -> ^XVisualInfo #foreign("GL");
 glXGetFBConfigAttrib :: (dpy : ^Display, config : GLXFBConfig, attribute : s32, value : ^s32) -> s32 #foreign("GL");
 glXGetProcAddressARB :: (name : ^u8) -> ^void #foreign("X11");
 XSetErrorHandler :: (errorHandler : (^Display, ^XErrorEvent) -> s32) -> (^Display, ^XErrorEvent) -> s32 #foreign("X11");
+XFreeColormap :: (display : ^Display, cmap : Colormap) -> s32 #foreign("X11");
 XFree :: (data : ^void) -> s32 #foreign("X11");
 XSync :: (display : ^Display, discard : bool) -> s32 #foreign("X11");
+glXIsDirect :: (display : ^Display, ctx : GLXContext) -> bool #foreign("GL");
 
+glClearColor :: (r : r32, g : r32, b : r32, a : r32) -> void #foreign("GL");
+glClear :: (mask : u32) -> void #foreign("GL");
+
+sleep :: (seconds : u32) -> s32 #foreign("c");
+
+GLXFBConfig : typedef : ^void;
 Window : typedef : u64;
 Colormap : typedef : u64;
 GLXContext : typedef : ^void;
+GLXDrawable : typedef : u32;
 
 DefaultScreen :: (dpy : ^Display) -> s32 {
 	return (*dpy).default_screen;
@@ -168,7 +215,11 @@ RootWindow :: (dpy : ^Display, screen : s32) -> Window {
 main :: () -> s32 {
 	info : Window_Info;
 	info.display = XOpenDisplay([^s8]0);
+	if info.display == [^Display]0 {
+		print_string("could not open display\n");
+	}
 
 	if init_opengl(&info) == -1 return -1;
+
     return 0;
 }
