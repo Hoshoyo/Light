@@ -1,3 +1,4 @@
+- gcc warning shift more than the register size holds
 - constant in type definition
 - make forward decls declarable more than once
 - check constants

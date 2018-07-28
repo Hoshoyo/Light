@@ -16,9 +16,12 @@ main :: () -> s32 {
 
 	//print_s32(*[^s32]y);
 
-	a : ^s32 = [^s32]foozle() + 1;
+	//a : ^s32 = [^s32]foozle() + 1;
+	print_u64(0x123456789abcdef0);
+	print_string("\n");
+	print_u32(0x12345678);
 
 	return 0;
 }
 
-//#import "linux/print.li"
+#import "linux/print.li"
