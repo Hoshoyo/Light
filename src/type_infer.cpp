@@ -140,6 +140,10 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 				assert(type_strong(infered) && type_strong(cast_to));
 				expr->type_return = cast_to;
 				return cast_to;
+			} else if (infered->kind == KIND_FUNCTION && cast_to->kind == KIND_POINTER) {
+				assert(type_strong(infered) && type_strong(cast_to));
+				expr->type_return = cast_to;
+				return cast_to;
 			} else {
 				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "cannot cast from type '");
 				DEBUG_print_type(stderr, infered, true);
