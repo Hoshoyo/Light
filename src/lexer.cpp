@@ -680,10 +680,11 @@ u64 literal_integer_to_u64(Token* t) {
 	}
 	case TOKEN_LITERAL_HEX_INT: {
 		u64 res = 0;
-		for (s32 i = t->value.length - 1, count = 0; i >= 0; --i, ++count) {
+		u64 count = 0;
+		for (s32 i = t->value.length - 1; i >= 0; --i, ++count) {
 			if (t->value.data[i] == 'x') break;
 			u8 c = hexdigit_to_u8(t->value.data[i]);
-			res += c << (count * 4);
+			res += (u64)c << (count * 4);
 		}
 
 		return res;
