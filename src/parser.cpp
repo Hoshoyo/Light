@@ -149,6 +149,7 @@ Ast** Parser::parse_top_level() {
 			continue;
 		}
 		Ast* decl = parse_declaration(global_scope);
+		DEBUG_print_node(stdout, decl);
 		switch (decl->node_type) {
 			case AST_DECL_VARIABLE:
 			case AST_DECL_CONSTANT:

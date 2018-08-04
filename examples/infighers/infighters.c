@@ -62,64 +62,67 @@ typedef struct timespec timespec;
 typedef struct stat stat;
 typedef struct Window_Info Window_Info;
 typedef struct Screen Screen;
-typedef s32 __func_type_0x11c8ce0(struct Window_Info*);
-typedef void* __func_type_0x11c8d40(u8*);
-typedef s32 __func_type_0x11c8da0(void*);
-typedef void __func_type_0x11c8e00(r32, r32, r32, r32);
-typedef void __func_type_0x11c8e78(u32);
-typedef s32 __func_type_0x11c8ed8(u32);
-typedef s32 __func_type_0x11c8f38();
-typedef u64 __func_type_0x11c8f90(void*);
-typedef s32 __func_type_0x11ca940(struct XExtData*);
-typedef struct Display* __func_type_0x11cad78(s8*);
-typedef u64 __func_type_0x11cadd8(struct Display*, u64, s32, s32, u32, u32, u32, u64, u64);
-typedef u64 __func_type_0x11caeb8(struct Display*, u64, s32, s32, u32, u32, u32, s32, u32, struct Visual*, u64, struct XSetWindowAttributes*);
-typedef s32 __func_type_0x11caf70(struct Display*, u64, s64);
-typedef s32 __func_type_0x11cafe0(struct Display*, u64);
-typedef s32 __func_type_0x11cb048(struct Display*, void*);
-typedef u64 __func_type_0x11cb0b0(struct Display*, u64, struct Visual*, s32);
-typedef s32 __func_type_0x11cb128(struct Display*, u64, u8*);
-typedef s32 __func_type_0x11cb198(struct Display*);
-typedef s32 __func_type_0x11cb238(struct Display*, u64, struct XWindowAttributes*);
-typedef struct XVisualInfo* __func_type_0x11cb2e8(struct Display*, s32, s32*);
-typedef void* __func_type_0x11cb358(struct Display*, struct XVisualInfo*, void*, s32);
-typedef s32 __func_type_0x11cb3d0(struct Display*, u64, void*);
-typedef void __func_type_0x11cb440(struct Display*, u64);
-typedef void __func_type_0x11cb4a8(struct Display*, void*);
-typedef void* __func_type_0x11cb510(void*, void*, u64);
-typedef s64 __func_type_0x11cb580(u8*);
-typedef s64 __func_type_0x11cb620(s32, u8*);
-typedef s64 __func_type_0x11cb688(u32, bool, s8*);
-typedef s64 __func_type_0x11cb738(s64, u8*);
-typedef s64 __func_type_0x11cb7a0(r32, u8*);
-typedef s64 __func_type_0x11cb848(r64, u8*);
-typedef s64 __func_type_0x11cb8b0(bool);
-typedef s64 __func_type_0x11cb910(u32);
-typedef s64 __func_type_0x11cb970(s32);
-typedef s64 __func_type_0x11cb9d0(s64);
-typedef s64 __func_type_0x11cba30(r32);
-typedef s64 __func_type_0x11cba90(r64);
-typedef s64 __func_type_0x11cbaf0(u8*, s64);
-typedef s64 __func_type_0x11cbb58(struct string);
-typedef u64 __func_type_0x11cbd28(s32, void*, u64);
-typedef s64 __func_type_0x11cbd98(s32, void*, u64);
-typedef s32 __func_type_0x11cbe08(u8*, s32);
-typedef s32 __func_type_0x11cbe70(s32);
-typedef s32 __func_type_0x11cbf10(s32, struct stat*);
-typedef void* __func_type_0x11cbf78(u64);
-typedef void* __func_type_0x11cbfd8(struct string, __func_type_0x11cbf78* , u64*);
-typedef bool __func_type_0x11cc0d0(struct Display*, s32*, s32*);
-typedef void** __func_type_0x11cc180(struct Display*, s32, u32*, s32*);
-typedef struct XVisualInfo* __func_type_0x11cc1f8(struct Display*, void*);
-typedef s32 __func_type_0x11cc260(struct Display*, void*, s32, s32*);
-typedef s32 __func_type_0x11cc318(struct Display*, struct XErrorEvent*);
-typedef __func_type_0x11cc318* __func_type_0x11cc380(__func_type_0x11cc318* );
-typedef s32 __func_type_0x11cc3e0(struct Display*, bool);
-typedef bool __func_type_0x11cc448(struct Display*, void*);
-typedef u64 __func_type_0x11cc4b0(struct Display*, s32);
-typedef void* __func_type_0x11cc650(struct Display*, void*, void*, bool, s32*);
+typedef s32 __func_type_0xc66ce0(struct Window_Info*);
+typedef void* __func_type_0xc66d40(u8*);
+typedef s32 __func_type_0xc66da0(void*);
+typedef void __func_type_0xc66e00(r32, r32, r32, r32);
+typedef void __func_type_0xc66e78(u32);
+typedef s32 __func_type_0xc66ed8(u32);
+typedef s32 __func_type_0xc66f38(u64);
+typedef s32 __func_type_0xc66f98();
+typedef u64 __func_type_0xc66ff0(void*);
+typedef s32 __func_type_0xc689a0(struct XExtData*);
+typedef struct Display* __func_type_0xc68dd8(s8*);
+typedef u64 __func_type_0xc68e38(struct Display*, u64, s32, s32, u32, u32, u32, u64, u64);
+typedef u64 __func_type_0xc68f18(struct Display*, u64, s32, s32, u32, u32, u32, s32, u32, struct Visual*, u64, struct XSetWindowAttributes*);
+typedef s32 __func_type_0xc68fd0(struct Display*, u64, s64);
+typedef s32 __func_type_0xc69040(struct Display*, u64);
+typedef s32 __func_type_0xc690a8(struct Display*, void*);
+typedef u64 __func_type_0xc69110(struct Display*, u64, struct Visual*, s32);
+typedef s32 __func_type_0xc69188(struct Display*, u64, u8*);
+typedef s32 __func_type_0xc691f8(struct Display*);
+typedef s32 __func_type_0xc69298(struct Display*, u64, struct XWindowAttributes*);
+typedef struct XVisualInfo* __func_type_0xc69348(struct Display*, s32, s32*);
+typedef void* __func_type_0xc693b8(struct Display*, struct XVisualInfo*, void*, s32);
+typedef s32 __func_type_0xc69430(struct Display*, u64, void*);
+typedef void __func_type_0xc694a0(struct Display*, u64);
+typedef void __func_type_0xc69508(struct Display*, void*);
+typedef void* __func_type_0xc69570(void*, void*, u64);
+typedef s64 __func_type_0xc695e0(u8*);
+typedef s64 __func_type_0xc69680(s32, u8*);
+typedef s64 __func_type_0xc696e8(u64, bool, s8*);
+typedef s64 __func_type_0xc69758(u32, bool, s8*);
+typedef s64 __func_type_0xc69808(s64, u8*);
+typedef s64 __func_type_0xc69870(r32, u8*);
+typedef s64 __func_type_0xc69918(r64, u8*);
+typedef s64 __func_type_0xc69980(bool);
+typedef s64 __func_type_0xc699e0(u64);
+typedef s64 __func_type_0xc69a40(u32);
+typedef s64 __func_type_0xc69aa0(s32);
+typedef s64 __func_type_0xc69b00(s64);
+typedef s64 __func_type_0xc69b60(r32);
+typedef s64 __func_type_0xc69bc0(r64);
+typedef s64 __func_type_0xc69c20(u8*, s64);
+typedef s64 __func_type_0xc69c88(struct string);
+typedef u64 __func_type_0xc69e58(s32, void*, u64);
+typedef s64 __func_type_0xc69ec8(s32, void*, u64);
+typedef s32 __func_type_0xc69f38(u8*, s32);
+typedef s32 __func_type_0xc69fa0(s32);
+typedef s32 __func_type_0xc6a040(s32, struct stat*);
+typedef void* __func_type_0xc6a0a8(u64);
+typedef void* __func_type_0xc6a108(struct string, __func_type_0xc6a0a8* , u64*);
+typedef bool __func_type_0xc6a210(struct Display*, s32*, s32*);
+typedef void** __func_type_0xc6a2c0(struct Display*, s32, u32*, s32*);
+typedef struct XVisualInfo* __func_type_0xc6a338(struct Display*, void*);
+typedef s32 __func_type_0xc6a3a0(struct Display*, void*, s32, s32*);
+typedef s32 __func_type_0xc6a458(struct Display*, struct XErrorEvent*);
+typedef __func_type_0xc6a458* __func_type_0xc6a4c0(__func_type_0xc6a458* );
+typedef s32 __func_type_0xc6a520(struct Display*, bool);
+typedef bool __func_type_0xc6a588(struct Display*, void*);
+typedef u64 __func_type_0xc6a5f0(struct Display*, s32);
+typedef void* __func_type_0xc6a790(struct Display*, void*, void*, bool, s32*);
 typedef struct string{s64 length;s64 capacity;u8* data;} string;
-typedef struct Display{void* ext_data;void* private1;s32 fd;s32 private2;s32 proto_major_version;s32 proto_minor_version;s8* vendor;u64 private3;u64 private4;u64 private5;s32 private6;__func_type_0x11c8f90* resource_alloc;s32 byte_order;s32 bitmap_unit;s32 bitmap_pad;s32 bitmap_bit_order;s32 nformats;void* pixmap_format;s32 private8;s32 release;void* private9;void* private10;s32 qlen;u64 last_request_read;u64 request;s8* private11;s8* private12;s8* private13;s8* private14;u32 max_request_size;void* db;__func_type_0x11c8da0* private15;s8* display_name;s32 default_screen;s32 nscreens;struct Screen* screens;u64 motion_buffer;u64 private16;s32 min_keycode;s32 max_keycode;s8* private17;s8* private18;s32 private19;s8* xdefaults;} Display;
+typedef struct Display{void* ext_data;void* private1;s32 fd;s32 private2;s32 proto_major_version;s32 proto_minor_version;s8* vendor;u64 private3;u64 private4;u64 private5;s32 private6;__func_type_0xc66ff0* resource_alloc;s32 byte_order;s32 bitmap_unit;s32 bitmap_pad;s32 bitmap_bit_order;s32 nformats;void* pixmap_format;s32 private8;s32 release;void* private9;void* private10;s32 qlen;u64 last_request_read;u64 request;s8* private11;s8* private12;s8* private13;s8* private14;u32 max_request_size;void* db;__func_type_0xc66da0* private15;s8* display_name;s32 default_screen;s32 nscreens;struct Screen* screens;u64 motion_buffer;u64 private16;s32 min_keycode;s32 max_keycode;s8* private17;s8* private18;s32 private19;s8* xdefaults;} Display;
 typedef struct XGenericEvent{s32 type;u64 serial;s32 send_event;struct Display* display;s32 extension;s32 evtype;} XGenericEvent;
 typedef struct XGenericEventCookie{s32 type;u64 serial;s32 send_event;struct Display* display;s32 extension;s32 evtype;u32 cookie;void* data;} XGenericEventCookie;
 typedef struct XKeymapEvent{s32 type;u64 serial;s32 send_event;struct Display* display;u64 window;char key_vector[32];} XKeymapEvent;
@@ -154,14 +157,14 @@ typedef struct XCrossingEvent{s32 type;u64 serial;s32 send_event;struct Display*
 typedef struct XKeyEvent{s32 type;u64 serial;s32 send_event;struct Display* display;u64 window;u64 root;u64 subwindow;u64 time;s32 x;s32 y;s32 x_root;s32 y_root;u32 state;u32 keycode;s32 same_screen;} XKeyEvent;
 typedef struct XAnyEvent{s32 type;u64 serial;s32 send_event;struct Display* display;u64 window;} XAnyEvent;
 typedef struct XEvent{s32 type;struct XAnyEvent xany;struct XKeyEvent xkey;struct XButtonEvent xbutton;struct XMotionEvent xmotion;struct XCrossingEvent xcrossing;struct XFocusChangeEvent xfocus;struct XExposeEvent xexpose;struct XGraphicsExposeEvent xgraphicsexpose;struct XNoExposeEvent xnoexpose;struct XVisibilityEvent xvisibility;struct XCreateWindowEvent xcreatewindow;struct XDestroyWindowEvent xdestroywindow;struct XUnmapEvent xunmap;struct XMapEvent xmap;struct XMapRequestEvent xmaprequest;struct XReparentEvent xreparent;struct XConfigureEvent xconfigure;struct XGravityEvent xgravity;struct XResizeRequestEvent xresizerequest;struct XConfigureRequestEvent xconfigurerequest;struct XCirculateEvent xcirculate;struct XCirculateRequestEvent xcirculaterequest;struct XPropertyEvent xproperty;struct XSelectionClearEvent xselectionclear;struct XSelectionRequestEvent xselectionrequest;struct XSelectionEvent xselection;struct XColormapEvent xcolormap;struct XClientMessageEvent xclient;struct XMappingEvent xmapping;struct XErrorEvent xerror;struct XKeymapEvent xkeymap;struct XGenericEvent xgeneric;struct XGenericEventCookie xcookie;char pad[192];} XEvent;
-typedef struct XExtData{s32 number;struct XExtData* next;__func_type_0x11ca940* free_private;s8* private_data;} XExtData;
+typedef struct XExtData{s32 number;struct XExtData* next;__func_type_0xc689a0* free_private;s8* private_data;} XExtData;
 typedef struct Visual{struct XExtData* ext_data;u64 visualid;s32 class;u64 red_mask;u64 green_mask;u64 blue_mask;s32 bits_per_rgb;s32 map_entries;} Visual;
 typedef struct XVisualInfo{struct Visual* visual;u64 visualid;s32 screen;s32 depth;s32 class;u64 red_mask;u64 green_mask;u64 blue_mask;s32 colormap_size;s32 bits_per_rgb;} XVisualInfo;
 typedef struct XSetWindowAttributes{u64 background_pixmap;u64 background_pixel;u64 border_pixmap;u64 border_pixel;s32 bit_gravity;s32 win_gravity;s32 backing_store;u64 backing_planes;u64 backing_pixel;s32 save_under;s64 event_mask;s64 do_not_propagate_mask;s32 override_redirect;u64 colormap;u64 cursor;} XSetWindowAttributes;
 typedef struct XWindowAttributes{s32 x;s32 y;s32 width;s32 height;s32 border_width;s32 depth;struct Visual* visual;u64 root;s32 class;s32 bit_gravity;s32 win_gravity;s32 backing_store;u64 backing_planes;u64 backing_pixel;s32 save_under;u64 colormap;s32 map_installed;s32 map_state;s64 all_event_masks;s64 your_event_mask;s64 do_not_propagate_mask;s32 override_redirect;struct Screen* screen;} XWindowAttributes;
 typedef struct timespec{s64 tv_sec;s64 tv_nsec;} timespec;
 typedef struct stat{u64 st_dev;u64 st_ino;u64 st_nlink;u32 st_mode;u32 st_uid;u32 st_gid;u64 st_rdev;s64 st_size;s64 st_blksize;s64 st_blocks;struct timespec st_atim;struct timespec st_mtim;struct timespec st_ctim;char __glibc_reserved[24];} stat;
-typedef struct Window_Info{s32 width;s32 height;struct Display* display;u64 window_handle;struct XVisualInfo* vi;struct XSetWindowAttributes swa;} Window_Info;
+typedef struct Window_Info{s32 width;s32 height;struct Display* display;u64 window_handle;struct XVisualInfo* vi;struct XSetWindowAttributes swa;void* ctx;u64 cmap;} Window_Info;
 typedef struct Screen{void* ext_data;struct Display* display;u64 root;s32 width;s32 height;s32 mwidth;s32 mheight;s32 ndepths;void* depths;s32 root_depth;void* root_visual;void* default_gc;u64 cmap;u64 white_pixel;u64 black_pixel;s32 max_maps;s32 min_maps;s32 backing_store;s32 save_unders;s64 root_input_mask;} Screen;
 
 bool glXQueryVersion(struct Display* dpy, s32* major, s32* minor);
@@ -184,12 +187,13 @@ char* __string_data_15 = "glXCreateContextAttribsARB";
 char* __string_data_16 = "Indirect GLX rendering context obtained\n";
 char* __string_data_17 = "Direct GLX rendering context obtained\n";
 s32 init_opengl(struct Window_Info* info);
+s32 release_opengl(struct Window_Info* info);
 void** glXChooseFBConfig(struct Display* dpy, s32 screen, u32* attrib_list, s32* nelements);
 struct XVisualInfo* glXGetVisualFromFBConfig(struct Display* dpy, void* config);
 s32 glXGetFBConfigAttrib(struct Display* dpy, void* config, s32 attribute, s32* value);
 void* glXGetProcAddressARB(u8* name);
 typedef s32 __ret_XSetErrorHandler(struct Display*, struct XErrorEvent*);
-__ret_XSetErrorHandler* XSetErrorHandler(__func_type_0x11cc318* errorHandler);
+__ret_XSetErrorHandler* XSetErrorHandler(__func_type_0xc6a458* errorHandler);
 s32 XFreeColormap(struct Display* display, u64 cmap);
 s32 XFree(void* data);
 s32 XSync(struct Display* display, bool discard);
@@ -197,9 +201,9 @@ bool glXIsDirect(struct Display* display, void* ctx);
 void glClearColor(r32 r, r32 g, r32 b, r32 a);
 void glClear(u32 mask);
 s32 sleep(u32 seconds);
+s32 usleep(u64 useconds);
 s32 DefaultScreen(struct Display* dpy);
 u64 RootWindow(struct Display* dpy, s32 screen);
-char* __string_data_18 = "could not open display\n";
 s32 __main();
 struct Display* XOpenDisplay(s8* v);
 u64 XCreateSimpleWindow(struct Display* display, u64 parent, s32 x, s32 y, u32 width, u32 height, u32 border_width, u64 border, u64 background);
@@ -220,11 +224,14 @@ void glXDestroyContext(struct Display* dpy, void* ctx);
 void* memcpy(void* dest, void* src, u64 size);
 s64 string_length(u8* s);
 s64 s32_to_str(s32 val, char buffer[16]);
-s64 u32_to_str_base16(u32 val, bool leading_zeros, s8* buffer);
+s64 u64_to_str_base16(u64 value, bool leading_zeros, s8* buffer);
+s64 u32_to_str_base16(u32 value, bool leading_zeros, s8* buffer);
 s64 s64_to_str(s64 val, char buffer[32]);
 s64 r32_to_str(r32 v, char buffer[32]);
 s64 r64_to_str(r64 v, char buffer[64]);
 s64 print_bool(bool v);
+char* __string_data_18 = "0x";
+s64 print_u64(u64 v);
 char* __string_data_19 = "0x";
 s64 print_u32(u32 v);
 s64 print_s32(s32 v);
@@ -239,7 +246,7 @@ s64 read(s32 fd, void* buf, u64 count);
 s32 open(u8* pathname, s32 flags);
 s32 close(s32 fd);
 s32 fstat(s32 fd, struct stat* buf);
-void* read_entire_file(struct string filename, __func_type_0x11cbf78* allocator, u64* out_file_size);
+void* read_entire_file(struct string filename, __func_type_0xc6a0a8* allocator, u64* out_file_size);
 
 s32 init_opengl(struct Window_Info* info){
 char visual_attribs[92];
@@ -463,6 +470,7 @@ cmap = (XCreateColormap)((((*info)).display),(RootWindow)((((*info)).display),((
 ((swa).background_pixmap) = 0x0;
 ((swa).border_pixel) = 0x0;
 ((swa).event_mask) = ((0x1)<<0x11);
+(((*info)).cmap) = cmap;
 struct string __temp_v_11;
 {
 char* __t_base = (char*)&(__temp_v_11);
@@ -474,6 +482,7 @@ char* __array_base = __t_base;
 (print_string)(__temp_v_11);
 u64 win;
 win = (XCreateWindow)((((*info)).display),(RootWindow)((((*info)).display),(((*vi)).screen)),0x0,0x0,0x320,0x258,0x0,(((*vi)).depth),0x1,(((*vi)).visual),((((((0x1)<<0x3))|((0x1)<<0xd)))|((0x1)<<0xb)),(&swa));
+(((*info)).window_handle) = win;
 if(((win)==0x0)){
 struct string __temp_v_12;
 {
@@ -506,7 +515,7 @@ char* __array_base = __t_base;
 }
 (print_string)(__temp_v_14);
 (XMapWindow)((((*info)).display),win);
-__func_type_0x11cc650* glXCreateContextAttribsARB;
+__func_type_0xc6a790* glXCreateContextAttribsARB;
 struct string __temp_v_15;
 {
 char* __t_base = (char*)&(__temp_v_15);
@@ -515,7 +524,7 @@ char* __array_base = __t_base;
 *(s64*)((char*)__t_base + 8) = 0xffffffffffffffff;
 *(u8**)((char*)__t_base + 16) = __string_data_15;
 }
-glXCreateContextAttribsARB = ((__func_type_0x11cc650* )(glXGetProcAddressARB)(((__temp_v_15).data)));
+glXCreateContextAttribsARB = ((__func_type_0xc6a790* )(glXGetProcAddressARB)(((__temp_v_15).data)));
 void* ctx = 0;
 
 char context_attribs[28];
@@ -539,6 +548,7 @@ __t_base += 4;
 }
 
 ctx = (glXCreateContextAttribsARB)((((*info)).display),bestFbc,((void*)0x0),true,((s32*)context_attribs));
+(((*info)).ctx) = ctx;
 (XSync)((((*info)).display),false);
 (glXMakeCurrent)((((*info)).display),win,ctx);
 if((!(glXIsDirect)((((*info)).display),ctx))){
@@ -562,17 +572,14 @@ char* __array_base = __t_base;
 }
 (print_string)(__temp_v_17);
 }
-{
-(glClearColor)(0.000000,0.500000,1.000000,1.000000);
-(glClear)(0x4000);
-(glXSwapBuffers)((((*info)).display),win);
-(sleep)(0x1);
-(glXMakeCurrent)((((*info)).display),0x0,((void*)0x0));
-(glXDestroyContext)((((*info)).display),ctx);
-(XDestroyWindow)((((*info)).display),win);
-(XFreeColormap)((((*info)).display),cmap);
-(XCloseDisplay)((((*info)).display));
 }
+
+s32 release_opengl(struct Window_Info* info){
+(glXMakeCurrent)((((*info)).display),0x0,((void*)0x0));
+(glXDestroyContext)((((*info)).display),(((*info)).ctx));
+(XDestroyWindow)((((*info)).display),(((*info)).window_handle));
+(XFreeColormap)((((*info)).display),(((*info)).cmap));
+(XCloseDisplay)((((*info)).display));
 }
 
 s32 DefaultScreen(struct Display* dpy){
@@ -589,20 +596,20 @@ struct Window_Info info = {0};
 ((info).display) = (XOpenDisplay)(((s8*)0x0));
 if(((((info).display))==((struct Display*)0x0))){
 {
-struct string __temp_v_18;
-{
-char* __t_base = (char*)&(__temp_v_18);
-char* __array_base = __t_base;
-*(s64*)((char*)__t_base + 0) = 0x17;
-*(s64*)((char*)__t_base + 8) = 0xffffffffffffffff;
-*(u8**)((char*)__t_base + 16) = __string_data_18;
-}
-(print_string)(__temp_v_18);
 }
 }
 if((((init_opengl)((&info)))==(-0x1))){
 return (-0x1);
 }
+while(true){
+(glClearColor)(0.000000,0.500000,1.000000,1.000000);
+(glClear)(0x4000);
+(glXSwapBuffers)(((info).display),((info).window_handle));
+(usleep)(0x3e8);
+}
+loop_1:;
+
+(release_opengl)((&info));
 return 0x0;
 }
 
@@ -613,7 +620,7 @@ while((((*s))!=0x0)){
 c = ((c)+0x1);
 s = ((s)+0x1);
 }
-loop_1:;
+loop_2:;
 
 return c;
 }
@@ -643,7 +650,7 @@ val = ((val)/0xa);
 (*auxbuffer) = ((0x30)+((u8)rem));
 auxbuffer = ((auxbuffer)-0x1);
 }
-loop_2:;
+loop_3:;
 
 s64 size;
 size = ((start)-auxbuffer);
@@ -651,51 +658,38 @@ size = ((start)-auxbuffer);
 return size;
 }
 
-s64 u32_to_str_base16(u32 val, bool leading_zeros, s8* buffer){
-char temp_buffer[64] = {0};
-
-s8* numbuffer;
-numbuffer = ((s8*)temp_buffer);
-s8* at;
-at = ((numbuffer)+0x3f);
-u32 count;
-count = 0x0;
-if(((val)==0x0)){
-(*buffer) = 0x30;
-count = ((count)+0x1);
-return ((((s64)count))+0x1);
-}
-u32 mask;
-mask = 0xf;
-u32 auxmask;
-auxmask = 0xffffffff;
-while(((count)<0x8)){
-if((((!((bool)((auxmask)&val))))&&(!leading_zeros)))goto loop_3;
-u32 v;
-v = ((((val)&((mask)<<((count)*0x4))))>>((count)*0x4));
-if(((v)>=0xa))v = ((v)+0x37); else v = ((v)+0x30);
-(*at) = ((s8)v);
-at = ((at)-0x1);
-auxmask = ((auxmask)&(((~mask))<<((count)*0x4)));
-count = ((count)+0x1);
-}
-loop_3:;
-
-u32 i;
+s64 u64_to_str_base16(u64 value, bool leading_zeros, s8* buffer){
+s64 i;
 i = 0x0;
 {
-u32 i;
-i = 0x0;
-while(((i)<count)){
-at = ((at)+0x1);
-(*buffer) = (*at);
-buffer = ((buffer)+0x1);
+while(((i)<0x10)){
+u64 f;
+f = ((((value)&0xf000000000000000))>>0x3c);
+if(((f)>0x9))*(s8*)((char*)buffer + i *  1 ) = ((((s8)f))+0x37); else *(s8*)((char*)buffer + i *  1 ) = ((((s8)f))+0x30);
+value = ((value)<<0x4);
 i = ((i)+0x1);
 }
 loop_4:;
 
 }
-return ((s64)count);
+return i;
+}
+
+s64 u32_to_str_base16(u32 value, bool leading_zeros, s8* buffer){
+s64 i;
+i = 0x0;
+{
+while(((i)<0x8)){
+u32 f;
+f = ((((value)&0xf0000000))>>0x1c);
+if(((f)>0x9))*(s8*)((char*)buffer + i *  1 ) = ((((s8)f))+0x37); else *(s8*)((char*)buffer + i *  1 ) = ((((s8)f))+0x30);
+value = ((value)<<0x4);
+i = ((i)+0x1);
+}
+loop_5:;
+
+}
+return i;
 }
 
 s64 s64_to_str(s64 val, char buffer[32]){
@@ -723,7 +717,7 @@ val = ((val)/0xa);
 (*auxbuffer) = ((0x30)+((u8)rem));
 auxbuffer = ((auxbuffer)-0x1);
 }
-loop_5:;
+loop_6:;
 
 s64 size;
 size = ((start)-auxbuffer);
@@ -754,7 +748,7 @@ fractional_part = ((fractional_part)*10.000000);
 fractional_part = ((fractional_part)-((r32)((s32)fractional_part)));
 l = ((l)+0x1);
 }
-loop_6:;
+loop_7:;
 
 return l;
 }
@@ -779,7 +773,7 @@ fractional_part = ((fractional_part)*10.000000);
 fractional_part = ((fractional_part)-((r64)((s64)fractional_part)));
 l = ((l)+0x1);
 }
-loop_7:;
+loop_8:;
 
 return l;
 }
@@ -822,6 +816,23 @@ __t_base += 1;
 
 len = 0x5;
 }
+return (print_string_l)(((u8*)buffer),len);
+}
+
+s64 print_u64(u64 v){
+char buffer[16] = {0};
+
+struct string __temp_v_18;
+{
+char* __t_base = (char*)&(__temp_v_18);
+char* __array_base = __t_base;
+*(s64*)((char*)__t_base + 0) = 0x2;
+*(s64*)((char*)__t_base + 8) = 0xffffffffffffffff;
+*(u8**)((char*)__t_base + 16) = __string_data_18;
+}
+(print_string)(__temp_v_18);
+s64 len;
+len = (u64_to_str_base16)(v,true,((s8*)buffer));
 return (print_string_l)(((u8*)buffer),len);
 }
 
@@ -886,7 +897,7 @@ s64 print_string(struct string s){
 (write)(0x1,((void*)((s).data)),((u64)((s).length)));
 }
 
-void* read_entire_file(struct string filename, __func_type_0x11cbf78* allocator, u64* out_file_size){
+void* read_entire_file(struct string filename, __func_type_0xc6a0a8* allocator, u64* out_file_size){
 s32 descriptor;
 descriptor = (open)(((filename).data),0x0);
 if(((descriptor)==(-0x1))){

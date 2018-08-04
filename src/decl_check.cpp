@@ -907,7 +907,9 @@ Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 	for (size_t i = 0; i < ndecls; ++i) 
 	{
 		Ast* node = ast_top_level[i];
+
 		assert(node->flags & AST_FLAG_IS_DECLARATION);
+
 		if (node->node_type == AST_DATA) continue;
 
 		error_code |= decl_check_redefinition(global_scope, node);

@@ -8,6 +8,8 @@ Window_Info :: struct {
 	window_handle : u64;
 	vi : ^XVisualInfo;
 	swa : XSetWindowAttributes;
+	ctx : GLXContext;
+	cmap : Colormap;
 }
 
 GLX_X_RENDERABLE : u32 : 0x8012;
@@ -117,11 +119,14 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	swa.background_pixmap = 0;
 	swa.border_pixel      = 0;
 	swa.event_mask        = StructureNotifyMask;
+	(*info).cmap = cmap;
 
 	print_string("Creating window\n");
 	win := XCreateWindow((*info).display, RootWindow((*info).display, (*vi).screen),
 		0, 0, 800, 600, 0, (*vi).depth, InputOutput, (*vi).visual,
 		CWBorderPixel|CWColormap|CWEventMask, &swa);
+
+	(*info).window_handle = win;
 
 	if win == 0 {
 		print_string("Failed to create window.\n");
@@ -150,6 +155,7 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	};
 
 	ctx = glXCreateContextAttribsARB((*info).display, bestFbc, [^void]0, true, [^s32]context_attribs);
+	(*info).ctx = ctx;
 
 	XSync((*info).display, false);
 
@@ -161,20 +167,15 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	} else {
 		print_string( "Direct GLX rendering context obtained\n" );
 	}
+}
 
-	{
-		glClearColor(0.0, 0.5, 1.0, 1.0);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glXSwapBuffers ((*info).display, win);
-		sleep(1);
+release_opengl :: (info : ^Window_Info) -> s32 {
+	glXMakeCurrent((*info).display, 0, [^void]0);
+	glXDestroyContext((*info).display, (*info).ctx);
 
-		glXMakeCurrent((*info).display, 0, [^void]0);
-		glXDestroyContext((*info).display, ctx);
-
-		XDestroyWindow((*info).display, win);
-		XFreeColormap((*info).display, cmap);
-		XCloseDisplay((*info).display);
-	}
+	XDestroyWindow((*info).display, (*info).window_handle);
+	XFreeColormap((*info).display, (*info).cmap);
+	XCloseDisplay((*info).display);
 }
 
 GL_COLOR_BUFFER_BIT : u32 : 0x00004000;
@@ -197,6 +198,7 @@ glClearColor :: (r : r32, g : r32, b : r32, a : r32) -> void #foreign("GL");
 glClear :: (mask : u32) -> void #foreign("GL");
 
 sleep :: (seconds : u32) -> s32 #foreign("c");
+usleep :: (useconds : u64) -> s32 #foreign("c");
 
 GLXFBConfig : typedef : ^void;
 Window : typedef : u64;
@@ -220,6 +222,15 @@ main :: () -> s32 {
 	}
 
 	if init_opengl(&info) == -1 return -1;
+
+	while true {
+		glClearColor(0.0, 0.5, 1.0, 1.0);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glXSwapBuffers (info.display, info.window_handle);
+		usleep(1000);
+	}
+
+	release_opengl(&info);
 
     return 0;
 }

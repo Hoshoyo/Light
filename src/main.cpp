@@ -51,6 +51,8 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
+	DEBUG_print_ast(stdout, ast_top_level, false);
+
 	// TODO(psv): Fuse type checking, and also refactor it
 	Type_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
 
