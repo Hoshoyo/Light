@@ -951,11 +951,10 @@ Ast* Parser::parse_expr_literal(Scope* scope) {
 				Ast* capacity_expr = ast_create_expr_literal(scope, LITERAL_HEX_INT, first, 0, type_primitive_get(TYPE_PRIMITIVE_S64));
 				capacity_expr->expr_literal.value_s64 = -1;	// start immutable
 
-				Ast* data_expr = g_data;
-
 				array_push(exprs, &length_expr);
 				array_push(exprs, &capacity_expr);
-				array_push(exprs, &data_expr);
+				array_push(exprs, &g_data);
+				node->expr_literal.struct_exprs = exprs;
 			} break;
 			case TOKEN_KEYWORD_NULL: {
 				node->expr_literal.type = LITERAL_POINTER;
