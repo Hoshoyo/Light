@@ -140,8 +140,7 @@ Ast** Parser::parse_top_level() {
 		return 0;
 	Parser_Error perr = PARSER_OK;
 
-	Ast** ast_top_level = array_create(Ast*, 64);
-	top_level = ast_top_level;
+	top_level = array_create(Ast*, 64);
 
 	while (perr == PARSER_OK && lexer->peek_token_type() != TOKEN_END_OF_STREAM) {
 		if(lexer->peek_token_type() == '#') {
@@ -158,14 +157,14 @@ Ast** Parser::parse_top_level() {
 				break;
 		}
 		if (!decl) break;
-		array_push(ast_top_level, &decl);
+		array_push(top_level, &decl);
 	}
 
 	if (perr == PARSER_ERROR_FATAL) {
 		fprintf(stderr, "There were errors, exiting...\n");
 		return 0;
 	}
-	return ast_top_level;
+	return top_level;
 }
 
 // pushes a u8* literal to the data segment
