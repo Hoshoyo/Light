@@ -721,3 +721,26 @@ ClientMessage	 : s32 : 33;
 MappingNotify	 : s32 : 34;
 GenericEvent	 : s32 : 35;
 LASTEvent	     : s32 : 36;	/* must be bigger than any event # */
+
+GLXFBConfig : typedef : ^void;
+Window      : typedef : u64;
+Colormap    : typedef : u64;
+GLXContext  : typedef : ^void;
+GLXDrawable : typedef : u32;
+
+#foreign("X11")
+
+XSetErrorHandler :: (errorHandler : (^Display, ^XErrorEvent) -> s32) -> (^Display, ^XErrorEvent) -> s32;
+XFreeColormap :: (display : ^Display, cmap : Colormap) -> s32;
+XFree :: (data : ^void) -> s32;
+XSync :: (display : ^Display, discard : bool) -> s32;
+
+#end
+
+DefaultScreen :: (dpy : ^Display) -> s32 {
+	return (*dpy).default_screen;
+}
+
+RootWindow :: (dpy : ^Display, screen : s32) -> Window {
+	return (((*dpy).screens)[screen]).root;
+}

@@ -1,5 +1,6 @@
 #import "../x11/x11.li"
 #import "../linux/print.li"
+#import "../GL/gl.li"
 
 Window_Info :: struct {
 	width : s32;
@@ -11,26 +12,6 @@ Window_Info :: struct {
 	ctx : GLXContext;
 	cmap : Colormap;
 }
-
-GLX_X_RENDERABLE : u32 : 0x8012;
-GLX_DRAWABLE_TYPE : u32 : 0x8010;
-GLX_RENDER_TYPE : u32 : 0x8011;
-GLX_RGBA_BIT : u32 : 0x1;
-GLX_X_VISUAL_TYPE : u32 : 0x22;
-GLX_TRUE_COLOR : u32 : 0x8002;
-GLX_RED_SIZE : u32 : 8;
-GLX_GREEN_SIZE : u32 : 9;
-GLX_BLUE_SIZE : u32 : 10;
-GLX_ALPHA_SIZE : u32 : 11;
-GLX_DEPTH_SIZE : u32 : 12;
-GLX_STENCIL_SIZE : u32 : 13;
-GLX_DOUBLEBUFFER : u32 : 5;
-GLX_WINDOW_BIT : u32 : 1;
-GLX_SAMPLE_BUFFERS : s32 : 100000;
-GLX_SAMPLES : s32 : 100001;
-True : u32 : 1;
-
-glXQueryVersion :: (dpy : ^Display, major : ^s32, minor : ^s32) -> bool #foreign("X11");
 
 init_opengl :: (info : ^Window_Info) -> s32 {
     visual_attribs := array{
@@ -143,8 +124,8 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	glXCreateContextAttribsARB := [(^Display, GLXFBConfig, GLXContext, bool, ^s32) -> GLXContext]glXGetProcAddressARB("glXCreateContextAttribsARB".data);
 	ctx : GLXContext;
 
-	//ctxErrorHandler : (^Display, ^XErrorEvent) -> s32;
-	//XSetErrorHandler(ctxErrorHandler);
+	ctxErrorHandler : (^Display, ^XErrorEvent) -> s32;
+	XSetErrorHandler(ctxErrorHandler);
 
 	context_attribs := array {
 		GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
@@ -178,41 +159,8 @@ release_opengl :: (info : ^Window_Info) -> s32 {
 	XCloseDisplay((*info).display);
 }
 
-GL_COLOR_BUFFER_BIT : u32 : 0x00004000;
-GLX_CONTEXT_MAJOR_VERSION_ARB : s32 : 0x2091;
-GLX_CONTEXT_MINOR_VERSION_ARB : s32 : 0x2092;
-GLX_CONTEXT_FLAGS_ARB : s32 : 0x2094;
-GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB : s32 : 0x00000002;
-
-glXChooseFBConfig :: (dpy : ^Display, screen : s32, attrib_list : ^u32, nelements : ^s32) -> ^GLXFBConfig #foreign("GL");
-glXGetVisualFromFBConfig :: (dpy : ^Display, config : GLXFBConfig) -> ^XVisualInfo #foreign("GL");
-glXGetFBConfigAttrib :: (dpy : ^Display, config : GLXFBConfig, attribute : s32, value : ^s32) -> s32 #foreign("GL");
-glXGetProcAddressARB :: (name : ^u8) -> ^void #foreign("X11");
-XSetErrorHandler :: (errorHandler : (^Display, ^XErrorEvent) -> s32) -> (^Display, ^XErrorEvent) -> s32 #foreign("X11");
-XFreeColormap :: (display : ^Display, cmap : Colormap) -> s32 #foreign("X11");
-XFree :: (data : ^void) -> s32 #foreign("X11");
-XSync :: (display : ^Display, discard : bool) -> s32 #foreign("X11");
-glXIsDirect :: (display : ^Display, ctx : GLXContext) -> bool #foreign("GL");
-
-glClearColor :: (r : r32, g : r32, b : r32, a : r32) -> void #foreign("GL");
-glClear :: (mask : u32) -> void #foreign("GL");
-
 sleep :: (seconds : u32) -> s32 #foreign("c");
 usleep :: (useconds : u64) -> s32 #foreign("c");
-
-GLXFBConfig : typedef : ^void;
-Window : typedef : u64;
-Colormap : typedef : u64;
-GLXContext : typedef : ^void;
-GLXDrawable : typedef : u32;
-
-DefaultScreen :: (dpy : ^Display) -> s32 {
-	return (*dpy).default_screen;
-}
-
-RootWindow :: (dpy : ^Display, screen : s32) -> Window {
-	return (((*dpy).screens)[screen]).root;
-}
 
 main :: () -> s32 {
 	info : Window_Info;
@@ -224,7 +172,7 @@ main :: () -> s32 {
 	if init_opengl(&info) == -1 return -1;
 
 	while true {
-		glClearColor(0.0, 0.5, 1.0, 1.0);
+		glClearColor(1.0, 0.0, 1.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
 		glXSwapBuffers (info.display, info.window_handle);
 		usleep(1000);
