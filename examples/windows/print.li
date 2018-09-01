@@ -13,7 +13,7 @@ string_length :: (s : ^u8) -> s64 {
 memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void {
 	i :u64= 0;
 	while i < size {
-		*[^u8](dest + i) = *[^u8](src + i);
+		*[^u8]([^u8]dest + i) = *[^u8]([^u8]src + i);
 		i += 1;
 	}
 }
