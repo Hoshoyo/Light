@@ -3,12 +3,10 @@
 #import "GL/gl.li"
 
 GLX_RGBA : s32 : 4;
-GLX_DEPTH_SIZE : s32 : 12;
-GLX_DOUBLEBUFFER : s32 : 5;
 
 dpy  : ^Display;
 root : Display;
-att  : [5]s32 = array{ GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, 0};
+att  : [5]u32 = array{ [u32]GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, 0};
 vi   : ^XVisualInfo;
 cmap : u64;    // Colormap
 swa  : XSetWindowAttributes;

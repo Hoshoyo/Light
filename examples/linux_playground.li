@@ -17,7 +17,7 @@ fill_array :: () {
     }
 }
 
-main :: () -> s64 {
+main :: () -> s32 {
     fill_array();
 
     return 0;
