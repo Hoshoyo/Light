@@ -1,27 +1,15 @@
-bar : s32 = 4;
-foo : ^s32 = &bar;
-
-alloc :: () -> ^^void {
-	return [^^void]&foo;
+k :: struct {
+    z : r32;
 }
-
-// TODO: pointer arithmetic needs sized type
-foozle :: () -> ^void {
-	return null;
+x :: struct {
+    y : k;
 }
 
 main :: () -> s32 {
-	x := alloc();
-	y := x[0];
-
-	//print_s32(*[^s32]y);
-
-	//a : ^s32 = [^s32]foozle() + 1;
-	print_u64(0x123456789abcdef0);
-	print_string("\n");
-	print_u32(0x12345678);
-
-	return 0;
+	b : x;
+    a := b.y.z;
+    print_string("Hello");
+    return 0;
 }
 
-#import "linux/print.li"
+#import "windows/print.li"

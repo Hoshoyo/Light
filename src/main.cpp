@@ -19,6 +19,19 @@ void initialize() {
 	Parser::init();
 }
 
+char* definitions_source_path(char* binary_path) {
+	size_t compiler_fullpath_length = 0;
+	char* compiler_fullpath = ho_realpath(binary_path, &compiler_fullpath_length);
+	
+	string compiler_fullpath_string = string_new(compiler_fullpath, compiler_fullpath_length);
+	string compiler_path = path_from_fullpath(compiler_fullpath_string);
+	//compiler_path.data[compiler_path.length] = 'f';
+	string definitions_path = string_new_append(&compiler_path, "../../internal/definitions.li", sizeof("../../internal/definitions.li"));
+	definitions_path.data[definitions_path.length - 1] = 0;
+
+	return (char*)definitions_path.data;
+}
+
 int main(int argc, char** argv) {
 	bool verbose = false;
 
@@ -43,7 +56,7 @@ int main(int argc, char** argv) {
 	Scope  global_scope = { 0 };
 
 	// TODO(psv): multiple input files
-	queue_file_for_parsing("internal/definitions.li");
+	queue_file_for_parsing(definitions_source_path(argv[0]));
 	queue_file_for_parsing(argv[1]);
 
 	Ast** ast_top_level = parse_files_in_queue(&global_scope);
