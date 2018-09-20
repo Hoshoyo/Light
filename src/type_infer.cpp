@@ -66,6 +66,15 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 		// TODO(psv): more cases could be lvalue
 		// arr[0] -> array dereference
 		expr->flags |= AST_FLAG_LVALUE;
+	} else {
+		// OP_BINARY_DOT
+		// Implementation of the singular implicit dereference using dot operator
+		if(expr->expr_binary.left->type_return->kind == KIND_POINTER) {
+			Ast* leftexpr = expr->expr_binary.left;
+			expr->expr_binary.left = ast_create_expr_unary(leftexpr->scope, leftexpr, OP_UNARY_DEREFERENCE, expr->expr_binary.token_op, 0, UNARY_EXPR_FLAG_PREFIXED);
+			expr->expr_binary.left->type_return = leftexpr->type_return->pointer_to;
+		}
+		//
 	}
 	if(*error & TYPE_ERROR_FATAL) return 0;
 	
