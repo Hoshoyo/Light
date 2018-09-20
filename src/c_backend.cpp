@@ -1052,7 +1052,7 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 	if(out == INVALID_HANDLE_VALUE){
 		report_fatal_error("Could not create file %s", out_obj.data);
 	}
-	ho_writefile(out, code_generator.ptr, (u8*)code_generator.buffer);
+	ho_writefile(out, code_generator.ptr, (char*)code_generator.buffer);
 	ho_closefile(out);
 
 	// Execute commands to compile .c
