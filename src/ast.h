@@ -338,6 +338,7 @@ const u32 AST_FLAG_IS_EXPRESSION  = FLAG(2);
 const u32 AST_FLAG_IS_DATA        = FLAG(3);
 const u32 AST_FLAG_QUEUED         = FLAG(4);
 const u32 AST_FLAG_LVALUE         = FLAG(5);
+const u32 AST_FLAG_ENUM_ACCESSER  = FLAG(6);
 //const u32 AST_FLAG_FAILED_TYPE_CHECK = FLAG(6);
 
 struct Ast {
@@ -373,6 +374,8 @@ struct Ast {
 
 		Ast_Data                data_global;
 	};
+
+	s32 unique_id;
 };
 
 Scope* scope_create(Ast* creator, Scope* parent, u32 flags);

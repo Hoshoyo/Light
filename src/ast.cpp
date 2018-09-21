@@ -5,7 +5,16 @@
 static Memory_Arena arena_scope(65536);
 static Memory_Arena arena_ast(65536);
 
-#define ALLOC_AST() (Ast*)arena_ast.allocate(sizeof(Ast))
+
+inline Ast* ALLOC_AST() {
+	static s32 node_unique_id = 0;
+
+	Ast* result = (Ast*)arena_ast.allocate(sizeof(Ast));
+	result->unique_id = node_unique_id++;
+	return result;
+}
+
+//#define ALLOC_AST() (Ast*)arena_ast.allocate(sizeof(Ast))
 #define ALLOC_SCOPE() (Scope*)arena_scope.allocate(sizeof(Scope))
 
 Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {

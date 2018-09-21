@@ -44,7 +44,7 @@ extern "C" s64 HO_API ho_getfilesize(const char* filename);
 */
 #define HO_ALLOC ((void*)0)
 extern "C" void* HO_API ho_readentirefile(int file, size_t file_size, void* mem);
-extern "C" s64 HO_API ho_writefile(int file, s64 bytes_to_write, char* bytes);
+extern "C" s64 HO_API ho_writefile(int file, s64 bytes_to_write, u8* bytes);
 extern "C" char* HO_API ho_realpath(const char* path, size_t* size);
 
 struct Timer
@@ -152,7 +152,7 @@ void* HO_API ho_readentirefile(int file, size_t file_size, void* mem)
 	return memory;
 }
 
-s64 ho_writefile(int fd, s64 bytes_to_write, char* bytes){
+s64 ho_writefile(int fd, s64 bytes_to_write, u8* bytes){
 	s64 written = write(fd, bytes, bytes_to_write);
 	return written;
 }

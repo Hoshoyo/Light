@@ -7,8 +7,9 @@ x :: struct {
 
 main :: () -> s32 {
 	b : x;
+	b.y.z = 1.5;
     a := b.y.z;
-    print_string("Hello");
+	print_r32(a);
     return 0;
 }
 

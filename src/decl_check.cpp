@@ -135,11 +135,16 @@ Type_Error decl_check_redefinition(Scope* scope, Ast* node) {
 		}break;
 		case AST_DECL_ENUM: {
 			error |= decl_insert_into_symbol_table(node, node->decl_enum.name, "enum");
+			/*
+				enum values have their own namespace and should not be put as global variables
+			*/
+			/*
 
-			for (size_t i = 0; i < node->decl_enum.fields_count; ++i) {
-				error |= decl_insert_into_symbol_table(node->decl_enum.fields[i],
-					node->decl_enum.fields[i]->decl_constant.name, "enum field");
-			}
+				for (size_t i = 0; i < node->decl_enum.fields_count; ++i) {
+					error |= decl_insert_into_symbol_table(node->decl_enum.fields[i],
+						node->decl_enum.fields[i]->decl_constant.name, "enum field");
+				}
+			*/
 		}break;
 		case AST_DECL_CONSTANT: {
 			error |= decl_insert_into_symbol_table(node, node->decl_constant.name, "constant");
@@ -605,7 +610,29 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 			assert(node->decl_constant.type_info->flags & TYPE_FLAG_INTERNALIZED);
 		}break;
 		case AST_DECL_ENUM: {
-			assert_msg(0, "enum type information pass not implemented");
+			//assert_msg(0, "enum type information pass not implemented");
+			assert(node->decl_enum.type_hint->flags & TYPE_FLAG_INTERNALIZED);
+
+			size_t nfields = node->decl_enum.fields_count;
+			Type_Instance* tinfo = node->decl_enum.type_hint;
+
+			if (!type_primitive_int(tinfo)) {
+				error_code |= report_type_error(TYPE_ERROR_FATAL, node, "enum declaration must have an integer base type\n");
+				return error_code;
+			}
+
+			for (size_t i = 0; i < nfields; ++i) {
+				error_code |= type_information_pass(node->decl_enum.enum_scope, node->decl_enum.fields[i]);
+				if (error_code & TYPE_ERROR_FATAL) {
+					return error_code;
+				} else if (error_code & TYPE_QUEUED) {
+					infer_queue_push(node);
+					return error_code;
+				}
+			}
+
+			infer_queue_remove(node);
+			type_decl_push(node);
 		}break;
 		default: {
 			assert_msg(0, "invalid declaration in top level type information pass");
@@ -813,8 +840,7 @@ Type_Error type_checking_decl(Scope* scope, Ast* node) {
 				if (infered->kind == KIND_ARRAY || infered->kind == KIND_STRUCT) {
 					infered = type_check_expr(node->decl_constant.value->type_return, node->decl_constant.value, &error_code);
 					typechecked = true;
-				}
-				else {
+				} else {
 					infered = node->decl_constant.value->type_return;
 				}
 			}
@@ -824,8 +850,7 @@ Type_Error type_checking_decl(Scope* scope, Ast* node) {
 					return type_error | error_code;
 				}
 				node->decl_constant.type_info = infered;
-			}
-			else {
+			} else {
 				if (!typechecked)
 					node->decl_constant.value->type_return = type_check_expr(node->decl_constant.type_info, node->decl_constant.value, &type_error);
 			}
@@ -845,6 +870,13 @@ Type_Error type_checking_decl(Scope* scope, Ast* node) {
 					error_code |= decl_insert_into_symbol_table(node, node->decl_procedure.name, "procedure");
 			}
 		}break;
+		case AST_DECL_ENUM: {
+			for (size_t i = 0; i < node->decl_enum.fields_count; ++i) {
+				error_code |= type_checking_decl(node->decl_enum.enum_scope, node->decl_enum.fields[i]);
+				assert(node->decl_enum.fields[i]->node_type == AST_DECL_CONSTANT);
+			}
+		}break;
+
 		case AST_DECL_STRUCT:
 		case AST_DECL_UNION:
 		case AST_DECL_TYPEDEF:
@@ -866,8 +898,8 @@ Type_Error type_checking_pass(Scope* scope, Ast* node) {
 		case AST_DECL_TYPEDEF:
 		case AST_DECL_PROCEDURE:
 		case AST_DECL_STRUCT:
-		case AST_DECL_UNION: //assert_msg(0, "union not yet implemented on type checking pass"); break;
-		case AST_DECL_ENUM:  //assert_msg(0, "enum not yet implemented on type checking pass"); break;
+		case AST_DECL_UNION:
+		case AST_DECL_ENUM:
 			error_code |= type_checking_decl(scope, node);
 			break;
 
@@ -962,6 +994,7 @@ Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 }
 
 Ast* decl_from_name(Scope* scope, Token* name) {
+	// Try to find the declaration with that name within the scope passed
 	while (scope) {
 		if (scope->symb_table.entries_count > 0) {
 			s64 index = symbol_table_entry_exist(&scope->symb_table, name);
@@ -971,6 +1004,7 @@ Ast* decl_from_name(Scope* scope, Token* name) {
 		}
 		scope = scope->parent;
 	}
+	
 	return 0;
 }
 

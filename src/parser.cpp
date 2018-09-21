@@ -529,7 +529,6 @@ Ast* Parser::parse_decl_struct(Token* name, Scope* scope) {
 
 Ast* Parser::parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint_type) {
 
-	require_and_eat(':');
 	require_and_eat(TOKEN_KEYWORD_ENUM);
 	require_and_eat('{');
 
@@ -539,7 +538,7 @@ Ast* Parser::parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint_type
 	}
 
 	s32    fields_count = 0;
-	Ast**  fields = 0;
+	Ast**  fields = array_create(Ast*, 4);
 	Scope* enum_scope = scope_create(0, scope, SCOPE_ENUM);
 
 	for (;;) {
@@ -548,6 +547,7 @@ Ast* Parser::parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint_type
 		Token* const_name = lexer->eat_token();
 		if (const_name->type != TOKEN_IDENTIFIER)
 			report_syntax_error(const_name, "expected enum field constant declaration, but got '%.*s'\n", TOKEN_STR(const_name));
+		require_and_eat(':');
 		Ast* field = parse_decl_constant(const_name, enum_scope, hint_type);
 		array_push(fields, &field);
 		++fields_count;

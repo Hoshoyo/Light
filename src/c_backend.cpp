@@ -285,7 +285,7 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
             sprint("} %.*s", TOKEN_STR(decl->decl_union.name));
         }break;
         case AST_DECL_ENUM:{
-            assert_msg(0, "enum C codegen not yet implemented");
+            //assert_msg(0, "enum C codegen not yet implemented");
         }break;
     }
 }
@@ -1052,7 +1052,7 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 	if(out == INVALID_HANDLE_VALUE){
 		report_fatal_error("Could not create file %s", out_obj.data);
 	}
-	ho_writefile(out, code_generator.ptr, (char*)code_generator.buffer);
+	ho_writefile(out, code_generator.ptr, (u8*)code_generator.buffer);
 	ho_closefile(out);
 
 	// Execute commands to compile .c
