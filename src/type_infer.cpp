@@ -82,11 +82,13 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 		//
 
 		// Enumeration must have right side CONSTANT enumarated value
-		if (expr->expr_binary.left->flags & AST_FLAG_ENUM_ACCESSER) {
+		if (expr->expr_binary.left->flags & AST_FLAG_ENUM_ACCESSOR) {
 			if (expr->expr_binary.right->node_type != AST_EXPRESSION_VARIABLE) {
 				*error |= report_type_error(TYPE_ERROR_FATAL, expr, "enum field must be accessed by a name");
 			} else {
 				expr->expr_binary.right->type_return = expr->expr_binary.left->type_return;
+				// copy scope to be the enum scope for this binary expression only
+				expr->expr_binary.right->scope = expr->expr_binary.left->scope;
 			}
 		}
 	}
@@ -380,7 +382,8 @@ Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 
 
 	if (decl->node_type == AST_DECL_ENUM) {
 		type = decl->decl_enum.type_hint;
-		expr->flags |= AST_FLAG_ENUM_ACCESSER;
+		expr->flags |= AST_FLAG_ENUM_ACCESSOR;
+		expr->scope = decl->decl_enum.enum_scope;
 		assert(type_strong(type));
 		expr->type_return = type;
 	} else if (decl->node_type != AST_DECL_VARIABLE && decl->node_type != AST_DECL_CONSTANT) {
@@ -1102,7 +1105,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 				case OP_BINARY_DOT:
 					// @TODO: IMPLEMENT namespaces
 
-					if (expr->expr_binary.left->flags & AST_FLAG_ENUM_ACCESSER) {
+					if (expr->expr_binary.left->flags & AST_FLAG_ENUM_ACCESSOR) {
 						expr->type_return = expr->expr_binary.left->type_return;
 						return defer_check_against(expr, check_against, expr->type_return, error);
 					} else {

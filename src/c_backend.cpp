@@ -285,7 +285,7 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
             sprint("} %.*s", TOKEN_STR(decl->decl_union.name));
         }break;
         case AST_DECL_ENUM:{
-            //assert_msg(0, "enum C codegen not yet implemented");
+            // implemented as CONSTANT for now
         }break;
     }
 }
@@ -612,8 +612,7 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
         case OP_BINARY_LT:
         case OP_BINARY_LOGIC_AND:
         case OP_BINARY_LOGIC_OR:
-        case OP_BINARY_NOT_EQUAL:
-        case OP_BINARY_DOT:{
+        case OP_BINARY_NOT_EQUAL: {
 			sprint("((");
             emit_expression(expr->expr_binary.left);
 			sprint(")");
@@ -621,6 +620,20 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
             emit_expression(expr->expr_binary.right);
 			sprint(")");
         }break;
+
+		case OP_BINARY_DOT: {
+			if(expr->expr_binary.left->flags & AST_FLAG_ENUM_ACCESSOR) {
+				emit_expression(expr->expr_binary.right);
+			} else {
+				sprint("((");
+				emit_expression(expr->expr_binary.left);
+				sprint(")");
+				sprint(binop_op_to_string(expr->expr_binary.op));
+				emit_expression(expr->expr_binary.right);
+				sprint(")");
+			}
+		}break;
+
         case OP_BINARY_VECTOR_ACCESS:{
             Type_Instance* indexed_type = expr->expr_binary.left->type_return;
 
