@@ -1,7 +1,7 @@
 #include "type_table.h"
 #include "util.h"
-#include "memory.h"
 #include "decl_check.h"
+#include <light_arena.h>
 
 Type_Instance** g_type_table = 0;
 static Hash_Table type_table;
@@ -11,6 +11,19 @@ struct Internalize_Queue {
 	Scope* scope;
 };
 static Internalize_Queue* type_internalize_queue;
+
+#define ALLOC_TYPE(ARENA) (Type_Instance*)arena_alloc(ARENA, sizeof(Type_Instance))
+
+static Light_Arena* types_internal;
+static Light_Arena* types_temporary;
+
+struct Type_Table_Arena_Init {
+	Type_Table_Arena_Init(size_t size) {
+		types_internal = arena_create(size);
+		types_temporary = arena_create(size);
+	}
+};
+Type_Table_Arena_Init type_table_arena_init(65536);
 
 // patches the hanging non-internalized pointers of recursive defined structs. 
 int resolve_type_internalize_queue() {
@@ -35,11 +48,6 @@ int resolve_type_internalize_queue() {
 
 	return error;
 }
-
-#define ALLOC_TYPE(ARENA) (Type_Instance*)(ARENA).allocate(sizeof(Type_Instance))
-
-static Memory_Arena types_internal(65536);
-static Memory_Arena types_temporary(65536);
 
 static Type_Instance* type_s8;
 static Type_Instance* type_s16;
@@ -191,7 +199,7 @@ Type_Instance* type_copy_internal(Type_Instance* type, Scope* scope) {
 	case KIND_UNION:
 	case KIND_STRUCT: {
 		size_t num_args = array_get_length(type->struct_desc.fields_types);
-		result->struct_desc.fields_types = (Type_Instance**)types_internal.allocate(array_get_header_size() + num_args * sizeof(Type_Instance*));
+		result->struct_desc.fields_types = (Type_Instance**)arena_alloc(types_internal, array_get_header_size() + num_args * sizeof(Type_Instance*));
 		result->struct_desc.fields_types = (Type_Instance**)((u8*)result->struct_desc.fields_types + array_get_header_size());
 		array_set_capacity(result->struct_desc.fields_types, num_args);
 		array_set_length(result->struct_desc.fields_types, num_args);
@@ -203,7 +211,7 @@ Type_Instance* type_copy_internal(Type_Instance* type, Scope* scope) {
 	case KIND_FUNCTION: {
 		result->function_desc.return_type = internalize_type(&type->function_desc.return_type, scope, true);//type_copy_internal(type->function_desc.return_type);
 		size_t num_args = type->function_desc.num_arguments;
-		result->function_desc.arguments_type = (Type_Instance**)types_internal.allocate(array_get_header_size() + num_args * sizeof(Type_Instance*));
+		result->function_desc.arguments_type = (Type_Instance**)arena_alloc(types_internal, array_get_header_size() + num_args * sizeof(Type_Instance*));
 		result->function_desc.arguments_type = (Type_Instance**)((u8*)result->function_desc.arguments_type + array_get_header_size());
 		array_set_capacity(result->function_desc.arguments_type, num_args);
 		array_set_length(result->function_desc.arguments_type, num_args);

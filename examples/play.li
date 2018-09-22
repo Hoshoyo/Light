@@ -17,4 +17,4 @@ main :: () -> s32 {
     return 0;
 }
 
-#import "linux/print.li"
+#import "windows/print.li"

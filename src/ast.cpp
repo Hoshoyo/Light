@@ -1,21 +1,28 @@
 #include "ast.h"
-#include "memory.h"
+#include "light_arena.h"
 #include "type_table.h"
 
-static Memory_Arena arena_scope(65536);
-static Memory_Arena arena_ast(65536);
+static Light_Arena* arena_scope;
+static Light_Arena* arena_ast;
 
+struct Ast_Arena_Init {
+	Ast_Arena_Init(size_t size) {
+		arena_ast = arena_create(size);
+		arena_scope = arena_create(size);
+	}
+};
+Ast_Arena_Init ast_arena_init(65536);
 
 inline Ast* ALLOC_AST() {
 	static s32 node_unique_id = 0;
 
-	Ast* result = (Ast*)arena_ast.allocate(sizeof(Ast));
+	//Ast* result = (Ast*)arena_ast.allocate(sizeof(Ast));
+	Ast* result = (Ast*)arena_alloc(arena_ast, sizeof(Ast));
 	result->unique_id = node_unique_id++;
 	return result;
 }
 
-//#define ALLOC_AST() (Ast*)arena_ast.allocate(sizeof(Ast))
-#define ALLOC_SCOPE() (Scope*)arena_scope.allocate(sizeof(Scope))
+#define ALLOC_SCOPE() (Scope*)arena_alloc(arena_scope, sizeof(Scope))
 
 Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {
 	static s64 id = 1;

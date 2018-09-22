@@ -1,11 +1,18 @@
 #include "file_table.h"
-#include "memory.h"
 #include "hash_table.h"
+#include <light_arena.h>
 
 Hash_Table file_table = {0};
-static Memory_Arena file_table_arena(65536);
-#define FTABLE_ALLOC() (File_Table_Entry*)file_table_arena.allocate(sizeof(File_Table_Entry))
 
+static Light_Arena* file_table_arena;
+#define FTABLE_ALLOC() (File_Table_Entry*)arena_alloc(file_table_arena, sizeof(File_Table_Entry))
+
+struct File_Table_Arena_Init {
+	File_Table_Arena_Init(size_t size) {
+		file_table_arena = arena_create(size);
+	}
+};
+File_Table_Arena_Init file_table_arena_init(65536);
 
 u64 file_table_hash(void* data) {
     File_Table_Entry* e = (File_Table_Entry*)data;

@@ -142,7 +142,6 @@
     <ClCompile Include="src\hash_table.cpp" />
     <ClCompile Include="src\lexer.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\memory.cpp" />
     <ClCompile Include="src\parser.cpp" />
     <ClCompile Include="src\symbol_table.cpp" />
     <ClCompile Include="src\type.cpp" />
@@ -159,7 +158,6 @@
     <ClInclude Include="src\file_table.h" />
     <ClInclude Include="src\hash_table.h" />
     <ClInclude Include="src\lexer.h" />
-    <ClInclude Include="src\memory.h" />
     <ClInclude Include="src\parser.h" />
     <ClInclude Include="src\symbol_table.h" />
     <ClInclude Include="src\type.h" />
