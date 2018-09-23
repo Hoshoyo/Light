@@ -2,8 +2,6 @@
 #include "interpreter.h"
 #define internal static
 
-#define HALT push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0))
-
 internal u8* stack_ptr = 0;
 internal u8* heap_ptr = 0;
 internal u8* code_ptr = 0;
@@ -32,6 +30,13 @@ u64 push_instruction(Instruction inst, u64 next_word) {
 	push_instruction(inst);
 	*(u64*)code_ptr = next_word;	// @todo this should be the size of the immediate value u16 u8 s32 etc..
 	code_ptr += sizeof(next_word);
+	return (u64)code_ptr;
+}
+
+u64 push_instruction(Instruction inst, u64** out_next_word) {
+	push_instruction(inst);
+	*out_next_word = (u64*)code_ptr;
+	code_ptr += sizeof(**out_next_word);
 	return (u64)code_ptr;
 }
 
@@ -326,6 +331,7 @@ int run_interpreter()
 #endif
 		if (execute(instruction, immediate)) break;
 	}
+	printf("interpreter exited with code %d\n", reg[R_0]);
 	return 0;
 }
 
@@ -569,105 +575,137 @@ int execute(Instruction inst, u64 next_word)
 	return status;
 }
 
+static char* reg_name(u8 r) {
+	static char n[64] = { 0 };
+	int l = 0;
+	switch (r) {
+	case R_0:		l = sprintf(n, "R_0[0x%llx]", reg[R_0]);			break;
+	case R_1:		l = sprintf(n, "R_1[0x%llx]", reg[R_1]);			break;
+	case R_2:		l = sprintf(n, "R_2[0x%llx]", reg[R_2]);			break;
+	case R_3:		l = sprintf(n, "R_3[0x%llx]", reg[R_3]);			break;
+	case R_4:		l = sprintf(n, "R_4[0x%llx]", reg[R_4]);			break;
+	case R_5:		l = sprintf(n, "R_5[0x%llx]", reg[R_5]);			break;
+	case R_6:		l = sprintf(n, "R_6[0x%llx]", reg[R_6]);			break;
+	case R_7:		l = sprintf(n, "R_7[0x%llx]", reg[R_7]);			break;
+	case R_8:		l = sprintf(n, "R_8[0x%llx]", reg[R_8]);			break;
+	case R_IP:		l = sprintf(n, "R_IP[0x%llx]", reg[R_IP]);			break;
+	case R_SP:		l = sprintf(n, "R_SP[0x%llx]", reg[R_SP]);			break;
+	case R_SB:		l = sprintf(n, "R_SB[0x%llx]", reg[R_SB]);			break;
+	case R_SS:		l = sprintf(n, "R_SS[0x%llx]", reg[R_SS]);			break;
+	case R_FLAGS:	l = sprintf(n, "R_FLAGS[0x%llx]", reg[R_FLAGS]);	break;
+	case NO_REG:	l = sprintf(n, "NO_REG");						break;
+	default:        l = sprintf(n, "R_UNK");						break;
+	}
+	n[l] = 0;
+	return n;
+}
+
 void print_instruction(Instruction inst, u64 next_qword)
 {
+	int l = 0;
+	printf("0x%llx: ", reg[R_IP]);
 	switch (inst.type) {
-		case ADD  : printf("ADD "); break;
-		case SUB  : printf("SUB "); break;
-		case MUL  : printf("MUL "); break;
-		case DIV  : printf("DIV "); break;
-		case MOD  : printf("MOD "); break;
-		case BEQ  : printf("BEQ "); break;
-		case BNE  : printf("BNE "); break;
-		case BLT  : printf("BLT "); break;
-		case BLE  : printf("BLE "); break;
-		case BGT  : printf("BGT "); break;
-		case BGE  : printf("BGE "); break;
-		case JMP  : printf("JMP "); break;
-		case PUSH : printf("PUSH "); break;
-		case POP  : printf("POP "); break;
-		case CALL : printf("CALL "); break;
-		case RET  : printf("RET "); break;
-		case MOV  : printf("MOV "); break;
-		case CMP  : printf("CMP "); break;
-		case AND  : printf("AND "); break;
-		case OR   : printf("OR "); break;
-		case XOR  : printf("XOR "); break;
-		case NOT  : printf("NOT "); break;
-		case SHL  : printf("SHL "); break;
-		case SHR  : printf("SHR "); break;
-		case EXTCALL: printf("EXTERNAL CALL: "); break;
-		case HLT  : printf("HLT "); break;
-		default   : printf("UNKNOWN "); break;
+		case ADD  : l += printf("ADD "); break;
+		case SUB  : l += printf("SUB "); break;
+		case MUL  : l += printf("MUL "); break;
+		case DIV  : l += printf("DIV "); break;
+		case MOD  : l += printf("MOD "); break;
+		case BEQ  : l += printf("BEQ "); break;
+		case BNE  : l += printf("BNE "); break;
+		case BLT  : l += printf("BLT "); break;
+		case BLE  : l += printf("BLE "); break;
+		case BGT  : l += printf("BGT "); break;
+		case BGE  : l += printf("BGE "); break;
+		case JMP  : l += printf("JMP "); break;
+		case PUSH : l += printf("PUSH "); break;
+		case POP  : l += printf("POP "); break;
+		case CALL : l += printf("CALL "); break;
+		case RET  : l += printf("RET "); break;
+		case MOV  : l += printf("MOV "); break;
+		case CMP  : l += printf("CMP "); break;
+		case AND  : l += printf("AND "); break;
+		case OR   : l += printf("OR "); break;
+		case XOR  : l += printf("XOR "); break;
+		case NOT  : l += printf("NOT "); break;
+		case SHL  : l += printf("SHL "); break;
+		case SHR  : l += printf("SHR "); break;
+		case EXTCALL: l += printf("EXTERNAL CALL: "); break;
+		case HLT  : l += printf("HLT "); break;
+		default   : l += printf("UNKNOWN "); break;
 	}
 
 	switch (inst.addressing) {
-	case REG_TO_REG	    : printf("R_%d, R_%d", inst.left_reg, inst.right_reg); break;
-	case MEM_TO_REG     : printf("R_%d, 0x%llx", inst.left_reg, next_qword); break;
-	case SINGLE_REG		: printf("R_%d", inst.left_reg); break;
-	case SINGLE_MEM		: printf("%llx", next_qword); break;
+	case REG_TO_REG	    : l += printf("%s, %s", reg_name(inst.left_reg), reg_name(inst.right_reg)); break;
+	case MEM_TO_REG     : l += printf("%s, 0x%llx", reg_name(inst.left_reg), next_qword); break;
+	case SINGLE_REG		: l += printf("%s", reg_name(inst.left_reg)); break;
+	case SINGLE_MEM		: l += printf("0x%llx", next_qword); break;
 
 	case SINGLE_MEM_PTR: {
 		if (inst.flags & IMMEDIATE_OFFSET) {
 			if (inst.flags & IMMEDIATE_VALUE)
-				printf("[0x%x + 0x%llx]", next_qword, inst.immediate_offset);
+				l += printf("[0x%x + 0x%llx]", next_qword, inst.immediate_offset);
 			else
-				printf("[0x%llx]", inst.immediate_offset);
+				l += printf("[0x%llx]", inst.immediate_offset);
 		} else if(inst.flags & REGISTER_OFFSET) {
-			printf("[0x%llx + R_%d]", next_qword, inst.offset_reg);
+			l += printf("[0x%llx + %s]", next_qword, reg_name(inst.offset_reg));
 		} else {
-			printf("[0x%llx]", next_qword);
+			l += printf("[0x%llx]", next_qword);
 		}
 	}break;
 	case SINGLE_REG_PTR: {
 		if (inst.flags & IMMEDIATE_OFFSET) {
 			if (inst.flags & IMMEDIATE_VALUE)
-				printf("[R_%d + 0x%llx]", inst.left_reg, next_qword);
+				l += printf("[%s + 0x%llx]", reg_name(inst.left_reg), next_qword);
 			else
-				printf("[R_%d]", inst.left_reg);
+				l += printf("[%s]", reg_name(inst.left_reg));
 		} else if (inst.flags & REGISTER_OFFSET) {
-			printf("[R_%d + R_%d]", inst.left_reg, inst.offset_reg);
+			l += printf("[%s + %s]", reg_name(inst.left_reg), reg_name(inst.offset_reg));
 		} else {
-			printf("[R_%d]", inst.left_reg);
+			l += printf("[%s]", reg_name(inst.left_reg));
 		}
 	}break;
 	case REG_TO_REG_PTR: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			printf("[R_%d + 0x%llx], R_%d", inst.left_reg, inst.immediate_offset, inst.right_reg);
+			l += printf("[%s + 0x%llx], %s", reg_name(inst.left_reg), inst.immediate_offset, reg_name(inst.right_reg));
 		else if(inst.flags & REGISTER_OFFSET)
-			printf("[R_%d + R_%d], R_%d", inst.left_reg, inst.offset_reg, inst.right_reg);
+			l += printf("[%s + %s], %s", reg_name(inst.left_reg), reg_name(inst.offset_reg), reg_name(inst.right_reg));
 		else
-			printf("[R_%d], R_%d", inst.left_reg, inst.right_reg);
+			l += printf("[%s], %s", reg_name(inst.left_reg), reg_name(inst.right_reg));
 	}break;
 	case REG_PTR_TO_REG: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			printf("R_%d, [R_%d + 0x%llx]", inst.left_reg, inst.right_reg, inst.immediate_offset);
+			l += printf("%s, [%s + 0x%llx]", reg_name(inst.left_reg), reg_name(inst.right_reg), inst.immediate_offset);
 		else if(inst.flags & REGISTER_OFFSET)
-			printf("R_%d, [R_%d + R_%d]", inst.left_reg, inst.right_reg, inst.offset_reg);
+			l += printf("%s, [%s + %s]", reg_name(inst.left_reg), reg_name(inst.right_reg), reg_name(inst.offset_reg));
 		else
-			printf("R_%d, [R_%d]", inst.left_reg, inst.right_reg);
+			l += printf("%s, [%s]", reg_name(inst.left_reg), reg_name(inst.right_reg));
 	}break;
 	case MEM_PTR_TO_REG: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			printf("R_%d, [0x%llx + 0x%llx]", inst.left_reg, next_qword, inst.immediate_offset);
+			l += printf("%s, [0x%llx + 0x%llx]", reg_name(inst.left_reg), next_qword, inst.immediate_offset);
 		else if(inst.flags & REGISTER_OFFSET)
-			printf("R_%d, [0x%llx + R_%d]", inst.left_reg, next_qword, inst.offset_reg);
+			l += printf("%s, [0x%llx + %s]", reg_name(inst.left_reg), next_qword, reg_name(inst.offset_reg));
 		else
-			printf("R_%d, [0x%llx]", inst.left_reg, next_qword);
+			l += printf("%s, [0x%llx]", reg_name(inst.left_reg), next_qword);
 	}break;
 	case REG_TO_MEM_PTR: {
 		if (inst.flags & IMMEDIATE_OFFSET)
-			printf("[%llx + 0x%llx], R_%d", next_qword, inst.immediate_offset, inst.right_reg);
+			l += printf("[%llx + 0x%llx], %s", next_qword, inst.immediate_offset, reg_name(inst.right_reg));
 		else if(inst.flags & REGISTER_OFFSET)
-			printf("[%llx + R_%d], R_%d", next_qword, inst.offset_reg, inst.right_reg);
+			l += printf("[%llx + %s], %s", next_qword, reg_name(inst.offset_reg), reg_name(inst.right_reg));
 		else
-			printf("[0x%llx], R_%d", next_qword, inst.right_reg);
+			l += printf("[0x%llx], %s", next_qword, reg_name(inst.right_reg));
 	}break;
 	case NO_ADDRESSING: {
 		if (inst.flags & IMMEDIATE_OFFSET) {
-			printf("0x%llx", inst.immediate_offset);
+			l += printf("0x%llx", inst.immediate_offset);
 		}
 	}break;
+	}
+
+	while (l < 35) {
+		++l;
+		printf(" ");
 	}
 
 	if (inst.flags & INSTR_BYTE) {

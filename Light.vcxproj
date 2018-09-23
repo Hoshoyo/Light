@@ -135,11 +135,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\ast.cpp" />
+    <ClCompile Include="src\bytecode_gen.cpp" />
     <ClCompile Include="src\c_backend.cpp" />
     <ClCompile Include="src\decl_check.cpp" />
     <ClCompile Include="src\error.cpp" />
     <ClCompile Include="src\file_table.cpp" />
     <ClCompile Include="src\hash_table.cpp" />
+    <ClCompile Include="src\interpreter.cpp" />
     <ClCompile Include="src\lexer.cpp" />
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\parser.cpp" />
@@ -152,11 +154,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\ast.h" />
+    <ClInclude Include="src\bytecode_gen.h" />
     <ClInclude Include="src\c_backend.h" />
     <ClInclude Include="src\decl_check.h" />
     <ClInclude Include="src\error.h" />
     <ClInclude Include="src\file_table.h" />
     <ClInclude Include="src\hash_table.h" />
+    <ClInclude Include="src\interpreter.h" />
     <ClInclude Include="src\lexer.h" />
     <ClInclude Include="src\parser.h" />
     <ClInclude Include="src\symbol_table.h" />
@@ -165,6 +169,9 @@
     <ClInclude Include="src\type_infer.h" />
     <ClInclude Include="src\type_table.h" />
     <ClInclude Include="src\util.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="src\external_caller.asm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

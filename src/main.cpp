@@ -11,6 +11,8 @@
 #include "llvm_backend.h"
 #include "c_backend.h"
 #include "file_table.h"
+#include "interpreter.h"
+#include "bytecode_gen.h"
 
 void initialize() {
 	type_table_init();
@@ -25,7 +27,6 @@ char* definitions_source_path(char* binary_path) {
 	
 	string compiler_fullpath_string = string_new(compiler_fullpath, compiler_fullpath_length);
 	string compiler_path = path_from_fullpath(compiler_fullpath_string);
-	//compiler_path.data[compiler_path.length] = 'f';
 	string definitions_path = string_new_append(&compiler_path, "../../internal/definitions.li", sizeof("../../internal/definitions.li"));
 	definitions_path.data[definitions_path.length - 1] = 0;
 
@@ -87,11 +88,21 @@ int main(int argc, char** argv) {
 		DEBUG_print_type_table_structs();
 	}
 	
+#if 0
 	double bend_start = timer.GetTime();
 	c_generate(ast_top_level, g_type_table, argv[1], argv[0], g_lib_table);
 	double bend_end = timer.GetTime();
 	
 	printf("Backend      elapsed: %fms\n", (bend_end - bend_start));
 	printf("Total        elapsed: %fms\n", ((end - start) + (bend_end - bend_start)));
+
+#else
+	{
+		init_interpreter();
+		bytecode_generate(ast_top_level);
+		run_interpreter();
+		return 0;
+	}
+#endif
 	return 0;
 }
