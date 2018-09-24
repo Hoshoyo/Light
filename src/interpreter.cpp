@@ -74,6 +74,11 @@ void init_interpreter(s64 stack_size, s64 heap_size)
 	code  = (u8*)ho_bigalloc_rw(1024 * 1024);
 	datas = (u8*)ho_bigalloc_rw(1024 * 1024);
 
+	printf("stack: %p\n", stack);
+	printf("heap : %p\n", heap);
+	printf("code : %p\n", code);
+	printf("datas: %p\n", datas);
+
 	stack = stack + 4 * sizeof(u64);	// this is necessary for external call, in order to not access an address below the stack address
 
 	stack_ptr = stack;
@@ -575,33 +580,39 @@ int execute(Instruction inst, u64 next_word)
 	return status;
 }
 
-static char* reg_name(u8 r) {
-	static char n[64] = { 0 };
+#include <light_arena.h>
+static char* reg_name(Light_Arena* arena, u8 r) {
+	char n[64] = { 0 };
 	int l = 0;
+
 	switch (r) {
-	case R_0:		l = sprintf(n, "R_0[0x%llx]", reg[R_0]);			break;
-	case R_1:		l = sprintf(n, "R_1[0x%llx]", reg[R_1]);			break;
-	case R_2:		l = sprintf(n, "R_2[0x%llx]", reg[R_2]);			break;
-	case R_3:		l = sprintf(n, "R_3[0x%llx]", reg[R_3]);			break;
-	case R_4:		l = sprintf(n, "R_4[0x%llx]", reg[R_4]);			break;
-	case R_5:		l = sprintf(n, "R_5[0x%llx]", reg[R_5]);			break;
-	case R_6:		l = sprintf(n, "R_6[0x%llx]", reg[R_6]);			break;
-	case R_7:		l = sprintf(n, "R_7[0x%llx]", reg[R_7]);			break;
-	case R_8:		l = sprintf(n, "R_8[0x%llx]", reg[R_8]);			break;
-	case R_IP:		l = sprintf(n, "R_IP[0x%llx]", reg[R_IP]);			break;
-	case R_SP:		l = sprintf(n, "R_SP[0x%llx]", reg[R_SP]);			break;
-	case R_SB:		l = sprintf(n, "R_SB[0x%llx]", reg[R_SB]);			break;
-	case R_SS:		l = sprintf(n, "R_SS[0x%llx]", reg[R_SS]);			break;
-	case R_FLAGS:	l = sprintf(n, "R_FLAGS[0x%llx]", reg[R_FLAGS]);	break;
-	case NO_REG:	l = sprintf(n, "NO_REG");						break;
-	default:        l = sprintf(n, "R_UNK");						break;
+		case R_0:		l = sprintf(n, "R_0[0x%llx]", reg[R_0]);			break;
+		case R_1:		l = sprintf(n, "R_1[0x%llx]", reg[R_1]);			break;
+		case R_2:		l = sprintf(n, "R_2[0x%llx]", reg[R_2]);			break;
+		case R_3:		l = sprintf(n, "R_3[0x%llx]", reg[R_3]);			break;
+		case R_4:		l = sprintf(n, "R_4[0x%llx]", reg[R_4]);			break;
+		case R_5:		l = sprintf(n, "R_5[0x%llx]", reg[R_5]);			break;
+		case R_6:		l = sprintf(n, "R_6[0x%llx]", reg[R_6]);			break;
+		case R_7:		l = sprintf(n, "R_7[0x%llx]", reg[R_7]);			break;
+		case R_8:		l = sprintf(n, "R_8[0x%llx]", reg[R_8]);			break;
+		case R_IP:		l = sprintf(n, "R_IP[0x%llx]", reg[R_IP]);			break;
+		case R_SP:		l = sprintf(n, "R_SP[0x%llx]", reg[R_SP]);			break;
+		case R_SB:		l = sprintf(n, "R_SB[0x%llx]", reg[R_SB]);			break;
+		case R_SS:		l = sprintf(n, "R_SS[0x%llx]", reg[R_SS]);			break;
+		case R_FLAGS:	l = sprintf(n, "R_FLAGS[0x%llx]", reg[R_FLAGS]);	break;
+		case NO_REG:	l = sprintf(n, "NO_REG");						break;
+		default:        l = sprintf(n, "R_UNK");						break;
 	}
 	n[l] = 0;
-	return n;
+
+	void* result = arena_alloc(arena, l + 1);
+	memcpy(result, n, l + 1);
+	return (char*)result;
 }
 
 void print_instruction(Instruction inst, u64 next_qword)
 {
+	Light_Arena* sar = arena_create(2048);
 	int l = 0;
 	printf("0x%llx: ", reg[R_IP]);
 	switch (inst.type) {
@@ -635,9 +646,9 @@ void print_instruction(Instruction inst, u64 next_qword)
 	}
 
 	switch (inst.addressing) {
-	case REG_TO_REG	    : l += printf("%s, %s", reg_name(inst.left_reg), reg_name(inst.right_reg)); break;
-	case MEM_TO_REG     : l += printf("%s, 0x%llx", reg_name(inst.left_reg), next_qword); break;
-	case SINGLE_REG		: l += printf("%s", reg_name(inst.left_reg)); break;
+	case REG_TO_REG	    : l += printf("%s, %s", reg_name(sar, inst.left_reg), reg_name(sar, inst.right_reg)); break;
+	case MEM_TO_REG     : l += printf("%s, 0x%llx", reg_name(sar, inst.left_reg), next_qword); break;
+	case SINGLE_REG		: l += printf("%s", reg_name(sar, inst.left_reg)); break;
 	case SINGLE_MEM		: l += printf("0x%llx", next_qword); break;
 
 	case SINGLE_MEM_PTR: {
@@ -647,7 +658,7 @@ void print_instruction(Instruction inst, u64 next_qword)
 			else
 				l += printf("[0x%llx]", inst.immediate_offset);
 		} else if(inst.flags & REGISTER_OFFSET) {
-			l += printf("[0x%llx + %s]", next_qword, reg_name(inst.offset_reg));
+			l += printf("[0x%llx + %s]", next_qword, reg_name(sar, inst.offset_reg));
 		} else {
 			l += printf("[0x%llx]", next_qword);
 		}
@@ -655,46 +666,46 @@ void print_instruction(Instruction inst, u64 next_qword)
 	case SINGLE_REG_PTR: {
 		if (inst.flags & IMMEDIATE_OFFSET) {
 			if (inst.flags & IMMEDIATE_VALUE)
-				l += printf("[%s + 0x%llx]", reg_name(inst.left_reg), next_qword);
+				l += printf("[%s + 0x%llx]", reg_name(sar, inst.left_reg), next_qword);
 			else
-				l += printf("[%s]", reg_name(inst.left_reg));
+				l += printf("[%s]", reg_name(sar, inst.left_reg));
 		} else if (inst.flags & REGISTER_OFFSET) {
-			l += printf("[%s + %s]", reg_name(inst.left_reg), reg_name(inst.offset_reg));
+			l += printf("[%s + %s]", reg_name(sar, inst.left_reg), reg_name(sar, inst.offset_reg));
 		} else {
-			l += printf("[%s]", reg_name(inst.left_reg));
+			l += printf("[%s]", reg_name(sar, inst.left_reg));
 		}
 	}break;
 	case REG_TO_REG_PTR: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			l += printf("[%s + 0x%llx], %s", reg_name(inst.left_reg), inst.immediate_offset, reg_name(inst.right_reg));
+			l += printf("[%s + 0x%llx], %s", reg_name(sar, inst.left_reg), inst.immediate_offset, reg_name(sar, inst.right_reg));
 		else if(inst.flags & REGISTER_OFFSET)
-			l += printf("[%s + %s], %s", reg_name(inst.left_reg), reg_name(inst.offset_reg), reg_name(inst.right_reg));
+			l += printf("[%s + %s], %s", reg_name(sar, inst.left_reg), reg_name(sar, inst.offset_reg), reg_name(sar, inst.right_reg));
 		else
-			l += printf("[%s], %s", reg_name(inst.left_reg), reg_name(inst.right_reg));
+			l += printf("[%s], %s", reg_name(sar, inst.left_reg), reg_name(sar, inst.right_reg));
 	}break;
 	case REG_PTR_TO_REG: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			l += printf("%s, [%s + 0x%llx]", reg_name(inst.left_reg), reg_name(inst.right_reg), inst.immediate_offset);
+			l += printf("%s, [%s + 0x%llx]", reg_name(sar, inst.left_reg), reg_name(sar, inst.right_reg), inst.immediate_offset);
 		else if(inst.flags & REGISTER_OFFSET)
-			l += printf("%s, [%s + %s]", reg_name(inst.left_reg), reg_name(inst.right_reg), reg_name(inst.offset_reg));
+			l += printf("%s, [%s + %s]", reg_name(sar, inst.left_reg), reg_name(sar, inst.right_reg), reg_name(sar, inst.offset_reg));
 		else
-			l += printf("%s, [%s]", reg_name(inst.left_reg), reg_name(inst.right_reg));
+			l += printf("%s, [%s]", reg_name(sar, inst.left_reg), reg_name(sar, inst.right_reg));
 	}break;
 	case MEM_PTR_TO_REG: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			l += printf("%s, [0x%llx + 0x%llx]", reg_name(inst.left_reg), next_qword, inst.immediate_offset);
+			l += printf("%s, [0x%llx + 0x%llx]", reg_name(sar, inst.left_reg), next_qword, inst.immediate_offset);
 		else if(inst.flags & REGISTER_OFFSET)
-			l += printf("%s, [0x%llx + %s]", reg_name(inst.left_reg), next_qword, reg_name(inst.offset_reg));
+			l += printf("%s, [0x%llx + %s]", reg_name(sar, inst.left_reg), next_qword, reg_name(sar, inst.offset_reg));
 		else
-			l += printf("%s, [0x%llx]", reg_name(inst.left_reg), next_qword);
+			l += printf("%s, [0x%llx]", reg_name(sar, inst.left_reg), next_qword);
 	}break;
 	case REG_TO_MEM_PTR: {
 		if (inst.flags & IMMEDIATE_OFFSET)
-			l += printf("[%llx + 0x%llx], %s", next_qword, inst.immediate_offset, reg_name(inst.right_reg));
+			l += printf("[%llx + 0x%llx], %s", next_qword, inst.immediate_offset, reg_name(sar, inst.right_reg));
 		else if(inst.flags & REGISTER_OFFSET)
-			l += printf("[%llx + %s], %s", next_qword, reg_name(inst.offset_reg), reg_name(inst.right_reg));
+			l += printf("[%llx + %s], %s", next_qword, reg_name(sar, inst.offset_reg), reg_name(sar, inst.right_reg));
 		else
-			l += printf("[0x%llx], %s", next_qword, reg_name(inst.right_reg));
+			l += printf("[0x%llx], %s", next_qword, reg_name(sar, inst.right_reg));
 	}break;
 	case NO_ADDRESSING: {
 		if (inst.flags & IMMEDIATE_OFFSET) {
@@ -725,4 +736,6 @@ void print_instruction(Instruction inst, u64 next_qword)
 	}
 
 	printf("\n");
+
+	arena_free(sar);
 }
