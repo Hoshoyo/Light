@@ -2,9 +2,15 @@
 #include <ho_system.h>
 #include "interpreter.h"
 #include "type.h"
+#include <dlfcn.h>
 
+#if defined(_WIN64)
 void* load_address_of_external_function(string* name, HMODULE library);
 HMODULE load_library_dynamic(string* library);
+#elif defined(__linux__)
+void* load_address_of_external_function(string* name, void* library);
+void* load_library_dynamic(string* library);
+#endif
 
 struct Register_Allocation{
 	bool allocated;
@@ -369,5 +375,19 @@ void* load_address_of_external_function(string* name, HMODULE library) {
 	return mem;
 }
 #else
-#error "os not supported"
+void* load_library_dynamic(string* library) {
+	// "/lib/x86_64-linux-gnu/libc.so.6"
+	void* lib = dlopen((const char*)library->data, RTLD_LAZY);
+	printf("loaded library %s at %p\n", library->data, lib);
+	return lib;
+}
+void* load_address_of_external_function(string* name, void* library) {
+	void* proc = dlsym(library, (const char*)name->data);
+	printf("loaded procedure %s at %p\n", name->data, proc);
+	return proc;
+}
+
+void free_library(void* library) {
+	dlclose(library);
+}
 #endif

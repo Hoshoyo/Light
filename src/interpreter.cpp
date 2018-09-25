@@ -143,7 +143,7 @@ void init_interpreter(s64 stack_size, s64 heap_size)
 
 		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG, R_3, R_SP, 0, 0));
 
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 0);
+		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), (u64)0);
 		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_2, 0, 0));
 		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
 
