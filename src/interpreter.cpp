@@ -443,6 +443,9 @@ int execute_instruction(Instruction inst, u64 next_word)
 	case MOD:	ui_left = ui_left % ui_right; break;
 	case SHL:   ui_left = ui_left << ui_right; break;
 	case SHR:   ui_left = ui_left >> ui_right; break;
+	case OR:    ui_left = ui_left | ui_right; break;
+	case AND:   ui_left = ui_left & ui_right; break;
+	case XOR:   ui_left = ui_left ^ ui_right; break;
 
 	case CMP: {
 		if (ui_left < ui_right)

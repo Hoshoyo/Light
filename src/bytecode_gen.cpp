@@ -2,12 +2,12 @@
 #include <ho_system.h>
 #include "interpreter.h"
 #include "type.h"
-#include <dlfcn.h>
 
 #if defined(_WIN64)
 void* load_address_of_external_function(string* name, HMODULE library);
 HMODULE load_library_dynamic(string* library);
 #elif defined(__linux__)
+#include <dlfcn.h>
 void* load_address_of_external_function(string* name, void* library);
 void* load_library_dynamic(string* library);
 #endif
@@ -111,7 +111,7 @@ s64 gen_proc_prologue(Ast* proc_body, s64 offset)
 	// @TODO OPTIMIZE THIS!!!!!
 	// make a data struct on the scope to store all the declarations and its respective offsets within the stack
 	if (num_decls > 0) {
-		for (int i = 0; i < scope->symb_table.entries_count; ++i) {
+		for (int i = 0; i < scope->symb_table.entries_capacity; ++i) {
 			if (scope->symb_table.entries[i].occupied) {
 				Ast* decl_node = scope->symb_table.entries[i].decl_node;
 				if (decl_node->node_type == AST_DECL_VARIABLE) {
@@ -121,6 +121,7 @@ s64 gen_proc_prologue(Ast* proc_body, s64 offset)
 			}
 		}
 	}
+	printf("stack_size: %d\n", stack_size);
 
 	push_instruction(make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, R_SB, NO_REG, 0, 0));
 	push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG, R_SB, R_SP, 0, 0));
@@ -297,17 +298,20 @@ s64 gen_code_node(Ast* node, s64 offset) {
 	s64 start_offset = offset;
 
 	switch (node->node_type) {
+
 		case AST_DECL_PROCEDURE: {
 			offset += gen_proc_prologue(node, offset);
 			offset += gen_code_node(node->decl_procedure.body, offset);
 			offset += gen_proc_epilogue(offset);
 		}break;
+
 		case AST_COMMAND_BLOCK: {
 			for (size_t i = 0; i < array_get_length(node->comm_block.commands); ++i) {
 				Ast* comm = node->comm_block.commands[i];
 				offset += gen_code_node(comm, offset);
 			}
 		}break;
+
 		case AST_COMMAND_RETURN: {
 			
 			if (node->comm_return.expression) {
@@ -330,6 +334,11 @@ s64 gen_code_node(Ast* node, s64 offset) {
 			if(end_address != start_address)
 				offset = end_address - start_address;
 		}break;
+
+		case AST_DECL_VARIABLE: {
+
+		}break;
+
 		default: break;
 	}
 

@@ -151,6 +151,7 @@ void type_table_init() {
 	g_type_table = array_create(Type_Instance*, 1024);
 	type_internalize_queue = array_create(Internalize_Queue, 1024);
 
+	// TODO(psv): why does this take 40 something ms?
 	type_s64 = type_setup_primitive(TYPE_PRIMITIVE_S64);
 	type_s32 = type_setup_primitive(TYPE_PRIMITIVE_S32);
 	type_s16 = type_setup_primitive(TYPE_PRIMITIVE_S16);
@@ -163,6 +164,7 @@ void type_table_init() {
 	type_r64 = type_setup_primitive(TYPE_PRIMITIVE_R64);
 	type_bool = type_setup_primitive(TYPE_PRIMITIVE_BOOL);
 	type_void = type_setup_primitive(TYPE_PRIMITIVE_VOID);
+	//
 
 	type_ptr_s64 = type_setup_ptr(type_s64);
 	type_ptr_s32 = type_setup_ptr(type_s32);
@@ -176,6 +178,7 @@ void type_table_init() {
 	type_ptr_r64 = type_setup_ptr(type_r64);
 	type_ptr_bool = type_setup_ptr(type_bool);
 	type_ptr_void = type_setup_ptr(type_void);
+	
 }
 
 // Deep copy of types, this function follow the pointers of all Type_Instance* in the type description

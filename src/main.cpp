@@ -33,6 +33,8 @@ char* definitions_source_path(char* binary_path) {
 	return (char*)definitions_path.data;
 }
 
+extern double total_file_load_time;
+
 int main(int argc, char** argv) {
 	bool verbose = false;
 
@@ -78,6 +80,7 @@ int main(int argc, char** argv) {
 	}
 
 	double end = timer.GetTime();
+	printf("File load time      : %fms\n", total_file_load_time);
 	printf("Compiler     elapsed: %fms\n", (end - start));
 
 	if(verbose){

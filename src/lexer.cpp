@@ -106,6 +106,8 @@ void Lexer::init() {
 	}
 }
 
+extern double total_file_load_time = 0;
+
 Lexer_Error Lexer::start(const char* filename, Token* location)
 {
 	this->filename = string_make(filename);
@@ -113,6 +115,10 @@ Lexer_Error Lexer::start(const char* filename, Token* location)
 	size_t filepath_length = 0;
 	char* fullpath = ho_realpath(filename, &filepath_length);
 	this->filepath = string_make(fullpath, filepath_length);
+
+	Timer timer;
+
+	double bend_start = timer.GetTime();
 
 	file_size = ho_getfilesize(filename);
 	HANDLE filehandle = ho_openfile(filename, OPEN_EXISTING);
@@ -124,6 +130,9 @@ Lexer_Error Lexer::start(const char* filename, Token* location)
 	*((char*)file_memory + file_size) = 0;
 	filedata = (char*)ho_readentirefile(filehandle, file_size, file_memory);
 	ho_closefile(filehandle);
+
+	double bend_end = timer.GetTime();
+	total_file_load_time += bend_end - bend_start;
 
 	this->path = path_from_fullpath(this->filepath);
 
