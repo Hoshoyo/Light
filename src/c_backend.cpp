@@ -1071,12 +1071,12 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 	// Execute commands to compile .c
 	char cmdbuffer[1024];
 #if defined(_WIN32) || defined(_WIN64)
-	sprintf(cmdbuffer, "gcc -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
+	sprintf(cmdbuffer, "gcc -w -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 	int len = sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe -L%.*s..\\..\\lib -lKernel32",
 		fname_len, out_obj.data, fname_len, out_obj.data, comp_path.length, comp_path.data);
 #elif defined(__linux__)
-    sprintf(cmdbuffer, "gcc -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
+    sprintf(cmdbuffer, "gcc -w -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
 		fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
