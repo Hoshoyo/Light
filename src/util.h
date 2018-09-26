@@ -75,4 +75,8 @@ struct TimeFunc {
 	~TimeFunc();
 };
 
+#if defined(_WIN64) || defined(_WIN32)
 #define TIME_FUNC() TimeFunc time_##__FUNCTION__##(__FUNCTION__)
+#elif defined(__linux__)
+#define TIME_FUNC()
+#endif

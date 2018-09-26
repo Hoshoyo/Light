@@ -63,7 +63,7 @@ void print_profile() {
 }
 
 TimeFunc::TimeFunc(const char* func_name) {
-	u32 index = (u32)func_name % 2048;
+	u32 index = (u32)*(u32*)func_name % 2048;
 	while (profile[index % 2048].function_name != func_name) {
 		if (!profile[index % 2048].function_name) {
 			profile[index % 2048].function_name = func_name;

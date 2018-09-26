@@ -12,6 +12,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -81,16 +82,16 @@ double Timer::GetTime()
 /* Allocations */
 void* HO_API ho_bigalloc_rw(size_t size)
 {
-	return malloc(size);
+	return mmap(0, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 }
 void* HO_API ho_bigalloc_r(size_t size)
 {
-	return malloc(size);
+	return mmap(0, size, PROT_READ, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
 }
 
 void HO_API ho_bigfree(void* block, size_t size)
 {
-	free(block);
+	munmap(block, size);
 }
 
 char* HO_API ho_realpath(const char* path, size_t* size)
