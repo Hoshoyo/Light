@@ -13,6 +13,7 @@
 #include "file_table.h"
 
 void initialize() {
+	TIME_FUNC();
 	type_table_init();
 	file_table_init();
 	Lexer::init();
@@ -93,5 +94,6 @@ int main(int argc, char** argv) {
 	
 	printf("Backend      elapsed: %fms\n", (bend_end - bend_start));
 	printf("Total        elapsed: %fms\n", ((end - start) + (bend_end - bend_start)));
+	print_profile();
 	return 0;
 }

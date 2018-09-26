@@ -64,3 +64,15 @@ u64 fnv_1_hash_from_start(u64 hash, const u8* s, u64 length);
 s32 system_exit(s32 ret);
 
 void report_internal_compiler_error(char* filename, int line, char* msg, ...);
+
+void print_profile();
+
+struct TimeFunc {
+	int index;
+	double start_time;
+
+	TimeFunc(const char* func_name);
+	~TimeFunc();
+};
+
+#define TIME_FUNC() TimeFunc time_##__FUNCTION__##(__FUNCTION__)

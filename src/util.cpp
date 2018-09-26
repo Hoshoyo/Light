@@ -3,6 +3,84 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
+struct Profile {
+	double       elapsed_total;
+	s64          call_count;
+	const char*  function_name;
+};
+
+static Profile profile[2048] = { 0 };
+static Profile profile_sorted[2048] = { 0 };
+Timer global_timer;
+
+void quicksort(Profile values[], int began, int end)
+{
+	int i, j;
+	Profile pivo, aux;
+	i = began;
+	j = end - 1;
+	pivo = values[(began + end) / 2];
+	while (i <= j)
+	{
+		while (values[i].elapsed_total > pivo.elapsed_total && i < end)
+		{
+			i++;
+		}
+		while (values[j].elapsed_total < pivo.elapsed_total && j > began)
+		{
+			j--;
+		}
+		if (i <= j)
+		{
+			aux = values[i];
+			values[i] = values[j];
+			values[j] = aux;
+			i++;
+			j--;
+		}
+	}
+	if (j > began)
+		quicksort(values, began, j + 1);
+	if (i < end)
+		quicksort(values, i, end);
+}
+
+void print_profile() {
+	int c = 0;
+	for (int i = 0; i < 2048; ++i) {
+		if (profile[i].function_name) {
+			profile_sorted[c++] = profile[i];
+		}
+	}
+	quicksort(profile_sorted, 0, c);
+	for (int i = 0; i < c; ++i) {
+		printf("%fms(total) | %fms(average) | %s[%lld]\n", 
+			profile_sorted[i].elapsed_total, 
+			profile_sorted[i].elapsed_total / (r32)profile_sorted[i].call_count, 
+			profile_sorted[i].function_name, 
+			profile_sorted[i].call_count);
+	}
+}
+
+TimeFunc::TimeFunc(const char* func_name) {
+	u32 index = (u32)func_name % 2048;
+	while (profile[index % 2048].function_name != func_name) {
+		if (!profile[index % 2048].function_name) {
+			profile[index % 2048].function_name = func_name;
+			break;
+		}
+		index++;
+	}
+	this->index = index;
+
+	start_time = global_timer.GetTime();
+}
+
+TimeFunc::~TimeFunc() {
+	profile[index].call_count++;
+	profile[index].elapsed_total += global_timer.GetTime() - start_time;
+}
+
 string string_new(const char* v, s64 length){
 	string result = {0};
 	if(length <= 0) return result;

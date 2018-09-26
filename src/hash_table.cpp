@@ -3,7 +3,7 @@
 #include "util.h"
 
 void hash_table_init(Hash_Table* table, s64 max_entries, hash_function_type* hash_function, hash_entries_equal_type* compare_entries) {
-	table->entries = (Hash_Table::Entry*)calloc(max_entries, sizeof(Hash_Table::Entry));
+	table->entries = (Hash_Table::Entry*)calloc(1, max_entries * sizeof(Hash_Table::Entry));
 	table->hash_function = hash_function;
 	table->entries_equal = compare_entries;
 	table->entries_capacity = max_entries;

@@ -135,6 +135,7 @@ Token* Parser::require_and_eat(char t) {
 }
 
 Ast** Parser::parse_top_level() {
+	TIME_FUNC();
 	// Empty file check
 	if (lexer->token_count == 1 && lexer->peek_token_type() == TOKEN_END_OF_STREAM)
 		return 0;
