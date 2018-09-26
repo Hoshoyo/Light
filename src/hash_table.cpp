@@ -3,7 +3,8 @@
 #include "util.h"
 
 void hash_table_init(Hash_Table* table, s64 max_entries, hash_function_type* hash_function, hash_entries_equal_type* compare_entries) {
-	table->entries = (Hash_Table::Entry*)calloc(1, max_entries * sizeof(Hash_Table::Entry));
+	//table->entries = (Hash_Table::Entry*)calloc(1, max_entries * sizeof(Hash_Table::Entry));
+	table->entries = (Hash_Table::Entry*)ho_bigalloc_rw(max_entries * sizeof(Hash_Table::Entry));
 	table->hash_function = hash_function;
 	table->entries_equal = compare_entries;
 	table->entries_capacity = max_entries;
@@ -97,7 +98,8 @@ void* hash_table_get_entry(Hash_Table* table, s64 index) {
 
 // String specialized hash table
 void hash_table_init(String_Hash_Table* table, s64 max_entries) {
-	table->entries = (String_Hash_Table::Entry*)calloc(max_entries, sizeof(String_Hash_Table::Entry));
+	//table->entries = (String_Hash_Table::Entry*)calloc(max_entries, sizeof(String_Hash_Table::Entry));
+	table->entries = (String_Hash_Table::Entry*)ho_bigalloc_rw(max_entries * sizeof(String_Hash_Table::Entry));
 	table->entries_capacity = max_entries;
 	table->entries_count = 0;
 	table->hash_collision_count = 0;
