@@ -1,4 +1,5 @@
 #todo
+- char causes a type error that does not stop compilation
 
 - better error when enum type mismatch happens
 - bytecode implement all language

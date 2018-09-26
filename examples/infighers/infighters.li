@@ -1,6 +1,7 @@
 #import "../x11/x11.li"
 #import "../linux/print.li"
 #import "../GL/gl.li"
+#import "../GL/ho_gl.li"
 
 Window_Info :: struct {
 	width : s32;
@@ -128,8 +129,8 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	XSetErrorHandler(ctxErrorHandler);
 
 	context_attribs := array {
-		GLX_CONTEXT_MAJOR_VERSION_ARB, 4,
-		GLX_CONTEXT_MINOR_VERSION_ARB, 5,
+		GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
+		GLX_CONTEXT_MINOR_VERSION_ARB, 3,
 		GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
 		//GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
 		0
@@ -170,6 +171,7 @@ main :: () -> s32 {
 	}
 
 	if init_opengl(&info) == -1 return -1;
+	hogl_init_extensions();
 
 	while true {
 		glClearColor(1.0, 0.0, 1.0, 1.0);

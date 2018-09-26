@@ -201,3 +201,5 @@ u64 literal_integer_to_u64(Token* t);
 r64 literal_float_to_r64(Token* t);
 bool literal_bool_to_bool(Token* t);
 u64 literal_char_to_u64(Token* t);
+
+extern s32 global_lexer_line_count;
