@@ -204,7 +204,6 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 		Type_Instance* t = type_from_alias(scope, type, rep_undeclared, error);
 		if (!t) {
 			if (rep_undeclared) {
-				*error |= report_undeclared(type->alias.name);
 				return 0;
 			}
 			return type;
