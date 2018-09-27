@@ -923,6 +923,7 @@ Type_Error type_checking_pass(Scope* scope, Ast* node) {
 }
 
 Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
+	TIME_FUNC();
 	Type_Error error_code = TYPE_OK;
 
 	// Initialize the global scope symbol table

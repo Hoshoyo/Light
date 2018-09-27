@@ -45,6 +45,7 @@ void queue_file_for_parsing(Token* token) {
 }
 
 Ast** parse_files_in_queue(Scope* global_scope) {
+	TIME_FUNC();
 	// TODO(psv): check for double include
 	// TODO(psv): include recursively
 
