@@ -1,4 +1,38 @@
+hello :: enum {
+	FOO : 1,
+	BAR : 2
+}
+#import "linux/print.li"
+
 main :: () -> s32 {
-	hello : char;
+	a := hello.FOO;
+	print_u32(a);
+	
 	return 0;
 }
+
+/*
+
+Type_Info :: struct {
+
+}
+
+any :: struct {
+	type_info : ^Type_Info;
+	data      : ^void;
+}
+
+array :: struct {
+	capacity : s64;
+	length   : s64;
+
+	value    : any;
+}
+
+//print :: (fmt : string, values : [..]Value) -> s64 {
+print :: (fmt : string, values : array) -> s64 {
+	for i := 0; i < values.size; i += 1 {
+
+	}
+}
+*/

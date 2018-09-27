@@ -1,6 +1,6 @@
 #todo
-- char causes a type error that does not stop compilation
 
+- variadic functions
 - better error when enum type mismatch happens
 - bytecode implement all language
 - gcc warning shift more than the register size holds
@@ -22,7 +22,8 @@
 - namespaces
 
 #changelog - most recent first
-
+26/09/2018
+    - char causes a type error that does not stop compilation
 25/09/2018
     - improved bytecode generation
     - implemented linux external function name solving and calling for bytecode

@@ -187,6 +187,8 @@ Type_Instance* type_from_alias(Scope* scope, Type_Instance* type, bool rep_undec
 		return resolve_type(scope, d->decl_struct.type_info, rep_undeclared, error);
 	} else if(d->node_type == AST_DECL_UNION) {
 		return resolve_type(scope, d->decl_union.type_info, rep_undeclared, error);
+	} else if(d->node_type == AST_DECL_ENUM) {
+		return resolve_type(scope, d->decl_enum.type_hint, rep_undeclared, error);
 	} else {
 		// TODO(psv): error here
 	}

@@ -13,7 +13,8 @@ void hash_table_init(Hash_Table* table, s64 max_entries, hash_function_type* has
 }
 
 void hash_table_release(Hash_Table* table) {
-	free(table->entries);
+	//free(table->entries);
+	ho_bigfree(table->entries, table->entries_capacity * sizeof(Hash_Table::Entry));
 	table->entries_count = 0;
 	table->entries_capacity = 0;
 	table->hash_collision_count = 0;
