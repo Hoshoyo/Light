@@ -1,4 +1,4 @@
 main :: () -> s32 {
 	a := 2;
-    return 3 * 5;
+    return 0;
 }

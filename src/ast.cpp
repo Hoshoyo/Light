@@ -35,6 +35,7 @@ Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {
 	scope->flags = flags;
 	scope->parent = parent;
 	scope->symb_table = { 0 };
+	scope->stack_allocation_offset = 0;
 
 	return scope;
 }
@@ -101,6 +102,7 @@ Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_I
 	dv->decl_variable.variable_type = var_type;
 	dv->decl_variable.assignment = assignment;
 	dv->decl_variable.alignment = 8;		// @TEMPORARY
+	dv->decl_variable.stack_offset = 0;	// filled in later
 
 	dv->decl_variable.site.filename = name->filename;
 	dv->decl_variable.site.line = name->line;

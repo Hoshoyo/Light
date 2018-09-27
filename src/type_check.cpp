@@ -61,6 +61,12 @@ Type_Error type_check(Ast* node) {
 		if (node->decl_variable.assignment && (node->decl_variable.variable_type != node->decl_variable.assignment->type_return)) {
 			error |= report_type_mismatch(node, node->decl_variable.variable_type, node->decl_variable.assignment->type_return);
 		}
+		// Allocate scope space for this variable within alignment
+		Type_Instance* var_type = node->decl_variable.variable_type;
+		size_t byte_size = var_type->type_size_bits / 8;
+		Scope* scope = node->scope;
+		node->decl_variable.stack_offset = scope->stack_allocation_offset;
+		scope->stack_allocation_offset += byte_size;	// TODO(psv): align before
 	}break;
 	case AST_DECL_ENUM: {
 		for (size_t i = 0; i < node->decl_enum.fields_count; ++i) {

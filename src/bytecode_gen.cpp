@@ -106,22 +106,8 @@ s64 gen_proc_prologue(Ast* proc_body, s64 offset)
 	Scope* scope = proc_body->decl_procedure.body->comm_block.block_scope;
 	int num_decls = scope->decl_count;
 
-	// @TODO OPTIMIZE THIS!!!!!
-	// @TODO OPTIMIZE THIS!!!!!
-	// @TODO OPTIMIZE THIS!!!!!
-	// make a data struct on the scope to store all the declarations and its respective offsets within the stack
-	if (num_decls > 0) {
-		for (int i = 0; i < scope->symb_table.entries_capacity; ++i) {
-			if (scope->symb_table.entries[i].occupied) {
-				Ast* decl_node = scope->symb_table.entries[i].decl_node;
-				if (decl_node->node_type == AST_DECL_VARIABLE) {
-					assert(decl_node->decl_variable.variable_type->type_size_bits != 0);
-					stack_size += decl_node->decl_variable.variable_type->type_size_bits / 8;
-				}
-			}
-		}
-	}
-	printf("stack_size: %d\n", stack_size);
+	printf("stack offset: %d\n", scope->stack_allocation_offset);
+	stack_size = scope->stack_allocation_offset;
 
 	push_instruction(make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, R_SB, NO_REG, 0, 0));
 	push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG, R_SB, R_SP, 0, 0));

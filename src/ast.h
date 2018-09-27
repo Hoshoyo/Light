@@ -129,6 +129,7 @@ struct Scope {
 	s32           level;
 	s32           decl_count;
 	u32           flags;
+	s32           stack_allocation_offset;
 	Symbol_Table  symb_table;
 	Scope*        parent;
 	union {
@@ -176,6 +177,7 @@ struct Ast_Decl_Variable {
 	s32 size_bytes;
 	s32 alignment;
 	u32 temporary_register;
+	s32 stack_offset;
 };
 
 const u32 STRUCT_FLAG_PACKED = FLAG(1);
