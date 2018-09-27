@@ -149,7 +149,7 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 
 		// @INFER CAST
 		case OP_UNARY_CAST: {
-			Type_Instance* cast_to = resolve_type(expr->scope, expr->expr_unary.type_to_cast, true);
+			Type_Instance* cast_to = resolve_type(expr->scope, expr->expr_unary.type_to_cast, true, error);
 			expr->expr_unary.type_to_cast = cast_to;
 			if(!cast_to) {
 				*error |= TYPE_ERROR_FATAL;
@@ -474,13 +474,13 @@ Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 						type_propagate(0, expr->expr_literal.array_exprs[i]);
 					}
 					expr->type_return->array_desc.array_of = expr->expr_literal.array_exprs[0]->type_return;
-					expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+					expr->type_return = resolve_type(expr->scope, expr->type_return, false, &error_code);
 				} else if(expr->expr_literal.type == LITERAL_STRUCT) {
 					size_t nexpr = 0;
 					if(expr->expr_literal.struct_exprs) {
 						nexpr = array_get_length(expr->expr_literal.struct_exprs);
 					}
-					strong = expr->type_return = resolve_type(expr->scope, expr->type_return, true);
+					strong = expr->type_return = resolve_type(expr->scope, expr->type_return, true, &error_code);
 					if(!strong) {
 						return error_code;
 					}
@@ -494,7 +494,7 @@ Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 						expr->type_return->struct_desc.fields_types[i] = expr->expr_literal.struct_exprs[i]->type_return;
 					}
 				}else {
-					expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+					expr->type_return = resolve_type(expr->scope, expr->type_return, false, &error_code);
 					expr->type_return = internalize_type(&expr->type_return, expr->scope, true);
 				}
 			}
@@ -545,7 +545,7 @@ Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 						// type is an array literal
 						assert(expr->expr_binary.left->node_type == AST_EXPRESSION_LITERAL && expr->expr_binary.left->expr_literal.type == LITERAL_ARRAY);
 						type_propagate(strong, expr->expr_binary.left);
-						expr->type_return = resolve_type(expr->scope, expr->type_return, true);
+						expr->type_return = resolve_type(expr->scope, expr->type_return, true, &error_code);
 					}
 
 					// index should be strong aswell as indexed
@@ -631,7 +631,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					} else if (type_strong(lt) && type_weak(rt)) {
 						// pointer arithmetic ^T(strong) + INT(weak) |-> ^T(strong) , propagate(INT(weak))
 						if (lt->kind == KIND_POINTER && type_primitive_int(rt)) {
-							rt = resolve_type(expr->scope, rt, false);
+							rt = resolve_type(expr->scope, rt, false, error);
 							assert(rt->flags & TYPE_FLAG_INTERNALIZED);
 							type_propagate(rt, expr->expr_binary.right);
 							if(lt == type_pointer_get(TYPE_PRIMITIVE_VOID)){
@@ -708,7 +708,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					} else if (type_strong(lt) && type_weak(rt)) {
 						// pointer arithmetic ^T(strong) - INT(weak) |-> ^T(strong) , propagate(INT(weak))
 						if (lt->kind == KIND_POINTER && type_primitive_int(rt)) {
-							rt = resolve_type(expr->scope, rt, false);
+							rt = resolve_type(expr->scope, rt, false, error);
 							assert(rt->flags & TYPE_FLAG_INTERNALIZED);
 							type_propagate(rt, expr->expr_binary.right);
 							return defer_check_against(expr, check_against, lt, error);;
@@ -1166,7 +1166,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 						}
 					}
 				}
-				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+				expr->type_return = resolve_type(expr->scope, expr->type_return, false, error);
 			} else if(expr->expr_literal.type == LITERAL_STRUCT && check_against->kind == KIND_STRUCT) {
 				// @TODO set check_against here to 0
 				// @BUG

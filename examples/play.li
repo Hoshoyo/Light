@@ -1,4 +1,4 @@
 main :: () -> s32 {
-	a := "Hello".data;
-	return [s32]a;
+	hello : char;
+	return 0;
 }
