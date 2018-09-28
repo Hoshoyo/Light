@@ -1,5 +1,7 @@
 #todo
 
+- implement sizeof
+- make ^T cast to ^void implicitly
 - variadic functions
 - better error when enum type mismatch happens
 - bytecode implement all language
@@ -7,6 +9,7 @@
 - constant in type definition
 - make forward decls declarable more than once
 - check constants
+- implement typeof
 
 #backlog
 

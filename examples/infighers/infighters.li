@@ -1,7 +1,8 @@
 #import "../x11/x11.li"
 #import "../linux/print.li"
 #import "../GL/gl.li"
-//#import "../GL/ho_gl.li"
+#import "../GL/ho_gl.li"
+#import "renderer.li"
 
 Window_Info :: struct {
 	width : s32;
@@ -171,7 +172,11 @@ main :: () -> s32 {
 	}
 
 	if init_opengl(&info) == -1 return -1;
-	//hogl_init_extensions();
+	hogl_init_extensions();
+
+	vbo : u32;
+	glGenBuffers(1, &vbo);
+	print_u32(vbo);
 
 	while true {
 		glClearColor(1.0, 0.0, 1.0, 1.0);
