@@ -1,0 +1,13 @@
+foo :: (v : ^void) {
+	
+}
+
+print :: () -> ^void { return null; }
+
+main :: () -> s32 {
+	//a : ^s32 = print();
+	
+	a := 1;
+	foo(&a);
+	return 0;
+}

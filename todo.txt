@@ -1,6 +1,5 @@
 #todo
 
-- make ^T cast to ^void implicitly
 - variadic functions
 - better error when enum type mismatch happens
 - bytecode implement all language
@@ -25,6 +24,7 @@
 
 #changelog - most recent first
 29/09/2018
+	- make ^T cast to ^void implicitly (fixed the opposite)
 	- implement sizeof
 26/09/2018
     - char causes a type error that does not stop compilation

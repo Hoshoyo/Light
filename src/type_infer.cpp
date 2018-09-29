@@ -628,7 +628,7 @@ static Type_Instance* defer_check_against(Ast* expr, Type_Instance* check_agains
 	if (check_against == type) {
 		return type;
 	} else {
-		if(check_against->kind == KIND_POINTER && type == type_pointer_get(TYPE_PRIMITIVE_VOID)){
+		if(type->kind == KIND_POINTER && check_against == type_pointer_get(TYPE_PRIMITIVE_VOID)){
 			assert(check_against->flags & TYPE_FLAG_INTERNALIZED);
 			return check_against;
 		}
