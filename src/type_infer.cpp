@@ -337,7 +337,11 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 			result = type_check_expr(struct_decl->decl_struct.type_info, expr, error);
 		}break;
 		case LITERAL_POINTER: {
-			result = type_pointer_get(TYPE_PRIMITIVE_VOID);
+			result->kind = KIND_POINTER;
+			result->pointer_to = type_new_temporary();
+			result->pointer_to->kind = KIND_PRIMITIVE;
+			result->pointer_to->primitive = TYPE_PRIMITIVE_VOID;
+			result->pointer_to->flags = TYPE_FLAG_WEAK;
 		}break;
 		default: {
 			assert_msg(0, "tried to infer type of undefined literal");
@@ -503,6 +507,9 @@ Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 					}
 					expr->type_return->flags |= TYPE_FLAG_INTERNALIZED;
 					internalize_type(&expr->type_return, expr->scope, true);
+				} else if (strong->kind == KIND_POINTER && expr->expr_literal.type == LITERAL_POINTER) {
+					// null converts to any type
+					expr->type_return = strong;
 				}
 			} else {
 				if(expr->expr_literal.type == LITERAL_ARRAY){

@@ -21,6 +21,7 @@
 - switch
 - scoped functions
 - namespaces
+- check cast to static array
 
 #changelog - most recent first
 29/09/2018
