@@ -1,16 +1,43 @@
-//foo :: (v : ^void) {
-//	
-//}
+#import "linux/print.li"
 
-//print :: () -> ^void { return null; }
+vec2 :: struct {
+    x : r32;
+    y : r32;
+}
+
+vec3 :: struct {
+    x : r32;
+    y : r32;
+    z : r32;
+}
+
+vec4 :: struct {
+    x : r32;
+    y : r32;
+    z : r32;
+    w : r32;
+}
+
+Vertex_3D :: struct {
+	position           : vec3;
+	texture_alpha      : r32;
+	texture_coordinate : vec2;
+	color              : vec4;
+	mask               : r32;
+}
+
+Quad_2D :: struct {
+	vertices : [4]Vertex_3D;
+}
+
+foo :: (color : vec4) -> Quad_2D {
+	q : Quad_2D;
+	q.vertices[0] = Vertex_3D:{ vec3:{0.0, 0.0, 0.0}, 1.0, vec2:{0.0, 0.0}, color, 1.0 };
+}
 
 main :: () -> s32 {
-	//a : ^s32 = print();
-	//a := 1;
-	//foo(&a);
-	
-	b : = null;
-	//a : ^s32 = b;
-	
+	//a := vec2:{3.0, 4.0};
+	a := foo(vec4:{1.0, 1.0, 1.0, 1.0});
+
 	return 0;
 }

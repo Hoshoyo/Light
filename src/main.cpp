@@ -94,6 +94,6 @@ int main(int argc, char** argv) {
 	
 	printf("Backend      elapsed: %f ms\n", (bend_end - bend_start));
 	printf("Total        elapsed: %f ms\n", ((end - start) + (bend_end - bend_start)));
-	print_profile();
+	//print_profile();
 	return 0;
 }

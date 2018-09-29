@@ -853,6 +853,8 @@ int C_Code_Generator::sprint_data(Ast_Data* data) {
 				buffer[aux_len++] = 'x';
 				buffer[aux_len++] = CHAR_HIGH_HEX(d);
 				buffer[aux_len++] = CHAR_LOW_HEX(d);
+				buffer[aux_len++] = '"';
+				buffer[aux_len++] = '"';
 			}
 		}break;
 		}

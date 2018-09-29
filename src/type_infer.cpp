@@ -364,9 +364,7 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "expression is not a procedure\n");
 	} else {
 		//assert_msg(type_strong(caller_type), "weak functional type in type inference pass");
-		if(!type_strong(caller_type)){
-			int xx = 0;
-		}
+		assert(!type_strong(caller_type));
 	}
 
 	proc_type = caller_type;
@@ -384,7 +382,7 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 	}
 
 	for (size_t i = 0; i < nargs; ++i) {
-		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, true);
+		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, TYPE_INFER_REPORT_UNDECLARED);
 		if (*error & TYPE_ERROR_FATAL) continue;
 		expr->expr_proc_call.args[i]->type_return = type;
 		
@@ -1005,10 +1003,11 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' is not defined for this type\n", binop_op_to_string(binop));
 						}
 					} else if (type_strong(lt) && type_weak(rt)) {
-						// pointer and bool types should not be weak
-						assert(rt->kind != KIND_POINTER);
+						// bool type should not be weak
+						// pointer type null literal can be weak
 						// NUMTYPE(strong) == != NUMTYPE(weak) |-> BOOL(strong) , propagete(NUMTYPE(strong) -> NUMTYPE(weak))
-						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt)) ||
+							(lt->kind == KIND_POINTER && rt->kind == KIND_POINTER)) {
 							type_propagate(lt, expr->expr_binary.right);
 							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
 						} else {
@@ -1019,10 +1018,11 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 						}
 					}
 					else if (type_weak(lt) && type_strong(rt)) {
-						// pointer and bool types should not be weak
-						assert(lt->kind != KIND_POINTER);
+						// bool type should not be weak
+						// pointer type null literal can be weak
 						// NUMTYPE(weak) == != NUMTYPE(strong) |-> BOOL(strong) , propagate(NUMTYPE(strong) -> NUMTYPE(weak))
-						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt)) ||
+							(lt->kind == KIND_POINTER && rt->kind == KIND_POINTER)) {
 							type_propagate(rt, expr->expr_binary.left);
 							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
 						} else {
@@ -1033,7 +1033,8 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 						}
 					} else if (type_weak(lt) && type_weak(rt)) {
 						// NUMTYP(weak) == != NUMTYPE(weak) |-> BOOL(strong) , 2 * propagate(0 -> NUMTYPE(weak))
-						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt)) ||
+							(lt->kind == KIND_POINTER && rt->kind == KIND_POINTER)) {
 							// TODO: can types here be different?
 							type_propagate(0, expr->expr_binary.left);
 							type_propagate(0, expr->expr_binary.right);

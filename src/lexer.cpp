@@ -440,6 +440,9 @@ bool Lexer::read_token(char** begin)
 		at++;
 		current_col++;
 		for (; at[i] != '"'; ++i) {
+			if(at[i] == '\n'){
+				line_count++;
+			}
 			if (at[i] == 0) {
 				fprintf(stderr, "%.*s: ", filepath.length, filepath.data);
 

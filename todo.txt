@@ -1,5 +1,6 @@
 #todo
 
+- multiple line strings avoid lexer line counter
 - variadic functions
 - better error when enum type mismatch happens
 - bytecode implement all language
@@ -11,6 +12,7 @@
 
 #backlog
 
+- multiple line string
 - check for end of stream within comment
 - do better errors in parser stage and check for end of stream
 - do better errors in semantic stage
