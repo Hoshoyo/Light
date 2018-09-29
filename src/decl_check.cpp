@@ -42,8 +42,24 @@ s32 get_alignment_from_type(Type_Instance* type){
 			} else {
 				return 0;
 			}
-		}   
+		} break;
+		case KIND_UNION: {
+			// TODO(psv): maybe do this process earlier?
+			// calculate union alignment is the alignment of the biggest type
+			Type_Instance* biggest_type = 0;
+			for (size_t i = 0; i < type->union_desc.fields_count; ++i) {
+				size_t type_size = type->union_desc.fields_types[i]->type_size_bits;
+				assert(type_size > 0); // this needs to be calculated first
+				if (biggest_type && type->union_desc.fields_types[i]->type_size_bits > biggest_type->type_size_bits) {
+					biggest_type = type->union_desc.fields_types[i];
+				} else {
+					biggest_type = type->union_desc.fields_types[i];
+				}
+			}
+			return get_alignment_from_type(biggest_type);
+		}break;
 	}
+	assert_msg(0, "invalid node type in get alignment call");
 	return 0;
 }
 
@@ -414,7 +430,7 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 							s64 field_type_size_bytes = field_type_size / 8;
 							alignment = get_alignment_from_type(tinfo->struct_desc.fields_types[i]);
 
-							if (offset_bytes % alignment != 0) {
+							if (alignment > 0 && offset_bytes % alignment != 0) {
 								s64 delta = align_delta(offset_bytes, alignment);
 								delta *= 8; // delta in bits
 								tinfo->struct_desc.offset_bits[i] += delta;
@@ -611,7 +627,6 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 			assert(node->decl_constant.type_info->flags & TYPE_FLAG_INTERNALIZED);
 		}break;
 		case AST_DECL_ENUM: {
-			//assert_msg(0, "enum type information pass not implemented");
 			assert(node->decl_enum.type_hint->flags & TYPE_FLAG_INTERNALIZED);
 
 			size_t nfields = node->decl_enum.fields_count;

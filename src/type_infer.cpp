@@ -35,6 +35,39 @@ inline bool type_strong(Type_Instance* type) {
 	return (type->flags & TYPE_FLAG_STRONG);
 }
 
+Type_Error evaluate_directive(Ast* expr, u32 flags) {
+	Type_Error error = TYPE_OK;
+	assert(expr->flags & AST_FLAG_IS_DIRECTIVE);
+
+	switch (expr->expr_directive.type) {
+	case EXPR_DIRECTIVE_SIZEOF: {
+		// Make sure the type is internalized, otherwise it cant infer size
+		Type_Instance* internalized_type = resolve_type(expr->scope, expr->expr_directive.type_expr, flags & TYPE_INFER_REPORT_UNDECLARED, &error);
+		if (error) return error;
+		assert(type_strong(internalized_type));
+
+		// Transform it into a integer literal
+		expr->node_type = AST_EXPRESSION_LITERAL;
+		expr->type_return = 0;
+		expr->flags = AST_FLAG_IS_EXPRESSION;
+		expr->infer_queue_index = -1;
+
+		expr->expr_literal.token = expr->expr_directive.token;	// NOTE(psv): copy this first so it doesnt get overritten
+		expr->expr_literal.flags = 0;
+		expr->expr_literal.type = LITERAL_HEX_INT;
+		expr->expr_literal.array_exprs = 0;
+		expr->expr_literal.array_strong_type = 0;
+		assert(internalized_type->type_size_bits > 0);
+		expr->expr_literal.value_u64 = internalized_type->type_size_bits / 8;
+	} break;
+	case EXPR_DIRECTIVE_TYPEOF:
+	default:
+		assert_msg(0, "unimplemented directive evaluation");
+		break;
+	}
+	return error;
+}
+
 Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
 	// if it is raw data, get the type directly
 	if(expr->node_type == AST_DATA) {
@@ -45,6 +78,13 @@ Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 
 	Type_Instance* type_infered = 0;
+
+	if (expr->node_type == AST_EXPRESSION_DIRECTIVE) {
+		// Evaluate directive first, then type check
+		// This could be #run #sizeof #typeof etc.
+		*error |= evaluate_directive(expr, flags);
+		if (*error) return 0;
+	}
 
 	switch (expr->node_type) {
 		case AST_EXPRESSION_BINARY:				type_infered = infer_from_binary_expression(expr, error, flags); break;
@@ -109,9 +149,6 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 		case OP_UNARY_ADDRESSOF:{
 			if (expr->expr_unary.operand->flags & AST_FLAG_LVALUE) {
 				// that means right side is strong because it is lvalue
-				if(!type_strong(infered)){
-					int x = 0;
-				}
 				assert(type_strong(infered));
 				Type_Instance* ptrtype = type_new_temporary();
 				ptrtype->kind = KIND_POINTER;

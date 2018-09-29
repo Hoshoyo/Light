@@ -1,6 +1,5 @@
 #todo
 
-- implement sizeof
 - make ^T cast to ^void implicitly
 - variadic functions
 - better error when enum type mismatch happens
@@ -25,6 +24,8 @@
 - namespaces
 
 #changelog - most recent first
+29/09/2018
+	- implement sizeof
 26/09/2018
     - char causes a type error that does not stop compilation
 25/09/2018

@@ -48,6 +48,7 @@ string compiler_tags[] = {
 	{sizeof("import")  - 1, -1, (u8*)"import"},
 	{sizeof("end")     - 1, -1, (u8*)"end"},
 	{sizeof("typedef") - 1, -1, (u8*)"typedef" },
+	{sizeof("sizeof")  - 1, -1, (u8*)"sizeof" },
 };
 
 s32 Lexer::report_error_location(Token* tok) {

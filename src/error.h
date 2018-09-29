@@ -8,7 +8,7 @@
 typedef u32 Type_Error;
 
 const u32 TYPE_OK			= 0;
-const u32 TYPE_ERROR_FATAL = FLAG(1);
+const u32 TYPE_ERROR_FATAL  = FLAG(1);
 const u32 TYPE_QUEUED		= FLAG(2);
 
 void report_error_location(Token* location);

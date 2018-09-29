@@ -24,6 +24,7 @@ struct Parser {
 	Ast** parse_top_level();
 
 	void parse_directive(Scope* scope);
+	Ast* parse_directive_expression(Scope* scope);
 
 	// String data
 	Ast* data_global_string_push(Token* s);
@@ -65,7 +66,6 @@ struct Parser {
 	Ast* parse_expr_literal_struct(Token* name, Scope* scope);
 	Ast* parse_expr_literal_array(Scope* scope);
 	Ast* parse_expr_literal(Scope* scope);
-	//Ast* parse_expr_proc_call(Scope* scope);
 
 	// Expression auxiliary
 	Precedence unary_op_precedence_level(Operator_Unary unop, bool prefixed);

@@ -182,6 +182,24 @@ Ast* Parser::data_global_string_push(Token* s) {
 	return node;
 }
 
+Ast* Parser::parse_directive_expression(Scope* scope) {
+	require_and_eat('#');
+
+	Token* directive = lexer->eat_token();
+
+	if (directive->type != TOKEN_IDENTIFIER) {
+		report_syntax_error(directive, "expected compiler expression directive but got '%.*s'\n", TOKEN_STR(directive));
+	}
+
+	// #sizeof directive
+	if (directive->value.data == compiler_tags[COMPILER_TAG_SIZEOF].data) {
+		Type_Instance* type = parse_type();
+		return ast_create_expr_sizeof(type, scope, directive);
+	} else {
+		report_syntax_error(directive, "unrecognized compiler directive '%.*s'\n", TOKEN_STR(directive));
+	}
+}
+
 void Parser::parse_directive(Scope* scope) {
 	require_and_eat('#');
 
@@ -615,12 +633,15 @@ Ast* Parser::parse_expression_precedence10(Scope* scope) {
 	} else if (t->type == TOKEN_IDENTIFIER) {
 		// variable
 		lexer->eat_token();
-		if(lexer->peek_token_type() == ':'){
+		if (lexer->peek_token_type() == ':') {
 			lexer->eat_token();
 			return parse_expr_literal_struct(t, scope);
-		} else {
+		}
+		else {
 			return ast_create_expr_variable(t, scope, 0);
 		}
+	} else if(t->type == '#') {
+		return parse_directive_expression(scope);
 	} else if(t->type == '(') {
 		// ( expr )
 		lexer->eat_token();
