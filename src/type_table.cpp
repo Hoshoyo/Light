@@ -146,8 +146,9 @@ u64 type_hash(Type_Instance* type) {
 }
 
 void type_table_init() {
+	TIME_FUNC();
 	// TODO(psv): no compare function between types yet
-	hash_table_init(&type_table, 1024 * 1024 * 4, (hash_function_type*)type_hash, (hash_entries_equal_type*)0);
+	hash_table_init(&type_table, 1024 * 512, (hash_function_type*)type_hash, (hash_entries_equal_type*)0);
 	g_type_table = array_create(Type_Instance*, 1024);
 	type_internalize_queue = array_create(Internalize_Queue, 1024);
 
@@ -234,6 +235,7 @@ Type_Instance* type_copy_internal(Type_Instance* type, Scope* scope) {
 }
 
 Type_Instance* internalize_type(Type_Instance** type, Scope* scope, bool copy) {
+	TIME_FUNC();
 	//assert_msg((*type)->flags & TYPE_FLAG_RESOLVED, "trying to internalize a type that is not resolved");
 	// @TODO check this
 	u64 hash = type_hash(*type);
@@ -269,6 +271,7 @@ inline Type_Instance* type_setup_ptr(Type_Instance* p) {
 }
 
 inline Type_Instance* type_setup_primitive(Type_Primitive p) {
+	TIME_FUNC();
 	Type_Instance* res = ALLOC_TYPE(types_internal);
 	res->kind = KIND_PRIMITIVE;
 	res->flags = TYPE_FLAG_SIZE_RESOLVED;

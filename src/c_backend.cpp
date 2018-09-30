@@ -12,6 +12,8 @@ static void report_fatal_error(char* msg, ...) {
 	exit(-1);
 }
 
+bool print_debug_c = false;
+
 int C_Code_Generator::sprint(char* msg, ...) {
 	va_list args;
 	va_start(args, msg);
@@ -26,22 +28,28 @@ int C_Code_Generator::sprint(char* msg, ...) {
 	}
 
 	va_end(args);
-#if DEBUG
-	{
-		va_list args;
-		va_start(args, msg);
-		int num_written = 0;
 
-		num_written = vfprintf(stdout, msg, args);
-		fflush(stdout);
+	if(print_debug_c){
+		if (!deferring) {
+			va_list args;
+			va_start(args, msg);
+			int num_written = 0;
 
-		va_end(args);
+			num_written = vfprintf(stdout, msg, args);
+			fflush(stdout);
+
+			va_end(args);
+		}
 	}
-#endif
 	return num_written;
 }
 
 void C_Code_Generator::defer_flush() {
+	if(print_debug_c) {
+		fprintf(stdout, "%.*s", defer_ptr, defer_buffer);
+		fflush(stdout);
+	}
+
 	memcpy(buffer + ptr, defer_buffer, defer_ptr);
 	ptr += defer_ptr;
 	defer_ptr = 0;
@@ -408,13 +416,17 @@ void C_Code_Generator::emit_struct_assignment(Ast* decl) {
 
         // array copies will use this
         sprint("char* __array_base = __t_base;\n");
+		// struct copies will use this
+		sprint("char* __struct_base = __t_base;\n");
         emit_struct_assignment_from_base(0, expr);
 
         sprint("}\n");
     } else {
+		deferring = true;
         sprint("%.*s = ", TOKEN_STR(decl->decl_variable.name));
         emit_expression(decl->decl_variable.assignment);
         sprint(";\n");
+		defer_flush();
     }
 }
 
@@ -444,8 +456,8 @@ void C_Code_Generator::emit_command(Ast* comm) {
                                 sprint("%.*s = ", TOKEN_STR(cm->decl_variable.name));
                                 emit_expression(cm->decl_variable.assignment);
                                 sprint(";");
-								deferring = false;
 								defer_flush();
+								deferring = false;
                             }
                         }
 					} else if (cm->node_type == AST_DECL_CONSTANT) {
@@ -525,12 +537,15 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			// bigger than regsize
 			else {
 				if(rval->node_type == AST_EXPRESSION_BINARY || rval->node_type == AST_EXPRESSION_PROCEDURE_CALL){
+					deferring = true;
 					if (comm->comm_var_assign.lvalue) {
                         emit_expression(comm->comm_var_assign.lvalue);
                         sprint(" = ");
                     }
                     emit_expression(comm->comm_var_assign.rvalue);
                     sprint(";");
+					defer_flush();
+					deferring = false;
 				} else if(rval->node_type == AST_EXPRESSION_VARIABLE && 
 					(rval->type_return->kind == KIND_STRUCT || rval->type_return->kind == KIND_UNION)){
                     if (comm->comm_var_assign.lvalue) {
@@ -853,6 +868,8 @@ int C_Code_Generator::sprint_data(Ast_Data* data) {
 				buffer[aux_len++] = 'x';
 				buffer[aux_len++] = CHAR_HIGH_HEX(d);
 				buffer[aux_len++] = CHAR_LOW_HEX(d);
+				buffer[aux_len++] = '"';
+				buffer[aux_len++] = '"';
 			}
 		}break;
 		}
@@ -1071,12 +1088,12 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 	// Execute commands to compile .c
 	char cmdbuffer[1024];
 #if defined(_WIN32) || defined(_WIN64)
-	sprintf(cmdbuffer, "gcc -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
+	sprintf(cmdbuffer, "gcc -w -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 	int len = sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe -L%.*s..\\..\\lib -lKernel32",
 		fname_len, out_obj.data, fname_len, out_obj.data, comp_path.length, comp_path.data);
 #elif defined(__linux__)
-    sprintf(cmdbuffer, "gcc -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
+    sprintf(cmdbuffer, "gcc -w -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
 		fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);

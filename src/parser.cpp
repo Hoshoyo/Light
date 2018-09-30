@@ -45,6 +45,7 @@ void queue_file_for_parsing(Token* token) {
 }
 
 Ast** parse_files_in_queue(Scope* global_scope) {
+	TIME_FUNC();
 	// TODO(psv): check for double include
 	// TODO(psv): include recursively
 
@@ -135,6 +136,7 @@ Token* Parser::require_and_eat(char t) {
 }
 
 Ast** Parser::parse_top_level() {
+	TIME_FUNC();
 	// Empty file check
 	if (lexer->token_count == 1 && lexer->peek_token_type() == TOKEN_END_OF_STREAM)
 		return 0;
@@ -178,6 +180,24 @@ Ast* Parser::data_global_string_push(Token* s) {
 	Ast* node = ast_create_data(GLOBAL_STRING, global_scope, s, (u8*)data, length, type_pointer_get(TYPE_PRIMITIVE_U8));
 	array_push(top_level, &node);
 	return node;
+}
+
+Ast* Parser::parse_directive_expression(Scope* scope) {
+	require_and_eat('#');
+
+	Token* directive = lexer->eat_token();
+
+	if (directive->type != TOKEN_IDENTIFIER) {
+		report_syntax_error(directive, "expected compiler expression directive but got '%.*s'\n", TOKEN_STR(directive));
+	}
+
+	// #sizeof directive
+	if (directive->value.data == compiler_tags[COMPILER_TAG_SIZEOF].data) {
+		Type_Instance* type = parse_type();
+		return ast_create_expr_sizeof(type, scope, directive);
+	} else {
+		report_syntax_error(directive, "unrecognized compiler directive '%.*s'\n", TOKEN_STR(directive));
+	}
 }
 
 void Parser::parse_directive(Scope* scope) {
@@ -613,12 +633,15 @@ Ast* Parser::parse_expression_precedence10(Scope* scope) {
 	} else if (t->type == TOKEN_IDENTIFIER) {
 		// variable
 		lexer->eat_token();
-		if(lexer->peek_token_type() == ':'){
+		if (lexer->peek_token_type() == ':') {
 			lexer->eat_token();
 			return parse_expr_literal_struct(t, scope);
-		} else {
+		}
+		else {
 			return ast_create_expr_variable(t, scope, 0);
 		}
+	} else if(t->type == '#') {
+		return parse_directive_expression(scope);
 	} else if(t->type == '(') {
 		// ( expr )
 		lexer->eat_token();

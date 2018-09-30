@@ -35,6 +35,39 @@ inline bool type_strong(Type_Instance* type) {
 	return (type->flags & TYPE_FLAG_STRONG);
 }
 
+Type_Error evaluate_directive(Ast* expr, u32 flags) {
+	Type_Error error = TYPE_OK;
+	assert(expr->flags & AST_FLAG_IS_DIRECTIVE);
+
+	switch (expr->expr_directive.type) {
+	case EXPR_DIRECTIVE_SIZEOF: {
+		// Make sure the type is internalized, otherwise it cant infer size
+		Type_Instance* internalized_type = resolve_type(expr->scope, expr->expr_directive.type_expr, flags & TYPE_INFER_REPORT_UNDECLARED, &error);
+		if (error) return error;
+		assert(type_strong(internalized_type));
+
+		// Transform it into a integer literal
+		expr->node_type = AST_EXPRESSION_LITERAL;
+		expr->type_return = 0;
+		expr->flags = AST_FLAG_IS_EXPRESSION;
+		expr->infer_queue_index = -1;
+
+		expr->expr_literal.token = expr->expr_directive.token;	// NOTE(psv): copy this first so it doesnt get overritten
+		expr->expr_literal.flags = 0;
+		expr->expr_literal.type = LITERAL_HEX_INT;
+		expr->expr_literal.array_exprs = 0;
+		expr->expr_literal.array_strong_type = 0;
+		assert(internalized_type->type_size_bits > 0);
+		expr->expr_literal.value_u64 = internalized_type->type_size_bits / 8;
+	} break;
+	case EXPR_DIRECTIVE_TYPEOF:
+	default:
+		assert_msg(0, "unimplemented directive evaluation");
+		break;
+	}
+	return error;
+}
+
 Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
 	// if it is raw data, get the type directly
 	if(expr->node_type == AST_DATA) {
@@ -45,6 +78,13 @@ Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 
 	Type_Instance* type_infered = 0;
+
+	if (expr->node_type == AST_EXPRESSION_DIRECTIVE) {
+		// Evaluate directive first, then type check
+		// This could be #run #sizeof #typeof etc.
+		*error |= evaluate_directive(expr, flags);
+		if (*error) return 0;
+	}
 
 	switch (expr->node_type) {
 		case AST_EXPRESSION_BINARY:				type_infered = infer_from_binary_expression(expr, error, flags); break;
@@ -109,9 +149,6 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 		case OP_UNARY_ADDRESSOF:{
 			if (expr->expr_unary.operand->flags & AST_FLAG_LVALUE) {
 				// that means right side is strong because it is lvalue
-				if(!type_strong(infered)){
-					int x = 0;
-				}
 				assert(type_strong(infered));
 				Type_Instance* ptrtype = type_new_temporary();
 				ptrtype->kind = KIND_POINTER;
@@ -149,7 +186,7 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 
 		// @INFER CAST
 		case OP_UNARY_CAST: {
-			Type_Instance* cast_to = resolve_type(expr->scope, expr->expr_unary.type_to_cast, true);
+			Type_Instance* cast_to = resolve_type(expr->scope, expr->expr_unary.type_to_cast, true, error);
 			expr->expr_unary.type_to_cast = cast_to;
 			if(!cast_to) {
 				*error |= TYPE_ERROR_FATAL;
@@ -300,7 +337,11 @@ Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 f
 			result = type_check_expr(struct_decl->decl_struct.type_info, expr, error);
 		}break;
 		case LITERAL_POINTER: {
-			result = type_pointer_get(TYPE_PRIMITIVE_VOID);
+			result->kind = KIND_POINTER;
+			result->pointer_to = type_new_temporary();
+			result->pointer_to->kind = KIND_PRIMITIVE;
+			result->pointer_to->primitive = TYPE_PRIMITIVE_VOID;
+			result->pointer_to->flags = TYPE_FLAG_WEAK;
 		}break;
 		default: {
 			assert_msg(0, "tried to infer type of undefined literal");
@@ -323,9 +364,7 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "expression is not a procedure\n");
 	} else {
 		//assert_msg(type_strong(caller_type), "weak functional type in type inference pass");
-		if(!type_strong(caller_type)){
-			int xx = 0;
-		}
+		assert(type_strong(caller_type));
 	}
 
 	proc_type = caller_type;
@@ -343,7 +382,7 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 	}
 
 	for (size_t i = 0; i < nargs; ++i) {
-		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, true);
+		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, TYPE_INFER_REPORT_UNDECLARED);
 		if (*error & TYPE_ERROR_FATAL) continue;
 		expr->expr_proc_call.args[i]->type_return = type;
 		
@@ -466,6 +505,9 @@ Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 					}
 					expr->type_return->flags |= TYPE_FLAG_INTERNALIZED;
 					internalize_type(&expr->type_return, expr->scope, true);
+				} else if (strong->kind == KIND_POINTER && expr->expr_literal.type == LITERAL_POINTER) {
+					// null converts to any type
+					expr->type_return = strong;
 				}
 			} else {
 				if(expr->expr_literal.type == LITERAL_ARRAY){
@@ -474,13 +516,13 @@ Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 						type_propagate(0, expr->expr_literal.array_exprs[i]);
 					}
 					expr->type_return->array_desc.array_of = expr->expr_literal.array_exprs[0]->type_return;
-					expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+					expr->type_return = resolve_type(expr->scope, expr->type_return, false, &error_code);
 				} else if(expr->expr_literal.type == LITERAL_STRUCT) {
 					size_t nexpr = 0;
 					if(expr->expr_literal.struct_exprs) {
 						nexpr = array_get_length(expr->expr_literal.struct_exprs);
 					}
-					strong = expr->type_return = resolve_type(expr->scope, expr->type_return, true);
+					strong = expr->type_return = resolve_type(expr->scope, expr->type_return, true, &error_code);
 					if(!strong) {
 						return error_code;
 					}
@@ -494,7 +536,7 @@ Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 						expr->type_return->struct_desc.fields_types[i] = expr->expr_literal.struct_exprs[i]->type_return;
 					}
 				}else {
-					expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+					expr->type_return = resolve_type(expr->scope, expr->type_return, false, &error_code);
 					expr->type_return = internalize_type(&expr->type_return, expr->scope, true);
 				}
 			}
@@ -545,7 +587,7 @@ Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 						// type is an array literal
 						assert(expr->expr_binary.left->node_type == AST_EXPRESSION_LITERAL && expr->expr_binary.left->expr_literal.type == LITERAL_ARRAY);
 						type_propagate(strong, expr->expr_binary.left);
-						expr->type_return = resolve_type(expr->scope, expr->type_return, true);
+						expr->type_return = resolve_type(expr->scope, expr->type_return, true, &error_code);
 					}
 
 					// index should be strong aswell as indexed
@@ -591,7 +633,7 @@ static Type_Instance* defer_check_against(Ast* expr, Type_Instance* check_agains
 	if (check_against == type) {
 		return type;
 	} else {
-		if(check_against->kind == KIND_POINTER && type == type_pointer_get(TYPE_PRIMITIVE_VOID)){
+		if(type->kind == KIND_POINTER && check_against == type_pointer_get(TYPE_PRIMITIVE_VOID)){
 			assert(check_against->flags & TYPE_FLAG_INTERNALIZED);
 			return check_against;
 		}
@@ -631,7 +673,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					} else if (type_strong(lt) && type_weak(rt)) {
 						// pointer arithmetic ^T(strong) + INT(weak) |-> ^T(strong) , propagate(INT(weak))
 						if (lt->kind == KIND_POINTER && type_primitive_int(rt)) {
-							rt = resolve_type(expr->scope, rt, false);
+							rt = resolve_type(expr->scope, rt, false, error);
 							assert(rt->flags & TYPE_FLAG_INTERNALIZED);
 							type_propagate(rt, expr->expr_binary.right);
 							if(lt == type_pointer_get(TYPE_PRIMITIVE_VOID)){
@@ -708,7 +750,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					} else if (type_strong(lt) && type_weak(rt)) {
 						// pointer arithmetic ^T(strong) - INT(weak) |-> ^T(strong) , propagate(INT(weak))
 						if (lt->kind == KIND_POINTER && type_primitive_int(rt)) {
-							rt = resolve_type(expr->scope, rt, false);
+							rt = resolve_type(expr->scope, rt, false, error);
 							assert(rt->flags & TYPE_FLAG_INTERNALIZED);
 							type_propagate(rt, expr->expr_binary.right);
 							return defer_check_against(expr, check_against, lt, error);;
@@ -961,10 +1003,11 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "binary operator '%s' is not defined for this type\n", binop_op_to_string(binop));
 						}
 					} else if (type_strong(lt) && type_weak(rt)) {
-						// pointer and bool types should not be weak
-						assert(rt->kind != KIND_POINTER);
+						// bool type should not be weak
+						// pointer type null literal can be weak
 						// NUMTYPE(strong) == != NUMTYPE(weak) |-> BOOL(strong) , propagete(NUMTYPE(strong) -> NUMTYPE(weak))
-						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt)) ||
+							(lt->kind == KIND_POINTER && rt->kind == KIND_POINTER)) {
 							type_propagate(lt, expr->expr_binary.right);
 							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
 						} else {
@@ -975,10 +1018,11 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 						}
 					}
 					else if (type_weak(lt) && type_strong(rt)) {
-						// pointer and bool types should not be weak
-						assert(lt->kind != KIND_POINTER);
+						// bool type should not be weak
+						// pointer type null literal can be weak
 						// NUMTYPE(weak) == != NUMTYPE(strong) |-> BOOL(strong) , propagate(NUMTYPE(strong) -> NUMTYPE(weak))
-						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt)) ||
+							(lt->kind == KIND_POINTER && rt->kind == KIND_POINTER)) {
 							type_propagate(rt, expr->expr_binary.left);
 							return defer_check_against(expr, check_against, type_primitive_get(TYPE_PRIMITIVE_BOOL), error);
 						} else {
@@ -989,7 +1033,8 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 						}
 					} else if (type_weak(lt) && type_weak(rt)) {
 						// NUMTYP(weak) == != NUMTYPE(weak) |-> BOOL(strong) , 2 * propagate(0 -> NUMTYPE(weak))
-						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt))) {
+						if ((type_primitive_int(lt) && type_primitive_int(rt)) || (type_primitive_float(lt) && type_primitive_float(rt)) ||
+							(lt->kind == KIND_POINTER && rt->kind == KIND_POINTER)) {
 							// TODO: can types here be different?
 							type_propagate(0, expr->expr_binary.left);
 							type_propagate(0, expr->expr_binary.right);
@@ -1166,7 +1211,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 						}
 					}
 				}
-				expr->type_return = resolve_type(expr->scope, expr->type_return, false);
+				expr->type_return = resolve_type(expr->scope, expr->type_return, false, error);
 			} else if(expr->expr_literal.type == LITERAL_STRUCT && check_against->kind == KIND_STRUCT) {
 				// @TODO set check_against here to 0
 				// @BUG

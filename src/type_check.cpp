@@ -43,6 +43,18 @@ static bool scope_inside_loop(Scope* scope) {
 	return false;
 }
 
+void constant_eval(Ast* node) {
+	assert(node->node_type == AST_DECL_CONSTANT);
+	Ast* expr = node->decl_constant.value;
+	switch(expr->node_type) {
+		case AST_EXPRESSION_BINARY:
+		case AST_EXPRESSION_LITERAL:
+		case AST_EXPRESSION_UNARY:
+		case AST_EXPRESSION_VARIABLE:
+		default: assert_msg(0, "invalid expression in constant evaluation"); break;
+	}
+}
+
 Type_Error type_check(Ast* node) {
 	Type_Error error = TYPE_OK;
 
@@ -69,9 +81,38 @@ Type_Error type_check(Ast* node) {
 		scope->stack_allocation_offset += byte_size;	// TODO(psv): align before
 	}break;
 	case AST_DECL_ENUM: {
+		Hash_Table h;
+		auto enum_hash = [](void* data) -> u64 {
+			Ast* expr = (Ast*)data;
+			assert(expr->node_type == AST_EXPRESSION_LITERAL);
+			return (u64)expr->expr_literal.value_u64;
+		};
+		auto enum_equal = [](void* e1, void* e2) -> bool {
+			Ast* expr1 = (Ast*)e1;
+			Ast* expr2 = (Ast*)e1;
+			assert(expr1->node_type == AST_EXPRESSION_LITERAL);
+			assert(expr2->node_type == AST_EXPRESSION_LITERAL);
+			return expr1->expr_literal.value_u64 == expr2->expr_literal.value_u64;
+		};
+		hash_table_init(&h, node->decl_enum.fields_count + 4 * 8, enum_hash, enum_equal);
 		for (size_t i = 0; i < node->decl_enum.fields_count; ++i) {
 			error |= type_check(node->decl_enum.fields[i]);
+			// evaluate constant to literal
+			Ast* n = node->decl_enum.fields[i]->decl_constant.value;
+			s64 index = hash_table_entry_exist(&h, n);
+			if (index == -1) {
+				s64 i = hash_table_add(&h, n, sizeof(n));
+				assert(i != -1);
+			} else {
+				// TODO(psv): print correctly signed values.
+				error |= report_decl_error(TYPE_ERROR_FATAL, n, "enum value '%llu' duplicated\n", n->expr_literal.value_u64);
+				fprintf(stderr, " - previously defined at: ");
+				Ast* previous_def = (Ast*)h.entries[index].data;
+				report_error_location(previous_def);
+				fprintf(stderr, "\n");
+			}
 		}
+		hash_table_release(&h);
 	}break;
 	case AST_DECL_PROCEDURE: {
 		for (size_t i = 0; i < node->decl_procedure.arguments_count; ++i) {

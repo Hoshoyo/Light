@@ -42,8 +42,24 @@ s32 get_alignment_from_type(Type_Instance* type){
 			} else {
 				return 0;
 			}
-		}   
+		} break;
+		case KIND_UNION: {
+			// TODO(psv): maybe do this process earlier?
+			// calculate union alignment is the alignment of the biggest type
+			Type_Instance* biggest_type = 0;
+			for (size_t i = 0; i < type->union_desc.fields_count; ++i) {
+				size_t type_size = type->union_desc.fields_types[i]->type_size_bits;
+				assert(type_size > 0); // this needs to be calculated first
+				if (biggest_type && type->union_desc.fields_types[i]->type_size_bits > biggest_type->type_size_bits) {
+					biggest_type = type->union_desc.fields_types[i];
+				} else {
+					biggest_type = type->union_desc.fields_types[i];
+				}
+			}
+			return get_alignment_from_type(biggest_type);
+		}break;
 	}
+	assert_msg(0, "invalid node type in get alignment call");
 	return 0;
 }
 
@@ -173,20 +189,22 @@ Type_Error decl_check_redefinition(Scope* scope, Ast* node) {
 	return error;
 }
 
-Type_Instance* type_from_alias(Scope* scope, Type_Instance* type, bool rep_undeclared) {
+Type_Instance* type_from_alias(Scope* scope, Type_Instance* type, bool rep_undeclared, Type_Error* error) {
 	assert(type->kind == KIND_ALIAS);
 	Ast* d = decl_from_name(scope, type->alias.name);
 	if (!d) {
 		if (rep_undeclared) {
-			report_undeclared(type->alias.name);
+			*error |= report_undeclared(type->alias.name);
 		}
 		return 0;
 	} else if(d->node_type == AST_DECL_TYPEDEF){
-		return resolve_type(scope, d->decl_typedef.type, rep_undeclared);
+		return resolve_type(scope, d->decl_typedef.type, rep_undeclared, error);
 	} else if(d->node_type == AST_DECL_STRUCT){
-		return resolve_type(scope, d->decl_struct.type_info, rep_undeclared);
+		return resolve_type(scope, d->decl_struct.type_info, rep_undeclared, error);
 	} else if(d->node_type == AST_DECL_UNION) {
-		return resolve_type(scope, d->decl_union.type_info, rep_undeclared);
+		return resolve_type(scope, d->decl_union.type_info, rep_undeclared, error);
+	} else if(d->node_type == AST_DECL_ENUM) {
+		return resolve_type(scope, d->decl_enum.type_hint, rep_undeclared, error);
 	} else {
 		// TODO(psv): error here
 	}
@@ -195,16 +213,15 @@ Type_Instance* type_from_alias(Scope* scope, Type_Instance* type, bool rep_undec
 // resolves and internalizes type if it can, if the type was resolved set TYPE_FLAG_INTERNALIZE
 // if undeclared error return 0
 // when not resolved and rep_undeclared is false, return the type as it were do it can be queued
-Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclared) {
+Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclared, Type_Error* error) {
 	if (type->flags & TYPE_FLAG_INTERNALIZED)
 		return type;
 
 	switch (type->kind) {
 	case KIND_ALIAS: {
-		Type_Instance* t = type_from_alias(scope, type, rep_undeclared);
+		Type_Instance* t = type_from_alias(scope, type, rep_undeclared, error);
 		if (!t) {
 			if (rep_undeclared) {
-				report_undeclared(type->alias.name);
 				return 0;
 			}
 			return type;
@@ -212,7 +229,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 			if (t->flags & TYPE_FLAG_INTERNALIZED) {
 				return t;
 			} else {
-				return resolve_type(scope, t, rep_undeclared);
+				return resolve_type(scope, t, rep_undeclared, error);
 			}
 		}
 	}break;
@@ -228,26 +245,26 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 			Ast* struct_decl = decl_from_name(scope, type->pointer_to->struct_desc.name);
 			if (!struct_decl) {
 				if (rep_undeclared) {
-					report_undeclared(type->pointer_to->struct_desc.name);
+					*error |= report_undeclared(type->pointer_to->struct_desc.name);
 				}
 				return 0;
 			}
 			//type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared);
-			type->pointer_to = resolve_type(scope, struct_decl->decl_struct.type_info, rep_undeclared);
+			type->pointer_to = resolve_type(scope, struct_decl->decl_struct.type_info, rep_undeclared, error);
 			return internalize_type(&type, scope, true);
 		} else if(type->pointer_to->kind == KIND_ALIAS) {
-			Type_Instance* tpf = type_from_alias(scope, type->pointer_to, rep_undeclared);
+			Type_Instance* tpf = type_from_alias(scope, type->pointer_to, rep_undeclared, error);
 			if(!tpf) {
 				if(rep_undeclared) {
-					report_undeclared(type->pointer_to->alias.name);
+					*error |= report_undeclared(type->pointer_to->alias.name);
 				}
 				return 0;
 			}
-			type->pointer_to = resolve_type(scope, tpf, rep_undeclared);
+			type->pointer_to = resolve_type(scope, tpf, rep_undeclared, error);
 			if(!type->pointer_to) return 0;
 			return internalize_type(&type, scope, true);
 		} else {
-			type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared);
+			type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared, error);
 			if (!type->pointer_to) return 0;
 			return internalize_type(&type, scope, true);
 		}
@@ -256,7 +273,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 		Ast* struct_decl = decl_from_name(scope, type->struct_desc.name);
 		if (!struct_decl) {
 			if (rep_undeclared) {
-				report_undeclared(type->struct_desc.name);
+				*error |= report_undeclared(type->struct_desc.name);
 				return 0;
 			}
 			return type;
@@ -269,7 +286,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 		}
 	} break;
 	case KIND_ARRAY: {
-		type->array_desc.array_of = resolve_type(scope, type->array_desc.array_of, rep_undeclared);
+		type->array_desc.array_of = resolve_type(scope, type->array_desc.array_of, rep_undeclared, error);
 		if (!type->array_desc.array_of) return 0;
 		if (type->array_desc.array_of->flags & TYPE_FLAG_INTERNALIZED) {
 			type->flags |= TYPE_FLAG_SIZE_RESOLVED;
@@ -281,7 +298,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 		}
 	} break;
 	case KIND_FUNCTION: {
-		Type_Instance* ret_type = resolve_type(scope, type->function_desc.return_type, rep_undeclared);
+		Type_Instance* ret_type = resolve_type(scope, type->function_desc.return_type, rep_undeclared, error);
 		if (!ret_type) return 0;
 		if (!(ret_type->flags & TYPE_FLAG_INTERNALIZED)) {
 			return type;
@@ -290,7 +307,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 			size_t nargs = type->function_desc.num_arguments;
 			for (size_t i = 0; i < nargs; ++i) {
 				Type_Instance* t = type->function_desc.arguments_type[i];
-				t = resolve_type(scope, type->function_desc.arguments_type[i], rep_undeclared);
+				t = resolve_type(scope, type->function_desc.arguments_type[i], rep_undeclared, error);
 				if (!t) return type;
 				type->function_desc.arguments_type[i] = t;
 				if (!(t->flags & TYPE_FLAG_INTERNALIZED)) {
@@ -312,7 +329,7 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 	switch (node->node_type) 
 	{
 		case AST_DECL_TYPEDEF: {
-			Type_Instance* type = resolve_type(node->scope, node->decl_typedef.type, false);
+			Type_Instance* type = resolve_type(node->scope, node->decl_typedef.type, false, &error_code);
 			if (!type || !(type->flags & TYPE_FLAG_INTERNALIZED)) {
 				error_code |= TYPE_QUEUED;
 				return error_code;
@@ -333,7 +350,7 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 
 			// Try to internalize the return type of the procedure
 			if (!(node->decl_procedure.type_return->flags & TYPE_FLAG_INTERNALIZED)) {
-				Type_Instance* type = resolve_type(scope, node->decl_procedure.type_return, false);
+				Type_Instance* type = resolve_type(scope, node->decl_procedure.type_return, false, &error_code);
 				// The type could not be resolved, that means it some name could not be resolved to a type, so queue this node
 				if (!type || !(type->flags & TYPE_FLAG_INTERNALIZED)) {
 					infer_queue_push(node);
@@ -373,7 +390,7 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 
 				// Internalize procedure type
 				node->decl_procedure.type_procedure->function_desc.return_type = node->decl_procedure.type_return;
-				node->decl_procedure.type_procedure = resolve_type(scope, node->decl_procedure.type_procedure, false);
+				node->decl_procedure.type_procedure = resolve_type(scope, node->decl_procedure.type_procedure, false, &error_code);
 				node->decl_procedure.type_procedure = internalize_type(&node->decl_procedure.type_procedure, scope, true);
 				assert(node->decl_procedure.type_procedure->flags & TYPE_FLAG_INTERNALIZED);
 				infer_queue_remove(node);
@@ -413,7 +430,7 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 							s64 field_type_size_bytes = field_type_size / 8;
 							alignment = get_alignment_from_type(tinfo->struct_desc.fields_types[i]);
 
-							if (offset_bytes % alignment != 0) {
+							if (alignment > 0 && offset_bytes % alignment != 0) {
 								s64 delta = align_delta(offset_bytes, alignment);
 								delta *= 8; // delta in bits
 								tinfo->struct_desc.offset_bits[i] += delta;
@@ -504,7 +521,7 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 			}
 			
 			if (node->decl_variable.variable_type) {
-				Type_Instance* type_var = resolve_type(node->scope, node->decl_variable.variable_type, false);
+				Type_Instance* type_var = resolve_type(node->scope, node->decl_variable.variable_type, false, &error_code);
 				if (!type_var || !(type_var->flags & TYPE_FLAG_INTERNALIZED)) {
 					error_code |= TYPE_QUEUED;
 					return error_code;
@@ -566,7 +583,7 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 			}
 			
 			if (node->decl_constant.type_info) {
-				Type_Instance* type_var = resolve_type(node->scope, node->decl_constant.type_info, false);
+				Type_Instance* type_var = resolve_type(node->scope, node->decl_constant.type_info, false, &error_code);
 				if (!type_var || !(type_var->flags & TYPE_FLAG_INTERNALIZED)) {
 					error_code |= TYPE_QUEUED;
 					return error_code;
@@ -610,7 +627,6 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 			assert(node->decl_constant.type_info->flags & TYPE_FLAG_INTERNALIZED);
 		}break;
 		case AST_DECL_ENUM: {
-			//assert_msg(0, "enum type information pass not implemented");
 			assert(node->decl_enum.type_hint->flags & TYPE_FLAG_INTERNALIZED);
 
 			size_t nfields = node->decl_enum.fields_count;
@@ -762,7 +778,7 @@ Type_Error type_checking_decl(Scope* scope, Ast* node) {
 	switch (node->node_type) {
 		case AST_DECL_VARIABLE: {
 			if (node->decl_variable.variable_type) {
-				node->decl_variable.variable_type = resolve_type(node->scope, node->decl_variable.variable_type, true);
+				node->decl_variable.variable_type = resolve_type(node->scope, node->decl_variable.variable_type, true, &error_code);
 				if (node->decl_variable.variable_type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
 					error_code |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a variable of type void\n");
 				}
@@ -816,7 +832,7 @@ Type_Error type_checking_decl(Scope* scope, Ast* node) {
 			}
 
 			if (node->decl_constant.type_info) {
-				node->decl_constant.type_info = resolve_type(node->scope, node->decl_constant.type_info, true);
+				node->decl_constant.type_info = resolve_type(node->scope, node->decl_constant.type_info, true, &type_error);
 				if (node->decl_constant.type_info == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
 					error_code |= report_type_error(TYPE_ERROR_FATAL, node, "cannot declare a constant of type void\n");
 				}
@@ -924,6 +940,7 @@ Type_Error type_checking_pass(Scope* scope, Ast* node) {
 }
 
 Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
+	TIME_FUNC();
 	Type_Error error_code = TYPE_OK;
 
 	// Initialize the global scope symbol table

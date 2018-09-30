@@ -112,3 +112,7 @@ HELPER_EXPRESSION_LIST :=
 ;
 
 
+EXPRESSION_DIRECTIVE := 
+	'#' sizeof TYPE
+|	'#' typeof EXPRESSION
+;

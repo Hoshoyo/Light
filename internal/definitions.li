@@ -3,3 +3,38 @@ string :: struct {
     capacity : s64;
     data     : ^u8;
 }
+/*
+Type_Primitive :: enum {
+	TYPE_UNKNOWN        : 0,
+	TYPE_PRIMITIVE_S8   : 1,
+	TYPE_PRIMITIVE_S16  : 2,
+	TYPE_PRIMITIVE_S32  : 3,
+	TYPE_PRIMITIVE_S64  : 4,
+	TYPE_PRIMITIVE_U8   : 5,
+	TYPE_PRIMITIVE_U16  : 6,
+	TYPE_PRIMITIVE_U32  : 7,
+	TYPE_PRIMITIVE_U64  : 8,
+	TYPE_PRIMITIVE_R32  : 9,
+	TYPE_PRIMITIVE_R64  : 10,
+	TYPE_PRIMITIVE_BOOL : 11,
+	TYPE_PRIMITIVE_VOID : 12
+}
+
+Type_Desc :: union {
+    primitive     : Type_Primitive;
+    pointer_to    : ^Type_Info;
+    array_desc    : Type_Array;
+    struct_desc   : Type_Struct;
+    union_desc    : Type_Union;
+    function_desc : Type_Function;
+    alias         : Type_Alias;
+}
+
+Type_Info :: struct {
+    kind           : Type_Kind;
+	flags          : u32;
+	reserved       : s32;
+	type_size_bits : s64;
+    description    : Type_Desc;
+}
+*/

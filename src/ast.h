@@ -33,6 +33,7 @@ enum Ast_NodeType {
 	AST_EXPRESSION_LITERAL,
 	AST_EXPRESSION_VARIABLE,
 	AST_EXPRESSION_PROCEDURE_CALL,
+	AST_EXPRESSION_DIRECTIVE,
 
 };
 
@@ -334,6 +335,19 @@ struct Ast_Data {
 	s32       id;
 };
 
+enum Expr_Directive_Type {
+	EXPR_DIRECTIVE_SIZEOF,	// #sizeof type
+	EXPR_DIRECTIVE_TYPEOF,  // #typeof expr
+};
+struct Ast_Expr_Directive {
+	Expr_Directive_Type type;
+	Token* token;
+	union {
+		Ast*           expr;
+		Type_Instance* type_expr;
+	};
+};
+
 const u32 AST_FLAG_IS_DECLARATION = FLAG(0);
 const u32 AST_FLAG_IS_COMMAND     = FLAG(1);
 const u32 AST_FLAG_IS_EXPRESSION  = FLAG(2);
@@ -341,6 +355,7 @@ const u32 AST_FLAG_IS_DATA        = FLAG(3);
 const u32 AST_FLAG_QUEUED         = FLAG(4);
 const u32 AST_FLAG_LVALUE         = FLAG(5);
 const u32 AST_FLAG_ENUM_ACCESSOR  = FLAG(6);
+const u32 AST_FLAG_IS_DIRECTIVE   = FLAG(7);
 //const u32 AST_FLAG_FAILED_TYPE_CHECK = FLAG(6);
 
 struct Ast {
@@ -374,6 +389,8 @@ struct Ast {
 		Ast_Expr_Variable       expr_variable;
 		Ast_Expr_ProcCall       expr_proc_call;
 
+		Ast_Expr_Directive      expr_directive;
+
 		Ast_Data                data_global;
 	};
 
@@ -381,6 +398,8 @@ struct Ast {
 };
 
 Scope* scope_create(Ast* creator, Scope* parent, u32 flags);
+
+Ast* ast_create_expr_sizeof(Type_Instance* type, Scope* scope, Token* directive_token);
 
 Ast* ast_create_data(Data_Type type, Scope* scope, Token* location, u8* data, s64 length_bytes, Type_Instance* data_type);
 

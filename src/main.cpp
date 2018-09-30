@@ -15,6 +15,7 @@
 #include "bytecode_gen.h"
 
 void initialize() {
+	TIME_FUNC();
 	type_table_init();
 	file_table_init();
 	Lexer::init();
@@ -48,6 +49,9 @@ int main(int argc, char** argv) {
 		if(c_str_equal(argv[2], "-v")) {
 			verbose = true;
 		}
+		if(c_str_equal(argv[2], "-d")) {
+			print_debug_c = true;
+		}
 	}
 
 	Timer timer;
@@ -67,21 +71,27 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 
-	// TODO(psv): Fuse type checking, and also refactor it
-	Type_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
-
-	if (decl_err & TYPE_ERROR_FATAL) {
-		return -1;
+	{
+		TIME_FUNC_NAMED("decl_checking");
+		// TODO(psv): Fuse type checking, and also refactor it
+		Type_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
+		if (decl_err & TYPE_ERROR_FATAL) {
+			return -1;
+		}
 	}
 
-	Type_Error type_error = type_check(&global_scope, ast_top_level);
-	if (type_error) {
-		return -1;
+	{
+		TIME_FUNC_NAMED("type check");
+		Type_Error type_error = type_check(&global_scope, ast_top_level);
+		if (type_error) {
+			return -1;
+		}
 	}
 
 	double end = timer.GetTime();
-	printf("File load time      : %fms\n", total_file_load_time);
-	printf("Compiler     elapsed: %fms\n", (end - start));
+	printf("File load time      : %f ms\n", total_file_load_time);
+	printf("Compiler     elapsed: %f ms\n", (end - start));
+	printf("Lexer      processed: %d LoC\n", global_lexer_line_count);
 
 	if(verbose){
 		// TODO(psv): make compiler options/flags to print this
@@ -91,14 +101,10 @@ int main(int argc, char** argv) {
 		DEBUG_print_type_table_structs();
 	}
 	
-#if 0
+#if 1
 	double bend_start = timer.GetTime();
 	c_generate(ast_top_level, g_type_table, argv[1], argv[0], g_lib_table);
-	double bend_end = timer.GetTime();
-	
-	printf("Backend      elapsed: %fms\n", (bend_end - bend_start));
-	printf("Total        elapsed: %fms\n", ((end - start) + (bend_end - bend_start)));
-
+	double bend_end = timer.GetTime();	
 #else
 	{
 		init_interpreter();
@@ -107,5 +113,8 @@ int main(int argc, char** argv) {
 		return 0;
 	}
 #endif
+	printf("Backend      elapsed: %f ms\n", (bend_end - bend_start));
+	printf("Total        elapsed: %f ms\n", ((end - start) + (bend_end - bend_start)));
+	print_profile();
 	return 0;
 }

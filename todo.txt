@@ -1,34 +1,67 @@
-- better error when enum type mismatch happens
-- check for enum value duplication
+#todo
 
+- multiple line strings avoid lexer line counter
+- variadic functions
+- better error when enum type mismatch happens
+- bytecode implement all language
 - gcc warning shift more than the register size holds
 - constant in type definition
 - make forward decls declarable more than once
 - check constants
+- implement typeof
 
-- this causes warning in the c backend
-main :: () -> s32 {
-	a := "Hello".data;
-	return cast(s32)a;
-}
+#backlog
 
-#changes
-
-- dereference pointer on . operator
+- multiple line string
+- check for end of stream within comment
+- do better errors in parser stage and check for end of stream
+- do better errors in semantic stage
 - check return in all paths, proc with no return clause and other commands is ignored when returning any non-void
 - make array infer its size from expression
-
-#features
-
-- enums
-- unions
+- implement union literals
 - file scope
 - switch
 - scoped functions
 - namespaces
+- check cast to static array
 
-#backlog
-
-- check for end of stream within comment
-- do better errors in parser stage and check for end of stream
-- do better errors in semantic stage
+#changelog - most recent first
+29/09/2018
+	- make ^T cast to ^void implicitly (fixed the opposite)
+	- implement sizeof
+26/09/2018
+    - char causes a type error that does not stop compilation
+25/09/2018
+    - improved bytecode generation
+    - implemented linux external function name solving and calling for bytecode
+    - check for enum value duplication
+21/09/2018
+    - enums
+19/09/2018
+    - dereference pointer on . operator
+23/06/2018
+    - type alias
+12/05/2018
+    - change cast to be [type]
+    - added 'for' init_commands ; condition ; defered_commands
+    - added while
+13/05/2018
+    - make includes in files from where they are
+    - make includes in files unique
+	- pointer to proc emit in c backend
+14/05/2018
+    - #foreign block added
+15/05/2018
+    - temp/c_entry.o not found when compiling outside compiler directory
+    - updated docs
+    - use foreign library name to link (linux)
+    - updated examples to new cast syntax
+19/05/2018
+	- use foreign library name to link (windows)
+	- assignment of arrays
+    - string escaping
+    - internal definitions
+22/05/2018
+    - verify if main is declared before compiling
+	if not, then compile a .obj file (for now)
+	- unions

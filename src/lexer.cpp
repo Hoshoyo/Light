@@ -6,6 +6,7 @@
 
 extern Hash_Table keywords = {};
 extern String_Hash_Table identifiers = {};
+extern s32 global_lexer_line_count = 0;
 
 // All the keywords in the language
 Keyword keywords_info[] = {
@@ -47,6 +48,7 @@ string compiler_tags[] = {
 	{sizeof("import")  - 1, -1, (u8*)"import"},
 	{sizeof("end")     - 1, -1, (u8*)"end"},
 	{sizeof("typedef") - 1, -1, (u8*)"typedef" },
+	{sizeof("sizeof")  - 1, -1, (u8*)"sizeof" },
 };
 
 s32 Lexer::report_error_location(Token* tok) {
@@ -138,6 +140,7 @@ Lexer_Error Lexer::start(const char* filename, Token* location)
 
 	lex_file();
 	current_token = 0;
+	global_lexer_line_count += this->line_count;
 	return LEXER_OK;
 }
 
@@ -446,6 +449,9 @@ bool Lexer::read_token(char** begin)
 		at++;
 		current_col++;
 		for (; at[i] != '"'; ++i) {
+			if(at[i] == '\n'){
+				line_count++;
+			}
 			if (at[i] == 0) {
 				fprintf(stderr, "%.*s: ", filepath.length, filepath.data);
 
@@ -736,7 +742,7 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_SYMBOL_NOT:				return  ("!"); break;
 	case TOKEN_SYMBOL_POUND:			return  ("#"); break;
 	case TOKEN_SYMBOL_DOLLAR:			return  ("$"); break;
-	case TOKEN_SYMBOL_MOD:				return  ("%"); break;
+	case TOKEN_SYMBOL_MOD:				return  ("%%"); break;
 	case TOKEN_SYMBOL_AND:				return  ("&"); break;
 	case TOKEN_SYMBOL_OPEN_PAREN:		return  ("("); break;
 	case TOKEN_SYMBOL_CLOSE_PAREN:		return  (")"); break;
@@ -776,7 +782,7 @@ char* Lexer::get_token_string(Token_Type t)
 	case TOKEN_MINUS_EQUAL: return ("-="); break;
 	case TOKEN_TIMES_EQUAL: return ("*="); break;
 	case TOKEN_DIV_EQUAL:	return ("/="); break;
-	case TOKEN_MOD_EQUAL:	return ("%="); break;
+	case TOKEN_MOD_EQUAL:	return ("%%="); break;
 	case TOKEN_AND_EQUAL:	return ("&="); break;
 	case TOKEN_OR_EQUAL:	return ("|="); break;
 	case TOKEN_XOR_EQUAL:	return ("^="); break;
