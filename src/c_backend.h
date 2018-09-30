@@ -47,3 +47,5 @@ struct C_Code_Generator {
 };
 
 void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char* compiler_path, string* libs_to_link);
+
+extern bool print_debug_c;

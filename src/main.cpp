@@ -46,6 +46,9 @@ int main(int argc, char** argv) {
 		if(c_str_equal(argv[2], "-v")) {
 			verbose = true;
 		}
+		if(c_str_equal(argv[2], "-d")) {
+			print_debug_c = true;
+		}
 	}
 
 	Timer timer;

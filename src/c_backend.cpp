@@ -12,6 +12,8 @@ static void report_fatal_error(char* msg, ...) {
 	exit(-1);
 }
 
+bool print_debug_c = false;
+
 int C_Code_Generator::sprint(char* msg, ...) {
 	va_list args;
 	va_start(args, msg);
@@ -26,22 +28,28 @@ int C_Code_Generator::sprint(char* msg, ...) {
 	}
 
 	va_end(args);
-#if DEBUG
-	{
-		va_list args;
-		va_start(args, msg);
-		int num_written = 0;
 
-		num_written = vfprintf(stdout, msg, args);
-		fflush(stdout);
+	if(print_debug_c){
+		if (!deferring) {
+			va_list args;
+			va_start(args, msg);
+			int num_written = 0;
 
-		va_end(args);
+			num_written = vfprintf(stdout, msg, args);
+			fflush(stdout);
+
+			va_end(args);
+		}
 	}
-#endif
 	return num_written;
 }
 
 void C_Code_Generator::defer_flush() {
+	if(print_debug_c) {
+		fprintf(stdout, "%.*s", defer_ptr, defer_buffer);
+		fflush(stdout);
+	}
+
 	memcpy(buffer + ptr, defer_buffer, defer_ptr);
 	ptr += defer_ptr;
 	defer_ptr = 0;
@@ -412,9 +420,11 @@ void C_Code_Generator::emit_struct_assignment(Ast* decl) {
 
         sprint("}\n");
     } else {
+		deferring = true;
         sprint("%.*s = ", TOKEN_STR(decl->decl_variable.name));
         emit_expression(decl->decl_variable.assignment);
         sprint(";\n");
+		defer_flush();
     }
 }
 
@@ -444,8 +454,8 @@ void C_Code_Generator::emit_command(Ast* comm) {
                                 sprint("%.*s = ", TOKEN_STR(cm->decl_variable.name));
                                 emit_expression(cm->decl_variable.assignment);
                                 sprint(";");
-								deferring = false;
 								defer_flush();
+								deferring = false;
                             }
                         }
 					} else if (cm->node_type == AST_DECL_CONSTANT) {
@@ -525,12 +535,15 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			// bigger than regsize
 			else {
 				if(rval->node_type == AST_EXPRESSION_BINARY || rval->node_type == AST_EXPRESSION_PROCEDURE_CALL){
+					deferring = true;
 					if (comm->comm_var_assign.lvalue) {
                         emit_expression(comm->comm_var_assign.lvalue);
                         sprint(" = ");
                     }
                     emit_expression(comm->comm_var_assign.rvalue);
                     sprint(";");
+					defer_flush();
+					deferring = false;
 				} else if(rval->node_type == AST_EXPRESSION_VARIABLE && 
 					(rval->type_return->kind == KIND_STRUCT || rval->type_return->kind == KIND_UNION)){
                     if (comm->comm_var_assign.lvalue) {

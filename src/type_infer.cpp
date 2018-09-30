@@ -364,7 +364,7 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 		*error |= report_type_error(TYPE_ERROR_FATAL, expr, "expression is not a procedure\n");
 	} else {
 		//assert_msg(type_strong(caller_type), "weak functional type in type inference pass");
-		assert(!type_strong(caller_type));
+		assert(type_strong(caller_type));
 	}
 
 	proc_type = caller_type;
