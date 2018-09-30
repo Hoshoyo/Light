@@ -558,10 +558,156 @@ int execute_instruction(Instruction inst, u64 next_word)
 	return 0;
 }
 
+template <typename T>
+int execute_float_instruction(Instruction inst, u64 next_word) {
+	T ui_left, ui_right;
+	bool write_memory = false;
+	bool write_register = false;
+	bool advance_ip = true;
+	u64 address_to_write = 0;
+
+	switch (inst.addressing) {
+	case REG_TO_REG: {
+		ui_left = reg[inst.left_reg];
+		ui_right = reg[inst.right_reg];
+		write_register = true;
+	}break;
+	case MEM_TO_REG: {
+		ui_left = reg[inst.left_reg];
+		ui_right = next_word;
+		write_register = true;
+	}break;
+	case SINGLE_REG: {
+		ui_left = reg[inst.left_reg];
+	}break;
+	case SINGLE_MEM: {
+		ui_left = next_word;
+	}break;
+	case SINGLE_MEM_PTR: {
+		assert(inst.flags & IMMEDIATE_VALUE);
+		if (inst.flags & IMMEDIATE_OFFSET) {
+			address_to_write = next_word + inst.immediate_offset;
+		} else if (inst.flags & REGISTER_OFFSET) {
+			address_to_write = next_word + reg[inst.offset_reg];
+		} else {
+			address_to_write = next_word;
+		}
+		ui_left = *(T*)(address_to_write);
+	}break;
+	case SINGLE_REG_PTR: {
+		if (inst.flags & IMMEDIATE_OFFSET) {
+			address_to_write = reg[inst.left_reg] + inst.immediate_offset;
+		} else if (inst.flags & REGISTER_OFFSET) {
+			address_to_write = reg[inst.left_reg] + reg[inst.offset_reg];
+		} else {
+			address_to_write = reg[inst.left_reg];
+		}
+		ui_left = *(T*)(address_to_write);
+	}break;
+	case REG_TO_REG_PTR: {
+		if (inst.flags & IMMEDIATE_OFFSET) {
+			address_to_write = reg[inst.left_reg] + inst.immediate_offset;
+		} else if (inst.flags & REGISTER_OFFSET) {
+			address_to_write = reg[inst.left_reg] + reg[inst.offset_reg];
+		} else {
+			address_to_write = reg[inst.left_reg];
+		}
+		ui_left = *(T*)(address_to_write);
+		ui_right = reg[inst.right_reg];
+		write_memory = true;
+	}break;
+	case REG_PTR_TO_REG: {
+		ui_left = reg[inst.left_reg];
+		if (inst.flags & IMMEDIATE_OFFSET)
+			ui_right = *(T*)(reg[inst.right_reg] + inst.immediate_offset);
+		else if (inst.flags & REGISTER_OFFSET)
+			ui_right = *(T*)(reg[inst.right_reg] + reg[inst.offset_reg]);
+		else
+			ui_right = *(T*)reg[inst.right_reg];
+		write_register = true;
+	}break;
+	case MEM_PTR_TO_REG: {
+		ui_left = reg[inst.left_reg];
+		if (inst.flags & IMMEDIATE_OFFSET)
+			ui_right = *(T*)(next_word + inst.immediate_offset);
+		else if (inst.flags & REGISTER_OFFSET)
+			ui_right = *(T*)(next_word + reg[inst.offset_reg]);
+		else
+			ui_right = *(T*)next_word;
+		write_register = true;
+	}break;
+	case REG_TO_MEM_PTR: {
+		if (inst.flags & IMMEDIATE_OFFSET) {
+			address_to_write = next_word + inst.immediate_offset;
+		} else if (inst.flags & REGISTER_OFFSET) {
+			address_to_write = next_word + reg[inst.offset_reg];
+		} else {
+			address_to_write = next_word;
+		}
+		ui_left = *(T*)(address_to_write);
+		ui_right = reg[inst.right_reg];
+		write_memory = true;
+	}break;
+	}
+
+	// instruction decode
+	switch (inst.type) {
+	case ADD:	ui_left = ui_left + ui_right; break;
+	case SUB:	ui_left = ui_left - ui_right; break;
+	case MUL:	ui_left = ui_left * ui_right; break;
+	case DIV:	ui_left = ui_left / ui_right; break;
+
+	case CMP: {
+		if (ui_left < ui_right)
+			reg[R_FLAGS] |= FLAGS_REG_SIGN;
+		else
+			reg[R_FLAGS] &= ~FLAGS_REG_SIGN;
+		if (ui_left == ui_right)
+			reg[R_FLAGS] |= FLAGS_REG_ZERO;
+		else
+			reg[R_FLAGS] &= ~FLAGS_REG_ZERO;
+	}break;
+
+	case MOV: {
+		ui_left = ui_right;
+	}break;
+	case PUSH: {
+		assert(inst.addressing == SINGLE_MEM || inst.addressing == SINGLE_REG || inst.addressing == SINGLE_REG_PTR || inst.addressing == SINGLE_MEM);
+		address_to_write = reg[R_SP];
+		reg[R_SP] += sizeof(u64);
+		write_memory = true;
+	}break;
+	case POP: {
+		assert(inst.addressing == SINGLE_REG);
+		reg[R_SP] -= sizeof(u64);
+		ui_left = *(T*)reg[R_SP];
+		write_register = true;
+	}break;
+	}
+	
+	if (write_register) {
+		reg[inst.left_reg] = ui_left;
+	} else if (write_memory) {
+		*(T*)address_to_write = ui_left;
+	}
+	if (advance_ip) {
+		s64 advance = REG_SIZE;
+		if (inst.flags & IMMEDIATE_OFFSET) advance += sizeof(inst.immediate_offset);
+		if (inst.flags & IMMEDIATE_VALUE) advance += sizeof(u64);	// @todo this should be the size of the immediate value u16 u8 s32 etc..
+		reg[R_IP] += advance;
+	}
+
+	return 0;
+}
+
 int execute(Instruction inst, u64 next_word)
 {
 	int status = 0;
-	if (inst.flags & SIGNED) {
+	if(inst.flags & INSTR_FLOAT_32) {
+		status = execute_float_instruction<r32>(inst, next_word);
+	} else if (inst.flags & INSTR_FLOAT_64) {
+		status = execute_float_instruction<r64>(inst, next_word);
+	} else if (inst.flags & SIGNED) {
 		if (inst.flags & INSTR_BYTE)
 			status = execute_instruction<s8>(inst, next_word);
 		else if (inst.flags & INSTR_WORD)
@@ -602,9 +748,13 @@ static char* reg_name(Light_Arena* arena, u8 r) {
 		case R_SP:		l = sprintf(n, "R_SP[0x%llx]", reg[R_SP]);			break;
 		case R_SB:		l = sprintf(n, "R_SB[0x%llx]", reg[R_SB]);			break;
 		case R_SS:		l = sprintf(n, "R_SS[0x%llx]", reg[R_SS]);			break;
+		case FR_0:		l = sprintf(n, "FR_0[%f]", reg[FR_0]); 				break;			
+		case FR_1:		l = sprintf(n, "FR_1[%f]", reg[FR_1]); 				break;	
+		case FR_2:		l = sprintf(n, "FR_2[%f]", reg[FR_2]); 				break;	
+		case FR_3:		l = sprintf(n, "FR_3[%f]", reg[FR_3]); 				break;	
 		case R_FLAGS:	l = sprintf(n, "R_FLAGS[0x%llx]", reg[R_FLAGS]);	break;
-		case NO_REG:	l = sprintf(n, "NO_REG");						break;
-		default:        l = sprintf(n, "R_UNK");						break;
+		case NO_REG:	l = sprintf(n, "NO_REG");							break;
+		default:        l = sprintf(n, "R_UNK");							break;
 	}
 	n[l] = 0;
 

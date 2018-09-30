@@ -23,12 +23,16 @@ static Registers* register_stack;
 
 // The oldest register, the one allocated farther back gets allocated in
 // case of all allocated.
-Registers reg_allocate(bool* push_before_using) {
+Registers reg_allocate(bool* push_before_using, bool floating_point = false) {
 	*push_before_using = false;
 
 	s32 oldest = -1;
 	Registers result = NO_REG;
-	for (int i = 0; i <= R_8; ++i) {
+
+	Registers r_first = (floating_point) ? FR_0 : R_0;
+	Registers r_last  = (floating_point) ? FR_3 : R_8;
+
+	for (int i = r_last; i <= r_first; ++i) {
 		if (!register_allocated[i].allocated) {
 			register_allocated[i].allocated = true;
 			register_allocated[i].age = 0;
@@ -218,8 +222,9 @@ Expr_Generation gen_code_for_expression(Ast* expr, s64 offset) {
 
 	case AST_EXPRESSION_LITERAL: {
 		bool push_before_use = false;
-		Registers result_register = reg_allocate(&push_before_use);
+		Registers result_register = reg_allocate(&push_before_use, type_primitive_float(expr->type_return));
 		result.reg = result_register;
+
 		if (push_before_use) {
 			end_address = push_instruction(make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, result_register, NO_REG, 0, 0));
 		}
@@ -232,7 +237,7 @@ Expr_Generation gen_code_for_expression(Ast* expr, s64 offset) {
 			switch (expr->type_return->primitive) {
 			case TYPE_PRIMITIVE_U8:
 			case TYPE_PRIMITIVE_S8:
-				end_address = push_instruction(make_instruction(MOV, INSTR_BYTE|IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
+				end_address = push_instruction(make_instruction(MOV, INSTR_BYTE | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
 				break;
 			case TYPE_PRIMITIVE_U16:
 			case TYPE_PRIMITIVE_S16:
@@ -249,7 +254,12 @@ Expr_Generation gen_code_for_expression(Ast* expr, s64 offset) {
 			}
 		}break;
 		case LITERAL_FLOAT: {
-
+			switch(expr->type_return->primitive) {
+			case TYPE_PRIMITIVE_R32:
+				end_address = push_instruction(make_instruction(MOV, INSTR_DWORD|INSTR_FLOAT_32|IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
+			case TYPE_PRIMITIVE_R64:
+				end_address = push_instruction(make_instruction(MOV, INSTR_DWORD|INSTR_FLOAT_64|IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
+			}
 		}break;
 		case LITERAL_BOOL: {
 			end_address = push_instruction(make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), (u64)expr->expr_literal.value_bool);

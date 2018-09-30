@@ -57,6 +57,8 @@ const u16 INSTR_WORD = FLAG(5);
 const u16 INSTR_DWORD = FLAG(6);
 const u16 INSTR_QWORD = FLAG(7);
 const u16 IMMEDIATE_VALUE = FLAG(8);
+const u16 INSTR_FLOAT_32 = FLAG(9);
+const u16 INSTR_FLOAT_64 = FLAG(9);
 
 // Flags register
 //const s64 FLAGS_REG_OVERFLOW	= FLAG(0);	// @todo
@@ -83,8 +85,13 @@ enum Registers {
 
 	R_FLAGS = 13,
 
-	NO_REG = 14,
-	NUM_REGS = 15,
+	FR_0 = 14,
+	FR_1 = 15,
+	FR_2 = 16,
+	FR_3 = 17,
+
+	NO_REG,
+	NUM_REGS,
 };
 
 struct Instruction {

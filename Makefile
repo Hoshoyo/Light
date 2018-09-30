@@ -6,7 +6,7 @@ BINDIR=./bin/gcc
 
 all: extcall 
 	mkdir -p ./bin/gcc
-	$(CC) $(CFLAGS) $(SRCDIR)/ast.cpp $(SRCDIR)/main.cpp $(SRCDIR)/lexer.cpp $(SRCDIR)/util.cpp $(SRCDIR)/type.cpp $(SRCDIR)/type_table.cpp $(SRCDIR)/parser.cpp $(SRCDIR)/decl_check.cpp $(SRCDIR)/type_infer.cpp $(SRCDIR)/type_check.cpp $(SRCDIR)/symbol_table.cpp $(SRCDIR)/hash_table.cpp $(SRCDIR)/error.cpp $(SRCDIR)/c_backend.cpp $(SRCDIR)/file_table.cpp -o $(BINDIR)/light $(BINDIR)/external_caller.o 
+	$(CC) $(CFLAGS) $(SRCDIR)/ast.cpp $(SRCDIR)/interpreter.cpp $(SRCDIR)/bytecode_gen.cpp $(SRCDIR)/main.cpp $(SRCDIR)/lexer.cpp $(SRCDIR)/util.cpp $(SRCDIR)/type.cpp $(SRCDIR)/type_table.cpp $(SRCDIR)/parser.cpp $(SRCDIR)/decl_check.cpp $(SRCDIR)/type_infer.cpp $(SRCDIR)/type_check.cpp $(SRCDIR)/symbol_table.cpp $(SRCDIR)/hash_table.cpp $(SRCDIR)/error.cpp $(SRCDIR)/c_backend.cpp $(SRCDIR)/file_table.cpp -o $(BINDIR)/light $(BINDIR)/external_caller.o $(LINKFLAGS)
 
 extcall: 
 	mkdir -p $(BINDIR)
