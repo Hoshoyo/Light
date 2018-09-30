@@ -416,6 +416,8 @@ void C_Code_Generator::emit_struct_assignment(Ast* decl) {
 
         // array copies will use this
         sprint("char* __array_base = __t_base;\n");
+		// struct copies will use this
+		sprint("char* __struct_base = __t_base;\n");
         emit_struct_assignment_from_base(0, expr);
 
         sprint("}\n");

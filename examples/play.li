@@ -32,9 +32,7 @@ Quad_2D :: struct {
 
 //quad_new :: (position : vec2, width : r32, height : r32, color : vec4) -> Quad_2D {}
 //foo :: (color : vec4) -> Quad_2D {}
-test :: (f : ^u8) -> s32{
-
-}
+//test :: (f : ^u8) -> s32{}
 
 main :: () -> s32 {
 	//a := foo(vec4:{1.0, 1.0, 1.0, 1.0});
@@ -43,8 +41,16 @@ main :: () -> s32 {
 	//quad : Quad_2D;
 	//quad = quad_new(vec2:{0.0, 0.0}, 100.0, 100.0, vec4:{1.0, 0.0, 0.0, 1.0});
 
-	a := test("hello".data);
+	//a := test("hello".data);
 
+	q := Quad_2D:{
+		array {
+			Vertex_3D:{ vec3:{1.0, 1.0, 0.0}, 1.0, vec2:{0.0, 0.0}, vec4:{1.0, 0.0, 0.0, 1.0}, 1.0 },
+			Vertex_3D:{ vec3:{1.0, 1.0, 0.0}, 1.0, vec2:{1.0, 0.0}, vec4:{1.0, 0.0, 0.0, 1.0}, 1.0 },
+			Vertex_3D:{ vec3:{1.0, 1.0, 0.0}, 1.0, vec2:{0.0, 1.0}, vec4:{1.0, 0.0, 0.0, 1.0}, 1.0 },
+			Vertex_3D:{ vec3:{1.0, 1.0, 0.0}, 1.0, vec2:{1.0, 1.0}, vec4:{1.0, 0.0, 0.0, 1.0}, 1.0 }
+		}
+	};
 
 	return 0;
 }
