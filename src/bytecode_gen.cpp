@@ -431,6 +431,36 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 			env->code_offset += end_address - start_address;
 		}break;
 
+		case AST_COMMAND_IF:{
+			// conditional expression in a register R_X
+			//    cmp R_X, R_X[0|1]
+			Expr_Generation condition = gen_code_for_expression(env, node->comm_if.condition);
+			assert(condition.flags & EXPR_RESULT_ON_REGISTER);
+
+			//    beq case_false
+			s64 start_address = move_code_offset(env->code_offset);
+			s32* immediate_offset_case_false;
+			s64 end_address = push_instruction(make_instruction(BEQ, SIGNED | IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, &immediate_offset_case_false));
+			env->code_offset += end_address - start_address;
+			
+			// case_true:
+			gen_code_node(env, node->comm_if.body_true);
+
+			//    jmp if_end:
+			start_address = move_code_offset(env->code_offset);
+			s64 case_false = push_instruction(make_instruction(JMP, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0));
+			*immediate_offset_case_false = case_false - start_address;
+			env->code_offset += case_false - start_address;
+
+			// case_false:
+			gen_code_node(env, node->comm_if.body_false);
+
+			// if_end:
+			s64* immediate_offset_if_end = &((Instruction*)case_false)->immediate_offset;
+			*immediate_offset_if_end = move_code_offset(env->code_offset);
+
+		}break;
+
 		case AST_DECL_VARIABLE: {
 			node->decl_variable.stack_offset = env->stack_base_offset;
 			env->stack_base_offset += node->decl_variable.variable_type->type_size_bits / 8;

@@ -119,6 +119,7 @@ u64 push_instruction(Instruction inst);
 u64 push_instruction(Instruction inst, u64 next_word);
 u64 push_instruction(Instruction inst, u64** out_next_word);
 Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8 right_reg, u8 offset_reg, s32 immediate_offset);
+Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8 right_reg, u8 offset_reg, s32** immediate_offset);
 
 #define HALT push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0))
 void print_instruction(Instruction inst, u64 next_qword);

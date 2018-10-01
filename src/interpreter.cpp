@@ -66,6 +66,18 @@ Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8
 	return res;
 }
 
+Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8 right_reg, u8 offset_reg, s32** immediate_offset) {
+	Instruction res;
+	res.type = type;
+	res.flags = flags;
+	res.addressing = addressing;
+	res.left_reg = left_reg;
+	res.right_reg = right_reg;
+	res.offset_reg = offset_reg;
+	*immediate_offset = (s32*)&res.immediate_offset;
+	return res;
+}
+
 u64 get_data_segment_address()
 {
 	return (u64)datas;
