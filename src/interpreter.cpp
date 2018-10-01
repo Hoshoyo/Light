@@ -19,10 +19,12 @@ int execute(Instruction instruction, u64 next_word);
 
 u64 push_instruction(Instruction inst) {
 	*(Instruction*)code_ptr = inst;
-	if (inst.flags & IMMEDIATE_OFFSET)
+	if (inst.flags & IMMEDIATE_OFFSET) {
 		code_ptr += sizeof(Instruction);
-	else
+	} else {
 		code_ptr += sizeof(Instruction) - sizeof(inst.immediate_offset);
+	}
+	//print_instruction(inst, 0);
 	return (u64)code_ptr;
 }
 
@@ -30,6 +32,7 @@ u64 push_instruction(Instruction inst, u64 next_word) {
 	push_instruction(inst);
 	*(u64*)code_ptr = next_word;	// @todo this should be the size of the immediate value u16 u8 s32 etc..
 	code_ptr += sizeof(next_word);
+	//print_instruction(inst, next_word);
 	return (u64)code_ptr;
 }
 
@@ -37,6 +40,7 @@ u64 push_instruction(Instruction inst, u64** out_next_word) {
 	push_instruction(inst);
 	*out_next_word = (u64*)code_ptr;
 	code_ptr += sizeof(**out_next_word);
+	//print_instruction(inst, **out_next_word);
 	return (u64)code_ptr;
 }
 
@@ -538,6 +542,9 @@ int execute_instruction(Instruction inst, u64 next_word)
 		reg[R_0] = ret;
 		reg[R_SP] -= reg[R_SS];		
 	}break;
+	case COPY: {
+		memcpy((void*)ui_left, (void*)ui_right, next_word);
+	}break;
 	case HLT: {
 		return 1;
 	}break;
@@ -794,6 +801,7 @@ void print_instruction(Instruction inst, u64 next_qword)
 		case SHL  : l += printf("SHL "); break;
 		case SHR  : l += printf("SHR "); break;
 		case EXTCALL: l += printf("EXTERNAL CALL: "); break;
+		case COPY : l += printf("COPY "); break;
 		case HLT  : l += printf("HLT "); break;
 		default   : l += printf("UNKNOWN "); break;
 	}

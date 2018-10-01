@@ -33,6 +33,7 @@ const u16 XOR = 22;
 const u16 NOT = 23;
 const u16 SHL = 24;
 const u16 SHR = 25;
+const u16 COPY = 26;	// COPY [R]/MEM, [R]/MEM
 
 // Instruction addressing
 const u8 NO_ADDRESSING = 0;

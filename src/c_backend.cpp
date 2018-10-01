@@ -55,10 +55,6 @@ void C_Code_Generator::defer_flush() {
 	defer_ptr = 0;
 }
 
-bool type_regsize(Type_Instance* type) {
-	return (type->kind == KIND_POINTER || type->kind == KIND_PRIMITIVE);
-}
-
 s64 C_Code_Generator::alloc_loop_id() {
 	loop_id++;
 	return loop_id - 1;

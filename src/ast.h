@@ -167,6 +167,8 @@ struct Ast_Decl_Procedure {
 	Token* extern_library_name;
 };
 
+const u32 DECL_VARIABLE_STACK = FLAG(0);
+const u32 DECL_VARIABLE_DATA_SEGMENT = FLAG(1);
 struct Ast_Decl_Variable {
 	Token*         name;
 	Ast*           assignment;		// EXPRESSION
@@ -356,6 +358,7 @@ const u32 AST_FLAG_QUEUED         = FLAG(4);
 const u32 AST_FLAG_LVALUE         = FLAG(5);
 const u32 AST_FLAG_ENUM_ACCESSOR  = FLAG(6);
 const u32 AST_FLAG_IS_DIRECTIVE   = FLAG(7);
+const u32 AST_FLAG_LEFT_ASSIGN    = FLAG(8);
 //const u32 AST_FLAG_FAILED_TYPE_CHECK = FLAG(6);
 
 struct Ast {

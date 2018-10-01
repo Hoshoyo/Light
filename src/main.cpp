@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
 	}
 
 	{
-		TIME_FUNC_NAMED("decl_checking");
+		//TIME_FUNC_NAMED("decl_checking");
 		// TODO(psv): Fuse type checking, and also refactor it
 		Type_Error decl_err = decl_check_top_level(&global_scope, ast_top_level);
 		if (decl_err & TYPE_ERROR_FATAL) {
@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
 	}
 
 	{
-		TIME_FUNC_NAMED("type check");
+		//TIME_FUNC_NAMED("type check");
 		Type_Error type_error = type_check(&global_scope, ast_top_level);
 		if (type_error) {
 			return -1;

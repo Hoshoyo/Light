@@ -152,6 +152,10 @@ inline bool type_primitive_numeric(Type_Primitive p) {
 	return (type_primitive_int(p) || type_primitive_float(p));
 }
 
+inline bool type_regsize(Type_Instance* type) {
+	return (type->kind == KIND_POINTER || type->kind == KIND_PRIMITIVE);
+}
+
 inline s64 type_size_primitive(Type_Primitive primitive) {
 	switch (primitive) {
 	case TYPE_PRIMITIVE_S64:	return 8;

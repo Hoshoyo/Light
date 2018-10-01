@@ -69,6 +69,10 @@ Type_Error evaluate_directive(Ast* expr, u32 flags) {
 }
 
 Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
+	if (flags & TYPE_INFER_LVALUE) {
+		expr->flags |= AST_FLAG_LEFT_ASSIGN;
+	}
+
 	// if it is raw data, get the type directly
 	if(expr->node_type == AST_DATA) {
 		assert(expr->data_global.data_type->flags & TYPE_FLAG_INTERNALIZED);
