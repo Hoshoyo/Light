@@ -1,0 +1,167 @@
+sqrtf :: (v : r32) -> r32 #foreign("m");
+tanf :: (v : r32) -> r32 #foreign("m");
+
+DEGTORAD :: (degree : r32) -> r32 { return ((degree) * (3.141592654 / 180.0)); }
+RADTODEG :: (radian : r32) -> r32 { return ((radian) * (180.0 / 3.141592654)); }
+
+vec2 :: struct {
+    x : r32;
+    y : r32;
+}
+
+vec3 :: struct {
+    x : r32;
+    y : r32;
+    z : r32;
+}
+
+vec4 :: struct {
+    x : r32;
+    y : r32;
+    z : r32;
+    w : r32;
+}
+
+mat4 :: struct {
+	m : [4][4]r32;
+}
+
+mat4_mul :: (left : mat4, right : mat4) -> mat4 {
+    r : mat4;
+
+    r.m[0][0] = left.m[0][0] * right.m[0][0] + left.m[0][1] * right.m[1][0] + left.m[0][2] * right.m[2][0] + left.m[0][3] * right.m[3][0];
+    r.m[0][1] = left.m[0][0] * right.m[0][1] + left.m[0][1] * right.m[1][1] + left.m[0][2] * right.m[2][1] + left.m[0][3] * right.m[3][1];
+    r.m[0][2] = left.m[0][0] * right.m[0][2] + left.m[0][1] * right.m[1][2] + left.m[0][2] * right.m[2][2] + left.m[0][3] * right.m[3][2];
+    r.m[0][3] = left.m[0][0] * right.m[0][3] + left.m[0][1] * right.m[1][3] + left.m[0][2] * right.m[2][3] + left.m[0][3] * right.m[3][3];
+
+    r.m[1][0] = left.m[1][0] * right.m[0][0] + left.m[1][1] * right.m[1][0] + left.m[1][2] * right.m[2][0] + left.m[1][3] * right.m[3][0];
+    r.m[1][1] = left.m[1][0] * right.m[0][1] + left.m[1][1] * right.m[1][1] + left.m[1][2] * right.m[2][1] + left.m[1][3] * right.m[3][1];
+    r.m[1][2] = left.m[1][0] * right.m[0][2] + left.m[1][1] * right.m[1][2] + left.m[1][2] * right.m[2][2] + left.m[1][3] * right.m[3][2];
+    r.m[1][3] = left.m[1][0] * right.m[0][3] + left.m[1][1] * right.m[1][3] + left.m[1][2] * right.m[2][3] + left.m[1][3] * right.m[3][3];
+
+    r.m[2][0] = left.m[2][0] * right.m[0][0] + left.m[2][1] * right.m[1][0] + left.m[2][2] * right.m[2][0] + left.m[2][3] * right.m[3][0];
+    r.m[2][1] = left.m[2][0] * right.m[0][1] + left.m[2][1] * right.m[1][1] + left.m[2][2] * right.m[2][1] + left.m[2][3] * right.m[3][1];
+    r.m[2][2] = left.m[2][0] * right.m[0][2] + left.m[2][1] * right.m[1][2] + left.m[2][2] * right.m[2][2] + left.m[2][3] * right.m[3][2];
+    r.m[2][3] = left.m[2][0] * right.m[0][3] + left.m[2][1] * right.m[1][3] + left.m[2][2] * right.m[2][3] + left.m[2][3] * right.m[3][3];
+
+    r.m[3][0] = left.m[3][0] * right.m[0][0] + left.m[3][1] * right.m[1][0] + left.m[3][2] * right.m[2][0] + left.m[3][3] * right.m[3][0];
+    r.m[3][1] = left.m[3][0] * right.m[0][1] + left.m[3][1] * right.m[1][1] + left.m[3][2] * right.m[2][1] + left.m[3][3] * right.m[3][1];
+    r.m[3][2] = left.m[3][0] * right.m[0][2] + left.m[3][1] * right.m[1][2] + left.m[3][2] * right.m[2][2] + left.m[3][3] * right.m[3][2];
+    r.m[3][3] = left.m[3][0] * right.m[0][3] + left.m[3][1] * right.m[1][3] + left.m[3][2] * right.m[2][3] + left.m[3][3] * right.m[3][3];
+
+    return r;
+}
+
+mat4_identity :: () -> mat4 {
+    result : mat4;
+    result.m[0][0] = 1.0;
+    result.m[1][1] = 1.0;
+    result.m[2][2] = 1.0;
+    result.m[3][3] = 1.0;
+    return result;
+}
+
+ortho :: (left : r32, right : r32, bottom : r32, top : r32) -> mat4
+{
+	f := 1.0;
+	n := -1.0;
+	result : mat4;
+	result.m[0][0] = 2.0 / (right - left);		result.m[0][1] = 0.0;					result.m[0][2] = 0.0;	result.m[0][3] = -(right + left) / (right - left);
+	result.m[1][0] = 0.0;						result.m[1][1] = 2.0 / (top - bottom);	result.m[1][2] = 0.0;	result.m[1][3] = -(top + bottom) / (top - bottom);
+	result.m[2][0] = 0.0;						result.m[2][1] = 0.0;					result.m[2][2] = 1.0;	result.m[2][3] = 0.0;
+	result.m[3][0] = 0.0;						result.m[3][1] = 0.0;					result.m[3][2] = 0.0;	result.m[3][3] = 1.0;
+
+	return result;
+}
+
+translate :: (x : r32, y : r32, z : r32) -> mat4 {
+	result : mat4;
+	result.m[0][0] = 1.0;
+	result.m[1][1] = 1.0;
+	result.m[2][2] = 1.0;
+	result.m[3][3] = 1.0;
+
+	result.m[0][3] = x;
+	result.m[1][3] = y;
+	result.m[2][3] = z;
+	return result;
+}
+
+vec3_length :: (v : vec3) -> r32{
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+vec3_normalize :: (v : vec3) -> vec3 {
+    len := vec3_length(v);
+    v.x /= len;
+    v.y /= len;
+    v.z /= len;
+    return v;
+}
+
+cross :: (l : vec3, r : vec3) -> vec3 {
+    result : vec3;
+    result.x = l.y * r.z - l.z * r.y;
+    result.y = -l.x * r.z + l.z * r.x;
+    result.z = l.x * r.y - l.y * r.x;
+    return result;
+}
+
+vec3_sub :: (l : vec3, r : vec3) -> vec3 {
+    return vec3:{l.x - r.x, l.y - r.y, l.z - r.z};
+}
+vec3_add :: (l : vec3, r : vec3) -> vec3 {
+    return vec3:{l.x + r.x, l.y + r.y, l.z + r.z};
+}
+
+look_at :: (position : vec3, target : vec3, world_up : vec3) -> mat4 {
+    // 1. Position = known
+    // 2. Calculate cameraDirection
+    diff := vec3_sub(position, target);
+    zaxis := vec3_normalize(diff);
+    // 3. Get positive right axis vector
+    normalized_world_up := vec3_normalize(world_up);
+    cross_nwu_zax := cross(normalized_world_up, zaxis);
+    xaxis := vec3_normalize(cross_nwu_zax);
+    // 4. Calculate camera up vector
+    yaxis := cross(zaxis, xaxis);
+
+    // Create translation and rotation matrix
+    // In glm we access elements as mat[col][row] due to column-major layout
+    translation := mat4_identity(); // Identity matrix by default
+    translation.m[3][0] = -position.x; // Third column, first row
+    translation.m[3][1] = -position.y;
+    translation.m[3][2] = -position.z;
+    rotation := mat4_identity();
+    rotation.m[0][0] = xaxis.x; // First column, first row
+    rotation.m[1][0] = xaxis.y;
+    rotation.m[2][0] = xaxis.z;
+    rotation.m[0][1] = yaxis.x; // First column, second row
+    rotation.m[1][1] = yaxis.y;
+    rotation.m[2][1] = yaxis.z;
+    rotation.m[0][2] = zaxis.x; // First column, third row
+    rotation.m[1][2] = zaxis.y;
+    rotation.m[2][2] = zaxis.z;
+
+    // Return lookAt matrix as combination of translation and rotation matrix
+    return mat4_mul(translation, rotation); // Remember to read from right to left (first translation then rotation)
+}
+
+perspective :: (fovy : r32, aspect : r32, zNear : r32, zFar : r32) -> mat4 {
+    result := mat4_identity();
+
+    range := tanf(DEGTORAD(fovy / 2.0)) * zNear;
+    left := -range * aspect;
+    right := range * aspect;
+    bottom := -range;
+    top := range;
+
+    result.m[0][0] = (2.0 * zNear) / (right - left);
+    result.m[1][1] = (2.0 * zNear) / (top - bottom);
+    result.m[2][2] = -(zFar + zNear) / (zFar - zNear);
+    result.m[2][3] = -1.0;
+    result.m[3][2] = -(2.0 * zFar * zNear) / (zFar - zNear);
+    result.m[3][3] = 0.0;
+
+    return result;
+}

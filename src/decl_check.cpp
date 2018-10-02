@@ -82,6 +82,7 @@ Type_Error report_undeclared(Token* name){
 }
 
 Type_Error decl_insert_into_symbol_table(Ast* node, Token* name, char* descriptor) {
+	TIME_FUNC();
 	Type_Error error = TYPE_OK;
 	if (node->scope->symb_table.entries_capacity == 0) {
 		symbol_table_init(&node->scope->symb_table, (node->scope->decl_count + 4) * 8);
@@ -130,6 +131,7 @@ static bool scope_inside_loop(Scope* scope, u64 level) {
 }
 
 Type_Error decl_check_redefinition(Scope* scope, Ast* node) {
+	TIME_FUNC();
 	Type_Error error = TYPE_OK;
 
 	Token* decl_name = 0;
@@ -190,6 +192,7 @@ Type_Error decl_check_redefinition(Scope* scope, Ast* node) {
 }
 
 Type_Instance* type_from_alias(Scope* scope, Type_Instance* type, bool rep_undeclared, Type_Error* error) {
+	TIME_FUNC();
 	assert(type->kind == KIND_ALIAS);
 	Ast* d = decl_from_name(scope, type->alias.name);
 	if (!d) {
@@ -214,6 +217,7 @@ Type_Instance* type_from_alias(Scope* scope, Type_Instance* type, bool rep_undec
 // if undeclared error return 0
 // when not resolved and rep_undeclared is false, return the type as it were do it can be queued
 Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclared, Type_Error* error) {
+	TIME_FUNC();
 	if (type->flags & TYPE_FLAG_INTERNALIZED)
 		return type;
 
@@ -325,6 +329,7 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 }
 
 Type_Error type_information_pass(Scope* scope, Ast* node) {
+	TIME_FUNC();
 	Type_Error error_code = TYPE_OK;
 	switch (node->node_type) 
 	{
@@ -1011,6 +1016,7 @@ Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 }
 
 Ast* decl_from_name(Scope* scope, Token* name) {
+	TIME_FUNC();
 	// Try to find the declaration with that name within the scope passed
 	while (scope) {
 		if (scope->symb_table.entries_count > 0) {
@@ -1026,6 +1032,7 @@ Ast* decl_from_name(Scope* scope, Token* name) {
 }
 
 bool expr_is_constant(Ast* node, Type_Error* error, bool rep_undeclared, bool rep_error) {
+	TIME_FUNC();
 	assert(node->flags & AST_FLAG_IS_EXPRESSION);
 
 	switch(node->node_type) {

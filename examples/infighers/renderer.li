@@ -1,20 +1,4 @@
-vec2 :: struct {
-    x : r32;
-    y : r32;
-}
-
-vec3 :: struct {
-    x : r32;
-    y : r32;
-    z : r32;
-}
-
-vec4 :: struct {
-    x : r32;
-    y : r32;
-    z : r32;
-    w : r32;
-}
+#import "math.li"
 
 Vertex_3D :: struct {
 	position           : vec3;
@@ -43,7 +27,11 @@ ImmediateContext :: struct {
 	line_vbo : u32;
 
 	shader : u32;
-	line_shader : u32;
+	shader_3D : u32;
+
+	shader_3D_projection_matrix_location : s32;
+	shader_3D_view_matrix_location : s32;
+	shader_3D_model_matrix_location : s32;
 
 	valid : bool;
 	prerendering : bool;
@@ -117,6 +105,44 @@ shader_load :: (vert_shader : string, frag_shader : string) -> GLuint{
     return shader_id;
 }
 
+basic_vshader := "#version 330 core
+	layout(location = 0) in vec3 v_vertex;
+	layout(location = 1) in vec2 v_tcoords;
+	layout(location = 2) in vec3 v_normals;
+	
+	out vec2 o_tcoords;
+	out vec4 o_color;
+	out vec3 o_normals;
+	out vec3 o_tolight;
+
+	uniform mat4 u_model = mat4(1.0);
+	uniform mat4 u_view = mat4(1.0);
+	uniform mat4 u_projection = mat4(1.0);
+
+	void main() {
+		gl_Position = u_projection * u_view * u_model * vec4(v_vertex, 1.0);
+		vec3 world_pos = (u_model * vec4(v_vertex, 1.0)).xyz;
+		o_tcoords = v_tcoords;
+		o_normals = vec3(u_model * vec4(v_normals, 0.0));
+		o_tolight = vec3(30.0, 30.0, -30.0) - world_pos;
+	}";
+basic_fshader := "#version 330 core
+	in vec2 o_tcoords;
+	in vec3 o_normals;
+	in vec3 o_tolight;
+	
+	out vec4 color;
+
+	uniform sampler2D u_texture;
+	
+	void main() {
+		float factor = dot(normalize(o_normals), normalize(o_tolight));
+		vec3 diffuse = max(factor * vec3(1.0, 1.0, 1.0), 0.2);
+		//color  = texture(u_texture, o_tcoords);
+		color = vec4(diffuse, 1.0);
+		//color = vec4(o_normals, 1.0);
+	}";
+
 quad_vshader := "#version 330 core
 	layout(location = 0) in vec3 v_vertex;
 	layout(location = 1) in vec2 v_tcoords;
@@ -161,8 +187,10 @@ valid_glid :: (id : u32) -> bool {
 }
 
 render_context_init :: () {
-	// Start batch size
+	imm_ctx.shader_3D = shader_load(basic_vshader, basic_fshader);
+	assert(valid_glid(imm_ctx.shader_3D));
 
+	// Start batch size
 	batch_size := 1024 * 64;
 	imm_ctx.quad_max_count = batch_size;
 
@@ -172,6 +200,13 @@ render_context_init :: () {
 	imm_ctx.shader_projection_matrix_location = glGetUniformLocation(imm_ctx.shader, [^s8]"u_projection".data);
 	imm_ctx.shader_translation_matrix_location = glGetUniformLocation(imm_ctx.shader, [^s8]"u_translation".data);
 	imm_ctx.shader_text_location = glGetUniformLocation(imm_ctx.shader, [^s8]"u_text".data);
+
+	imm_ctx.shader_3D_projection_matrix_location = glGetUniformLocation(imm_ctx.shader_3D, [^s8]"u_projection".data);
+	imm_ctx.shader_3D_view_matrix_location = glGetUniformLocation(imm_ctx.shader_3D, [^s8]"u_view".data);
+	imm_ctx.shader_3D_model_matrix_location = glGetUniformLocation(imm_ctx.shader_3D, [^s8]"u_model".data);
+	assert(valid_glid([u32]imm_ctx.shader_3D_projection_matrix_location));
+	assert(valid_glid([u32]imm_ctx.shader_3D_view_matrix_location));
+	assert(valid_glid([u32]imm_ctx.shader_3D_model_matrix_location));
 
 	// Buffers setup for rendering
 	glGenVertexArrays(1, &imm_ctx.quad_vao);
@@ -271,7 +306,6 @@ render_immediate_flush :: () {
 }
 
 quad_new :: (position : vec2, width : r32, height : r32, color : vec4) -> Quad_2D {
-	// TODO(psv): fix this, error in c backend
 	q := Quad_2D:{
 		array {
 			Vertex_3D:{ vec3:{position.x, position.y, 0.0}, 					1.0, vec2:{0.0, 0.0}, color, 1.0 },
@@ -283,32 +317,116 @@ quad_new :: (position : vec2, width : r32, height : r32, color : vec4) -> Quad_2
 	return q;
 }
 
-ortho :: (left : r32, right : r32, bottom : r32, top : r32) -> mat4
-{
-	f := 1.0;
-	n := -1.0;
-	result : mat4;
-	result.m[0][0] = 2.0 / (right - left);		result.m[0][1] = 0.0;					result.m[0][2] = 0.0;	result.m[0][3] = -(right + left) / (right - left);
-	result.m[1][0] = 0.0;						result.m[1][1] = 2.0 / (top - bottom);	result.m[1][2] = 0.0;	result.m[1][3] = -(top + bottom) / (top - bottom);
-	result.m[2][0] = 0.0;						result.m[2][1] = 0.0;					result.m[2][2] = 1.0;	result.m[2][3] = 0.0;
-	result.m[3][0] = 0.0;						result.m[3][1] = 0.0;					result.m[3][2] = 0.0;	result.m[3][3] = 1.0;
+Vertex :: struct {
+	position      : vec3;
+	texture_coord : vec2;
+}
 
+Cube_3D :: struct {
+	vao : u32;
+	vbo : u32;
+	nbo : u32;
+	ebo : u32;
+}
+
+cube_new :: () -> Cube_3D {
+	result : Cube_3D;
+
+	vertices : [8]Vertex = array {
+		Vertex:{vec3:{-1.0, -1.0, 1.0}, vec2:{1.0, 1.0}},
+		Vertex:{vec3:{ 1.0, -1.0, 1.0}, vec2:{1.0, 1.0}},
+		Vertex:{vec3:{ 1.0,  1.0, 1.0}, vec2:{1.0, 1.0}},
+		Vertex:{vec3:{-1.0,  1.0, 1.0}, vec2:{1.0, 1.0}},
+
+		Vertex:{vec3:{-1.0, -1.0, -1.0}, vec2:{1.0, 1.0}},
+		Vertex:{vec3:{ 1.0, -1.0, -1.0}, vec2:{1.0, 1.0}},
+		Vertex:{vec3:{ 1.0,  1.0, -1.0}, vec2:{1.0, 1.0}},
+		Vertex:{vec3:{-1.0,  1.0, -1.0}, vec2:{1.0, 1.0}}
+	};
+
+	normals : [24]vec3 = array {
+		vec3:{0.0, 0.0, -1.0}, vec3:{0.0, 0.0, -1.0}, vec3:{0.0, 0.0, -1.0}, vec3:{0.0, 0.0, -1.0},
+		vec3:{0.0, 1.0, 0.0}, vec3:{0.0, 1.0, 0.0}, vec3:{0.0, 1.0, 0.0}, vec3:{0.0, 1.0, 0.0},
+		vec3:{0.0, 0.0, 1.0}, vec3:{0.0, 0.0, 1.0}, vec3:{0.0, 0.0, 1.0}, vec3:{0.0, 0.0, 1.0},
+		vec3:{0.0, -1.0, 0.0}, vec3:{0.0, -1.0, 0.0}, vec3:{0.0, -1.0, 0.0}, vec3:{0.0, -1.0, 0.0},
+		vec3:{-1.0, 0.0, 0.0}, vec3:{-1.0, 0.0, 0.0}, vec3:{-1.0, 0.0, 0.0}, vec3:{-1.0, 0.0, 0.0},
+		vec3:{1.0, 0.0, 0.0}, vec3:{1.0, 0.0, 0.0}, vec3:{1.0, 0.0, 0.0}, vec3:{1.0, 0.0, 0.0}
+	};
+
+	indices : [36]u32 = array {
+		// front
+		0,1,2,
+		2,3,0,
+		// top
+		3,2,6,
+		6,7,3,
+		// back
+		7,6,5,
+		5,4,7,
+		// bottom
+		4,5,1,
+		1,0,4,
+		// left
+		4,0,3,
+		3,7,4,
+		// right
+		1,5,6,
+		6,2,1
+	};
+
+	// Buffers setup for rendering
+	glGenVertexArrays(1, &result.vao);
+	glBindVertexArray(result.vao);
+	glGenBuffers(1, &result.vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, result.vbo);
+	glBufferData(GL_ARRAY_BUFFER, #sizeof [8]Vertex, [^void]vertices, GL_STATIC_DRAW);
+	
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(0, 3, GL_FLOAT, [u8]GL_FALSE, #sizeof Vertex, null);
+	glVertexAttribPointer(1, 2, GL_FLOAT, [u8]GL_FALSE, #sizeof Vertex, [^void]&([^Vertex]0).texture_coord);
+	//glDisableVertexAttribArray(0);
+	//glDisableVertexAttribArray(1);
+
+	glEnableVertexAttribArray(2);
+	glGenBuffers(1, &result.nbo);
+	glBindBuffer(GL_ARRAY_BUFFER, result.nbo);
+	glBufferData(GL_ARRAY_BUFFER, #sizeof [24]vec3, [^void]normals, GL_STATIC_DRAW);
+	glVertexAttribPointer(2, 3, GL_FLOAT, [u8]GL_FALSE, #sizeof vec3, null);
+
+	glGenBuffers(1, &result.ebo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, result.ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 36 * #sizeof u32, [^void]indices, GL_STATIC_DRAW);
+
+	assert(valid_glid(result.vao));
+	assert(valid_glid(result.vbo));
+	assert(valid_glid(result.ebo));
+	assert(valid_glid(result.nbo));
 	return result;
 }
 
-translate :: (x : r32, y : r32, z : r32) -> mat4 {
-	result : mat4;
-	result.m[0][0] = 1.0;
-	result.m[1][1] = 1.0;
-	result.m[2][2] = 1.0;
-	result.m[3][3] = 1.0;
+render_cube :: (cube : Cube_3D) {
+	if !imm_ctx.valid return;
 
-	result.m[0][3] = x;
-	result.m[1][3] = y;
-	result.m[2][3] = z;
-	return result;
-}
+	glUseProgram(imm_ctx.shader_3D);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_DEPTH_TEST);
+	
+	glBindVertexArray(cube.vao);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube.ebo);
 
-mat4 :: struct {
-	m : [4][4]r32;
+	aspect := [r32]wnd_ctx.width / [r32]wnd_ctx.height;
+	projection := perspective(70.0, aspect, 0.5, 100.0);
+	translation := translate(0.0, 0.0, 0.0);
+	view := look_at(vec3:{10.0, 10.0, 10.0}, vec3:{0.0, 0.0, 0.0}, vec3:{0.0, 1.0, 0.0});
+	glUniformMatrix4fv(imm_ctx.shader_3D_projection_matrix_location, 1, [u8]GL_FALSE, [^r32]projection.m);
+	glUniformMatrix4fv(imm_ctx.shader_3D_view_matrix_location, 1, [u8]GL_FALSE, [^r32]view.m);
+	glUniformMatrix4fv(imm_ctx.shader_3D_model_matrix_location, 1, [u8]GL_TRUE, [^r32]translation.m);
+
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+
+	glDrawElements(GL_TRIANGLES, [s32]36, GL_UNSIGNED_INT, null);
+
 }

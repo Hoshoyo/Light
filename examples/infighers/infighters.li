@@ -186,6 +186,9 @@ main :: () -> s32 {
 	screen_width : s32;
 	screen_height : s32;
 	screen_size(&info, &screen_width, &screen_height);
+
+	cube := cube_new();
+
 	while true {
 		glClearColor(1.0, 0.0, 1.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -196,12 +199,16 @@ main :: () -> s32 {
 
 		wnd_ctx.width = width;
 		wnd_ctx.height = height;
+		
+		glViewport(0,0, width, height);
 
 		quad : Quad_2D;
 		quad = quad_new(vec2:{0.0, 0.0}, 100.0, 100.0, vec4:{1.0, 0.0, 0.0, 1.0});
 
 		render_quad_immediate(&quad);
 		render_immediate_flush();
+
+		render_cube(cube);
 
 		glXSwapBuffers (info.display, info.window_handle);
 		usleep(1000);
