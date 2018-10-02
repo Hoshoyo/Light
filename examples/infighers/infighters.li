@@ -200,6 +200,9 @@ main :: () -> s32 {
 		quad : Quad_2D;
 		quad = quad_new(vec2:{0.0, 0.0}, 100.0, 100.0, vec4:{1.0, 0.0, 0.0, 1.0});
 
+		render_quad_immediate(&quad);
+		render_immediate_flush();
+
 		glXSwapBuffers (info.display, info.window_handle);
 		usleep(1000);
 	}

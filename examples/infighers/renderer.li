@@ -1,0 +1,314 @@
+vec2 :: struct {
+    x : r32;
+    y : r32;
+}
+
+vec3 :: struct {
+    x : r32;
+    y : r32;
+    z : r32;
+}
+
+vec4 :: struct {
+    x : r32;
+    y : r32;
+    z : r32;
+    w : r32;
+}
+
+Vertex_3D :: struct {
+	position           : vec3;
+	texture_alpha      : r32;
+	texture_coordinate : vec2;
+	color              : vec4;
+	mask               : r32;
+}
+
+Quad_2D :: struct {
+	vertices : [4]Vertex_3D;
+}
+
+WindowContext :: struct {
+	width  : s32;
+	height : s32;
+}
+wnd_ctx : WindowContext;
+
+ImmediateContext :: struct {
+	quad_vao : u32;
+	quad_vbo : u32;
+	quad_ebo : u32;
+
+	line_vao : u32;
+	line_vbo : u32;
+
+	shader : u32;
+	line_shader : u32;
+
+	valid : bool;
+	prerendering : bool;
+	line_prerendering : bool;
+
+	quads : ^void;
+	quad_count : s64;
+	quad_max_count : s64;
+
+	shader_projection_matrix_location : s32;
+	shader_translation_matrix_location : s32;
+	shader_text_location : s32;
+}
+
+imm_ctx : ImmediateContext;
+
+calloc :: (count : u64, size : u64) -> ^void #foreign("c");
+free :: (block : ^void) -> void #foreign("c");
+
+shader_load :: (vert_shader : string, frag_shader : string) -> GLuint{
+    vs_id := glCreateShader(GL_VERTEX_SHADER);
+    fs_id := glCreateShader(GL_FRAGMENT_SHADER);
+    vs_length := [s32]vert_shader.length;
+    fs_length := [s32]frag_shader.length;
+
+    compile_status : GLint;
+
+    p_v : [1]^GLchar = array{ [^s8]vert_shader.data };
+    glShaderSource(vs_id, 1, [^^s8]p_v, &vs_length);
+
+    p_f : [1]^GLchar = array{ [^s8]frag_shader.data };
+    glShaderSource(fs_id, 1, [^^s8]p_f, &fs_length);
+
+    glCompileShader(vs_id);
+    glGetShaderiv(vs_id, GL_COMPILE_STATUS, &compile_status);
+    if compile_status == 0 {
+        error_buffer : [512]s8;
+        glGetShaderInfoLog(vs_id, 512, null, [^s8]error_buffer);
+        //printf("Vertex shader error: %s", error_buffer);
+        print_string("Vertex shader error: ");
+        print_string_c([^u8]error_buffer);
+        return -1;
+    }
+
+    glCompileShader(fs_id);
+    glGetShaderiv(fs_id, GL_COMPILE_STATUS, &compile_status);
+    if compile_status == 0 {
+        error_buffer : [512]^s8;
+        glGetShaderInfoLog(fs_id, 512, null, [^s8]error_buffer);
+        print_string("Fragment shader error: ");
+        print_string_c([^u8]error_buffer);
+        return -1;
+    }
+
+    shader_id := glCreateProgram();
+    glAttachShader(shader_id, vs_id);
+    glAttachShader(shader_id, fs_id);
+    glDeleteShader(vs_id);
+    glDeleteShader(fs_id);
+    glLinkProgram(shader_id);
+
+    glGetProgramiv(shader_id, GL_LINK_STATUS, &compile_status);
+    if (compile_status == 0) {
+        error_buffer : [512]GLchar;
+        glGetProgramInfoLog(shader_id, 512, null, [^s8]error_buffer);
+        print_string_c([^u8]error_buffer);
+        return -1;
+    }
+
+    glValidateProgram(shader_id);
+    return shader_id;
+}
+
+quad_vshader := "#version 330 core
+	layout(location = 0) in vec3 v_vertex;
+	layout(location = 1) in vec2 v_tcoords;
+	layout(location = 2) in vec4 v_color;
+	layout(location = 3) in float v_texture_alpha;
+	layout(location = 4) in float v_is_text;
+
+	out vec2 o_tcoords;
+	out vec4 o_color;
+	out float o_texture_alpha;
+	out float o_is_text;
+
+	uniform mat4 u_projection = mat4(1.0);
+	uniform mat4 u_translation = mat4(1.0);
+
+	void main(){
+		gl_Position = u_projection * u_translation * vec4(v_vertex.xy, 0.0, 1.0);
+		o_tcoords = v_tcoords;
+		o_color = v_color;
+		o_texture_alpha = v_texture_alpha;
+		o_is_text = v_is_text;
+	}";
+
+quad_fshader := "#version 330 core
+	in vec2 o_tcoords;
+	in vec4 o_color;
+	in float o_texture_alpha;
+	in float o_is_text;
+
+	out vec4 color;
+
+	uniform sampler2D u_text;
+	uniform bool u_use_texture;
+
+	void main(){
+		color = mix(o_color, texture(u_text, o_tcoords), o_texture_alpha);
+		color = vec4(o_color.rgb, o_color.a * max(color.r, o_is_text));
+	}";
+
+valid_glid :: (id : u32) -> bool {
+	return (id >= 0 && id < [u32]-1);
+}
+
+render_context_init :: () {
+	// Start batch size
+
+	batch_size := 1024 * 64;
+	imm_ctx.quad_max_count = batch_size;
+
+	// Shader setup
+	imm_ctx.shader = shader_load(quad_vshader, quad_fshader);
+	assert(valid_glid(imm_ctx.shader));
+	imm_ctx.shader_projection_matrix_location = glGetUniformLocation(imm_ctx.shader, [^s8]"u_projection".data);
+	imm_ctx.shader_translation_matrix_location = glGetUniformLocation(imm_ctx.shader, [^s8]"u_translation".data);
+	imm_ctx.shader_text_location = glGetUniformLocation(imm_ctx.shader, [^s8]"u_text".data);
+
+	// Buffers setup for rendering
+	glGenVertexArrays(1, &imm_ctx.quad_vao);
+	glBindVertexArray(imm_ctx.quad_vao);
+	glGenBuffers(1, &imm_ctx.quad_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, imm_ctx.quad_vbo);
+	glBufferData(GL_ARRAY_BUFFER, batch_size * #sizeof Quad_2D, null, GL_DYNAMIC_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
+	glEnableVertexAttribArray(3);
+	glEnableVertexAttribArray(4);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, [u8]GL_FALSE, #sizeof Vertex_3D, null);
+	glVertexAttribPointer(1, 2, GL_FLOAT, [u8]GL_FALSE, #sizeof Vertex_3D, [^void]&([^Vertex_3D]0).texture_coordinate);
+	glVertexAttribPointer(2, 4, GL_FLOAT, [u8]GL_FALSE, #sizeof Vertex_3D, [^void]&([^Vertex_3D]0).color);
+	glVertexAttribPointer(3, 1, GL_FLOAT, [u8]GL_FALSE, #sizeof Vertex_3D, [^void]&([^Vertex_3D]0).texture_alpha);
+	glVertexAttribPointer(4, 1, GL_FLOAT, [u8]GL_FALSE, #sizeof Vertex_3D, [^void]&([^Vertex_3D]0).mask);
+
+	indices := [^u32]calloc(1, [u64]batch_size * 6 * #sizeof u32);
+	for i := 0, j :u32= 0; i < batch_size * 6; i += 6, j += 4 
+    {
+		indices[i + 0] = j;
+		indices[i + 1] = j + 1;
+		indices[i + 2] = j + 2;
+		indices[i + 3] = j + 2;
+		indices[i + 4] = j + 1;
+		indices[i + 5] = j + 3;
+	}
+
+	glGenBuffers(1, &imm_ctx.quad_ebo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, imm_ctx.quad_ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * #sizeof u32 * batch_size, [^void]indices, GL_STATIC_DRAW);
+	free(indices);
+
+	imm_ctx.quad_count = 0;
+	imm_ctx.valid = true;
+}
+
+render_quad_immediate :: (quad : ^Quad_2D) {
+	if !imm_ctx.valid {
+		render_context_init();
+	}
+
+	if(imm_ctx.quad_count == imm_ctx.quad_max_count) {
+		return;
+	}
+
+	if !imm_ctx.prerendering {
+		imm_ctx.prerendering = true;
+		glBindBuffer(GL_ARRAY_BUFFER, imm_ctx.quad_vbo);
+		imm_ctx.quads = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+		assert(imm_ctx.quads != null);
+	}
+
+	quads := [^Quad_2D]imm_ctx.quads;
+
+	q := quads + imm_ctx.quad_count;
+	assert(q != null);
+	memcpy(q, quad, #sizeof Quad_2D);
+
+	imm_ctx.quad_count += 1;
+}
+
+render_immediate_flush :: () {
+	imm_ctx.prerendering = false;
+	imm_ctx.quads = null;
+	glBindBuffer(GL_ARRAY_BUFFER, imm_ctx.quad_vbo);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+
+	if !imm_ctx.valid return;
+
+	if imm_ctx.quad_count > 0 {
+		glUseProgram(imm_ctx.shader);
+		glBindVertexArray(imm_ctx.quad_vao);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, imm_ctx.quad_ebo);
+		glBindBuffer(GL_ARRAY_BUFFER, imm_ctx.quad_vbo);
+
+		//hm::mat4 projection = hm::mat4::ortho(0, wnd_ctx.width, 0, wnd_ctx.height);
+		projection := ortho(0.0, [r32]wnd_ctx.width, 0.0, [r32]wnd_ctx.height);
+		glUniformMatrix4fv(imm_ctx.shader_projection_matrix_location, 1, [u8]GL_TRUE, [^r32]projection.m);
+		//hm::mat4 translation = hm::mat4::translate(hm::vec3(0.0f, 0.0f, 0.0f));
+		translation := translate(0.0, 0.0, 0.0);
+		glUniformMatrix4fv(imm_ctx.shader_translation_matrix_location, 1, [u8]GL_TRUE, [^r32]translation.m);
+
+		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
+		glEnableVertexAttribArray(2);
+		glEnableVertexAttribArray(3);
+		glEnableVertexAttribArray(4);
+
+		glDrawElements(GL_TRIANGLES, [s32]imm_ctx.quad_count * 6, GL_UNSIGNED_INT, null);
+
+		imm_ctx.quad_count = 0;
+	}
+}
+
+quad_new :: (position : vec2, width : r32, height : r32, color : vec4) -> Quad_2D {
+	// TODO(psv): fix this, error in c backend
+	q := Quad_2D:{
+		array {
+			Vertex_3D:{ vec3:{position.x, position.y, 0.0}, 					1.0, vec2:{0.0, 0.0}, color, 1.0 },
+			Vertex_3D:{ vec3:{position.x + width, position.y, 0.0}, 			1.0, vec2:{1.0, 0.0}, color, 1.0 },
+			Vertex_3D:{ vec3:{position.x, position.y + height, 0.0}, 			1.0, vec2:{0.0, 1.0}, color, 1.0 },
+			Vertex_3D:{ vec3:{position.x + width, position.y + height, 0.0}, 	1.0, vec2:{1.0, 1.0}, color, 1.0 }
+		}
+	};
+	return q;
+}
+
+ortho :: (left : r32, right : r32, bottom : r32, top : r32) -> mat4
+{
+	f := 1.0;
+	n := -1.0;
+	result : mat4;
+	result.m[0][0] = 2.0 / (right - left);		result.m[0][1] = 0.0;					result.m[0][2] = 0.0;	result.m[0][3] = -(right + left) / (right - left);
+	result.m[1][0] = 0.0;						result.m[1][1] = 2.0 / (top - bottom);	result.m[1][2] = 0.0;	result.m[1][3] = -(top + bottom) / (top - bottom);
+	result.m[2][0] = 0.0;						result.m[2][1] = 0.0;					result.m[2][2] = 1.0;	result.m[2][3] = 0.0;
+	result.m[3][0] = 0.0;						result.m[3][1] = 0.0;					result.m[3][2] = 0.0;	result.m[3][3] = 1.0;
+
+	return result;
+}
+
+translate :: (x : r32, y : r32, z : r32) -> mat4 {
+	result : mat4;
+	result.m[0][0] = 1.0;
+	result.m[1][1] = 1.0;
+	result.m[2][2] = 1.0;
+	result.m[3][3] = 1.0;
+
+	result.m[0][3] = x;
+	result.m[1][3] = y;
+	result.m[2][3] = z;
+	return result;
+}
+
+mat4 :: struct {
+	m : [4][4]r32;
+}

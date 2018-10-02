@@ -6,48 +6,7 @@ DIGEST_SIZE : u64 : 5;
 
 digest : [5]u32 = array{0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0};
 transforms : u64 = 0;
-/*
-u32_to_str_base16 :: (val : u32, leading_zeros : bool, buffer : ^s8) -> s32
-{
-	numbuffer : [64]s8;
-	at : ^s8=  [^s8]numbuffer + 63;
-	count : u32 = 0;
 
-	if val == 0 {
-        if leading_zeros {
-            for i := 0; i < 8; i += 1 {
-                buffer[i] = '0';
-            }
-        } else {
-	        *buffer = '0';
-        }
-		count += 1;
-		return [s32]count + 1;
-	}
-
-	mask : u32 = 0x0000000f;
-	auxmask : u32 = 0xffffffff;
-	
-	while count < 8 {
-		if (![bool](auxmask & val) && !leading_zeros) break;
-		v : u32 = (val & (mask << (count * 4))) >> (count * 4);
-		if (v >= 10) v += 55 + 32;
-		else v += 48;
-		*at = [s8]v;
-		at -= 1;
-		auxmask &= ~mask << (count * 4);
-		count += 1;
-	}
-	i : u32 = 0;
-	while i < count {
-		at += 1;
-		*buffer = *at;
-		buffer += 1;
-		i += 1;
-	}
-	return [s32]count;
-}
-*/
 buffer_to_block :: (buffer : string, block : [16]u32)
 {
     /* Convert the string (byte buffer) to a uint32_t array (MSB) */

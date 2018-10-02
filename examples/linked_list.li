@@ -20,6 +20,7 @@ list_new :: () -> List_Head {
 
 list_add :: (l : ^List_Head, value : s32) {
 	n := [^List]malloc(#sizeof List);
+	n.next = null;
 
 	aux : ^List;
 	if l.root == null {
@@ -47,6 +48,24 @@ list_insert :: (l : ^List_Head, value : s32, index : s32) {
 				n.next = a;
 				last.next = n;
 			}
+			break;
+		}
+	}
+}
+
+list_remove :: (l : ^List_Head, value : s32) {
+	if l == null || l.root == null {
+		return;
+	}
+	last := [^List]null;
+	for a := l.root, i : s32 = 0; a != null; last = a, a = a.next, i += 1 {
+		if a.value == value {
+			if a.next != null {
+				last.next = a.next;
+			} else if last != null {
+				last.next = null;
+			}
+			free(a);
 			break;
 		}
 	}
@@ -80,10 +99,12 @@ main :: () -> s32 {
 	list_add(&list, 5);
 
 	list_insert(&list, 15, 1);
+	list_remove(&list, 3);
+	list_remove(&list, 4);
+	
+	print_list(&list);
 
 	list_free(&list);
-
-	print_list(&list);
 	
 	return 4;
 }
