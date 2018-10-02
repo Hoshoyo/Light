@@ -1,10 +1,10 @@
 
 main :: () -> s32 {
-	a := 1;
-	if true {
+	a : s32 = 1;
+	if false {
 		a = 2;
 	} else {
 		a = 3;
 	}
-	return 0;
+	return a;
 }

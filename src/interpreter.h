@@ -7,7 +7,7 @@ extern "C" u64 call_external(void* proc_address, u64 call_stack_ptr, u64 size_st
 #define REG_SIZE 8
 
 // Instruction type
-const u16 HLT = 0;
+const u16 HLT = 27;
 const u16 ADD = 1;
 const u16 SUB = 2;
 const u16 MUL = 3;

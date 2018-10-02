@@ -433,32 +433,36 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 
 		case AST_COMMAND_IF:{
 			// conditional expression in a register R_X
-			//    cmp R_X, R_X[0|1]
 			Expr_Generation condition = gen_code_for_expression(env, node->comm_if.condition);
 			assert(condition.flags & EXPR_RESULT_ON_REGISTER);
+			s64 start_address = move_code_offset(env->code_offset);
+
+			//    cmp R_X, R_X[0|1]
+			s64 compare = push_instruction(make_instruction(CMP, INSTR_QWORD|IMMEDIATE_VALUE, MEM_TO_REG, condition.reg, NO_REG, 0, 0), (u64)0);
+			env->code_offset += compare - start_address;
+			reg_free(env, condition.reg);
 
 			//    beq case_false
-			s64 start_address = move_code_offset(env->code_offset);
-			s32* immediate_offset_case_false;
-			s64 end_address = push_instruction(make_instruction(BEQ, SIGNED | IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, &immediate_offset_case_false));
-			env->code_offset += end_address - start_address;
+			s64 beq_start = move_code_offset(env->code_offset);
+			s64* immediate_offset_case_false = &((Instruction*)beq_start)->immediate_offset;
+			s64 end_address = push_instruction(make_instruction(BEQ, SIGNED | IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, 0));
+			env->code_offset += end_address - beq_start;
 			
 			// case_true:
 			gen_code_node(env, node->comm_if.body_true);
 
 			//    jmp if_end:
 			start_address = move_code_offset(env->code_offset);
-			s64 case_false = push_instruction(make_instruction(JMP, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0));
-			*immediate_offset_case_false = case_false - start_address;
+			u64* end_jump_address;
+			s64 case_false = push_instruction(make_instruction(JMP, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &end_jump_address);
+			*immediate_offset_case_false = case_false - beq_start;
 			env->code_offset += case_false - start_address;
 
 			// case_false:
 			gen_code_node(env, node->comm_if.body_false);
 
 			// if_end:
-			s64* immediate_offset_if_end = &((Instruction*)case_false)->immediate_offset;
-			*immediate_offset_if_end = move_code_offset(env->code_offset);
-
+			*end_jump_address = move_code_offset(env->code_offset);
 		}break;
 
 		case AST_DECL_VARIABLE: {

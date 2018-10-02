@@ -15,6 +15,7 @@ internal bool running;
 s64 reg[NUM_REGS] = {};
 
 void print_instruction(Instruction instruction, u64 next_qword);
+void print_code();
 int execute(Instruction instruction, u64 next_word);
 
 u64 push_instruction(Instruction inst) {
@@ -337,6 +338,8 @@ void init_interpreter(s64 stack_size, s64 heap_size)
 #define PRINT_INSTRUCTIONS 1
 int run_interpreter()
 {
+	print_code();
+
 	running = true;	
 	while (running) {
 		u64 address = reg[R_IP];
@@ -782,6 +785,13 @@ static char* reg_name(Light_Arena* arena, u8 r) {
 	return (char*)result;
 }
 
+inline s32 instruction_size(Instruction inst) {
+	s32 size = sizeof(Instruction) - sizeof(s64);
+	if (inst.flags & IMMEDIATE_OFFSET) size += sizeof(s64);
+	if (inst.flags & IMMEDIATE_VALUE) size += sizeof(u64);
+	return size;
+}
+
 void print_instruction(Instruction inst, u64 next_qword)
 {
 	Light_Arena* sar = arena_create(2048);
@@ -887,10 +897,12 @@ void print_instruction(Instruction inst, u64 next_qword)
 	}break;
 	}
 
-	while (l < 35) {
+	while (l < 50) {
 		++l;
 		printf(" ");
 	}
+
+	s32 isize = instruction_size(inst);
 
 	if (inst.flags & INSTR_BYTE) {
 		printf(" byte ");
@@ -900,15 +912,49 @@ void print_instruction(Instruction inst, u64 next_qword)
 		printf(" dword ");
 	} else if (inst.flags & INSTR_QWORD) {
 		printf(" qword ");
+	} else {
+		printf("       ");
 	}
 
 	if (inst.flags & SIGNED) {
-		printf(" signed");
+		printf(" signed   %d", isize);
 	} else {
-		printf(" unsigned");
+		printf(" unsigned %d", isize);
 	}
 
 	printf("\n");
 
 	arena_free(sar);
+}
+
+void print_code() {
+	u8* codeptr = code;
+	s64 start_ip = reg[R_IP];
+	while (true) {
+		u64 address = (u64)codeptr;
+		Instruction instruction = *(Instruction*)address;
+		if (instruction.flags & IMMEDIATE_OFFSET) {
+			instruction.immediate_offset = *((u64*)(address + REG_SIZE));
+			address += REG_SIZE;
+		}
+		u64 immediate = *((u64*)(address + REG_SIZE));
+
+		reg[R_IP] = address;
+		print_instruction(instruction, immediate);
+
+		if (instruction.type == 0) {
+			break;
+		}
+
+		codeptr += sizeof(Instruction) - sizeof(s64);
+
+		if (instruction.flags & IMMEDIATE_OFFSET) {
+			codeptr += sizeof(s64);
+		}
+		if (instruction.flags & IMMEDIATE_VALUE) {
+			codeptr += sizeof(u64);
+		}
+	}
+	reg[R_IP] = start_ip;
+	printf("\n");
 }

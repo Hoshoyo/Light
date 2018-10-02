@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
 		DEBUG_print_type_table_structs();
 	}
 	
-#if 1
+#if 0
 	double bend_start = timer.GetTime();
 	c_generate(ast_top_level, g_type_table, argv[1], argv[0], g_lib_table);
 	double bend_end = timer.GetTime();
