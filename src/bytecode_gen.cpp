@@ -151,30 +151,6 @@ generate_entry_point(Gen_Environment* env) {
 	*main_fill_relative = (u64)(env->code + env->code_offset);
 }
 
-void gen_entry_point(Gen_Environment* env) {
-	// push sb				; 8  bytes
-	// push next_address	; 16 bytes
-	// mov ss, 16			; 16 bytes
-	// jmp main				; 16 bytes
-	// hlt					; 8 bytes
-	// main: 
-
-	u64 start_address = move_code_offset(env->interp, 0);
-
-	u64 o1 = push_instruction(env->interp, make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, R_SB, NO_REG, 0, 0));
-	u64* hlt_relative_address;
-	u64 o2 = push_instruction(env->interp, make_instruction(PUSH, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &hlt_relative_address);
-	u64 o3 = push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 2 * 8);
-	u64* main_relative_address;
-	u64 o4 = push_instruction(env->interp, make_instruction(JMP, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &main_relative_address);
-	u64 end_address = push_instruction(env->interp, make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
-
-	*hlt_relative_address = o4;
-	*main_relative_address = end_address;
-
-	env->code_offset += end_address - start_address;
-}
-
 void
 generate_proc_prologue(Gen_Environment* env, Ast* proc_body) {
 	// push sb
@@ -216,6 +192,7 @@ struct Expr_Generation {
 	u32 flags;
 };
 
+// stack position indicates the offset within the stack that the expression result should be written to.
 Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 stack_position = 0) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 	Expr_Generation result = {0};
@@ -402,25 +379,11 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 	return result;
 }
 
-void gen_register_to_stack(Gen_Environment* env, Registers r, s64 stack_offset) {
-	u64 start_address = move_code_offset(env->interp, env->code_offset);
-	u64 end = push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD|IMMEDIATE_OFFSET, REG_TO_REG_PTR, R_SB, r, 0, stack_offset));
-	env->code_offset += end - start_address;
-}
-
-void gen_reg_addr_to_stack(Gen_Environment* env, Registers r, s64 stack_offset) {
-
-}
-
 /*
 	For each node generate code
 */
 void gen_code_node(Gen_Environment* env, Ast* node) {
 	if (!node) return;
-
-	u64 start_address = move_code_offset(env->interp, env->code_offset);
-	u64 end_address = start_address;
-	s64 start_offset = env->code_offset;
 
 	switch (node->node_type) {
 
@@ -438,19 +401,15 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 		}break;
 
 		case AST_COMMAND_RETURN: {
-			
 			if (node->comm_return.expression) {
 				Expr_Generation result = gen_code_for_expression(env, node->comm_return.expression);
 				
 				reg_free(env, R_0);	// R_0 must be free in order to use it for the return value
 
-				if (result.reg != R_0) {
-					end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD, REG_TO_REG, R_0, result.reg, 0, 0));
+				if(result.reg != R_0) {
+					Push(env, make_instruction(MOV, INSTR_QWORD, REG_TO_REG, R_0, result.reg, 0, 0));
 					reg_free(env, result.reg);
 				}
-			}
-			if (end_address != start_address) {
-				env->code_offset += end_address - start_address;
 			}
 		}break;
 
@@ -461,52 +420,43 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 
 			Expr_Generation rvalue_result = gen_code_for_expression(env, node->comm_var_assign.rvalue);
 
-			start_address = move_code_offset(env->interp, env->code_offset);
 			if (rvalue_result.flags & EXPR_RESULT_ON_REGISTER) {
 				// store register on the address given by lvalue
-				end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, lvalue_result.reg, rvalue_result.reg, 0, 0));
+				Push(env, make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, lvalue_result.reg, rvalue_result.reg, 0, 0));
 			} else {
 				// store memory pointed by rvalue register in memory pointed by lvalue
 				size_t rvalue_size = node->comm_var_assign.rvalue->type_return->type_size_bits / 8;
-				end_address = push_instruction(env->interp, make_instruction(COPY, IMMEDIATE_OFFSET | IMMEDIATE_VALUE, REG_TO_REG, lvalue_result.reg, rvalue_result.reg, NO_REG, 0), rvalue_size);
+				Push(env, make_instruction(COPY, IMMEDIATE_OFFSET|IMMEDIATE_VALUE, REG_TO_REG, lvalue_result.reg, rvalue_result.reg, NO_REG, 0), rvalue_size);
 			}
 			reg_free(env, lvalue_result.reg);
 			reg_free(env, rvalue_result.reg);
-			env->code_offset += end_address - start_address;
 		}break;
 
 		case AST_COMMAND_IF:{
 			// conditional expression in a register R_X
 			Expr_Generation condition = gen_code_for_expression(env, node->comm_if.condition);
 			assert(condition.flags & EXPR_RESULT_ON_REGISTER);
-			s64 start_address = move_code_offset(env->interp, env->code_offset);
 
-			//    cmp R_X, R_X[0|1]
-			s64 compare = push_instruction(env->interp, make_instruction(CMP, INSTR_QWORD|IMMEDIATE_VALUE, MEM_TO_REG, condition.reg, NO_REG, 0, 0), (u64)0);
-			env->code_offset += compare - start_address;
+			// cmp R_X, 0|1
+			Push(env, make_instruction(CMP, INSTR_QWORD|IMMEDIATE_VALUE, MEM_TO_REG, condition.reg, NO_REG, 0, 0), (u64)0);
 			reg_free(env, condition.reg);
 
-			//    beq case_false
-			s64 beq_start = move_code_offset(env->interp, env->code_offset);
-			s64* immediate_offset_case_false = &((Instruction*)beq_start)->immediate_offset;
-			s64 end_address = push_instruction(env->interp, make_instruction(BEQ, SIGNED | IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, 0));
-			env->code_offset += end_address - beq_start;
-			
+			// beq case_false
+			Instruction_Info beq = Push(env, make_instruction(BEQ, SIGNED|IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, 0));
+
 			// case_true:
 			gen_code_node(env, node->comm_if.body_true);
 
-			//    jmp if_end:
-			start_address = move_code_offset(env->interp, env->code_offset);
+			// jmp if_end;
 			u64* end_jump_address;
-			s64 case_false = push_instruction(env->interp, make_instruction(JMP, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &end_jump_address);
-			*immediate_offset_case_false = case_false - beq_start;
-			env->code_offset += case_false - start_address;
+			Instruction_Info jmp = Push(env, make_instruction(JMP, INSTR_QWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &end_jump_address);
+			((Instruction*)beq.absolute_address)->immediate_offset = jmp.offset - beq.offset + jmp.size_bytes;
 
 			// case_false:
 			gen_code_node(env, node->comm_if.body_false);
 
 			// if_end:
-			*end_jump_address = move_code_offset(env->interp, env->code_offset);
+			*end_jump_address = (u64)(env->code + env->code_offset);
 		}break;
 
 		case AST_DECL_VARIABLE: {
@@ -517,7 +467,7 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 				// TODO(psv): make the result be directly to the memory allocated
 				Expr_Generation result = gen_code_for_expression(env, node->decl_variable.assignment, node->decl_variable.stack_offset);
 				if (result.flags & EXPR_RESULT_ON_REGISTER) {
-					gen_register_to_stack(env, result.reg, node->decl_variable.stack_offset);
+					Push(env, make_instruction(MOV, INSTR_QWORD|IMMEDIATE_OFFSET, REG_TO_REG_PTR, R_SB, result.reg, 0, node->decl_variable.stack_offset));
 					reg_free(env, result.reg);
 				}
 			}

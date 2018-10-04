@@ -599,20 +599,20 @@ int execute_float_instruction(Instruction inst, u64 next_word) {
 
 	switch (inst.addressing) {
 	case REG_TO_REG: {
-		ui_left = reg[inst.left_reg];
-		ui_right = reg[inst.right_reg];
+		ui_left = *(T*)&reg[inst.left_reg];
+		ui_right = *(T*)&reg[inst.right_reg];
 		write_register = true;
 	}break;
 	case MEM_TO_REG: {
-		ui_left = reg[inst.left_reg];
-		ui_right = next_word;
+		ui_left = *(T*)&reg[inst.left_reg];
+		ui_right = (T)(*(r64*)&next_word);
 		write_register = true;
 	}break;
 	case SINGLE_REG: {
-		ui_left = reg[inst.left_reg];
+		ui_left = *(T*)&reg[inst.left_reg];
 	}break;
 	case SINGLE_MEM: {
-		ui_left = next_word;
+		ui_left = (T)(*(r64*)&next_word);
 	}break;
 	case SINGLE_MEM_PTR: {
 		assert(inst.flags & IMMEDIATE_VALUE);
@@ -644,11 +644,11 @@ int execute_float_instruction(Instruction inst, u64 next_word) {
 			address_to_write = reg[inst.left_reg];
 		}
 		ui_left = *(T*)(address_to_write);
-		ui_right = reg[inst.right_reg];
+		ui_right = *(T*)&reg[inst.right_reg];
 		write_memory = true;
 	}break;
 	case REG_PTR_TO_REG: {
-		ui_left = reg[inst.left_reg];
+		ui_left = *(T*)&reg[inst.left_reg];
 		if (inst.flags & IMMEDIATE_OFFSET)
 			ui_right = *(T*)(reg[inst.right_reg] + inst.immediate_offset);
 		else if (inst.flags & REGISTER_OFFSET)
@@ -717,7 +717,11 @@ int execute_float_instruction(Instruction inst, u64 next_word) {
 	}
 	
 	if (write_register) {
-		reg[inst.left_reg] = ui_left;
+		if(inst.flags & INSTR_FLOAT_32) {
+			reg[inst.left_reg] = (s32)*(u32*)&ui_left;
+		} else {
+			reg[inst.left_reg] = (s64)*(s64*)&ui_left;
+		}
 	} else if (write_memory) {
 		*(T*)address_to_write = ui_left;
 	}
@@ -779,10 +783,10 @@ static char* reg_name(Light_Arena* arena, u8 r) {
 		case R_SP:		l = sprintf(n, "R_SP[0x%llx]", reg[R_SP]);			break;
 		case R_SB:		l = sprintf(n, "R_SB[0x%llx]", reg[R_SB]);			break;
 		case R_SS:		l = sprintf(n, "R_SS[0x%llx]", reg[R_SS]);			break;
-		case FR_0:		l = sprintf(n, "FR_0[%f]", reg[FR_0]); 				break;			
-		case FR_1:		l = sprintf(n, "FR_1[%f]", reg[FR_1]); 				break;	
-		case FR_2:		l = sprintf(n, "FR_2[%f]", reg[FR_2]); 				break;	
-		case FR_3:		l = sprintf(n, "FR_3[%f]", reg[FR_3]); 				break;	
+		case FR_0:		l = sprintf(n, "FR_0[%f]", *(r32*)&reg[FR_0]); 				break;			
+		case FR_1:		l = sprintf(n, "FR_1[%f]", *(r32*)&reg[FR_1]); 				break;	
+		case FR_2:		l = sprintf(n, "FR_2[%f]", *(r32*)&reg[FR_2]); 				break;	
+		case FR_3:		l = sprintf(n, "FR_3[%f]", *(r32*)&reg[FR_3]); 				break;	
 		case R_FLAGS:	l = sprintf(n, "R_FLAGS[0x%llx]", reg[R_FLAGS]);	break;
 		case NO_REG:	l = sprintf(n, "NO_REG");							break;
 		default:        l = sprintf(n, "R_UNK");							break;
