@@ -34,6 +34,12 @@ const u16 NOT = 23;
 const u16 SHL = 24;
 const u16 SHR = 25;
 const u16 COPY = 26;	// COPY [R]/MEM, [R]/MEM
+const u16 EQ = 27;
+const u16 NE = 28;
+const u16 LT = 29;
+const u16 GT = 30;
+const u16 LE = 31;
+const u16 GE = 32;
 
 // Instruction addressing
 const u8 NO_ADDRESSING = 0;

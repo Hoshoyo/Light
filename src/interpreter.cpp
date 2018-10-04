@@ -471,6 +471,10 @@ int execute_instruction(Instruction inst, u64 next_word)
 			advance_ip = false;
 		}
 	}break;
+	case EQ: {
+		ui_left = reg[R_FLAGS] & FLAGS_REG_ZERO;
+		write_register = true;
+	}break;
 	case BNE: {
 		if (!(reg[R_FLAGS] & FLAGS_REG_ZERO)) {
 			if (inst.flags & IMMEDIATE_OFFSET)
@@ -479,6 +483,10 @@ int execute_instruction(Instruction inst, u64 next_word)
 				reg[R_IP] += ui_left;
 			advance_ip = false;
 		}
+	}break;
+	case NE:{
+		ui_left = !(reg[R_FLAGS] & FLAGS_REG_ZERO);
+		write_register = true;
 	}break;
 	case BLT: {
 		if ((reg[R_FLAGS] & FLAGS_REG_SIGN) != 0) {
@@ -489,6 +497,10 @@ int execute_instruction(Instruction inst, u64 next_word)
 			advance_ip = false;
 		}
 	}break;
+	case LT:{
+		ui_left = (reg[R_FLAGS] & FLAGS_REG_SIGN) != 0;
+		write_register = true;
+	}break;
 	case BGT: {
 		if ((reg[R_FLAGS] & FLAGS_REG_SIGN) == 0 && !(reg[R_FLAGS] & FLAGS_REG_ZERO)) {
 			if (inst.flags & IMMEDIATE_OFFSET)
@@ -497,6 +509,10 @@ int execute_instruction(Instruction inst, u64 next_word)
 				reg[R_IP] += ui_left;
 			advance_ip = false;
 		}
+	}break;
+	case GT:{
+		ui_left = (reg[R_FLAGS] & FLAGS_REG_SIGN) == 0 && !(reg[R_FLAGS] & FLAGS_REG_ZERO);
+		write_register = true;
 	}break;
 	case BLE: {
 		if ((reg[R_FLAGS] & FLAGS_REG_SIGN) != 0 || reg[R_FLAGS] & FLAGS_REG_ZERO) {
@@ -507,6 +523,10 @@ int execute_instruction(Instruction inst, u64 next_word)
 			advance_ip = false;
 		}
 	}break;
+	case LE:{
+		ui_left = (reg[R_FLAGS] & FLAGS_REG_SIGN) != 0 || reg[R_FLAGS] & FLAGS_REG_ZERO;
+		write_register = true;
+	}break;
 	case BGE: {
 		if ((reg[R_FLAGS] & FLAGS_REG_SIGN) == 0) {
 			if (inst.flags & IMMEDIATE_OFFSET)
@@ -515,6 +535,10 @@ int execute_instruction(Instruction inst, u64 next_word)
 				reg[R_IP] += ui_left;
 			advance_ip = false;
 		}
+	}break;
+	case GE:{
+		ui_left = (reg[R_FLAGS] & FLAGS_REG_SIGN) == 0;
+		write_register = true;
 	}break;
 	case JMP: {
 		advance_ip = false;
@@ -794,6 +818,12 @@ void print_instruction(Instruction inst, u64 next_qword)
 		case BLE  : l += printf("BLE "); break;
 		case BGT  : l += printf("BGT "); break;
 		case BGE  : l += printf("BGE "); break;
+		case EQ   : l += printf("EQ "); break; 
+		case NE   : l += printf("NE "); break;
+		case LT   : l += printf("LT "); break;
+		case GT   : l += printf("GT "); break;
+		case LE   : l += printf("LE "); break;
+		case GE   : l += printf("GE "); break;
 		case JMP  : l += printf("JMP "); break;
 		case PUSH : l += printf("PUSH "); break;
 		case POP  : l += printf("POP "); break;

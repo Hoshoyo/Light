@@ -3,6 +3,7 @@
 #include "interpreter.h"
 #include "decl_check.h"
 #include "type.h"
+#include "type_table.h"
 
 #if defined(_WIN64)
 void* load_address_of_external_function(string* name, HMODULE library);
@@ -233,6 +234,12 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 
 		start_address = move_code_offset(env->interp, env->code_offset);
 
+		u16 flags = INSTR_QWORD;
+		flags |= (type_primitive_int_signed(expr->type_return)) ? SIGNED : 0;
+		flags |= (expr->type_return == type_primitive_get(TYPE_PRIMITIVE_R32)) ? INSTR_FLOAT_32 : 0;
+
+		bool comparison = false;
+
 		switch (expr->expr_binary.op) {
 			case OP_BINARY_PLUS:			instruction = ADD; break; // +
 			case OP_BINARY_MINUS:			instruction = SUB; break; // -
@@ -245,16 +252,12 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 			case OP_BINARY_SHL:				instruction = SHL; break; // <<
 			case OP_BINARY_SHR:				instruction = SHR; break; // >>
 
-			case OP_BINARY_LT:				// <
-			case OP_BINARY_GT:				// >
-			case OP_BINARY_LE:				// <=
-			case OP_BINARY_GE:				// >=
-			case OP_BINARY_EQUAL:			// ==
-			case OP_BINARY_NOT_EQUAL:		// !=
-			{
-				u16 flags = INSTR_DWORD | SIGNED;
-				end_address = push_instruction(env->interp, make_instruction(CMP, flags, REG_TO_REG, left.reg, right.reg, 0, 0));
-			} break;
+			case OP_BINARY_LT:				instruction = LT; comparison = true; break; // <
+			case OP_BINARY_GT:				instruction = GT; comparison = true; break; // >
+			case OP_BINARY_LE:				instruction = LE; comparison = true; break; // <=
+			case OP_BINARY_GE:				instruction = GE; comparison = true; break; // >=
+			case OP_BINARY_EQUAL:			instruction = EQ; comparison = true; break; // ==
+			case OP_BINARY_NOT_EQUAL:		instruction = NE; comparison = true; break; // !=
 
 			case OP_BINARY_LOGIC_AND:		instruction = AND; break; // &&
 			case OP_BINARY_LOGIC_OR:		instruction = OR; break;  // ||
@@ -265,9 +268,11 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 			default: assert_msg(0, "invalid expression in bytecode generation");  break;
 		}
 
-		if(instruction != 0) {
-			u16 flags = INSTR_DWORD | SIGNED;
+		if(!comparison) {
 			end_address = push_instruction(env->interp, make_instruction(instruction, flags, REG_TO_REG, left.reg, right.reg, 0, 0));
+		} else {
+			push_instruction(env->interp, make_instruction(CMP, flags, REG_TO_REG, left.reg, right.reg, 0, 0));
+			end_address = push_instruction(env->interp, make_instruction(instruction, flags, SINGLE_REG, left.reg, NO_REG, 0, 0));
 		}
 		
 		result.flags |= EXPR_RESULT_ON_REGISTER;
