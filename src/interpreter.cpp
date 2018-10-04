@@ -2,57 +2,48 @@
 #include "interpreter.h"
 #define internal static
 
-internal u8* stack_ptr = 0;
-internal u8* heap_ptr = 0;
-internal u8* code_ptr = 0;
-internal u8* datas_ptr = 0;
-
-internal u8* stack;
-internal u8* heap;
-internal u8* code;
-internal u8* datas;
 internal bool running;
 s64 reg[NUM_REGS] = {};
 
 void print_instruction(Instruction instruction, u64 next_qword);
-void print_code();
-int execute(Instruction instruction, u64 next_word);
+void print_code(Interpreter* interp);
+int  execute(Instruction instruction, u64 next_word);
 
-u64 push_instruction(Instruction inst) {
-	*(Instruction*)code_ptr = inst;
+u64 push_instruction(Interpreter* interp, Instruction inst) {
+	*(Instruction*)interp->code_ptr = inst;
 	if (inst.flags & IMMEDIATE_OFFSET) {
-		code_ptr += sizeof(Instruction);
+		interp->code_ptr += sizeof(Instruction);
 	} else {
-		code_ptr += sizeof(Instruction) - sizeof(inst.immediate_offset);
+		interp->code_ptr += sizeof(Instruction) - sizeof(inst.immediate_offset);
 	}
 	//print_instruction(inst, 0);
-	return (u64)code_ptr;
+	return (u64)interp->code_ptr;
 }
 
-u64 push_instruction(Instruction inst, u64 next_word) {
-	push_instruction(inst);
-	*(u64*)code_ptr = next_word;	// @todo this should be the size of the immediate value u16 u8 s32 etc..
-	code_ptr += sizeof(next_word);
+u64 push_instruction(Interpreter* interp, Instruction inst, u64 next_word) {
+	push_instruction(interp, inst);
+	*(u64*)interp->code_ptr = next_word;	// @todo this should be the size of the immediate value u16 u8 s32 etc..
+	interp->code_ptr += sizeof(next_word);
 	//print_instruction(inst, next_word);
-	return (u64)code_ptr;
+	return (u64)interp->code_ptr;
 }
 
-u64 push_instruction(Instruction inst, u64** out_next_word) {
-	push_instruction(inst);
-	*out_next_word = (u64*)code_ptr;
-	code_ptr += sizeof(**out_next_word);
+u64 push_instruction(Interpreter* interp, Instruction inst, u64** out_next_word) {
+	push_instruction(interp, inst);
+	*out_next_word = (u64*)interp->code_ptr;
+	interp->code_ptr += sizeof(**out_next_word);
 	//print_instruction(inst, **out_next_word);
-	return (u64)code_ptr;
+	return (u64)interp->code_ptr;
 }
 
-u64 add_code_offset(s64 offset) {
-	code_ptr += offset;
-	return (u64)code_ptr;
+u64 add_code_offset(Interpreter* interp, s64 offset) {
+	interp->code_ptr += offset;
+	return (u64)interp->code_ptr;
 }
 
-u64 move_code_offset(s64 offset) {
-	code_ptr = code + offset;
-	return (u64)code_ptr;
+u64 move_code_offset(Interpreter* interp, s64 offset) {
+	interp->code_ptr = interp->code + offset;
+	return (u64)interp->code_ptr;
 }
 
 Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8 right_reg, u8 offset_reg, s32 immediate_offset) {
@@ -79,41 +70,33 @@ Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8
 	return res;
 }
 
-u64 get_data_segment_address()
+Interpreter init_interpreter(s64 stack_size, s64 heap_size) 
 {
-	return (u64)datas;
-}
+	Interpreter interp = {0};
 
-void init_interpreter(s64 stack_size, s64 heap_size) 
-{
-	stack = (u8*)ho_bigalloc_rw(stack_size);
-	heap  = (u8*)ho_bigalloc_rw(heap_size);
-	code  = (u8*)ho_bigalloc_rw(1024 * 1024);
-	datas = (u8*)ho_bigalloc_rw(1024 * 1024);
+	interp.stack = (u8*)ho_bigalloc_rw(stack_size);
+	interp.heap  = (u8*)ho_bigalloc_rw(heap_size);
+	interp.code  = (u8*)ho_bigalloc_rw(1024 * 1024);
+	interp.datas = (u8*)ho_bigalloc_rw(1024 * 1024);
 
-	printf("stack: %p\n", stack);
-	printf("heap : %p\n", heap);
-	printf("code : %p\n", code);
-	printf("datas: %p\n", datas);
+	printf("stack: %p\n", interp.stack);
+	printf("heap : %p\n", interp.heap);
+	printf("code : %p\n", interp.code);
+	printf("datas: %p\n", interp.datas);
 
-	stack = stack + 4 * sizeof(u64);	// this is necessary for external call, in order to not access an address below the stack address
+	interp.stack = interp.stack + 4 * sizeof(u64);	// this is necessary for external call, in order to not access an address below the stack address
 
-	stack_ptr = stack;
-	heap_ptr = heap;
-	code_ptr = code;
-	datas_ptr = datas;
+	interp.stack_ptr = interp.stack;
+	interp.heap_ptr = interp.heap;
+	interp.code_ptr = interp.code;
+	interp.datas_ptr = interp.datas;
 
-	reg[R_IP] = (u64)code;
-	reg[R_SP] = (u64)stack;
-	reg[R_SB] = (u64)stack;
+	reg[R_IP] = (u64)interp.code;
+	reg[R_SP] = (u64)interp.stack;
+	reg[R_SB] = (u64)interp.stack;
 
-	u64 label = (u64)code_ptr;
-	u64 start = (u64)code_ptr;
-
-	{
-		const char* str = "Hello World!\n";
-		*(u64*)datas_ptr = (u64)str;
-	}
+	u64 label = (u64)interp.code_ptr;
+	u64 start = (u64)interp.code_ptr;
 
 #if 0
 	{
@@ -333,12 +316,14 @@ void init_interpreter(s64 stack_size, s64 heap_size)
 		push_instruction(make_instruction(POP, SIGNED|INSTR_BYTE, SINGLE_REG, R_2, NO_REG, 0, 0));
 	}
 #endif
+
+	return interp;
 }
 
 #define PRINT_INSTRUCTIONS 1
-int run_interpreter()
+int run_interpreter(Interpreter* interp)
 {
-	print_code();
+	print_code(interp);
 
 	running = true;	
 	while (running) {
@@ -927,8 +912,8 @@ void print_instruction(Instruction inst, u64 next_qword)
 	arena_free(sar);
 }
 
-void print_code() {
-	u8* codeptr = code;
+void print_code(Interpreter* interp) {
+	u8* codeptr = interp->code;
 	s64 start_ip = reg[R_IP];
 	while (true) {
 		u64 address = (u64)codeptr;

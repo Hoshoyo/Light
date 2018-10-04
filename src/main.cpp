@@ -111,9 +111,9 @@ int main(int argc, char** argv) {
 	print_profile();
 #else
 	{
-		init_interpreter();
-		bytecode_generate(ast_top_level);
-		run_interpreter();
+		Interpreter interp = init_interpreter();
+		bytecode_generate(&interp, ast_top_level);
+		run_interpreter(&interp);
 		return 0;
 	}
 #endif

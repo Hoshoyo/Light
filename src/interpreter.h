@@ -7,7 +7,7 @@ extern "C" u64 call_external(void* proc_address, u64 call_stack_ptr, u64 size_st
 #define REG_SIZE 8
 
 // Instruction type
-const u16 HLT = 27;
+const u16 HLT = 255;
 const u16 ADD = 1;
 const u16 SUB = 2;
 const u16 MUL = 3;
@@ -107,19 +107,31 @@ struct Instruction {
 	s64 immediate_offset;
 };
 
-void init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024);
-int run_interpreter();
+struct Interpreter {
+	u8* stack_ptr;
+	u8* heap_ptr;
+	u8* code_ptr;
+	u8* datas_ptr;
 
-u64 move_code_offset(s64 offset);
-u64 add_code_offset(s64 offset);
+	u8* stack;
+	u8* heap;
+	u8* code;
+	u8* datas;
+};
+
+Interpreter init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024);
+int run_interpreter(Interpreter* interp);
+
+u64 move_code_offset(Interpreter* interp, s64 offset);
+u64 add_code_offset(Interpreter* interp, s64 offset);
 
 u64 get_data_segment_address();
 
-u64 push_instruction(Instruction inst);
-u64 push_instruction(Instruction inst, u64 next_word);
-u64 push_instruction(Instruction inst, u64** out_next_word);
+u64 push_instruction(Interpreter* interp, Instruction inst);
+u64 push_instruction(Interpreter* interp, Instruction inst, u64 next_word);
+u64 push_instruction(Interpreter* interp, Instruction inst, u64** out_next_word);
 Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8 right_reg, u8 offset_reg, s32 immediate_offset);
 Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8 right_reg, u8 offset_reg, s32** immediate_offset);
 
-#define HALT push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0))
-void print_instruction(Instruction inst, u64 next_qword);
+#define HALT push_instruction(interp, make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0))
+void print_instruction(Interpreter* interp, Instruction inst, u64 next_qword);
