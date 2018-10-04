@@ -1059,6 +1059,7 @@ Ast* Parser::parse_command(Scope* scope, bool eat_semicolon) {
 }
 
 Ast* Parser::parse_comm_variable_assignment(Scope* scope) {
+	s64 start_token = lexer->current_token;
 	Ast* lvalue = parse_expression(scope);
 
 	Token* op = lexer->eat_token();
@@ -1085,8 +1086,15 @@ Ast* Parser::parse_comm_variable_assignment(Scope* scope) {
 			report_internal_compiler_error(__FILE__, __LINE__, "Token '%.*s' flag assignment operator expected to be set but apparently it is not.\n", TOKEN_STR(op));
 		}break;
 	}
-	if(binop != OP_BINARY_UNKNOWN)
-		rvalue = ast_create_expr_binary(scope, lvalue, rvalue, binop, op);
+	s64 end_token = lexer->current_token;
+
+	// it needs to be a copy in order to be an RVALUE node not flagged.
+	if(binop != OP_BINARY_UNKNOWN) {
+		lexer->current_token = start_token;
+		Ast* rvalue_rep = parse_expression(scope);
+		lexer->current_token = end_token;
+		rvalue = ast_create_expr_binary(scope, rvalue_rep, rvalue, binop, op);
+	}
 
 	return ast_create_comm_variable_assignment(scope, lvalue, rvalue);
 }

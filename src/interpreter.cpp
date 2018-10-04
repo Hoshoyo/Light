@@ -16,7 +16,7 @@ u64 push_instruction(Interpreter* interp, Instruction inst) {
 	} else {
 		interp->code_ptr += sizeof(Instruction) - sizeof(inst.immediate_offset);
 	}
-	//print_instruction(inst, 0);
+	print_instruction(inst, 0);
 	return (u64)interp->code_ptr;
 }
 

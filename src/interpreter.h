@@ -138,6 +138,6 @@ u64 push_instruction(Interpreter* interp, Instruction inst, u64 next_word);
 u64 push_instruction(Interpreter* interp, Instruction inst, u64** out_next_word);
 Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8 right_reg, u8 offset_reg, s32 immediate_offset);
 Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8 right_reg, u8 offset_reg, s32** immediate_offset);
+void print_instruction(Instruction inst, u64 next_qword);
 
 #define HALT push_instruction(interp, make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0))
-void print_instruction(Interpreter* interp, Instruction inst, u64 next_qword);

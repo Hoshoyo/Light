@@ -112,6 +112,7 @@ Push(Gen_Environment* env, Instruction inst, u64 next_word = 0) {
 	}
 
 	result.size_bytes = env->code_offset - result.offset;
+	print_instruction(inst, next_word);
 	return result;
 }
 
@@ -185,7 +186,7 @@ generate_proc_epilogue(Gen_Environment* env) {
 }
 
 const u32 EXPR_RESULT_ON_STACK    = FLAG(0);
-const u32 EXPR_RESULT_ON_REGISTER = FLAG(0);
+const u32 EXPR_RESULT_ON_REGISTER = FLAG(1);
 struct Expr_Generation {
 	s64 result_offset_from_sb;
 	Registers reg;
@@ -471,6 +472,28 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 					reg_free(env, result.reg);
 				}
 			}
+		}break;
+
+		case AST_COMMAND_FOR: {
+			// conditional expression in a register R_X
+			u64 start_address = (u64)(env->code + env->code_offset);
+			Expr_Generation condition = gen_code_for_expression(env, node->comm_if.condition);
+			assert(condition.flags & EXPR_RESULT_ON_REGISTER);
+
+			// cmp R_X, 0|1
+			Push(env, make_instruction(CMP, INSTR_QWORD|IMMEDIATE_VALUE, MEM_TO_REG, condition.reg, NO_REG, 0, 0), (u64)0);
+			reg_free(env, condition.reg);
+
+			// beq for_end
+			Instruction_Info beq = Push(env, make_instruction(BEQ, SIGNED|IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, 0));
+
+			// case_true:
+			gen_code_node(env, node->comm_for.body);
+
+			// jmp for_begin;
+			Instruction_Info jmp = Push(env, make_instruction(JMP, INSTR_QWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), start_address);
+			((Instruction*)beq.absolute_address)->immediate_offset = jmp.offset - beq.offset + jmp.size_bytes;
+			// if_end:
 		}break;
 
 		default: break;
