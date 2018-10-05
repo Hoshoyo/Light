@@ -1,17 +1,8 @@
-
 main :: () -> s32 {
-	/*
-	a : r32 = 1.0 + 1.0;
-	result : s32;
-	if a == 1.0 + 1.0000 {
-		result = 1;
-	} else {
-		result = 0;
+	sum : s32 = -1;
+	
+	for i := 0; i < 10; i += 1 {
+		sum += [s32]i;
 	}
-	*/
-	result : s32 = 2;
-	while result < 10 {
-		result += 1;
-	}
-	return result;
+	return sum;
 }

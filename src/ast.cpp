@@ -94,6 +94,7 @@ Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Typ
 	dp->decl_procedure.extern_library_name = 0;
 	dp->decl_procedure.type_procedure = ptype;
 	dp->decl_procedure.arguments_scope = arguments_scope;
+	dp->decl_procedure.proc_runtime_address = 0;
 
 	dp->decl_procedure.site.filename = name->filename;
 	dp->decl_procedure.site.line = name->line;

@@ -325,7 +325,8 @@ int run_interpreter(Interpreter* interp)
 {
 	print_code(interp);
 
-	running = true;	
+	running = true;
+	int instruction_num = 0;
 	while (running) {
 		u64 address = reg[R_IP];
 		Instruction instruction = *(Instruction*)reg[R_IP];
@@ -334,7 +335,7 @@ int run_interpreter(Interpreter* interp)
 			address += REG_SIZE;
 		}
 		u64 immediate = *((u64*)(address + REG_SIZE));
-
+		instruction_num++;
 #if PRINT_INSTRUCTIONS
 		print_instruction(instruction, immediate);
 #endif
@@ -436,6 +437,12 @@ int execute_instruction(Instruction inst, u64 next_word)
 		ui_right = reg[inst.right_reg];
 		write_memory = true;
 	}break;
+	}
+
+	if (inst.flags & INVERT_OPS) {
+		T temp = ui_left;
+		ui_left = ui_right;
+		ui_right = temp;
 	}
 
 	// instruction decode

@@ -29,6 +29,34 @@ struct Register_Allocation{
 static Register_Allocation register_allocated[NUM_REGS];
 static Registers* register_stack;
 
+u32 instruction_regsize_from_type(Type_Instance* type) {
+	switch (type->kind) {
+	case KIND_PRIMITIVE: {
+		switch (type->primitive) {
+		case TYPE_PRIMITIVE_BOOL:
+			return INSTR_DWORD;
+		case TYPE_PRIMITIVE_S8:
+		case TYPE_PRIMITIVE_U8:
+			return INSTR_BYTE;
+		case TYPE_PRIMITIVE_S16:
+		case TYPE_PRIMITIVE_U16:
+			return INSTR_WORD;
+		case TYPE_PRIMITIVE_R32:
+		case TYPE_PRIMITIVE_S32:
+		case TYPE_PRIMITIVE_U32:
+			return INSTR_DWORD;
+		case TYPE_PRIMITIVE_S64:
+		case TYPE_PRIMITIVE_U64:
+		case TYPE_PRIMITIVE_R64:
+			return INSTR_QWORD;
+		}
+	}break;
+	case KIND_POINTER:
+		return INSTR_QWORD;
+	}
+	return 0;
+}
+
 // The oldest register, the one allocated farther back gets allocated in
 // case of all allocated.
 Registers reg_allocate(Gen_Environment* env, bool floating_point = false) {
@@ -158,6 +186,8 @@ generate_proc_prologue(Gen_Environment* env, Ast* proc_body) {
 	// mov	sb, sp
 	// add	sp, stack_size
 
+	proc_body->decl_procedure.proc_runtime_address = (u64*)(env->code + env->code_offset);
+
 	// calculate stack size from proc body
 	Scope* scope = proc_body->decl_procedure.body->comm_block.block_scope;
 	s32 num_decls = scope->decl_count;
@@ -198,11 +228,36 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 	Expr_Generation result = {0};
 
+	u32 instruction_regsize = instruction_regsize_from_type(expr->type_return);
+	u32 signed_ = (type_primitive_int_signed(expr->type_return)) ? SIGNED : 0;
+
 	u64 start_address = move_code_offset(env->interp, env->code_offset);
 	s64 start_offset = env->code_offset;
 	u64 end_address = 0;
 
 	switch (expr->node_type) {
+
+	case AST_EXPRESSION_UNARY: {
+		switch (expr->expr_unary.op) {
+			case OP_UNARY_ADDRESSOF:
+			case OP_UNARY_CAST: {
+				result = gen_code_for_expression(env, expr->expr_unary.operand);
+			} break;
+			case OP_UNARY_PLUS: {
+				result = gen_code_for_expression(env, expr->expr_unary.operand);
+			} break;
+			case OP_UNARY_MINUS: {
+				result = gen_code_for_expression(env, expr->expr_unary.operand);
+				Push(env, make_instruction(SUB, signed_ | instruction_regsize | IMMEDIATE_VALUE | INVERT_OPS, MEM_TO_REG, result.reg, NO_REG, 0, 0), (u64)0);
+			} break;
+			case OP_UNARY_BITWISE_NOT:
+			case OP_UNARY_DEREFERENCE:
+			case OP_UNARY_LOGIC_NOT:
+			default: 
+				assert_msg(0, "invalid unary operation in bytecode generation");
+				break;
+		}
+	} break; // case AST_EXPRESSION_UNARY
 
 	case AST_EXPRESSION_BINARY: {
 		// Calculate both sides
@@ -330,6 +385,8 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 
 			Registers r = reg_allocate(env, type_primitive_float(expr->type_return));
 
+			u32 instruction_size = instruction_regsize_from_type(expr->type_return);
+
 			if (expr->flags & AST_FLAG_LEFT_ASSIGN) {
 				// MOV R_X, R_SB
 				push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD, REG_TO_REG, r, R_SB, NO_REG, 0));
@@ -341,7 +398,7 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 				// When the type is of register size, allocate a register and put the result in it
 				if (type_regsize(expr->type_return)) {
 					// mov rx, [sb + offset]
-					end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_OFFSET, REG_PTR_TO_REG, r, R_SB, NO_REG, decl->decl_variable.stack_offset));
+					end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_OFFSET | instruction_size, REG_PTR_TO_REG, r, R_SB, NO_REG, decl->decl_variable.stack_offset));
 					result.flags |= EXPR_RESULT_ON_REGISTER;
 					result.reg = r;
 				} else {
@@ -420,14 +477,16 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 			assert(lvalue_result.flags & EXPR_RESULT_ON_REGISTER);
 
 			Expr_Generation rvalue_result = gen_code_for_expression(env, node->comm_var_assign.rvalue);
+			
+			u32 instruction_size = instruction_regsize_from_type(node->comm_var_assign.rvalue->type_return);
 
 			if (rvalue_result.flags & EXPR_RESULT_ON_REGISTER) {
 				// store register on the address given by lvalue
-				Push(env, make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, lvalue_result.reg, rvalue_result.reg, 0, 0));
+				Push(env, make_instruction(MOV, instruction_size, REG_TO_REG_PTR, lvalue_result.reg, rvalue_result.reg, 0, 0));
 			} else {
 				// store memory pointed by rvalue register in memory pointed by lvalue
 				size_t rvalue_size = node->comm_var_assign.rvalue->type_return->type_size_bits / 8;
-				Push(env, make_instruction(COPY, IMMEDIATE_OFFSET|IMMEDIATE_VALUE, REG_TO_REG, lvalue_result.reg, rvalue_result.reg, NO_REG, 0), rvalue_size);
+				Push(env, make_instruction(COPY, IMMEDIATE_OFFSET|IMMEDIATE_VALUE|instruction_size, REG_TO_REG, lvalue_result.reg, rvalue_result.reg, NO_REG, 0), rvalue_size);
 			}
 			reg_free(env, lvalue_result.reg);
 			reg_free(env, rvalue_result.reg);
@@ -512,7 +571,8 @@ void bytecode_generate(Interpreter* interp, Ast** top_level) {
 
 		gen_code_node(&env, node);
 	}
-	HALT;
+
+	Push(&env, make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
 }
 
 

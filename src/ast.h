@@ -163,6 +163,8 @@ struct Ast_Decl_Procedure {
 
 	u32    flags;
 	s32    arguments_count;
+
+	u64*   proc_runtime_address;
 	
 	Token* extern_library_name;
 };
