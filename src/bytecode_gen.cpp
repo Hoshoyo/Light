@@ -223,8 +223,76 @@ struct Expr_Generation {
 	u32 flags;
 };
 
+Expr_Generation generate_code_expr_variable_address(Gen_Environment* env, Ast* expr, s64 stack_position) {
+	Expr_Generation result = { 0 };
+	//Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
+	Ast* decl = expr->expr_variable.decl;
+	assert(decl);
+
+	if (decl->decl_variable.flags & DECL_VARIABLE_STACK) {
+		s32 stack_offset = decl->decl_variable.stack_offset;
+
+		Registers r = reg_allocate(env, type_primitive_float(expr->type_return));
+
+		// MOV R_X, R_SB
+		Push(env, make_instruction(MOV, INSTR_QWORD, REG_TO_REG, r, R_SB, NO_REG, 0));
+
+		if (decl->decl_variable.stack_offset > 0) {
+			// ADD R_X, stack_offset
+			Push(env, make_instruction(ADD, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, r, NO_REG, 0, 0), decl->decl_variable.stack_offset);
+		}
+		result.flags |= EXPR_RESULT_ON_REGISTER;
+		result.reg = r;
+	} else {
+		// TODO(psv): get variable in data segment
+		assert_msg(0, "not implemented");
+	}
+
+	return result;
+}
+
+Expr_Generation generate_code_expr_variable_value(Gen_Environment* env, Ast* expr, s64 stack_position) {
+	Expr_Generation result = { 0 };
+	//Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
+	Ast* decl = expr->expr_variable.decl;
+	assert(decl);
+
+	u32 instruction_regsize = instruction_regsize_from_type(expr->type_return);
+	s32 stack_offset = decl->decl_variable.stack_offset;
+	Registers r = reg_allocate(env, type_primitive_float(expr->type_return));
+
+	if (decl->decl_variable.flags & DECL_VARIABLE_STACK) {
+		// When the type is of register size, allocate a register and put the result in it
+		if (type_regsize(expr->type_return)) {
+			// mov rx, [sb + offset]
+			Push(env, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_OFFSET | instruction_regsize, REG_PTR_TO_REG, r, R_SB, NO_REG, decl->decl_variable.stack_offset));
+			result.flags |= EXPR_RESULT_ON_REGISTER;
+			result.reg = r;
+		} else {
+			// COPY from variable stack offset to stack_position
+			if (decl->decl_variable.stack_offset != stack_position) {
+				// MOV R_X, R_SB
+				Push(env, make_instruction(MOV, INSTR_QWORD, REG_TO_REG, r, R_SB, NO_REG, 0));
+				// ADD R_X, stack_offset
+				Push(env, make_instruction(ADD, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, r, NO_REG, 0, 0), decl->decl_variable.stack_offset);
+				// COPY [R_SB + stack_position], R_X
+				Push(env, make_instruction(COPY, IMMEDIATE_OFFSET | IMMEDIATE_VALUE, REG_TO_REG, R_SP, r, NO_REG, 0), stack_position);
+			} else {
+				// the variable is already where it is supposed to be ...
+			}
+			result.flags |= EXPR_RESULT_ON_STACK;
+			result.result_offset_from_sb = stack_position;
+		}
+	} else {
+		// TODO(psv): get variable in data segment
+		assert_msg(0, "not implemented");
+	}
+
+	return result;
+}
+
 // stack position indicates the offset within the stack that the expression result should be written to.
-Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 stack_position = 0) {
+Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 stack_position = 0, bool address_of = false) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 	Expr_Generation result = {0};
 
@@ -239,20 +307,26 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 
 	case AST_EXPRESSION_UNARY: {
 		switch (expr->expr_unary.op) {
-			case OP_UNARY_ADDRESSOF:
-			case OP_UNARY_CAST: {
-				result = gen_code_for_expression(env, expr->expr_unary.operand);
+			case OP_UNARY_ADDRESSOF: {
+				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, true);
 			} break;
+			case OP_UNARY_CAST:
 			case OP_UNARY_PLUS: {
-				result = gen_code_for_expression(env, expr->expr_unary.operand);
+				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, address_of);
 			} break;
 			case OP_UNARY_MINUS: {
-				result = gen_code_for_expression(env, expr->expr_unary.operand);
+				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, address_of);
 				Push(env, make_instruction(SUB, signed_ | instruction_regsize | IMMEDIATE_VALUE | INVERT_OPS, MEM_TO_REG, result.reg, NO_REG, 0, 0), (u64)0);
 			} break;
-			case OP_UNARY_BITWISE_NOT:
-			case OP_UNARY_DEREFERENCE:
 			case OP_UNARY_LOGIC_NOT:
+			case OP_UNARY_BITWISE_NOT: {
+				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, address_of);
+				Push(env, make_instruction(NOT, signed_ | instruction_regsize, SINGLE_REG, result.reg, NO_REG, 0, 0));
+			} break;
+			case OP_UNARY_DEREFERENCE: {
+				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, address_of);
+				Push(env, make_instruction(MOV, INSTR_QWORD, REG_PTR_TO_REG, result.reg, result.reg, 0, 0));
+			} break;
 			default: 
 				assert_msg(0, "invalid unary operation in bytecode generation");
 				break;
@@ -261,8 +335,8 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 
 	case AST_EXPRESSION_BINARY: {
 		// Calculate both sides
-		Expr_Generation left = gen_code_for_expression(env, expr->expr_binary.left);
-		Expr_Generation right = gen_code_for_expression(env, expr->expr_binary.right);
+		Expr_Generation left = gen_code_for_expression(env, expr->expr_binary.left, stack_position, address_of);
+		Expr_Generation right = gen_code_for_expression(env, expr->expr_binary.right, stack_position, address_of);
 		u16 instruction = 0;
 
 		start_address = move_code_offset(env->interp, env->code_offset);
@@ -376,55 +450,11 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 
 	case AST_EXPRESSION_VARIABLE: {
 		// Gives the result in a register if in the left side of an assignment
-
-		start_address = move_code_offset(env->interp, env->code_offset);
-		Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
-		assert(decl);
-		if (decl->decl_variable.flags & DECL_VARIABLE_STACK) {
-			s32 stack_offset = decl->decl_variable.stack_offset;
-
-			Registers r = reg_allocate(env, type_primitive_float(expr->type_return));
-
-			u32 instruction_size = instruction_regsize_from_type(expr->type_return);
-
-			if (expr->flags & AST_FLAG_LEFT_ASSIGN) {
-				// MOV R_X, R_SB
-				push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD, REG_TO_REG, r, R_SB, NO_REG, 0));
-				// ADD R_X, stack_offset
-				end_address = push_instruction(env->interp, make_instruction(ADD, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, r, NO_REG, 0, 0), decl->decl_variable.stack_offset);
-				result.flags |= EXPR_RESULT_ON_REGISTER;
-				result.reg = r;
-			} else {
-				// When the type is of register size, allocate a register and put the result in it
-				if (type_regsize(expr->type_return)) {
-					// mov rx, [sb + offset]
-					end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_OFFSET | instruction_size, REG_PTR_TO_REG, r, R_SB, NO_REG, decl->decl_variable.stack_offset));
-					result.flags |= EXPR_RESULT_ON_REGISTER;
-					result.reg = r;
-				} else {
-					// COPY from variable stack offset to stack_position
-					if (decl->decl_variable.stack_offset != stack_position) {
-						// MOV R_X, R_SB
-						push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD, REG_TO_REG, r, R_SB, NO_REG, 0));
-						// ADD R_X, stack_offset
-						push_instruction(env->interp, make_instruction(ADD, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, r, NO_REG, 0, 0), decl->decl_variable.stack_offset);
-
-						// COPY [R_SB + stack_position], R_X
-						end_address = push_instruction(env->interp, make_instruction(COPY, IMMEDIATE_OFFSET | IMMEDIATE_VALUE, REG_TO_REG, R_SP, r, NO_REG, 0), stack_position);
-					} else {
-						// the variable is already where it is supposed to be ...
-					}
-					result.flags |= EXPR_RESULT_ON_STACK;
-					result.result_offset_from_sb = stack_position;
-				}
-			}	
+		if (expr->flags & AST_FLAG_LEFT_ASSIGN || address_of) {
+			return generate_code_expr_variable_address(env, expr, stack_position);
 		} else {
-			// TODO(psv): get variable in data segment
-			assert_msg(0, "not implemented");
-		}
-		if (end_address) {
-			env->code_offset += end_address - start_address;
-		}
+			return generate_code_expr_variable_value(env, expr, stack_position);
+		}	
 	}break; // case AST_EXPRESSION_VARIABLE
 
 	case AST_EXPRESSION_PROCEDURE_CALL: {
