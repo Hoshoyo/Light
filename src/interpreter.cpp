@@ -105,7 +105,7 @@ Interpreter init_interpreter(s64 stack_size, s64 heap_size)
 	return interp;
 }
 
-#define PRINT_INSTRUCTIONS 0
+#define PRINT_INSTRUCTIONS 1
 int run_interpreter(Interpreter* interp)
 {
 	//print_code(interp);
@@ -355,7 +355,7 @@ int execute_instruction(Interpreter* interp, Instruction inst, u64 next_word)
 		write_register = true;
 	}break;
 	case EXTCALL: {
-		assert(inst.flags & IMMEDIATE_VALUE);
+		//assert(inst.flags & IMMEDIATE_VALUE);
 		// put arguments on the stack and call the function
 		u64 ret = call_external((void*)ui_left, (u64)reg[R_SP], (u64)reg[R_SS]);
 		reg[R_0] = ret;

@@ -123,6 +123,7 @@ struct Instruction_Info {
 	u8* absolute_address;
 };
 
+#define PRINT_INSTRUCTIONS 0
 Instruction_Info
 Push(Gen_Environment* env, Instruction inst, u64 next_word = 0) {
 	Instruction_Info result = {0};
@@ -161,6 +162,7 @@ Push(Gen_Environment* env, Instruction inst, u64** next_word_address) {
 
 const u32 EXPR_RESULT_ON_STACK = FLAG(0);
 const u32 EXPR_RESULT_ON_REGISTER = FLAG(1);
+const u32 EXPR_RESULT_EXT_CALL = FLAG(2);
 struct Expr_Generation {
 	s64 result_offset_from_sb;
 	Registers reg;
@@ -235,16 +237,23 @@ Expr_Generation generate_code_expr_procedure(Gen_Environment* env, Ast* expr) {
 	assert(decl && decl->node_type == AST_DECL_PROCEDURE);
 
 	Registers r = reg_allocate(env, type_primitive_float(expr->type_return));
+	
+	if (decl->decl_procedure.flags & DECL_PROC_FLAG_FOREIGN) {
+		HMODULE lib = load_library_dynamic(&decl->decl_procedure.extern_library_name->value);
+		void* address = load_address_of_external_function(&decl->decl_procedure.name->value, lib);
+		Push(env, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, r, NO_REG, 0, 0), (u64)address);
+		result.flags |= EXPR_RESULT_EXT_CALL;
+	} else {
+		// procedure
+		Instruction_Info ii = Push(env, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, r, NO_REG, 0, 0), (u64)0xcccccccccccccccc);
+		// queue to fill address
+		Gen_Proc_Addresses pfill;
+		pfill.decl = decl;
+		pfill.fill_address = (u64*)(ii.absolute_address + sizeof(Instruction) - sizeof(s64));
+		array_push(env->proc_addressing_queue, &pfill);
+	}
 
-	// procedure
-	Instruction_Info ii = Push(env, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, r, NO_REG, 0, 0), (u64)0xcccccccccccccccc);
-	// queue to fill address
-	Gen_Proc_Addresses pfill;
-	pfill.decl = decl;
-	pfill.fill_address = (u64*)(ii.absolute_address + sizeof(Instruction) - sizeof(s64));
-	array_push(env->proc_addressing_queue, &pfill);
-
-	result.flags = EXPR_RESULT_ON_REGISTER;
+	result.flags |= EXPR_RESULT_ON_REGISTER;
 	result.reg = r;
 	return result;
 }
@@ -365,7 +374,7 @@ Expr_Generation generate_binary_expression(Gen_Environment* env, Ast* expr, s64 
 			size_t type_size = expr->type_return->type_size_bits / 8;
 			if (address_of) {
 				// calculate address only
-				if (type_size > 1) {
+				if (type_size >= 1) {
 					Push(env, make_instruction(MUL, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, right.reg, NO_REG, 0, 0), (u64)type_size);
 					Push(env, make_instruction(ADD, INSTR_QWORD, REG_TO_REG, left.reg, right.reg, 0, 0));
 				}
@@ -428,7 +437,9 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 			case OP_UNARY_ADDRESSOF: {
 				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, true);
 			} break;
-			case OP_UNARY_CAST:
+			case OP_UNARY_CAST: {
+				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, true);
+			} break;
 			case OP_UNARY_PLUS: {
 				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, address_of);
 			} break;
@@ -551,6 +562,7 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 			env->stack_size += arguments_size + addition_stack_size;
 		}
 
+		u32 offset_first_four_args = 0;
 		if (expr->expr_proc_call.args_count > 0) {
 			// evaluate all arguments and push them from right to left
 			for (size_t i = 0; i < expr->expr_proc_call.args_count; ++i) {
@@ -561,6 +573,12 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 					// Push when result is in register, otherwise the result is in its place already
 					Push(env, make_instruction(PUSH, instr_size, SINGLE_REG, result.reg, NO_REG, 0, 0));
 				}
+
+				u32 s = arg->type_return->type_size_bits / 8;
+				assert(s < 255);
+				if (i < 4) {
+					offset_first_four_args |= ((u8)s << (i * 8));
+				}
 			}
 		}
 
@@ -569,10 +587,18 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 		// push return value to be the in R_SB[-8]
 		Push(env, make_instruction(PUSH, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &after_call_return_value);
 
-		// make call
 		reg_free(env, result.reg);
-		Instruction_Info ac = Push(env, make_instruction(JMP, INSTR_QWORD, SINGLE_REG, result.reg, NO_REG, 0, 0));
-		*after_call_return_value = (u64)(ac.absolute_address + ac.size_bytes);
+
+		// make call
+		if (result.flags & EXPR_RESULT_EXT_CALL) {
+			// 0x 11 22 33 44
+			Push(env, make_instruction(PUSH, INSTR_DWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)offset_first_four_args);
+			Instruction_Info ac = Push(env, make_instruction(EXTCALL, INSTR_QWORD, SINGLE_REG, result.reg, NO_REG, 0, 0));
+			*after_call_return_value = (u64)(ac.absolute_address + ac.size_bytes);
+		} else {
+			Instruction_Info ac = Push(env, make_instruction(JMP, INSTR_QWORD, SINGLE_REG, result.reg, NO_REG, 0, 0));
+			*after_call_return_value = (u64)(ac.absolute_address + ac.size_bytes);
+		}
 
 	}break; // case AST_EXPRESSION_PROCEDURE_CALL
 
@@ -591,6 +617,9 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 	switch (node->node_type) {
 
 		case AST_DECL_PROCEDURE: {
+			if (node->decl_procedure.flags & DECL_PROC_FLAG_FOREIGN) {
+				break;
+			}
 			node->decl_procedure.proc_runtime_address = (u64*)(env->code + env->code_offset);
 
 			s32 offset_from_sb = -type_pointer_size() * 2; // -16 return value and stack base
@@ -630,23 +659,28 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 		}break;
 
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
-			// The result register holds the address to be used to store the result of the rvalue
-			Expr_Generation lvalue_result = gen_code_for_expression(env, node->comm_var_assign.lvalue, 0, true);
-			assert(lvalue_result.flags & EXPR_RESULT_ON_REGISTER);
+			Expr_Generation lvalue_result = { 0 };
+			if (node->comm_var_assign.lvalue) {
+				// The result register holds the address to be used to store the result of the rvalue
+				lvalue_result = gen_code_for_expression(env, node->comm_var_assign.lvalue, 0, true);
+				assert(lvalue_result.flags & EXPR_RESULT_ON_REGISTER);
+			}
 
 			Expr_Generation rvalue_result = gen_code_for_expression(env, node->comm_var_assign.rvalue);
 			
-			u32 instruction_size = instruction_regsize_from_type(node->comm_var_assign.rvalue->type_return);
+			if (node->comm_var_assign.lvalue) {
+				u32 instruction_size = instruction_regsize_from_type(node->comm_var_assign.rvalue->type_return);
 
-			if (rvalue_result.flags & EXPR_RESULT_ON_REGISTER) {
-				// store register on the address given by lvalue
-				Push(env, make_instruction(MOV, instruction_size, REG_TO_REG_PTR, lvalue_result.reg, rvalue_result.reg, 0, 0));
-			} else {
-				// store memory pointed by rvalue register in memory pointed by lvalue
-				size_t rvalue_size = node->comm_var_assign.rvalue->type_return->type_size_bits / 8;
-				Push(env, make_instruction(COPY, IMMEDIATE_OFFSET|IMMEDIATE_VALUE|instruction_size, REG_TO_REG, lvalue_result.reg, rvalue_result.reg, NO_REG, 0), rvalue_size);
+				if (rvalue_result.flags & EXPR_RESULT_ON_REGISTER) {
+					// store register on the address given by lvalue
+					Push(env, make_instruction(MOV, instruction_size, REG_TO_REG_PTR, lvalue_result.reg, rvalue_result.reg, 0, 0));
+				} else {
+					// store memory pointed by rvalue register in memory pointed by lvalue
+					size_t rvalue_size = node->comm_var_assign.rvalue->type_return->type_size_bits / 8;
+					Push(env, make_instruction(COPY, IMMEDIATE_OFFSET | IMMEDIATE_VALUE | instruction_size, REG_TO_REG, lvalue_result.reg, rvalue_result.reg, NO_REG, 0), rvalue_size);
+				}
+				reg_free(env, lvalue_result.reg);
 			}
-			reg_free(env, lvalue_result.reg);
 			reg_free(env, rvalue_result.reg);
 		}break;
 
