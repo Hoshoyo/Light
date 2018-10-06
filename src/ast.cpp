@@ -801,7 +801,7 @@ void DEBUG_print_expression(FILE* out, Ast* node) {
 		fprintf(out, ")");
 	}break;
 	case AST_EXPRESSION_VARIABLE: {
-		fprintf(out, "%.*s", TOKEN_STR(node->expr_variable.name));
+		fprintf(out, "%s%.*s%s", KBLU, TOKEN_STR(node->expr_variable.name), KNRM);
 	} break;
 	case AST_EXPRESSION_PROCEDURE_CALL: {
 		int num_args = 0;

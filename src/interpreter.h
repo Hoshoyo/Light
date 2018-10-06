@@ -40,6 +40,7 @@ const u16 LT = 29;
 const u16 GT = 30;
 const u16 LE = 31;
 const u16 GE = 32;
+const u16 ASSERT = 33;
 
 // Instruction addressing
 const u8 NO_ADDRESSING = 0;

@@ -69,10 +69,6 @@ Type_Error evaluate_directive(Ast* expr, u32 flags) {
 }
 
 Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
-	if (flags & TYPE_INFER_LVALUE) {
-		expr->flags |= AST_FLAG_LEFT_ASSIGN;
-	}
-
 	// if it is raw data, get the type directly
 	if(expr->node_type == AST_DATA) {
 		assert(expr->data_global.data_type->flags & TYPE_FLAG_INTERNALIZED);
@@ -95,7 +91,11 @@ Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
 		case AST_EXPRESSION_LITERAL:			type_infered = infer_from_literal_expression(expr, error, flags); break;
 		case AST_EXPRESSION_PROCEDURE_CALL:		type_infered = infer_from_procedure_call(expr, error, flags); break;
 		case AST_EXPRESSION_UNARY:				type_infered = infer_from_unary_expression(expr, error, flags); break;
-		case AST_EXPRESSION_VARIABLE:			type_infered = infer_from_variable_expression(expr, error, flags); break;
+		case AST_EXPRESSION_VARIABLE:			type_infered = infer_from_variable_expression(expr, error, flags); 
+			if (flags & TYPE_INFER_LVALUE) {
+				expr->flags |= AST_FLAG_LEFT_ASSIGN;
+			}
+			break;
 	}
 	return type_infered;
 }
@@ -110,7 +110,7 @@ Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 fl
 	}
 
 	if(expr->expr_binary.op != OP_BINARY_DOT){
-		expr->expr_binary.right->type_return = infer_from_expression(expr->expr_binary.right, error, flags);
+		expr->expr_binary.right->type_return = infer_from_expression(expr->expr_binary.right, error, flags & ~TYPE_INFER_LVALUE);
 		// @IMPORTANT
 		// TODO(psv): more cases could be lvalue
 		// arr[0] -> array dereference
@@ -384,6 +384,8 @@ Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags
 			proc_type->function_desc.num_arguments, nargs);
 		return 0;
 	}
+
+	flags &= ~TYPE_INFER_LVALUE;
 
 	for (size_t i = 0; i < nargs; ++i) {
 		Type_Instance* type = infer_from_expression(expr->expr_proc_call.args[i], error, TYPE_INFER_REPORT_UNDECLARED);

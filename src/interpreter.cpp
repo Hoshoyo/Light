@@ -2,6 +2,14 @@
 #include "interpreter.h"
 #define internal static
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#define RUNTIME_BYTECODE_ASSERT_FAIL(X) MessageBoxA(0, X, "Assert Failed", MB_ICONERROR)
+#elif defined(__linux__)
+#define
+#define RUNTIME_BYTECODE_ASSERT_FAIL(X) printf(X)
+#endif
+
 internal bool running;
 
 void print_instruction(Interpreter* interp, Instruction instruction, u64 next_qword);
@@ -97,7 +105,7 @@ Interpreter init_interpreter(s64 stack_size, s64 heap_size)
 	return interp;
 }
 
-#define PRINT_INSTRUCTIONS 1
+#define PRINT_INSTRUCTIONS 0
 int run_interpreter(Interpreter* interp)
 {
 	//print_code(interp);
@@ -355,6 +363,12 @@ int execute_instruction(Interpreter* interp, Instruction inst, u64 next_word)
 	}break;
 	case COPY: {
 		memcpy((void*)ui_left, (void*)ui_right, next_word);
+	}break;
+	case ASSERT: {
+		if (ui_left == 0) {
+			RUNTIME_BYTECODE_ASSERT_FAIL("Array bounds check failed");
+			exit(-1);
+		}
 	}break;
 	case HLT: {
 		return 1;

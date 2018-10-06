@@ -90,7 +90,7 @@ enum Operator_Binary {
 	OP_BINARY_LOGIC_AND,	// &&
 	OP_BINARY_LOGIC_OR,		// ||
 
-	OP_BINARY_DOT,			// .
+	OP_BINARY_DOT,			 // .
 	OP_BINARY_VECTOR_ACCESS, // []
 };
 

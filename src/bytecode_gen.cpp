@@ -142,7 +142,9 @@ Push(Gen_Environment* env, Instruction inst, u64 next_word = 0) {
 	}
 
 	result.size_bytes = env->code_offset - result.offset;
+#if PRINT_INSTRUCTIONS
 	print_instruction(env->interp, inst, next_word);
+#endif
 	return result;
 }
 
@@ -316,9 +318,12 @@ Expr_Generation generate_code_expr_variable_value(Gen_Environment* env, Ast* exp
 
 Expr_Generation generate_binary_expression(Gen_Environment* env, Ast* expr, s64 stack_position, bool address_of) {
 	Expr_Generation result = { 0 };
+
+	bool left_address_of = (expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS) ? true : address_of;
+
 	// Calculate both sides
-	Expr_Generation left = gen_code_for_expression(env, expr->expr_binary.left, stack_position, address_of);
-	Expr_Generation right = gen_code_for_expression(env, expr->expr_binary.right, stack_position, address_of);
+	Expr_Generation left = gen_code_for_expression(env, expr->expr_binary.left, stack_position, left_address_of);
+	Expr_Generation right = gen_code_for_expression(env, expr->expr_binary.right, stack_position, false);
 	u16 instruction = 0;
 
 	u16 flags = instruction_regsize_from_type(expr->type_return);
@@ -350,7 +355,43 @@ Expr_Generation generate_binary_expression(Gen_Environment* env, Ast* expr, s64 
 
 																  // TODO(psv): dot and vector acessing operators
 		case OP_BINARY_DOT:				assert_msg(0, "unimplemented bytecode generation for dot operator"); break; // .
-		case OP_BINARY_VECTOR_ACCESS:	assert_msg(0, "unimplemented bytecode generation for vector acessing"); break; // []
+		case OP_BINARY_VECTOR_ACCESS:	// []
+		{
+			assert(right.flags & EXPR_RESULT_ON_REGISTER); // because is an integer expression
+			assert(left.flags & EXPR_RESULT_ON_REGISTER);  // because is an lvalue address
+
+			// TODO(psv): copy when not register size
+			// left side is address of where to put, right side is the offset
+			size_t type_size = expr->type_return->type_size_bits / 8;
+			if (address_of) {
+				// calculate address only
+				if (type_size > 1) {
+					Push(env, make_instruction(MUL, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, right.reg, NO_REG, 0, 0), (u64)type_size);
+					Push(env, make_instruction(ADD, INSTR_QWORD, REG_TO_REG, left.reg, right.reg, 0, 0));
+				}
+			} else {
+				// multiply by size of type to get the right offset
+				Push(env, make_instruction(MUL, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, right.reg, NO_REG, 0, 0), (u64)type_size);
+
+				if (expr->expr_binary.left->type_return->kind == KIND_ARRAY) {
+					// Array bounds check
+					Registers abc = reg_allocate(env);
+					Push(env, make_instruction(MOV, INSTR_QWORD, REG_TO_REG, abc, right.reg, 0, 0));
+					Push(env, make_instruction(CMP, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, abc, NO_REG, 0, 0), (u64)type_size * expr->expr_binary.left->type_return->array_desc.dimension);
+					Push(env, make_instruction(LT, INSTR_QWORD, SINGLE_REG, abc, NO_REG, 0, 0));
+					Push(env, make_instruction(ASSERT, INSTR_QWORD, SINGLE_REG, abc, NO_REG, 0, 0));
+				}
+
+				// get value in address using offset
+				// mov L, [L + R]
+				Push(env, make_instruction(MOV, flags | REGISTER_OFFSET, REG_PTR_TO_REG, left.reg, left.reg, right.reg, 0));
+			}
+			result.reg = left.reg;
+			result.flags |= EXPR_RESULT_ON_REGISTER;
+			reg_free(env, right.reg);
+
+			return result;
+		} break;
 		default: assert_msg(0, "invalid expression in bytecode generation");  break;
 	}
 
@@ -590,7 +631,7 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
 			// The result register holds the address to be used to store the result of the rvalue
-			Expr_Generation lvalue_result = gen_code_for_expression(env, node->comm_var_assign.lvalue);
+			Expr_Generation lvalue_result = gen_code_for_expression(env, node->comm_var_assign.lvalue, 0, true);
 			assert(lvalue_result.flags & EXPR_RESULT_ON_REGISTER);
 
 			Expr_Generation rvalue_result = gen_code_for_expression(env, node->comm_var_assign.rvalue);
@@ -641,7 +682,7 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 			env->stack_base_offset += node->decl_variable.variable_type->type_size_bits / 8;
 
 			// allocate memory on the stack
-			Push(env, make_instruction(ADD, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), (u64)0);
+			// Push(env, make_instruction(ADD, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), (u64)0);
 
 			if (node->decl_variable.assignment) {
 				// TODO(psv): make the result be directly to the memory allocated

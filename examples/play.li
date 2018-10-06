@@ -1,7 +1,17 @@
 main :: () -> s32 {
-	return sum(2,4);
+	a : [4][4]s64;
+	
+	for i := 0; i < 4; i += 1 {
+		for j := 0; j < 4; j += 1 {
+			a[i][j] = i * j;
+		}
+	}
+	
+	return [s32]a[3][8];
 }
 
-sum :: (a : s32, b : s32) -> s32 {
-	return a + b;
-}
+/*
+		LEFT_ASSIGN    RIGHT_ASSIGN
+AO		X				X
+NAOF	X				-
+*/
