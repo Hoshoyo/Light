@@ -1,5 +1,7 @@
 main :: () -> s32 {
-	a : s32 = 1;
-	a += 2 + 4;
-	return a;
+	return sum(2,4);
+}
+
+sum :: (a : s32, b : s32) -> s32 {
+	return a + b;
 }

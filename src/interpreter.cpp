@@ -337,12 +337,12 @@ int execute_instruction(Interpreter* interp, Instruction inst, u64 next_word)
 	case PUSH: {
 		assert(inst.addressing == SINGLE_MEM || inst.addressing == SINGLE_REG || inst.addressing == SINGLE_REG_PTR || inst.addressing == SINGLE_MEM);
 		address_to_write = reg[R_SP];
-		reg[R_SP] += sizeof(u64);
+		reg[R_SP] += sizeof(ui_left);
 		write_memory = true;
 	}break;
 	case POP: {
 		assert(inst.addressing == SINGLE_REG);
-		reg[R_SP] -= sizeof(u64);
+		reg[R_SP] -= sizeof(ui_left);
 		ui_left = *(T*)reg[R_SP];
 		write_register = true;
 	}break;

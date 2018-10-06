@@ -390,6 +390,8 @@ Type_Error type_information_pass(Scope* scope, Ast* node) {
 					assert(type_arg->flags & TYPE_FLAG_INTERNALIZED);
 					assert(type_arg);
 
+					node->decl_procedure.arguments[i]->decl_variable.size_bytes = type_arg->type_size_bits / 8;
+
 					node->decl_procedure.type_procedure->function_desc.arguments_type[i] = type_arg;
 				}
 

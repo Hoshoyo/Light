@@ -503,28 +503,31 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 			}
 			size_t addition_stack_size = type_pointer_size() * 2;
 			// allocate space for instructions, return address and stack base
-			Push(env, make_instruction(ADD, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), (u64)(arguments_size + addition_stack_size));
+			//Push(env, make_instruction(ADD, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), (u64)(arguments_size + addition_stack_size));
 
 			offset_from_stack_base = env->stack_temp_offset;
 			env->stack_temp_offset += arguments_size + addition_stack_size;
 			env->stack_size += arguments_size + addition_stack_size;
 		}
-			// push stack base value to be in R_SB[-8]
-			Push(env, make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, R_SB, NO_REG, 0, 0));
-			// push return value to be the in R_SB[-16]
-			Push(env, make_instruction(PUSH, INSTR_QWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &after_call_return_value);
 
 		if (expr->expr_proc_call.args_count > 0) {
 			// evaluate all arguments and push them from right to left
 			for (size_t i = 0; i < expr->expr_proc_call.args_count; ++i) {
 				Ast* arg = expr->expr_proc_call.args[i];
 				Expr_Generation result = gen_code_for_expression(env, arg, offset_from_stack_base);
+				u32 instr_size = instruction_regsize_from_type(arg->type_return);
 				if (result.flags & EXPR_RESULT_ON_REGISTER) {
 					// Push when result is in register, otherwise the result is in its place already
-					Push(env, make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, result.reg, NO_REG, 0, 0));
+					Push(env, make_instruction(PUSH, instr_size, SINGLE_REG, result.reg, NO_REG, 0, 0));
 				}
 			}
 		}
+
+		// push stack base value to be in R_SB[-8]
+		// Push(env, make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, R_SB, NO_REG, 0, 0));
+		// push return value to be the in R_SB[-8]
+		Push(env, make_instruction(PUSH, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &after_call_return_value);
+
 		// make call
 		reg_free(env, result.reg);
 		Instruction_Info ac = Push(env, make_instruction(JMP, INSTR_QWORD, SINGLE_REG, result.reg, NO_REG, 0, 0));
@@ -548,6 +551,16 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 
 		case AST_DECL_PROCEDURE: {
 			node->decl_procedure.proc_runtime_address = (u64*)(env->code + env->code_offset);
+
+			s32 offset_from_sb = -type_pointer_size() * 2; // -16 return value and stack base
+
+			if (node->decl_procedure.arguments_count) {
+				for (s32 i = node->decl_procedure.arguments_count - 1; i >= 0; --i) {
+					Ast* arg = node->decl_procedure.arguments[i];
+					offset_from_sb -= arg->decl_variable.size_bytes;
+					arg->decl_variable.stack_offset = offset_from_sb;
+				}
+			}
 
 			generate_proc_prologue(env, node);
 			gen_code_node(env, node->decl_procedure.body);
