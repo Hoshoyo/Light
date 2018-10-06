@@ -124,6 +124,8 @@ struct Interpreter {
 	u8* heap;
 	u8* code;
 	u8* datas;
+
+	s64 reg[NUM_REGS];
 };
 
 Interpreter init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024);
@@ -139,4 +141,4 @@ u64 push_instruction(Interpreter* interp, Instruction inst, u64 next_word);
 u64 push_instruction(Interpreter* interp, Instruction inst, u64** out_next_word);
 Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8 right_reg, u8 offset_reg, s32 immediate_offset);
 Instruction make_instruction(u16 type, u16 flags, u8 addressing, u8 left_reg, u8 right_reg, u8 offset_reg, s32** immediate_offset);
-void print_instruction(Instruction inst, u64 next_qword);
+void print_instruction(Interpreter* interp, Instruction inst, u64 next_qword);

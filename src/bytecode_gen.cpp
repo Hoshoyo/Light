@@ -41,14 +41,16 @@ u32 instruction_regsize_from_type(Type_Instance* type) {
 		case TYPE_PRIMITIVE_S16:
 		case TYPE_PRIMITIVE_U16:
 			return INSTR_WORD;
-		case TYPE_PRIMITIVE_R32:
 		case TYPE_PRIMITIVE_S32:
 		case TYPE_PRIMITIVE_U32:
 			return INSTR_DWORD;
+		case TYPE_PRIMITIVE_R32:
+			return INSTR_FLOAT_32;
 		case TYPE_PRIMITIVE_S64:
 		case TYPE_PRIMITIVE_U64:
-		case TYPE_PRIMITIVE_R64:
 			return INSTR_QWORD;
+		case TYPE_PRIMITIVE_R64:
+			return INSTR_FLOAT_64;
 		}
 	}break;
 	case KIND_POINTER:
@@ -140,7 +142,7 @@ Push(Gen_Environment* env, Instruction inst, u64 next_word = 0) {
 	}
 
 	result.size_bytes = env->code_offset - result.offset;
-	print_instruction(inst, next_word);
+	print_instruction(env->interp, inst, next_word);
 	return result;
 }
 
@@ -155,6 +157,16 @@ Push(Gen_Environment* env, Instruction inst, u64** next_word_address) {
 	********************************************
 */
 
+const u32 EXPR_RESULT_ON_STACK = FLAG(0);
+const u32 EXPR_RESULT_ON_REGISTER = FLAG(1);
+struct Expr_Generation {
+	s64 result_offset_from_sb;
+	Registers reg;
+	u32 flags;
+};
+
+Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 stack_position = 0, bool address_of = false);
+
 void
 generate_entry_point(Gen_Environment* env) {
 	//   push sb				; 8  bytes
@@ -164,6 +176,8 @@ generate_entry_point(Gen_Environment* env) {
 	// end:
 	//   hlt					; 8 bytes
 	// main:
+
+	env->proc_addressing_queue = array_create(Gen_Proc_Addresses, 16);
 
 	u64* hlt_fill_relative = 0;
 	u64* main_fill_relative = 0;
@@ -185,8 +199,6 @@ generate_proc_prologue(Gen_Environment* env, Ast* proc_body) {
 	// push sb
 	// mov	sb, sp
 	// add	sp, stack_size
-
-	proc_body->decl_procedure.proc_runtime_address = (u64*)(env->code + env->code_offset);
 
 	// calculate stack size from proc body
 	Scope* scope = proc_body->decl_procedure.body->comm_block.block_scope;
@@ -215,20 +227,32 @@ generate_proc_epilogue(Gen_Environment* env) {
 	Push(env, make_instruction(JMP, INSTR_QWORD, SINGLE_REG, R_SS, NO_REG, 0, 0));
 }
 
-const u32 EXPR_RESULT_ON_STACK    = FLAG(0);
-const u32 EXPR_RESULT_ON_REGISTER = FLAG(1);
-struct Expr_Generation {
-	s64 result_offset_from_sb;
-	Registers reg;
-	u32 flags;
-};
+Expr_Generation generate_code_expr_procedure(Gen_Environment* env, Ast* expr) {
+	Expr_Generation result = { 0 };
+	Ast* decl = expr->expr_variable.decl;
+	assert(decl && decl->node_type == AST_DECL_PROCEDURE);
+
+	Registers r = reg_allocate(env, type_primitive_float(expr->type_return));
+
+	// procedure
+	Instruction_Info ii = Push(env, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, r, NO_REG, 0, 0), (u64)0xcccccccccccccccc);
+	// queue to fill address
+	Gen_Proc_Addresses pfill;
+	pfill.decl = decl;
+	pfill.fill_address = (u64*)(ii.absolute_address + sizeof(Instruction) - sizeof(s64));
+	array_push(env->proc_addressing_queue, &pfill);
+
+	result.flags = EXPR_RESULT_ON_REGISTER;
+	result.reg = r;
+	return result;
+}
 
 Expr_Generation generate_code_expr_variable_address(Gen_Environment* env, Ast* expr, s64 stack_position) {
 	Expr_Generation result = { 0 };
-	//Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
 	Ast* decl = expr->expr_variable.decl;
 	assert(decl);
 
+	// variable
 	if (decl->decl_variable.flags & DECL_VARIABLE_STACK) {
 		s32 stack_offset = decl->decl_variable.stack_offset;
 
@@ -253,7 +277,6 @@ Expr_Generation generate_code_expr_variable_address(Gen_Environment* env, Ast* e
 
 Expr_Generation generate_code_expr_variable_value(Gen_Environment* env, Ast* expr, s64 stack_position) {
 	Expr_Generation result = { 0 };
-	//Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
 	Ast* decl = expr->expr_variable.decl;
 	assert(decl);
 
@@ -291,8 +314,62 @@ Expr_Generation generate_code_expr_variable_value(Gen_Environment* env, Ast* exp
 	return result;
 }
 
+Expr_Generation generate_binary_expression(Gen_Environment* env, Ast* expr, s64 stack_position, bool address_of) {
+	Expr_Generation result = { 0 };
+	// Calculate both sides
+	Expr_Generation left = gen_code_for_expression(env, expr->expr_binary.left, stack_position, address_of);
+	Expr_Generation right = gen_code_for_expression(env, expr->expr_binary.right, stack_position, address_of);
+	u16 instruction = 0;
+
+	u16 flags = instruction_regsize_from_type(expr->type_return);
+	flags |= (type_primitive_int_signed(expr->type_return)) ? SIGNED : 0;
+
+	bool comparison = false;
+
+	switch (expr->expr_binary.op) {
+		case OP_BINARY_PLUS:			instruction = ADD; break; // +
+		case OP_BINARY_MINUS:			instruction = SUB; break; // -
+		case OP_BINARY_MULT:			instruction = MUL; break; // *
+		case OP_BINARY_DIV:				instruction = DIV; break; // /
+		case OP_BINARY_MOD:				instruction = MOD; break; // %
+		case OP_BINARY_AND:				instruction = AND; break; // &
+		case OP_BINARY_OR:				instruction = OR;  break; // |
+		case OP_BINARY_XOR:				instruction = XOR; break; // ^
+		case OP_BINARY_SHL:				instruction = SHL; break; // <<
+		case OP_BINARY_SHR:				instruction = SHR; break; // >>
+
+		case OP_BINARY_LT:				instruction = LT; comparison = true; break; // <
+		case OP_BINARY_GT:				instruction = GT; comparison = true; break; // >
+		case OP_BINARY_LE:				instruction = LE; comparison = true; break; // <=
+		case OP_BINARY_GE:				instruction = GE; comparison = true; break; // >=
+		case OP_BINARY_EQUAL:			instruction = EQ; comparison = true; break; // ==
+		case OP_BINARY_NOT_EQUAL:		instruction = NE; comparison = true; break; // !=
+
+		case OP_BINARY_LOGIC_AND:		instruction = AND; break; // &&
+		case OP_BINARY_LOGIC_OR:		instruction = OR; break;  // ||
+
+																  // TODO(psv): dot and vector acessing operators
+		case OP_BINARY_DOT:				assert_msg(0, "unimplemented bytecode generation for dot operator"); break; // .
+		case OP_BINARY_VECTOR_ACCESS:	assert_msg(0, "unimplemented bytecode generation for vector acessing"); break; // []
+		default: assert_msg(0, "invalid expression in bytecode generation");  break;
+	}
+
+	if (!comparison) {
+		Push(env, make_instruction(instruction, flags, REG_TO_REG, left.reg, right.reg, 0, 0));
+	} else {
+		Push(env, make_instruction(CMP, flags, REG_TO_REG, left.reg, right.reg, 0, 0));
+		Push(env, make_instruction(instruction, flags, SINGLE_REG, left.reg, NO_REG, 0, 0));
+	}
+
+	result.flags |= EXPR_RESULT_ON_REGISTER;
+	reg_free(env, right.reg);
+	result.reg = left.reg;
+
+	return result;
+}
+
 // stack position indicates the offset within the stack that the expression result should be written to.
-Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 stack_position = 0, bool address_of = false) {
+Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 stack_position, bool address_of) {
 	assert(expr->flags & AST_FLAG_IS_EXPRESSION);
 	Expr_Generation result = {0};
 
@@ -334,65 +411,13 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 	} break; // case AST_EXPRESSION_UNARY
 
 	case AST_EXPRESSION_BINARY: {
-		// Calculate both sides
-		Expr_Generation left = gen_code_for_expression(env, expr->expr_binary.left, stack_position, address_of);
-		Expr_Generation right = gen_code_for_expression(env, expr->expr_binary.right, stack_position, address_of);
-		u16 instruction = 0;
-
-		start_address = move_code_offset(env->interp, env->code_offset);
-
-		u16 flags = INSTR_QWORD;
-		flags |= (type_primitive_int_signed(expr->type_return)) ? SIGNED : 0;
-		flags |= (expr->type_return == type_primitive_get(TYPE_PRIMITIVE_R32)) ? INSTR_FLOAT_32 : 0;
-
-		bool comparison = false;
-
-		switch (expr->expr_binary.op) {
-			case OP_BINARY_PLUS:			instruction = ADD; break; // +
-			case OP_BINARY_MINUS:			instruction = SUB; break; // -
-			case OP_BINARY_MULT:			instruction = MUL; break; // *
-			case OP_BINARY_DIV:				instruction = DIV; break; // /
-			case OP_BINARY_MOD:				instruction = MOD; break; // %
-			case OP_BINARY_AND:				instruction = AND; break; // &
-			case OP_BINARY_OR:				instruction = OR; break;  // |
-			case OP_BINARY_XOR:				instruction = XOR; break; // ^
-			case OP_BINARY_SHL:				instruction = SHL; break; // <<
-			case OP_BINARY_SHR:				instruction = SHR; break; // >>
-
-			case OP_BINARY_LT:				instruction = LT; comparison = true; break; // <
-			case OP_BINARY_GT:				instruction = GT; comparison = true; break; // >
-			case OP_BINARY_LE:				instruction = LE; comparison = true; break; // <=
-			case OP_BINARY_GE:				instruction = GE; comparison = true; break; // >=
-			case OP_BINARY_EQUAL:			instruction = EQ; comparison = true; break; // ==
-			case OP_BINARY_NOT_EQUAL:		instruction = NE; comparison = true; break; // !=
-
-			case OP_BINARY_LOGIC_AND:		instruction = AND; break; // &&
-			case OP_BINARY_LOGIC_OR:		instruction = OR; break;  // ||
-
-			// TODO(psv): dot and vector acessing operators
-			case OP_BINARY_DOT:				assert_msg(0, "unimplemented bytecode generation for dot operator"); break; // .
-			case OP_BINARY_VECTOR_ACCESS:	assert_msg(0, "unimplemented bytecode generation for vector acessing"); break; // []
-			default: assert_msg(0, "invalid expression in bytecode generation");  break;
-		}
-
-		if(!comparison) {
-			end_address = push_instruction(env->interp, make_instruction(instruction, flags, REG_TO_REG, left.reg, right.reg, 0, 0));
-		} else {
-			push_instruction(env->interp, make_instruction(CMP, flags, REG_TO_REG, left.reg, right.reg, 0, 0));
-			end_address = push_instruction(env->interp, make_instruction(instruction, flags, SINGLE_REG, left.reg, NO_REG, 0, 0));
-		}
-		
-		result.flags |= EXPR_RESULT_ON_REGISTER;
-		reg_free(env, right.reg);
-		result.reg = left.reg;
-		env->code_offset += end_address - start_address;
+		return generate_binary_expression(env, expr, stack_position, address_of);
 	} break; // case AST_EXPRESSION_BINARY
 
 	case AST_EXPRESSION_LITERAL: {
 		Registers result_register = reg_allocate(env, type_primitive_float(expr->type_return));
 		result.reg = result_register;
 
-		start_address = move_code_offset(env->interp, env->code_offset);
 		switch (expr->expr_literal.type) {
 		case LITERAL_SINT:
 		case LITERAL_BIN_INT:
@@ -401,19 +426,19 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 			switch (expr->type_return->primitive) {
 			case TYPE_PRIMITIVE_U8:
 			case TYPE_PRIMITIVE_S8:
-				end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_BYTE | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
+				Push(env, make_instruction(MOV, INSTR_BYTE | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
 				break;
 			case TYPE_PRIMITIVE_U16:
 			case TYPE_PRIMITIVE_S16:
-				end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_WORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
+				Push(env, make_instruction(MOV, INSTR_WORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
 				break;
 			case TYPE_PRIMITIVE_U32:
 			case TYPE_PRIMITIVE_S32:
-				end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_DWORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
+				Push(env, make_instruction(MOV, INSTR_DWORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
 				break;
 			case TYPE_PRIMITIVE_U64:
 			case TYPE_PRIMITIVE_S64:
-				end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
+				Push(env, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
 				break;
 			}
 			result.flags |= EXPR_RESULT_ON_REGISTER;
@@ -421,20 +446,20 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 		case LITERAL_FLOAT: {
 			switch(expr->type_return->primitive) {
 			case TYPE_PRIMITIVE_R32:
-				end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_DWORD|INSTR_FLOAT_32|IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
+				Push(env, make_instruction(MOV, INSTR_FLOAT_32|IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
 				break;
 			case TYPE_PRIMITIVE_R64:
-				end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_DWORD|INSTR_FLOAT_64|IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
+				Push(env, make_instruction(MOV, INSTR_FLOAT_64|IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), expr->expr_literal.value_u64);
 				break;
 			}
 			result.flags |= EXPR_RESULT_ON_REGISTER;
 		}break;
 		case LITERAL_BOOL: {
-			end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), (u64)expr->expr_literal.value_bool);
+			Push(env, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), (u64)expr->expr_literal.value_bool);
 			result.flags |= EXPR_RESULT_ON_REGISTER;
 		}break;
 		case LITERAL_POINTER: {
-			end_address = push_instruction(env->interp, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), (u64)0);
+			Push(env, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, result_register, NO_REG, 0, 0), (u64)0);
 			result.flags |= EXPR_RESULT_ON_REGISTER;
 		}break;
 		case LITERAL_ARRAY: {
@@ -445,19 +470,65 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 		} break;
 		}
 
-		env->code_offset += end_address - start_address;
 	} break; // case AST_EXPRESSION_LITERAL
 
 	case AST_EXPRESSION_VARIABLE: {
 		// Gives the result in a register if in the left side of an assignment
-		if (expr->flags & AST_FLAG_LEFT_ASSIGN || address_of) {
-			return generate_code_expr_variable_address(env, expr, stack_position);
+		Ast* decl = expr->expr_variable.decl;
+
+		if (decl->node_type == AST_DECL_PROCEDURE) {
+			return generate_code_expr_procedure(env, expr);
 		} else {
-			return generate_code_expr_variable_value(env, expr, stack_position);
-		}	
+			if (expr->flags & AST_FLAG_LEFT_ASSIGN || address_of) {
+				return generate_code_expr_variable_address(env, expr, stack_position);
+			} else {
+				return generate_code_expr_variable_value(env, expr, stack_position);
+			}
+		}
+
 	}break; // case AST_EXPRESSION_VARIABLE
 
 	case AST_EXPRESSION_PROCEDURE_CALL: {
+		Expr_Generation result = gen_code_for_expression(env, expr->expr_proc_call.caller, stack_position, true);
+		assert(result.flags & EXPR_RESULT_ON_REGISTER);
+
+		u64* after_call_return_value;
+
+		size_t offset_from_stack_base = 0;
+		if (expr->expr_proc_call.args_count > 0) {
+			// Push every argument to the stack, but first allocate space for it
+			size_t arguments_size = 0;
+			for (size_t i = 0; i < expr->expr_proc_call.args_count; ++i) {
+				arguments_size += expr->expr_proc_call.args[i]->type_return->type_size_bits / 8;
+			}
+			size_t addition_stack_size = type_pointer_size() * 2;
+			// allocate space for instructions, return address and stack base
+			Push(env, make_instruction(ADD, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), (u64)(arguments_size + addition_stack_size));
+
+			offset_from_stack_base = env->stack_temp_offset;
+			env->stack_temp_offset += arguments_size + addition_stack_size;
+			env->stack_size += arguments_size + addition_stack_size;
+		}
+			// push stack base value to be in R_SB[-8]
+			Push(env, make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, R_SB, NO_REG, 0, 0));
+			// push return value to be the in R_SB[-16]
+			Push(env, make_instruction(PUSH, INSTR_QWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &after_call_return_value);
+
+		if (expr->expr_proc_call.args_count > 0) {
+			// evaluate all arguments and push them from right to left
+			for (size_t i = 0; i < expr->expr_proc_call.args_count; ++i) {
+				Ast* arg = expr->expr_proc_call.args[i];
+				Expr_Generation result = gen_code_for_expression(env, arg, offset_from_stack_base);
+				if (result.flags & EXPR_RESULT_ON_REGISTER) {
+					// Push when result is in register, otherwise the result is in its place already
+					Push(env, make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, result.reg, NO_REG, 0, 0));
+				}
+			}
+		}
+		// make call
+		reg_free(env, result.reg);
+		Instruction_Info ac = Push(env, make_instruction(JMP, INSTR_QWORD, SINGLE_REG, result.reg, NO_REG, 0, 0));
+		*after_call_return_value = (u64)(ac.absolute_address + ac.size_bytes);
 
 	}break; // case AST_EXPRESSION_PROCEDURE_CALL
 
@@ -476,6 +547,8 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 	switch (node->node_type) {
 
 		case AST_DECL_PROCEDURE: {
+			node->decl_procedure.proc_runtime_address = (u64*)(env->code + env->code_offset);
+
 			generate_proc_prologue(env, node);
 			gen_code_node(env, node->decl_procedure.body);
 			generate_proc_epilogue(env);
@@ -499,6 +572,7 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 					reg_free(env, result.reg);
 				}
 			}
+			//generate_proc_epilogue(env);
 		}break;
 
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
@@ -553,6 +627,9 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 			node->decl_variable.stack_offset = env->stack_base_offset;
 			env->stack_base_offset += node->decl_variable.variable_type->type_size_bits / 8;
 
+			// allocate memory on the stack
+			Push(env, make_instruction(ADD, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), (u64)0);
+
 			if (node->decl_variable.assignment) {
 				// TODO(psv): make the result be directly to the memory allocated
 				Expr_Generation result = gen_code_for_expression(env, node->decl_variable.assignment, node->decl_variable.stack_offset);
@@ -603,6 +680,11 @@ void bytecode_generate(Interpreter* interp, Ast** top_level) {
 	}
 
 	Push(&env, make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
+
+	for (size_t i = 0; i < array_get_length(env.proc_addressing_queue); ++i) {
+		Ast* decl = env.proc_addressing_queue[i].decl;
+		*env.proc_addressing_queue[i].fill_address = (u64)decl->decl_procedure.proc_runtime_address;
+	}
 }
 
 

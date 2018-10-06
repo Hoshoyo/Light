@@ -3,11 +3,10 @@
 #define internal static
 
 internal bool running;
-s64 reg[NUM_REGS] = {};
 
-void print_instruction(Instruction instruction, u64 next_qword);
+void print_instruction(Interpreter* interp, Instruction instruction, u64 next_qword);
 void print_code(Interpreter* interp);
-int  execute(Instruction instruction, u64 next_word);
+int  execute(Interpreter* interp, Instruction instruction, u64 next_word);
 
 u64 push_instruction(Interpreter* interp, Instruction inst) {
 	*(Instruction*)interp->code_ptr = inst;
@@ -16,7 +15,7 @@ u64 push_instruction(Interpreter* interp, Instruction inst) {
 	} else {
 		interp->code_ptr += sizeof(Instruction) - sizeof(inst.immediate_offset);
 	}
-	print_instruction(inst, 0);
+	print_instruction(interp, inst, 0);
 	return (u64)interp->code_ptr;
 }
 
@@ -91,231 +90,9 @@ Interpreter init_interpreter(s64 stack_size, s64 heap_size)
 	interp.code_ptr = interp.code;
 	interp.datas_ptr = interp.datas;
 
-	reg[R_IP] = (u64)interp.code;
-	reg[R_SP] = (u64)interp.stack;
-	reg[R_SB] = (u64)interp.stack;
-
-	u64 label = (u64)interp.code_ptr;
-	u64 start = (u64)interp.code_ptr;
-
-#if 0
-	{
-		// mov r1, 0
-		// mov r2, 10
-		// label:
-		// mov [heap + r1], r2
-		// add r1, 8
-		// sub r2, 1
-		// cmp r2, 0
-		// bgt label
-		// hlt
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 10);
-		push_instruction(make_instruction(MOV, REGISTER_OFFSET | IMMEDIATE_VALUE, REG_TO_MEM_PTR, NO_REG, R_2, R_1, 0), (u64)heap);
-		push_instruction(make_instruction(ADD, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 8);
-		push_instruction(make_instruction(SUB, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 1);
-		push_instruction(make_instruction(CMP, SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 0);
-		push_instruction(make_instruction(BGT, SIGNED | IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, -64));
-		push_instruction(make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
-
-	}
-#endif
-#if 0
-	{
-		const char* str = "iterations : %d\n";
-		*(u64*)datas_ptr = (u64)str;
-	}
-	{
-		// mov r3, rsp
-		// mov r2, 0
-		// push r2
-		// push [datas_ptr]
-		// mov ss, 8
-	// label:
-		// extcall printf
-		// add rsp, 16
-		// add r2, 1
-		// mov [r3], r2
-		// cmp r2, 10
-		// ble label
-		// hlt
-
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG, R_3, R_SP, 0, 0));
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), (u64)0);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_2, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE|INSTR_QWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), *(u64*)datas_ptr);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 16);
-
-		// label
-		push_instruction(make_instruction(EXTCALL, INSTR_QWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)printf);	// 16
-
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 16);		// 16
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 1);			// 16
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_3, R_2, 0, 0));				// 8
-		push_instruction(make_instruction(CMP, IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 46);			// 16
-
-		push_instruction(make_instruction(BLE, IMMEDIATE_OFFSET, NO_ADDRESSING, NO_REG, NO_REG, 0, -(4*16 + 8)));
-
-		HALT;
-	}
-#endif
-#if 0
-	{
-		const char* str = "Untitled - Notepad";
-		const char* str2 = "Eita!";
-		*(u64*)datas_ptr = (u64)str;
-		datas_ptr += sizeof(u64);
-		*(u64*)datas_ptr = (u64)str2;
-	}
-	{
-		// mov r1, 0
-		// push r1
-		// push [datas_ptr - 8]
-		// push [datas_ptr]
-		// push r1
-		// callext MessageBoxA
-		
-		// mov r1, 0
-		// push r1
-		// push [datas_ptr - 8]
-		// callext FindWindowA
-
-		// mov r2, rsp
-		// add rsp, 16
-		// hlt
-
-		
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_QWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), *(u64*)datas_ptr);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_QWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), *(u64*)(datas_ptr - 8));
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 4 * 8);
-
-		push_instruction(make_instruction(EXTCALL, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)MessageBoxA);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE | INSTR_QWORD, MEM_TO_REG, R_1, NO_REG, 0, 0), *((u64*)(datas_ptr - 8)));
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 0);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-		
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 2 * 8);
-
-		push_instruction(make_instruction(EXTCALL, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)FindWindowA);
-
-
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG, R_2, R_SP, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 16);
-
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_2, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_0, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 2 * 8);
-
-		push_instruction(make_instruction(EXTCALL, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)GetWindowRect);
-
-		HALT;
-
-	}
-#endif
-#if 0
-	{
-		// mov r1, 1
-		// push r1
-		// mov r1, 2
-		// push r1
-		// mov r1, 3
-		// push r1
-		// mov r1, 4
-		// push r1
-		// mov r1, 5
-		// push r1
-		// mov r1, 6
-		// push r1
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 1);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 2);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 3);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 4);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 5);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 6);
-		push_instruction(make_instruction(MOV, INSTR_QWORD, REG_TO_REG_PTR, R_SP, R_1, 0, 0));
-		push_instruction(make_instruction(ADD, IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), 8);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 6 * 8);
-
-		push_instruction(make_instruction(EXTCALL, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)teste);
-
-		HALT;
-
-	}
-#endif
-#if 0
-	{
-		push_instruction(make_instruction(PUSH, INSTR_DWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 1);
-		push_instruction(make_instruction(PUSH, INSTR_DWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 2);
-
-		push_instruction(make_instruction(POP, INSTR_DWORD, SINGLE_REG, R_1, NO_REG, 0, 0));
-
-		push_instruction(make_instruction(PUSH, IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 3);
-		push_instruction(make_instruction(PUSH, IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 4);
-		push_instruction(make_instruction(PUSH, IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 5);
-		push_instruction(make_instruction(PUSH, IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), 6);
-
-		push_instruction(make_instruction(MOV, IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 6 * 8);
-		push_instruction(make_instruction(EXTCALL, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)teste);
-
-		HALT;
-	}
-#endif
-#if 0 
-	{
-		push_instruction(make_instruction(MOV, INSTR_BYTE | SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_1, NO_REG, 0, 0), 120);
-		push_instruction(make_instruction(MOV, INSTR_BYTE | SIGNED | IMMEDIATE_VALUE, MEM_TO_REG, R_2, NO_REG, 0, 0), 75);
-		push_instruction(make_instruction(ADD, INSTR_BYTE | SIGNED, REG_TO_REG, R_1, R_2, 0, 0));
-		push_instruction(make_instruction(PUSH, INSTR_BYTE, SINGLE_REG, R_1, NO_REG, 0, 0));
-		push_instruction(make_instruction(POP, SIGNED|INSTR_BYTE, SINGLE_REG, R_2, NO_REG, 0, 0));
-	}
-#endif
+	interp.reg[R_IP] = (u64)interp.code;
+	interp.reg[R_SP] = (u64)interp.stack;
+	interp.reg[R_SB] = (u64)interp.stack;
 
 	return interp;
 }
@@ -323,13 +100,13 @@ Interpreter init_interpreter(s64 stack_size, s64 heap_size)
 #define PRINT_INSTRUCTIONS 1
 int run_interpreter(Interpreter* interp)
 {
-	print_code(interp);
+	//print_code(interp);
 
 	running = true;
 	int instruction_num = 0;
 	while (running) {
-		u64 address = reg[R_IP];
-		Instruction instruction = *(Instruction*)reg[R_IP];
+		u64 address = interp->reg[R_IP];
+		Instruction instruction = *(Instruction*)interp->reg[R_IP];
 		if(instruction.flags & IMMEDIATE_OFFSET){
 			instruction.immediate_offset = *((u64*)(address + REG_SIZE));
 			address += REG_SIZE;
@@ -337,17 +114,18 @@ int run_interpreter(Interpreter* interp)
 		u64 immediate = *((u64*)(address + REG_SIZE));
 		instruction_num++;
 #if PRINT_INSTRUCTIONS
-		print_instruction(instruction, immediate);
+		print_instruction(interp, instruction, immediate);
 #endif
-		if (execute(instruction, immediate)) break;
+		if (execute(interp, instruction, immediate)) break;
 	}
-	printf("interpreter exited with code %d\n", reg[R_0]);
+	printf("interpreter exited with code %d\n", interp->reg[R_0]);
 	return 0;
 }
 
 template <typename T>
-int execute_instruction(Instruction inst, u64 next_word)
+int execute_instruction(Interpreter* interp, Instruction inst, u64 next_word)
 {	
+	s64* reg = interp->reg;
 	T ui_left, ui_right;
 	bool write_memory = false;
 	bool write_register = false;
@@ -368,6 +146,7 @@ int execute_instruction(Instruction inst, u64 next_word)
 	}break;
 	case SINGLE_REG: {
 		ui_left = reg[inst.left_reg];
+		write_register = true;
 	}break;
 	case SINGLE_MEM: {
 		ui_left = next_word;
@@ -457,6 +236,7 @@ int execute_instruction(Instruction inst, u64 next_word)
 	case OR:    ui_left = ui_left | ui_right; break;
 	case AND:   ui_left = ui_left & ui_right; break;
 	case XOR:   ui_left = ui_left ^ ui_right; break;
+	case NOT:   ui_left = ~ui_left; break;
 
 	case CMP: {
 		if (ui_left < ui_right)
@@ -583,7 +363,8 @@ int execute_instruction(Instruction inst, u64 next_word)
 	
 	if (write_register) {
 		reg[inst.left_reg] = ui_left;
-	} else if (write_memory) {
+	}
+	if (write_memory) {
 		*(T*)address_to_write = ui_left;
 	}
 	if (advance_ip) {
@@ -597,7 +378,8 @@ int execute_instruction(Instruction inst, u64 next_word)
 }
 
 template <typename T>
-int execute_float_instruction(Instruction inst, u64 next_word) {
+int execute_float_instruction(Interpreter* interp, Instruction inst, u64 next_word) {
+	s64* reg = interp->reg;
 	T ui_left, ui_right;
 	bool write_memory = false;
 	bool write_register = false;
@@ -617,6 +399,7 @@ int execute_float_instruction(Instruction inst, u64 next_word) {
 	}break;
 	case SINGLE_REG: {
 		ui_left = *(T*)&reg[inst.left_reg];
+		write_register = true;
 	}break;
 	case SINGLE_MEM: {
 		ui_left = (T)(*(r64*)&next_word);
@@ -742,37 +525,38 @@ int execute_float_instruction(Instruction inst, u64 next_word) {
 	return 0;
 }
 
-int execute(Instruction inst, u64 next_word)
+int execute(Interpreter* interp, Instruction inst, u64 next_word)
 {
 	int status = 0;
 	if(inst.flags & INSTR_FLOAT_32) {
-		status = execute_float_instruction<r32>(inst, next_word);
+		status = execute_float_instruction<r32>(interp, inst, next_word);
 	} else if (inst.flags & INSTR_FLOAT_64) {
-		status = execute_float_instruction<r64>(inst, next_word);
+		status = execute_float_instruction<r64>(interp, inst, next_word);
 	} else if (inst.flags & SIGNED) {
 		if (inst.flags & INSTR_BYTE)
-			status = execute_instruction<s8>(inst, next_word);
+			status = execute_instruction<s8>(interp, inst, next_word);
 		else if (inst.flags & INSTR_WORD)
-			status = execute_instruction<s16>(inst, next_word);
+			status = execute_instruction<s16>(interp, inst, next_word);
 		else if(inst.flags & INSTR_DWORD)
-			status = execute_instruction<s32>(inst, next_word);
+			status = execute_instruction<s32>(interp, inst, next_word);
 		else
-			status = execute_instruction<s64>(inst, next_word);
+			status = execute_instruction<s64>(interp, inst, next_word);
 	} else {
 		if(inst.flags & INSTR_BYTE)
-			status = execute_instruction<u8>(inst, next_word);
+			status = execute_instruction<u8>(interp, inst, next_word);
 		else if(inst.flags & INSTR_WORD)
-			status = execute_instruction<u16>(inst, next_word);
+			status = execute_instruction<u16>(interp, inst, next_word);
 		else if(inst.flags & INSTR_DWORD)
-			status = execute_instruction<u32>(inst, next_word);
+			status = execute_instruction<u32>(interp, inst, next_word);
 		else
-			status = execute_instruction<u64>(inst, next_word);
+			status = execute_instruction<u64>(interp, inst, next_word);
 	}
 	return status;
 }
 
 #include <light_arena.h>
-static char* reg_name(Light_Arena* arena, u8 r) {
+static char* reg_name(Interpreter* interp, Light_Arena* arena, u8 r) {
+	s64* reg = interp->reg;
 	char n[64] = { 0 };
 	int l = 0;
 
@@ -812,8 +596,9 @@ inline s32 instruction_size(Instruction inst) {
 	return size;
 }
 
-void print_instruction(Instruction inst, u64 next_qword)
+void print_instruction(Interpreter* interp, Instruction inst, u64 next_qword)
 {
+	s64* reg = interp->reg;
 	Light_Arena* sar = arena_create(2048);
 	int l = 0;
 	printf("0x%llx: ", reg[R_IP]);
@@ -855,9 +640,9 @@ void print_instruction(Instruction inst, u64 next_qword)
 	}
 
 	switch (inst.addressing) {
-	case REG_TO_REG	    : l += printf("%s, %s", reg_name(sar, inst.left_reg), reg_name(sar, inst.right_reg)); break;
-	case MEM_TO_REG     : l += printf("%s, 0x%llx", reg_name(sar, inst.left_reg), next_qword); break;
-	case SINGLE_REG		: l += printf("%s", reg_name(sar, inst.left_reg)); break;
+	case REG_TO_REG	    : l += printf("%s, %s", reg_name(interp, sar, inst.left_reg), reg_name(interp, sar, inst.right_reg)); break;
+	case MEM_TO_REG     : l += printf("%s, 0x%llx", reg_name(interp, sar, inst.left_reg), next_qword); break;
+	case SINGLE_REG		: l += printf("%s", reg_name(interp, sar, inst.left_reg)); break;
 	case SINGLE_MEM		: l += printf("0x%llx", next_qword); break;
 
 	case SINGLE_MEM_PTR: {
@@ -867,7 +652,7 @@ void print_instruction(Instruction inst, u64 next_qword)
 			else
 				l += printf("[0x%llx]", inst.immediate_offset);
 		} else if(inst.flags & REGISTER_OFFSET) {
-			l += printf("[0x%llx + %s]", next_qword, reg_name(sar, inst.offset_reg));
+			l += printf("[0x%llx + %s]", next_qword, reg_name(interp, sar, inst.offset_reg));
 		} else {
 			l += printf("[0x%llx]", next_qword);
 		}
@@ -875,46 +660,46 @@ void print_instruction(Instruction inst, u64 next_qword)
 	case SINGLE_REG_PTR: {
 		if (inst.flags & IMMEDIATE_OFFSET) {
 			if (inst.flags & IMMEDIATE_VALUE)
-				l += printf("[%s + 0x%llx]", reg_name(sar, inst.left_reg), next_qword);
+				l += printf("[%s + 0x%llx]", reg_name(interp, sar, inst.left_reg), next_qword);
 			else
-				l += printf("[%s]", reg_name(sar, inst.left_reg));
+				l += printf("[%s]", reg_name(interp, sar, inst.left_reg));
 		} else if (inst.flags & REGISTER_OFFSET) {
-			l += printf("[%s + %s]", reg_name(sar, inst.left_reg), reg_name(sar, inst.offset_reg));
+			l += printf("[%s + %s]", reg_name(interp, sar, inst.left_reg), reg_name(interp, sar, inst.offset_reg));
 		} else {
-			l += printf("[%s]", reg_name(sar, inst.left_reg));
+			l += printf("[%s]", reg_name(interp, sar, inst.left_reg));
 		}
 	}break;
 	case REG_TO_REG_PTR: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			l += printf("[%s + 0x%llx], %s", reg_name(sar, inst.left_reg), inst.immediate_offset, reg_name(sar, inst.right_reg));
+			l += printf("[%s + 0x%llx], %s", reg_name(interp, sar, inst.left_reg), inst.immediate_offset, reg_name(interp, sar, inst.right_reg));
 		else if(inst.flags & REGISTER_OFFSET)
-			l += printf("[%s + %s], %s", reg_name(sar, inst.left_reg), reg_name(sar, inst.offset_reg), reg_name(sar, inst.right_reg));
+			l += printf("[%s + %s], %s", reg_name(interp, sar, inst.left_reg), reg_name(interp, sar, inst.offset_reg), reg_name(interp, sar, inst.right_reg));
 		else
-			l += printf("[%s], %s", reg_name(sar, inst.left_reg), reg_name(sar, inst.right_reg));
+			l += printf("[%s], %s", reg_name(interp, sar, inst.left_reg), reg_name(interp, sar, inst.right_reg));
 	}break;
 	case REG_PTR_TO_REG: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			l += printf("%s, [%s + 0x%llx]", reg_name(sar, inst.left_reg), reg_name(sar, inst.right_reg), inst.immediate_offset);
+			l += printf("%s, [%s + 0x%llx]", reg_name(interp, sar, inst.left_reg), reg_name(interp, sar, inst.right_reg), inst.immediate_offset);
 		else if(inst.flags & REGISTER_OFFSET)
-			l += printf("%s, [%s + %s]", reg_name(sar, inst.left_reg), reg_name(sar, inst.right_reg), reg_name(sar, inst.offset_reg));
+			l += printf("%s, [%s + %s]", reg_name(interp, sar, inst.left_reg), reg_name(interp, sar, inst.right_reg), reg_name(interp, sar, inst.offset_reg));
 		else
-			l += printf("%s, [%s]", reg_name(sar, inst.left_reg), reg_name(sar, inst.right_reg));
+			l += printf("%s, [%s]", reg_name(interp, sar, inst.left_reg), reg_name(interp, sar, inst.right_reg));
 	}break;
 	case MEM_PTR_TO_REG: {
 		if(inst.flags & IMMEDIATE_OFFSET)
-			l += printf("%s, [0x%llx + 0x%llx]", reg_name(sar, inst.left_reg), next_qword, inst.immediate_offset);
+			l += printf("%s, [0x%llx + 0x%llx]", reg_name(interp, sar, inst.left_reg), next_qword, inst.immediate_offset);
 		else if(inst.flags & REGISTER_OFFSET)
-			l += printf("%s, [0x%llx + %s]", reg_name(sar, inst.left_reg), next_qword, reg_name(sar, inst.offset_reg));
+			l += printf("%s, [0x%llx + %s]", reg_name(interp, sar, inst.left_reg), next_qword, reg_name(interp, sar, inst.offset_reg));
 		else
-			l += printf("%s, [0x%llx]", reg_name(sar, inst.left_reg), next_qword);
+			l += printf("%s, [0x%llx]", reg_name(interp, sar, inst.left_reg), next_qword);
 	}break;
 	case REG_TO_MEM_PTR: {
 		if (inst.flags & IMMEDIATE_OFFSET)
-			l += printf("[%llx + 0x%llx], %s", next_qword, inst.immediate_offset, reg_name(sar, inst.right_reg));
+			l += printf("[%llx + 0x%llx], %s", next_qword, inst.immediate_offset, reg_name(interp, sar, inst.right_reg));
 		else if(inst.flags & REGISTER_OFFSET)
-			l += printf("[%llx + %s], %s", next_qword, reg_name(sar, inst.offset_reg), reg_name(sar, inst.right_reg));
+			l += printf("[%llx + %s], %s", next_qword, reg_name(interp, sar, inst.offset_reg), reg_name(interp, sar, inst.right_reg));
 		else
-			l += printf("[0x%llx], %s", next_qword, reg_name(sar, inst.right_reg));
+			l += printf("[0x%llx], %s", next_qword, reg_name(interp, sar, inst.right_reg));
 	}break;
 	case NO_ADDRESSING: {
 		if (inst.flags & IMMEDIATE_OFFSET) {
@@ -955,7 +740,7 @@ void print_instruction(Instruction inst, u64 next_qword)
 
 void print_code(Interpreter* interp) {
 	u8* codeptr = interp->code;
-	s64 start_ip = reg[R_IP];
+	s64 start_ip = interp->reg[R_IP];
 	while (true) {
 		u64 address = (u64)codeptr;
 		Instruction instruction = *(Instruction*)address;
@@ -965,8 +750,8 @@ void print_code(Interpreter* interp) {
 		}
 		u64 immediate = *((u64*)(address + REG_SIZE));
 
-		reg[R_IP] = address;
-		print_instruction(instruction, immediate);
+		interp->reg[R_IP] = address;
+		print_instruction(interp, instruction, immediate);
 
 		if (instruction.type == 0) {
 			break;
@@ -981,6 +766,6 @@ void print_code(Interpreter* interp) {
 			codeptr += sizeof(u64);
 		}
 	}
-	reg[R_IP] = start_ip;
+	interp->reg[R_IP] = start_ip;
 	printf("\n");
 }
