@@ -89,9 +89,9 @@ int main(int argc, char** argv) {
 	}
 
 	double end = timer.GetTime();
-	printf("File load time      : %f ms\n", total_file_load_time);
-	printf("Compiler     elapsed: %f ms\n", (end - start));
-	printf("Lexer      processed: %d LoC\n", global_lexer_line_count);
+	printf("File load time:     %f ms\n", total_file_load_time);
+	printf("Compiler elapsed:   %f ms\n", (end - start));
+	printf("Lexer processed:    %d LoC\n", global_lexer_line_count);
 
 	if(verbose){
 		// TODO(psv): make compiler options/flags to print this
@@ -118,8 +118,4 @@ int main(int argc, char** argv) {
 	}
 #endif
 	return 0;
-}
-
-extern "C" void print_register(u64 r) {
-	printf("-> 0x%lx\n", r);
 }

@@ -231,7 +231,6 @@ generate_proc_prologue(Gen_Environment* env, Ast* proc_body) {
 	Scope* scope = proc_body->decl_procedure.body->comm_block.block_scope;
 	s32 num_decls = scope->decl_count;
 
-	printf("stack offset: %d\n", scope->stack_allocation_offset);
 	env->stack_size = scope->stack_allocation_offset;
 	env->stack_base_offset = 0;
 	env->stack_temp_offset = 0;
@@ -846,16 +845,20 @@ void* load_library_dynamic(string* library) {
 	// "/lib/x86_64-linux-gnu/libc.so.6"
 	char* libname = make_c_string(*library);
 	void* lib = dlopen((const char*)libname, RTLD_LAZY);
+#if DEBUG
 	printf("loaded library %s at %p\n", libname, lib);
+#endif
 	free(libname);
+
 	return lib;
 }
 void* load_address_of_external_function(string* name, void* library) {
 	char* procname = make_c_string(*name);
 	void* proc = dlsym(library, (const char*)procname);
+#if DEBUG
 	printf("loaded procedure %s at %p\n", procname, proc);
+#endif
 	free(procname);
-	//((int(*)(int, void*, size_t))proc)(1, (void*)"foo", 3);
 
 	return proc;
 }

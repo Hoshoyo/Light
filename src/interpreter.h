@@ -127,6 +127,8 @@ struct Interpreter {
 	u8* datas;
 
 	s64 reg[NUM_REGS];
+
+	bool running;
 };
 
 Interpreter init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024);

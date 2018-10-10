@@ -1,14 +1,10 @@
 section .data
-    printf_format: db '%lx', 10, 0
-
 section .text
 
 ; rcx  procedure address to call
 ; rdx  pointer to stack
 ; r8   size of stack
 ;call_external proc
-extern printf
-extern print_register
 global call_external
 call_external:
 	push rbp

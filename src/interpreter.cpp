@@ -2,14 +2,14 @@
 #include "interpreter.h"
 #define internal static
 
+#define PRINT_INSTRUCTIONS 0
+
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #define RUNTIME_BYTECODE_ASSERT_FAIL(X) MessageBoxA(0, X, "Assert Failed", MB_ICONERROR)
 #elif defined(__linux__)
 #define RUNTIME_BYTECODE_ASSERT_FAIL(X) printf(X)
 #endif
-
-internal bool running;
 
 void print_instruction(Interpreter* interp, Instruction instruction, u64 next_qword);
 void print_code(Interpreter* interp);
@@ -85,10 +85,12 @@ Interpreter init_interpreter(s64 stack_size, s64 heap_size)
 	interp.code  = (u8*)ho_bigalloc_rw(1024 * 1024);
 	interp.datas = (u8*)ho_bigalloc_rw(1024 * 1024);
 
+#if DEBUG
 	printf("stack: %p\n", interp.stack);
 	printf("heap : %p\n", interp.heap);
 	printf("code : %p\n", interp.code);
 	printf("datas: %p\n", interp.datas);
+#endif
 
 	interp.stack = interp.stack + 4 * sizeof(u64);	// this is necessary for external call, in order to not access an address below the stack address
 
@@ -104,14 +106,13 @@ Interpreter init_interpreter(s64 stack_size, s64 heap_size)
 	return interp;
 }
 
-#define PRINT_INSTRUCTIONS 0
 int run_interpreter(Interpreter* interp)
 {
 	//print_code(interp);
 
-	running = true;
+	interp->running = true;
 	int instruction_num = 0;
-	while (running) {
+	while (interp->running) {
 		u64 address = interp->reg[R_IP];
 		Instruction instruction = *(Instruction*)interp->reg[R_IP];
 		if(instruction.flags & IMMEDIATE_OFFSET){
@@ -125,7 +126,9 @@ int run_interpreter(Interpreter* interp)
 #endif
 		if (execute(interp, instruction, immediate)) break;
 	}
+#if PRINT_INSTRUCTIONS
 	printf("interpreter exited with code %d\n", interp->reg[R_0]);
+#endif
 	return 0;
 }
 
