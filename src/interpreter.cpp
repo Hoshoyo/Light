@@ -6,7 +6,6 @@
 #include <windows.h>
 #define RUNTIME_BYTECODE_ASSERT_FAIL(X) MessageBoxA(0, X, "Assert Failed", MB_ICONERROR)
 #elif defined(__linux__)
-#define
 #define RUNTIME_BYTECODE_ASSERT_FAIL(X) printf(X)
 #endif
 

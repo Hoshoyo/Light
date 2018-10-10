@@ -9,6 +9,7 @@
 void* load_address_of_external_function(string* name, HMODULE library);
 HMODULE load_library_dynamic(string* library);
 #elif defined(__linux__)
+typedef void* HMODULE;
 #include <dlfcn.h>
 void* load_address_of_external_function(string* name, void* library);
 void* load_library_dynamic(string* library);
