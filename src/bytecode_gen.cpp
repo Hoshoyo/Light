@@ -27,7 +27,8 @@ struct Register_Allocation{
 };
 // TODO(psv): thread safety
 static Register_Allocation register_allocated[NUM_REGS];
-static Registers* register_stack;
+static Registers* register_allocation_stack;
+static Registers* register_saved_stack;
 
 u32 instruction_regsize_from_type(Type_Instance* type) {
 	switch (type->kind) {
@@ -65,7 +66,7 @@ Registers reg_allocate(Gen_Environment* env, bool floating_point = false) {
 	s32 oldest = -1;
 	Registers result = NO_REG;
 
-	Registers r_first = (floating_point) ? FR_0 : R_0;
+	Registers r_first = (floating_point) ? FR_1 : R_1;
 	Registers r_last  = (floating_point) ? FR_3 : R_8;
 
 	for (int i = r_first; i <= r_last; ++i) {
@@ -83,12 +84,12 @@ Registers reg_allocate(Gen_Environment* env, bool floating_point = false) {
 	if (result != NO_REG) return result;
 
 	// push the oldest to the stack
-	if (!register_stack) {
-		register_stack = array_create(Registers, 512);
+	if (!register_allocation_stack) {
+		register_allocation_stack = array_create(Registers, 512);
 	}
 	register_allocated[oldest].in_stack = true;
 	register_allocated[oldest].age++;
-	array_push(register_stack, (Registers*)&oldest);
+	array_push(register_allocation_stack, (Registers*)&oldest);
 
 	env->code_offset += push_instruction(env->interp, make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, oldest, NO_REG, 0, 0));
 
@@ -100,7 +101,7 @@ void reg_free(Gen_Environment* env, Registers r) {
 	bool pop = false;
 	// free the last in the stack rather
 	if (register_allocated[r].in_stack) {
-		Registers last = *(Registers*)array_pop(register_stack);
+		Registers last = *(Registers*)array_pop(register_allocation_stack);
 		assert(last == r);
 		pop = true;
 	}
@@ -123,7 +124,7 @@ struct Instruction_Info {
 	u8* absolute_address;
 };
 
-#define PRINT_INSTRUCTIONS 0
+#define PRINT_INSTRUCTIONS 1
 Instruction_Info
 Push(Gen_Environment* env, Instruction inst, u64 next_word = 0) {
 	Instruction_Info result = {0};
@@ -170,6 +171,27 @@ struct Expr_Generation {
 };
 
 Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 stack_position = 0, bool address_of = false);
+
+void
+PushRegisters(Gen_Environment* env) {
+	for (size_t i = 0; i < NUM_REGS; ++i) {
+		if (register_allocated[i].allocated) {
+			if (!register_allocation_stack) {
+				register_saved_stack = array_create(Registers, 512);
+			}
+			array_push(register_saved_stack, &i);
+			Push(env, make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, i, NO_REG, 0, 0));
+		}
+	}
+}
+
+void PopRegisters(Gen_Environment* env) {
+	if (!register_saved_stack) return;
+	while(array_get_length(register_saved_stack) > 0) {
+		Registers r = *(Registers*)array_pop(register_saved_stack);
+		Push(env, make_instruction(POP, INSTR_QWORD, SINGLE_REG, r, NO_REG, 0, 0));
+	}
+}
 
 void
 generate_entry_point(Gen_Environment* env) {
@@ -546,10 +568,15 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 
 		u64* after_call_return_value;
 
+		// Save all registers to the stack, not the one holding the procedure address though
+		register_allocated[result.reg].allocated = false;
+		PushRegisters(env);
+		register_allocated[result.reg].allocated = true;
+
 		size_t offset_from_stack_base = 0;
+		size_t arguments_size = 0;
 		if (expr->expr_proc_call.args_count > 0) {
 			// Push every argument to the stack, but first allocate space for it
-			size_t arguments_size = 0;
 			for (size_t i = 0; i < expr->expr_proc_call.args_count; ++i) {
 				arguments_size += expr->expr_proc_call.args[i]->type_return->type_size_bits / 8;
 			}
@@ -573,6 +600,7 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 					// Push when result is in register, otherwise the result is in its place already
 					Push(env, make_instruction(PUSH, instr_size, SINGLE_REG, result.reg, NO_REG, 0, 0));
 				}
+				reg_free(env, result.reg);
 
 				u32 s = arg->type_return->type_size_bits / 8;
 				assert(s < 255);
@@ -582,12 +610,12 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 			}
 		}
 
+		reg_free(env, result.reg);
+
 		// push stack base value to be in R_SB[-8]
 		// Push(env, make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, R_SB, NO_REG, 0, 0));
 		// push return value to be the in R_SB[-8]
 		Push(env, make_instruction(PUSH, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &after_call_return_value);
-
-		reg_free(env, result.reg);
 
 		// make call
 		if (result.flags & EXPR_RESULT_EXT_CALL) {
@@ -600,6 +628,16 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 			*after_call_return_value = (u64)(ac.absolute_address + ac.size_bytes);
 		}
 
+		// dealloc proc arguments in the stack
+		Push(env, make_instruction(SUB, INSTR_QWORD|IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), (u64)arguments_size);
+
+		// Restore all registers from the stack
+		PopRegisters(env);
+
+		Expr_Generation return_value = { 0 };
+		return_value.flags = EXPR_RESULT_ON_REGISTER;
+		return_value.reg = R_0;
+		return return_value;
 	}break; // case AST_EXPRESSION_PROCEDURE_CALL
 
 	default:break;
@@ -655,7 +693,7 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 					reg_free(env, result.reg);
 				}
 			}
-			//generate_proc_epilogue(env);
+			generate_proc_epilogue(env);
 		}break;
 
 		case AST_COMMAND_VARIABLE_ASSIGNMENT: {
@@ -755,6 +793,7 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 }
 
 void bytecode_generate(Interpreter* interp, Ast** top_level) {
+	TIME_FUNC();
 	Gen_Environment env = {};
 	env.interp = interp;
 	env.code = interp->code;
