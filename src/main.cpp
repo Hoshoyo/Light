@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
 		//DEBUG_print_type_table();
 		DEBUG_print_type_table_structs();
 	}
-	
+
 #if 0
 	double bend_start = timer.GetTime();
 	c_generate(ast_top_level, g_type_table, argv[1], argv[0], g_lib_table);
@@ -114,8 +114,12 @@ int main(int argc, char** argv) {
 		Interpreter interp = init_interpreter();
 		bytecode_generate(&interp, ast_top_level);
 		run_interpreter(&interp);
-		print_profile();
+		//print_profile();
 	}
 #endif
 	return 0;
+}
+
+extern "C" void print_register(u64 r) {
+	printf("-> 0x%lx\n", r);
 }

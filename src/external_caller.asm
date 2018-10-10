@@ -43,6 +43,7 @@ label_call:					; copy first 4 arguments to rcx, rdx, r8 and r9 following the C 
 	add r9, 8		; do -x + 8
 	shl r9, 3		; multiply by 8
 	mov r14, 0ffffffffffffffffh
+	mov rcx, r9
 	shr r14, cl		; shift 2^64-1 by that amount
 	mov r9, [rdx + r12]		; get the value from stack
 	and r9, r14	; mask by type size
@@ -55,6 +56,7 @@ label_call:					; copy first 4 arguments to rcx, rdx, r8 and r9 following the C 
 	add r8, 8
 	shl r8, 3
 	mov r14, 0ffffffffffffffffh
+	mov rcx, r8
 	shr r14, cl
 	mov r8, [rdx + r12]
 	and r8, r14
@@ -67,6 +69,7 @@ label_call:					; copy first 4 arguments to rcx, rdx, r8 and r9 following the C 
 	add r15, 8
 	shl r15, 3
 	mov r14, 0ffffffffffffffffh
+	mov rcx, r15
 	shr r14, cl
 	mov r15, [rdx + r12]
 	and r15, r14

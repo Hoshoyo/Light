@@ -104,7 +104,7 @@ Interpreter init_interpreter(s64 stack_size, s64 heap_size)
 	return interp;
 }
 
-#define PRINT_INSTRUCTIONS 1
+#define PRINT_INSTRUCTIONS 0
 int run_interpreter(Interpreter* interp)
 {
 	//print_code(interp);

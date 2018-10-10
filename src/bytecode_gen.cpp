@@ -125,7 +125,7 @@ struct Instruction_Info {
 	u8* absolute_address;
 };
 
-#define PRINT_INSTRUCTIONS 1
+#define PRINT_INSTRUCTIONS 0
 Instruction_Info
 Push(Gen_Environment* env, Instruction inst, u64 next_word = 0) {
 	Instruction_Info result = {0};
@@ -844,13 +844,19 @@ void* load_address_of_external_function(string* name, HMODULE library) {
 #else
 void* load_library_dynamic(string* library) {
 	// "/lib/x86_64-linux-gnu/libc.so.6"
-	void* lib = dlopen((const char*)library->data, RTLD_LAZY);
-	printf("loaded library %s at %p\n", library->data, lib);
+	char* libname = make_c_string(*library);
+	void* lib = dlopen((const char*)libname, RTLD_LAZY);
+	printf("loaded library %s at %p\n", libname, lib);
+	free(libname);
 	return lib;
 }
 void* load_address_of_external_function(string* name, void* library) {
-	void* proc = dlsym(library, (const char*)name->data);
-	printf("loaded procedure %s at %p\n", name->data, proc);
+	char* procname = make_c_string(*name);
+	void* proc = dlsym(library, (const char*)procname);
+	printf("loaded procedure %s at %p\n", procname, proc);
+	free(procname);
+	//((int(*)(int, void*, size_t))proc)(1, (void*)"foo", 3);
+
 	return proc;
 }
 
