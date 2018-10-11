@@ -7,6 +7,11 @@ struct Gen_Proc_Addresses {
 	Ast*  decl;
 };
 
+struct Gen_Loop_Stack {
+	u64** fill_before;
+	u64** fill_after;
+};
+
 struct Gen_Environment {
 	Interpreter* interp;
 
@@ -18,6 +23,7 @@ struct Gen_Environment {
 	s64 stack_temp_offset;
 
 	Gen_Proc_Addresses* proc_addressing_queue;
+	Gen_Loop_Stack* loop_stack;
 };
 
 void bytecode_generate(Interpreter* interp, Ast** top_level);

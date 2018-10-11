@@ -126,7 +126,7 @@ int run_interpreter(Interpreter* interp)
 #endif
 		if (execute(interp, instruction, immediate)) break;
 	}
-#if PRINT_INSTRUCTIONS
+#if 1
 	printf("interpreter exited with code %d\n", interp->reg[R_0]);
 #endif
 	return 0;

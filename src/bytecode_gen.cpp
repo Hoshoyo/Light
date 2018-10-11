@@ -460,7 +460,7 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, true);
 			} break;
 			case OP_UNARY_CAST: {
-				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, true);
+				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, address_of);
 			} break;
 			case OP_UNARY_PLUS: {
 				result = gen_code_for_expression(env, expr->expr_unary.operand, stack_position, address_of);
@@ -676,9 +676,11 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 		}break;
 
 		case AST_COMMAND_BLOCK: {
-			for (size_t i = 0; i < array_get_length(node->comm_block.commands); ++i) {
-				Ast* comm = node->comm_block.commands[i];
-				gen_code_node(env, comm);
+			if (node->comm_block.commands) {
+				for (size_t i = 0; i < array_get_length(node->comm_block.commands); ++i) {
+					Ast* comm = node->comm_block.commands[i];
+					gen_code_node(env, comm);
+				}
 			}
 		}break;
 
@@ -767,9 +769,13 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 		}break;
 
 		case AST_COMMAND_FOR: {
+			Gen_Loop_Stack ls = {};
+			array_push(env->loop_stack, &ls);
+			
 			// conditional expression in a register R_X
 			u64 start_address = (u64)(env->code + env->code_offset);
-			Expr_Generation condition = gen_code_for_expression(env, node->comm_if.condition);
+
+			Expr_Generation condition = gen_code_for_expression(env, node->comm_for.condition);
 			assert(condition.flags & EXPR_RESULT_ON_REGISTER);
 
 			// cmp R_X, 0|1
@@ -786,7 +792,38 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 			Instruction_Info jmp = Push(env, make_instruction(JMP, INSTR_QWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), start_address);
 			((Instruction*)beq.absolute_address)->immediate_offset = jmp.offset - beq.offset + jmp.size_bytes;
 			// if_end:
+
+			Gen_Loop_Stack* loop_stack = (Gen_Loop_Stack*)array_pop(env->loop_stack);
+
+			if (loop_stack->fill_before) {
+				for (size_t i = 0; i < array_get_length(loop_stack->fill_before); ++i) {
+					*loop_stack->fill_before[i] = (u64)(start_address);
+				}
+				array_release(loop_stack->fill_before);
+			}
+			if (loop_stack->fill_after) {
+				for (size_t i = 0; i < array_get_length(loop_stack->fill_after); ++i) {
+					*loop_stack->fill_after[i] = (u64)(env->code + env->code_offset);
+				}
+				array_release(loop_stack->fill_after);
+			}
 		}break;
+
+		case AST_COMMAND_BREAK: {
+			Instruction_Info ii = Push(env, make_instruction(JMP, INSTR_QWORD|IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), (u64)0xcccccccccccccccc);
+			u64* address_to_fill = (u64*)&((Instruction*)ii.absolute_address)->immediate_offset;
+
+			s64 lvl = 1;
+			if (node->comm_break.level) {
+				lvl = node->comm_break.level->expr_literal.value_s64;
+			}
+			size_t stack_size = array_get_length(env->loop_stack);
+			assert(stack_size >= lvl);
+			if (!env->loop_stack[stack_size - lvl].fill_after) {
+				env->loop_stack[stack_size - lvl].fill_after = array_create(u64*, 4);
+			}
+			array_push(env->loop_stack[stack_size - lvl].fill_after, &address_to_fill);
+		} break;
 
 		default: break;
 	}
@@ -797,6 +834,8 @@ void bytecode_generate(Interpreter* interp, Ast** top_level) {
 	Gen_Environment env = {};
 	env.interp = interp;
 	env.code = interp->code;
+
+	env.loop_stack = array_create(Gen_Loop_Stack, 16);
 
 	generate_entry_point(&env);
 
