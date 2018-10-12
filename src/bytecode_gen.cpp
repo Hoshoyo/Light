@@ -227,11 +227,19 @@ generate_proc_prologue(Gen_Environment* env, Ast* proc_body) {
 	// mov	sb, sp
 	// add	sp, stack_size
 
+	// reset stack size
+	env->stack_size = 0;
+
 	// calculate stack size from proc body
 	Scope* scope = proc_body->decl_procedure.body->comm_block.block_scope;
-	s32 num_decls = scope->decl_count;
+	s32 num_decls = 0;
+	if (scope) {
+		num_decls = scope->decl_count;
+		env->stack_size = scope->stack_allocation_offset;
+	}
 
-	env->stack_size = scope->stack_allocation_offset;
+	printf("stack size(%.*s): %d\n", TOKEN_STR(proc_body->decl_procedure.name), env->stack_size);
+
 	env->stack_base_offset = 0;
 	env->stack_temp_offset = 0;
 

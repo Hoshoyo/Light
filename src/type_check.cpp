@@ -31,6 +31,14 @@ Type_Instance* scope_get_function_type(Scope* scope) {
 	return 0;
 }
 
+static Scope* proc_scope(Scope* scope) {
+	while (scope) {
+		if (scope->flags & SCOPE_PROCEDURE_BODY) return scope;
+		scope = scope->parent;
+	}
+	return 0;
+}
+
 static bool scope_inside_loop(Scope* scope) {
 	while (scope) {
 		if (scope->flags & SCOPE_LOOP) return true;
@@ -76,9 +84,11 @@ Type_Error type_check(Ast* node) {
 		// Allocate scope space for this variable within alignment
 		Type_Instance* var_type = node->decl_variable.variable_type;
 		size_t byte_size = var_type->type_size_bits / 8;
-		Scope* scope = node->scope;
-		node->decl_variable.stack_offset = scope->stack_allocation_offset;
-		scope->stack_allocation_offset += byte_size;	// TODO(psv): align before
+		Scope* scope = proc_scope(node->scope);
+		if (scope) {
+			node->decl_variable.stack_offset = scope->stack_allocation_offset;
+			scope->stack_allocation_offset += byte_size;	// TODO(psv): align before
+		}
 	}break;
 	case AST_DECL_ENUM: {
 		Hash_Table h;
