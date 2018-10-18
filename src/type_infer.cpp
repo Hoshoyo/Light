@@ -1178,6 +1178,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 							return 0;
 						} else {
 							expr->expr_binary.right->scope = decl_struct->decl_struct.struct_scope;
+							expr->expr_binary.right->expr_variable.decl = decl;
 						}
 						assert(type_strong(decl->decl_variable.variable_type));
 

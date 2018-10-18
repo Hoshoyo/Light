@@ -2,8 +2,6 @@
 #include "interpreter.h"
 #define internal static
 
-#define PRINT_INSTRUCTIONS 0
-
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #define RUNTIME_BYTECODE_ASSERT_FAIL(X) MessageBoxA(0, X, "Assert Failed", MB_ICONERROR)
@@ -108,6 +106,7 @@ Interpreter init_interpreter(s64 stack_size, s64 heap_size)
 
 int run_interpreter(Interpreter* interp)
 {
+#define PRINT_INSTRUCTIONS 1
 	//print_code(interp);
 
 	interp->running = true;

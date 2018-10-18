@@ -1,16 +1,23 @@
 //ExitProcess :: (r : u32) -> u32 #foreign("kernel32.lib");
 
 main :: () -> s32 {
-	d := 0;
+	//a : [5]u8 = array {'H', 'e', 'l', 'o', 0};
+	a : foo;
+	a.z.l = 3;
+	//b := a.z.l;
 	
-	for i := 0; i < 5; i += 1 {
-		d = factorial(i);
-	}
-	
-	return [s32]d;
+	//return MessageBoxA(null, [^u8]&a, [^u8]&a, 0);
+	return a.z.l;
 }
 
-factorial :: (v : s64) -> s64 {
-	if v <= 1 return 1;
-	return v * factorial(v - 1);
+//MessageBoxA :: (hwnd : ^void, t : ^u8, c : ^u8, f : u32) -> s32 #foreign("user32.dll");
+
+foo :: struct {
+	x : s32;
+	y : s32;
+	z : hey;
+}
+
+hey :: struct {
+	l : s32;
 }

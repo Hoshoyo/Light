@@ -171,6 +171,7 @@ struct Ast_Decl_Procedure {
 
 const u32 DECL_VARIABLE_STACK = FLAG(0);
 const u32 DECL_VARIABLE_DATA_SEGMENT = FLAG(1);
+const u32 DECL_VARIABLE_STRUCT_FIELD = FLAG(2);
 struct Ast_Decl_Variable {
 	Token*         name;
 	Ast*           assignment;		// EXPRESSION
@@ -183,6 +184,7 @@ struct Ast_Decl_Variable {
 	s32 alignment;
 	u32 temporary_register;
 	s32 stack_offset;
+	s32 field_index;
 };
 
 const u32 STRUCT_FLAG_PACKED = FLAG(1);

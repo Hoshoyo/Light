@@ -173,6 +173,8 @@ Type_Error decl_check_redefinition(Scope* scope, Ast* node) {
 			for (size_t i = 0; i < node->decl_struct.fields_count; ++i) {
 				error |= decl_insert_into_symbol_table(node->decl_struct.fields[i],
 					node->decl_struct.fields[i]->decl_variable.name, "struct field");
+				node->decl_struct.fields[i]->decl_variable.field_index = i;
+				node->decl_struct.fields[i]->decl_variable.flags |= DECL_VARIABLE_STRUCT_FIELD;
 			}
 		}break;
 		case AST_DECL_UNION: {

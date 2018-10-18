@@ -125,7 +125,7 @@ struct Instruction_Info {
 	u8* absolute_address;
 };
 
-#define PRINT_INSTRUCTIONS 0
+#define PRINT_INSTRUCTIONS 1
 Instruction_Info
 Push(Gen_Environment* env, Instruction inst, u64 next_word = 0) {
 	Instruction_Info result = {0};
@@ -165,6 +165,7 @@ Push(Gen_Environment* env, Instruction inst, u64** next_word_address) {
 const u32 EXPR_RESULT_ON_STACK = FLAG(0);
 const u32 EXPR_RESULT_ON_REGISTER = FLAG(1);
 const u32 EXPR_RESULT_EXT_CALL = FLAG(2);
+const u32 EXPR_ADDRESS_OF_RESULT = FLAG(3);
 struct Expr_Generation {
 	s64 result_offset_from_sb;
 	Registers reg;
@@ -355,8 +356,47 @@ Expr_Generation generate_code_expr_variable_value(Gen_Environment* env, Ast* exp
 	return result;
 }
 
+Expr_Generation generate_binary_expression(Gen_Environment* env, Ast* expr, s64 stack_position, bool address_of);
+
+Expr_Generation generate_expr_binary_dot(Gen_Environment* env, Ast* expr, s64 stack_position) {
+	Expr_Generation result = { 0 };
+	Expr_Generation left = {0}; 
+	if (expr->expr_binary.left->node_type == AST_EXPRESSION_BINARY &&
+		expr->expr_binary.left->expr_binary.op == OP_BINARY_DOT) 
+	{
+		left = generate_expr_binary_dot(env, expr->expr_binary.left, stack_position);
+	} else {
+		left = gen_code_for_expression(env, expr->expr_binary.left, stack_position, true);
+	}
+
+	// left result is address in register
+	assert(left.flags & EXPR_RESULT_ON_REGISTER);
+
+	Expr_Generation right = { 0 };
+	assert(expr->expr_binary.right->node_type == AST_EXPRESSION_VARIABLE);
+	Type_Instance* left_type = expr->expr_binary.left->type_return;
+	size_t field_index = expr->expr_binary.right->expr_variable.decl->decl_variable.field_index;
+	size_t offset_within_struct = left_type->struct_desc.offset_bits[field_index] / 8;
+
+	// name is the same in the field of struct
+	assert(str_equal(left_type->struct_desc.fields_names[field_index], expr->expr_binary.right->expr_variable.name->value));
+
+	if (offset_within_struct > 0) {
+		Push(env, make_instruction(ADD, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, left.reg, NO_REG, 0, 0), (u64)offset_within_struct);
+	}
+
+	result.flags |= EXPR_RESULT_ON_REGISTER | EXPR_ADDRESS_OF_RESULT;
+	result.reg = left.reg;
+
+	return result;
+}
+
 Expr_Generation generate_binary_expression(Gen_Environment* env, Ast* expr, s64 stack_position, bool address_of) {
 	Expr_Generation result = { 0 };
+
+	if (expr->expr_binary.op == OP_BINARY_DOT) {
+		return generate_expr_binary_dot(env, expr, stack_position);
+	}
 
 	bool left_address_of = (expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS) ? true : address_of;
 
@@ -444,6 +484,29 @@ Expr_Generation generate_binary_expression(Gen_Environment* env, Ast* expr, s64 
 	result.flags |= EXPR_RESULT_ON_REGISTER;
 	reg_free(env, right.reg);
 	result.reg = left.reg;
+
+	return result;
+}
+
+Expr_Generation generate_array_into_stack(Gen_Environment* env, Ast* expr, s64 stack_position) {
+	Expr_Generation result = { 0 };
+	result.flags = EXPR_RESULT_ON_STACK;
+	result.result_offset_from_sb = stack_position;
+
+	s64 length_bytes = expr->type_return->type_size_bits / 8;
+	s64 base_type_size_bytes = expr->type_return->array_desc.array_of->type_size_bits / 8;
+
+	s64 pos = stack_position;
+	for (size_t i = 0; i < array_get_length(expr->expr_literal.array_exprs); ++i) {
+		Expr_Generation r = gen_code_for_expression(env, expr->expr_literal.array_exprs[i], pos, false);
+		if (r.flags & EXPR_RESULT_ON_REGISTER) {
+			u32 instruction_size = instruction_regsize_from_type(expr->type_return->array_desc.array_of);
+			Push(env, make_instruction(MOV, instruction_size | IMMEDIATE_OFFSET, REG_TO_REG_PTR, R_SB, r.reg, NO_REG, (s32)pos));
+			reg_free(env, r.reg);
+		}
+
+		pos += base_type_size_bytes;
+	}
 
 	return result;
 }
@@ -545,7 +608,7 @@ Expr_Generation gen_code_for_expression(Gen_Environment* env, Ast* expr, s64 sta
 			result.flags |= EXPR_RESULT_ON_REGISTER;
 		}break;
 		case LITERAL_ARRAY: {
-			assert_msg(0, "not implemented");
+			generate_array_into_stack(env, expr, stack_position);
 		}break;
 		case LITERAL_STRUCT: {
 			assert_msg(0, "not implemented");
@@ -763,14 +826,33 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 			node->decl_variable.stack_offset = env->stack_base_offset;
 			env->stack_base_offset += node->decl_variable.variable_type->type_size_bits / 8;
 
+			if (node->decl_variable.variable_type->kind == KIND_STRUCT) {
+				s64 offset = 0;
+				Ast* struct_decl = decl_from_name(node->scope, node->decl_variable.variable_type->struct_desc.name);
+				for (size_t i = 0; i < struct_decl->decl_struct.fields_count; ++i) {
+					assert(struct_decl->decl_struct.fields[i]->node_type == AST_DECL_VARIABLE);
+					struct_decl->decl_struct.fields[i]->decl_variable.stack_offset = node->decl_variable.stack_offset + offset;
+					offset += struct_decl->decl_struct.fields[i]->decl_variable.variable_type->type_size_bits / 8;
+				}
+			}
+
 			// allocate memory on the stack
 			// Push(env, make_instruction(ADD, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, R_SP, NO_REG, 0, 0), (u64)0);
 
 			if (node->decl_variable.assignment) {
 				// TODO(psv): make the result be directly to the memory allocated
 				Expr_Generation result = gen_code_for_expression(env, node->decl_variable.assignment, node->decl_variable.stack_offset);
-				if (result.flags & EXPR_RESULT_ON_REGISTER) {
-					Push(env, make_instruction(MOV, INSTR_QWORD|IMMEDIATE_OFFSET, REG_TO_REG_PTR, R_SB, result.reg, 0, node->decl_variable.stack_offset));
+
+				assert(result.flags & EXPR_RESULT_ON_REGISTER);
+				if (result.flags & EXPR_ADDRESS_OF_RESULT) {
+					u16 fl = instruction_regsize_from_type(node->decl_variable.assignment->type_return);
+					// mov R_X, [R_X]
+					Push(env, make_instruction(MOV, fl, REG_PTR_TO_REG, result.reg, result.reg, 0, 0));
+					// mov [R_SB + stack_offset], R_X
+					Push(env, make_instruction(MOV, fl|IMMEDIATE_OFFSET, REG_TO_REG_PTR, R_SB, result.reg, 0, node->decl_variable.stack_offset));
+					reg_free(env, result.reg);
+				} else {
+					Push(env, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_OFFSET, REG_TO_REG_PTR, R_SB, result.reg, 0, node->decl_variable.stack_offset));
 					reg_free(env, result.reg);
 				}
 			}
@@ -835,6 +917,10 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 
 		default: break;
 	}
+}
+
+void generate_rvalue_expr(Gen_Environment* env, Ast* expr, s64 stack_position) {
+
 }
 
 void bytecode_generate(Interpreter* interp, Ast** top_level) {
