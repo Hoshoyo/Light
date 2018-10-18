@@ -208,18 +208,18 @@ generate_entry_point(Gen_Environment* env) {
 	env->proc_addressing_queue = array_create(Gen_Proc_Addresses, 16);
 
 	u64* hlt_fill_relative = 0;
-	u64* main_fill_relative = 0;
+	//u64* main_fill_relative = 0;
 	Instruction_Info last = {0};
 	Instruction_Info jmp_main = {0};
 
 	Push(env, make_instruction(PUSH, INSTR_QWORD, SINGLE_REG, R_SB, NO_REG, 0, 0));
 	Push(env, make_instruction(PUSH, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &hlt_fill_relative);
 	Push(env, make_instruction(MOV, INSTR_QWORD | IMMEDIATE_VALUE, MEM_TO_REG, R_SS, NO_REG, 0, 0), 2 * 8);
-	jmp_main = Push(env, make_instruction(JMP, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &main_fill_relative);
+	jmp_main = Push(env, make_instruction(JMP, INSTR_QWORD | IMMEDIATE_VALUE, SINGLE_MEM, NO_REG, NO_REG, 0, 0), &env->entry_point_fill);
 	last =     Push(env, make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
 
 	*hlt_fill_relative = (u64)last.absolute_address;
-	*main_fill_relative = (u64)(env->code + env->code_offset);
+	//*main_fill_relative = (u64)(env->code + env->code_offset);
 }
 
 void
@@ -227,6 +227,10 @@ generate_proc_prologue(Gen_Environment* env, Ast* proc_body) {
 	// push sb
 	// mov	sb, sp
 	// add	sp, stack_size
+
+	if(proc_body->decl_procedure.flags & DECL_PROC_FLAG_MAIN) {
+		*env->entry_point_fill = (u64)(env->code + env->code_offset);
+	}
 
 	// reset stack size
 	env->stack_size = 0;
@@ -360,16 +364,8 @@ Expr_Generation generate_binary_expression(Gen_Environment* env, Ast* expr, s64 
 
 Expr_Generation generate_expr_binary_dot(Gen_Environment* env, Ast* expr, s64 stack_position) {
 	Expr_Generation result = { 0 };
-	Expr_Generation left = {0}; 
-	if (expr->expr_binary.left->node_type == AST_EXPRESSION_BINARY &&
-		expr->expr_binary.left->expr_binary.op == OP_BINARY_DOT) 
-	{
-		left = generate_expr_binary_dot(env, expr->expr_binary.left, stack_position);
-	} else {
-		left = gen_code_for_expression(env, expr->expr_binary.left, stack_position, true);
-	}
 
-	// left result is address in register
+	Expr_Generation left = gen_code_for_expression(env, expr->expr_binary.left, stack_position, true);
 	assert(left.flags & EXPR_RESULT_ON_REGISTER);
 
 	Expr_Generation right = { 0 };
@@ -395,7 +391,14 @@ Expr_Generation generate_binary_expression(Gen_Environment* env, Ast* expr, s64 
 	Expr_Generation result = { 0 };
 
 	if (expr->expr_binary.op == OP_BINARY_DOT) {
-		return generate_expr_binary_dot(env, expr, stack_position);
+		Expr_Generation r = generate_expr_binary_dot(env, expr, stack_position);
+		assert(r.flags & EXPR_RESULT_ON_REGISTER);
+		// dereference r
+		if(!address_of) {
+			// assume regsize for now
+			Push(env, make_instruction(MOV, INSTR_QWORD, REG_PTR_TO_REG, r.reg, r.reg, 0, 0));
+		}
+		return r;
 	}
 
 	bool left_address_of = (expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS) ? true : address_of;
@@ -919,10 +922,6 @@ void gen_code_node(Gen_Environment* env, Ast* node) {
 	}
 }
 
-void generate_rvalue_expr(Gen_Environment* env, Ast* expr, s64 stack_position) {
-
-}
-
 void bytecode_generate(Interpreter* interp, Ast** top_level) {
 	TIME_FUNC();
 	Gen_Environment env = {};
@@ -947,6 +946,25 @@ void bytecode_generate(Interpreter* interp, Ast** top_level) {
 	}
 }
 
+void bytecode_generate_expr(Interpreter* interp, Ast* expr) {
+	Gen_Environment env = {};
+	env.interp = interp;
+	env.code = interp->code;
+
+	env.loop_stack = array_create(Gen_Loop_Stack, 16);
+
+	generate_entry_point(&env);
+
+	*env.entry_point_fill = (u64)(env.code + env.code_offset);
+
+	Expr_Generation r = gen_code_for_expression(&env, expr, 0, false);
+
+	if(r.flags & EXPR_RESULT_ON_REGISTER && r.reg != R_0) {
+		Push(&env, make_instruction(MOV, INSTR_QWORD, REG_TO_REG, R_0, r.reg, 0, 0));
+	}
+
+	Push(&env, make_instruction(HLT, 0, 0, NO_REG, NO_REG, 0, 0));
+}
 
 /*
 	Load libraries dynamically

@@ -40,6 +40,22 @@ Scope* scope_create(Ast* creator, Scope* parent, u32 flags) {
 	return scope;
 }
 
+Ast* ast_create_expr_run(Scope* scope, Token* directive_token, Ast* expr) {
+	Ast* d = ALLOC_AST();
+
+	d->node_type = AST_EXPRESSION_DIRECTIVE;
+	d->type_return = expr->type_return;
+	d->scope = scope;
+	d->flags = AST_FLAG_IS_EXPRESSION | AST_FLAG_IS_DIRECTIVE;
+	d->infer_queue_index = -1;
+
+	d->expr_directive.type = EXPR_DIRECTIVE_RUN;
+	d->expr_directive.expr = expr;
+	d->expr_directive.token = directive_token;
+
+	return d;
+}
+
 Ast* ast_create_expr_sizeof(Type_Instance* type, Scope* scope, Token* directive_token) {
 	Ast* d = ALLOC_AST();
 

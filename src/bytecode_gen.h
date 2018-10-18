@@ -15,6 +15,8 @@ struct Gen_Loop_Stack {
 struct Gen_Environment {
 	Interpreter* interp;
 
+	u64* entry_point_fill;
+
 	u8* code;
 
 	s64 code_offset;
@@ -27,3 +29,4 @@ struct Gen_Environment {
 };
 
 void bytecode_generate(Interpreter* interp, Ast** top_level);
+void bytecode_generate_expr(Interpreter* interp, Ast* expr);

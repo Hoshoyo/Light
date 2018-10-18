@@ -1,5 +1,7 @@
 #include "util.h"
 #include "interpreter.h"
+#include "type.h"
+#include "ast.h"
 #define internal static
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -104,7 +106,7 @@ Interpreter init_interpreter(s64 stack_size, s64 heap_size)
 	return interp;
 }
 
-int run_interpreter(Interpreter* interp)
+u64 run_interpreter(Interpreter* interp)
 {
 #define PRINT_INSTRUCTIONS 1
 	//print_code(interp);
@@ -128,7 +130,7 @@ int run_interpreter(Interpreter* interp)
 #if 1
 	printf("interpreter exited with code %d\n", interp->reg[R_0]);
 #endif
-	return 0;
+	return interp->reg[R_0];
 }
 
 template <typename T>
@@ -567,6 +569,62 @@ int execute(Interpreter* interp, Instruction inst, u64 next_word)
 			status = execute_instruction<u64>(interp, inst, next_word);
 	}
 	return status;
+}
+
+Ast* interpreter_to_ast_expr(Interpreter* interp, Type_Instance* type, Ast* expr) {
+	switch(type->kind) {
+		case KIND_PRIMITIVE: {
+			expr->node_type = AST_EXPRESSION_LITERAL;
+			expr->type_return = type;
+
+			u64 result = interp->reg[R_0];
+
+			switch(type->primitive) {
+				case TYPE_PRIMITIVE_BOOL:{
+					expr->expr_literal.type = LITERAL_BOOL;
+					if(result == 0) {
+						expr->expr_literal.value_bool = false;
+					} else {
+						expr->expr_literal.value_bool = true;
+					}
+				}break;
+
+				case TYPE_PRIMITIVE_S8:
+				case TYPE_PRIMITIVE_S16:
+				case TYPE_PRIMITIVE_S32:
+				case TYPE_PRIMITIVE_S64:
+					expr->expr_literal.value_s64 = (s64)result;
+					expr->expr_literal.type = LITERAL_SINT;
+					break;
+
+				case TYPE_PRIMITIVE_U8:
+				case TYPE_PRIMITIVE_U16:
+				case TYPE_PRIMITIVE_U32:
+				case TYPE_PRIMITIVE_U64:
+					expr->expr_literal.value_s64 = result;
+					expr->expr_literal.type = LITERAL_HEX_INT;
+					break;
+
+				case TYPE_PRIMITIVE_R32:
+					expr->expr_literal.value_r32 = *(r32*)&result;
+					expr->expr_literal.type = LITERAL_FLOAT;
+				case TYPE_PRIMITIVE_R64:
+					expr->expr_literal.value_r64 = *(r64*)&result;
+					expr->expr_literal.type = LITERAL_FLOAT;
+					break;
+
+				default:
+					assert_msg(0, "invalid primitive type");
+					break;
+			}
+		}break;
+
+		default:
+			assert_msg(0, "unimplemented interpreter to ast type");
+			break;
+	}
+
+	return expr;
 }
 
 #include <light_arena.h>

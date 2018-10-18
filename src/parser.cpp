@@ -191,10 +191,14 @@ Ast* Parser::parse_directive_expression(Scope* scope) {
 		report_syntax_error(directive, "expected compiler expression directive but got '%.*s'\n", TOKEN_STR(directive));
 	}
 
-	// #sizeof directive
 	if (directive->value.data == compiler_tags[COMPILER_TAG_SIZEOF].data) {
+		// #sizeof directive
 		Type_Instance* type = parse_type();
 		return ast_create_expr_sizeof(type, scope, directive);
+	} else if(directive->value.data == compiler_tags[COMPILER_TAG_RUN].data) {
+		// #run directive
+		Ast* expr = parse_expression(scope);
+		return ast_create_expr_run(scope, directive, expr);
 	} else {
 		report_syntax_error(directive, "unrecognized compiler directive '%.*s'\n", TOKEN_STR(directive));
 	}

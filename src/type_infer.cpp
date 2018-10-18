@@ -1,6 +1,8 @@
 #include "type_infer.h"
 #include "decl_check.h"
 #include "ast.h"
+#include "bytecode_gen.h"
+#include "interpreter.h"
 
 Type_Error report_type_mismatch(Ast* node, Type_Instance* t1, Type_Instance* t2) {
 	report_error_location(node);
@@ -80,10 +82,23 @@ Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
 	Type_Instance* type_infered = 0;
 
 	if (expr->node_type == AST_EXPRESSION_DIRECTIVE) {
-		// Evaluate directive first, then type check
-		// This could be #run #sizeof #typeof etc.
-		*error |= evaluate_directive(expr, flags);
-		if (*error) return 0;
+		if(expr->expr_directive.type == EXPR_DIRECTIVE_RUN) {
+			Type_Instance* type = infer_from_expression(expr->expr_directive.expr, error, flags);
+			if(*error) return 0;
+			{
+				Interpreter interp = init_interpreter();
+				bytecode_generate_expr(&interp, expr->expr_directive.expr);
+				u64 r = run_interpreter(&interp);
+				// TODO(psv): bigger data types
+				assert(type_regsize(type));
+				interpreter_to_ast_expr(&interp, type, expr);
+			}
+		} else {
+			// Evaluate directive first, then type check
+			// This could be #run #sizeof #typeof etc.
+			*error |= evaluate_directive(expr, flags);
+			if (*error) return 0;
+		}
 	}
 
 	switch (expr->node_type) {

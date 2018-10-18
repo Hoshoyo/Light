@@ -1,5 +1,6 @@
 #pragma once
 #include "ho_system.h"
+#include "ast.h"
 
 extern "C" u64 call_external(void* proc_address, u64 call_stack_ptr, u64 size_stack);
 
@@ -131,8 +132,10 @@ struct Interpreter {
 	bool running;
 };
 
+Ast* interpreter_to_ast_expr(Interpreter* interp, Type_Instance* type, Ast* expr);
+
 Interpreter init_interpreter(s64 stack_size = 1024 * 1024, s64 heap_size = 1024 * 1024);
-int run_interpreter(Interpreter* interp);
+u64 run_interpreter(Interpreter* interp);
 
 u64 move_code_offset(Interpreter* interp, s64 offset);
 u64 add_code_offset(Interpreter* interp, s64 offset);
