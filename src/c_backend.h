@@ -21,25 +21,25 @@ struct C_Code_Generator {
 
 	void defer_flush();
 
-    void emit_type(Type_Instance* type, Token* name = 0);
+    void emit_type(Type_Instance** type_table, Type_Instance* type, Token* name = 0);
 	
-	void emit_array_assignment(Ast* decl);
-	void emit_array_assignment_from_base(s64 offset, Ast* expr);
-	void emit_array_assignment_to_temp(Ast* expr);
+	void emit_array_assignment(Type_Instance** type_table, Ast* decl);
+	void emit_array_assignment_from_base(Type_Instance** type_table, s64 offset, Ast* expr);
+	void emit_array_assignment_to_temp(Type_Instance** type_table, Ast* expr);
 	
-	void emit_struct_assignment(Ast* decl);
-	void emit_struct_assignment_from_base(s64 offset, Ast* expr);
-	void emit_struct_assignment_to_temp(Ast* expr);
+	void emit_struct_assignment(Type_Instance** type_table, Ast* decl);
+	void emit_struct_assignment_from_base(Type_Instance** type_table, s64 offset, Ast* expr);
+	void emit_struct_assignment_to_temp(Type_Instance** type_table, Ast* expr);
 
-    void emit_decl(Ast* decl, bool forward = false);
-	void emit_proc(Ast* decl);
-	void emit_command(Ast* comm);
-	void emit_expression(Ast* expr);
-	void emit_expression_binary(Ast* expr);
-	void emit_temp_assignment(Ast* expr);
+    void emit_decl(Type_Instance** type_table, Ast* decl, bool forward = false);
+	void emit_proc(Type_Instance** type_table, Ast* decl);
+	void emit_command(Type_Instance** type_table, Ast* comm);
+	void emit_expression(Type_Instance** type_table, Ast* expr);
+	void emit_expression_binary(Type_Instance** type_table, Ast* expr);
+	void emit_temp_assignment(Type_Instance** type_table, Ast* expr);
 	void emit_default_value(Type_Instance* type);
-	void emit_typedef(Type_Instance* type, Token* name, char* prefix);
-	void emit_function_typedef(Type_Instance* type);
+	void emit_typedef(Type_Instance** type_table, Type_Instance* type, Token* name, char* prefix);
+	void emit_function_typedef(Type_Instance** type_table, Type_Instance* type);
 
 	void emit_data_decl(Ast* decl);
 

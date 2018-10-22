@@ -60,14 +60,14 @@ s64 C_Code_Generator::alloc_loop_id() {
 	return loop_id - 1;
 }
 
-void C_Code_Generator::emit_typedef(Type_Instance* type, Token* name, char* prefix) {
+void C_Code_Generator::emit_typedef(Type_Instance** type_table, Type_Instance* type, Token* name, char* prefix) {
     static int id = 0;
 
     switch(type->kind){
         case KIND_POINTER:
         case KIND_PRIMITIVE:{
             sprint("typedef ");
-            emit_type(type);
+            emit_type(type_table, type);
             if(prefix) sprint(" %s", prefix);
             if(name) sprint(" %.*s", TOKEN_STR(name));
             sprint(";\n");
@@ -78,11 +78,11 @@ void C_Code_Generator::emit_typedef(Type_Instance* type, Token* name, char* pref
                 char p[64] = {0};
                 int rettype_id = id;
                 sprintf(p, "%s__typet_%d", prefix, id++);
-                emit_typedef(type->function_desc.return_type, 0, p);
+                emit_typedef(type_table, type->function_desc.return_type, 0, p);
                 sprint("typedef __typet_%d ", rettype_id);
             } else {
                 sprint("typedef ");
-                emit_type(type->function_desc.return_type);
+                emit_type(type_table, type->function_desc.return_type);
             }
 
             sprint(" ");
@@ -96,7 +96,7 @@ void C_Code_Generator::emit_typedef(Type_Instance* type, Token* name, char* pref
             sprint("(");
             for(s32 i = 0; i < type->function_desc.num_arguments; ++i) {
                 if(i != 0) sprint(", ");
-                emit_type(type->function_desc.arguments_type[i]);
+                emit_type(type_table, type->function_desc.arguments_type[i]);
             }
             sprint(");\n");
 
@@ -107,7 +107,7 @@ void C_Code_Generator::emit_typedef(Type_Instance* type, Token* name, char* pref
     }
 }
 
-void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
+void C_Code_Generator::emit_type(Type_Instance** type_table, Type_Instance* type, Token* name){
     //assert_msg(type->flags & TYPE_FLAG_INTERNALIZED, "tried to emit a type that is not internalized");
     switch(type->kind){
         case KIND_PRIMITIVE:{
@@ -139,7 +139,7 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
             }
         }break;
         case KIND_POINTER: {
-            emit_type(type->pointer_to, name);
+            emit_type(type_table, type->pointer_to, name);
             sprint("*");
         }break;
         case KIND_ARRAY:{
@@ -147,7 +147,7 @@ void C_Code_Generator::emit_type(Type_Instance* type, Token* name){
                 Type_Instance* auxtype = type;
                 sprint("char %.*s[%lld]", TOKEN_STR(name), type->type_size_bits /8);
             } else {
-                emit_type(type->array_desc.array_of);
+                emit_type(type_table, type->array_desc.array_of);
                 sprint("*");
             }
         }break;
@@ -223,17 +223,17 @@ void C_Code_Generator::emit_default_value(Type_Instance* type) {
 	}
 }
 
-void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
+void C_Code_Generator::emit_decl(Type_Instance** type_table, Ast* decl, bool forward) {
     assert(decl->flags & AST_FLAG_IS_DECLARATION);
     switch(decl->node_type) {
         case AST_DECL_PROCEDURE: {
             if(forward && decl->decl_procedure.type_return->kind == KIND_FUNCTION){
-                emit_typedef(decl->decl_procedure.type_return, decl->decl_procedure.name, "__ret_");
+                emit_typedef(type_table, decl->decl_procedure.type_return, decl->decl_procedure.name, "__ret_");
             } 
             if(decl->decl_procedure.type_return->kind == KIND_FUNCTION){
                 sprint("__ret_%.*s*", TOKEN_STR(decl->decl_procedure.name));
             } else {
-                emit_type(decl->decl_procedure.type_return);
+                emit_type(type_table, decl->decl_procedure.type_return);
             }
 
 			if (decl->decl_procedure.flags & DECL_PROC_FLAG_FOREIGN) {
@@ -250,18 +250,18 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
 
                 Ast* arg = decl->decl_procedure.arguments[i];
                 assert(arg->node_type == AST_DECL_VARIABLE);
-                emit_decl(arg);
+                emit_decl(type_table, arg);
             }
             sprint(")");
         }break;
         case AST_DECL_VARIABLE:{
             if(decl->decl_variable.variable_type->kind == KIND_FUNCTION){
-                emit_type(decl->decl_variable.variable_type, decl->decl_variable.name);
+                emit_type(type_table, decl->decl_variable.variable_type, decl->decl_variable.name);
             } else {
                 if(decl->decl_variable.variable_type->kind == KIND_ARRAY){
-                    emit_type(decl->decl_variable.variable_type, decl->decl_variable.name);
+                    emit_type(type_table, decl->decl_variable.variable_type, decl->decl_variable.name);
                 } else {
-                    emit_type(decl->decl_variable.variable_type);
+                    emit_type(type_table, decl->decl_variable.variable_type);
                     sprint(" %.*s", TOKEN_STR(decl->decl_variable.name));
                 }
             }
@@ -274,7 +274,7 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
 			sprint("typedef struct %.*s{", TOKEN_STR(decl->decl_struct.name));
             size_t nfields = decl->decl_struct.fields_count;
             for(size_t i = 0; i < nfields; ++i){
-                emit_decl(decl->decl_struct.fields[i]);
+                emit_decl(type_table, decl->decl_struct.fields[i]);
 				sprint(";");
             }
             sprint("} %.*s", TOKEN_STR(decl->decl_struct.name));
@@ -283,7 +283,7 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
 			sprint("typedef union %.*s{", TOKEN_STR(decl->decl_union.name));
             size_t nfields = decl->decl_union.fields_count;
             for(size_t i = 0; i < nfields; ++i){
-                emit_decl(decl->decl_union.fields[i]);
+                emit_decl(type_table, decl->decl_union.fields[i]);
 				sprint(";");
             }
             sprint("} %.*s", TOKEN_STR(decl->decl_union.name));
@@ -294,34 +294,34 @@ void C_Code_Generator::emit_decl(Ast* decl, bool forward) {
     }
 }
 
-void C_Code_Generator::emit_array_assignment_from_base(s64 offset_bytes, Ast* expr){
+void C_Code_Generator::emit_array_assignment_from_base(Type_Instance** type_table, s64 offset_bytes, Ast* expr){
     // base is a char*
     if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY){
             size_t nexpr = 0;
             if(expr->expr_literal.array_exprs){
                 nexpr = array_get_length(expr->expr_literal.array_exprs);
                 for(size_t i = 0; i < nexpr; ++i) {
-                    emit_array_assignment_from_base(offset_bytes, expr->expr_literal.array_exprs[i]);
+                    emit_array_assignment_from_base(type_table, offset_bytes, expr->expr_literal.array_exprs[i]);
                 }
             }
     } else if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT) {
         sprint("__struct_base = __t_base;\n");
         sprint("{\n");
         sprint("char* __t_base = __struct_base;\n");
-        emit_struct_assignment_from_base(0, expr);
+        emit_struct_assignment_from_base(type_table, 0, expr);
         sprint("}\n");
         sprint("__t_base += %lld;\n", (expr->type_return->type_size_bits / 8) + offset_bytes);
     } else {
         sprint("*(");
-        emit_type(expr->type_return);
+        emit_type(type_table, expr->type_return);
         sprint("*)__t_base = ");
-        emit_expression(expr);
+        emit_expression(type_table, expr);
         sprint(";\n");
         sprint("__t_base += %lld;\n", (expr->type_return->type_size_bits / 8) + offset_bytes);
     }
 }
 
-void C_Code_Generator::emit_array_assignment(Ast* decl) {
+void C_Code_Generator::emit_array_assignment(Type_Instance** type_table, Ast* decl) {
     Type_Instance* indexed_type = decl->decl_variable.variable_type;
     Ast* expr = decl->decl_variable.assignment;
 
@@ -330,18 +330,18 @@ void C_Code_Generator::emit_array_assignment(Ast* decl) {
 		sprint("{\n");
 		sprint("char* __t_base = (char*)%.*s;\n", TOKEN_STR(decl->decl_variable.name));
 		sprint("char* __struct_base = __t_base;\n");
-		emit_array_assignment_from_base(0, expr);
+		emit_array_assignment_from_base(type_table, 0, expr);
 		sprint("}\n");
 	} else {
 		sprint("{\nchar* __arr_res = (char*)(");
-		emit_expression(decl->decl_variable.assignment);
+		emit_expression(type_table, decl->decl_variable.assignment);
 		sprint(");\n");
 		sprint("__memory_copy(%.*s, __arr_res, %lld);\n", TOKEN_STR(decl->decl_variable.name), decl->decl_variable.variable_type->type_size_bits / 8);
 		sprint("}\n");
 	}
 }
 
-void C_Code_Generator::emit_array_assignment_to_temp(Ast* expr) {
+void C_Code_Generator::emit_array_assignment_to_temp(Type_Instance** type_table, Ast* expr) {
 	Type_Instance* indexed_type = expr->type_return;
 	assert(indexed_type->kind == KIND_ARRAY);
 	assert(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY);
@@ -349,11 +349,11 @@ void C_Code_Generator::emit_array_assignment_to_temp(Ast* expr) {
 	sprint("{\n");
 	sprint("char* __t_base = (char*)__temp_v_%lld;\n", temp_variable);
 	sprint("char* __struct_base = __t_base;\n");
-	emit_array_assignment_from_base(0, expr);
+	emit_array_assignment_from_base(type_table, 0, expr);
 	sprint("}\n");
 }
 
-void C_Code_Generator::emit_struct_assignment_to_temp(Ast* expr) {
+void C_Code_Generator::emit_struct_assignment_to_temp(Type_Instance** type_table, Ast* expr) {
 	Type_Instance* struct_type = expr->type_return;
 
 	assert(struct_type->kind == KIND_STRUCT);
@@ -364,17 +364,17 @@ void C_Code_Generator::emit_struct_assignment_to_temp(Ast* expr) {
 
 		// array copies will use this
 		sprint("char* __array_base = __t_base;\n");
-		emit_struct_assignment_from_base(0, expr);
+		emit_struct_assignment_from_base(type_table, 0, expr);
 
 		sprint("}\n");
 	} else {
 		sprint("%.*s = __temp_v_%lld", temp_variable);
-		emit_expression(expr);
+		emit_expression(type_table, expr);
 		sprint(";\n");
 	}
 }
 
-void C_Code_Generator::emit_struct_assignment_from_base(s64 offset_bytes, Ast* expr) {
+void C_Code_Generator::emit_struct_assignment_from_base(Type_Instance** type_table, s64 offset_bytes, Ast* expr) {
     // base is a char*
     if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_STRUCT){
             size_t nexpr = 0;
@@ -383,24 +383,24 @@ void C_Code_Generator::emit_struct_assignment_from_base(s64 offset_bytes, Ast* e
                 nexpr = array_get_length(expr->expr_literal.struct_exprs);
                 for(size_t i = 0; i < nexpr; ++i) {
                     s64 localoffset_bytes = stype->struct_desc.offset_bits[i] / 8;
-                    emit_struct_assignment_from_base(offset_bytes + localoffset_bytes, expr->expr_literal.array_exprs[i]);
+                    emit_struct_assignment_from_base(type_table, offset_bytes + localoffset_bytes, expr->expr_literal.array_exprs[i]);
                 }
             }
     } else if(expr->node_type == AST_EXPRESSION_LITERAL && expr->expr_literal.type == LITERAL_ARRAY) {
         sprint("{\n");
         sprint("char* __t_base = __array_base;\n");
-        emit_array_assignment_from_base(offset_bytes, expr);
+        emit_array_assignment_from_base(type_table, offset_bytes, expr);
         sprint("}\n");
     } else {
         sprint("*(");
-        emit_type(expr->type_return);
+        emit_type(type_table, expr->type_return);
         sprint("*)((char*)__t_base + %lld) = ", offset_bytes);
-        emit_expression(expr);
+        emit_expression(type_table, expr);
         sprint(";\n");
     }
 }
 
-void C_Code_Generator::emit_struct_assignment(Ast* decl) {
+void C_Code_Generator::emit_struct_assignment(Type_Instance** type_table, Ast* decl) {
     Type_Instance* struct_type = decl->decl_variable.variable_type;
     Ast* expr = decl->decl_variable.assignment;
 
@@ -414,19 +414,19 @@ void C_Code_Generator::emit_struct_assignment(Ast* decl) {
         sprint("char* __array_base = __t_base;\n");
 		// struct copies will use this
 		sprint("char* __struct_base = __t_base;\n");
-        emit_struct_assignment_from_base(0, expr);
+        emit_struct_assignment_from_base(type_table, 0, expr);
 
         sprint("}\n");
     } else {
 		deferring = true;
         sprint("%.*s = ", TOKEN_STR(decl->decl_variable.name));
-        emit_expression(decl->decl_variable.assignment);
+        emit_expression(type_table, decl->decl_variable.assignment);
         sprint(";\n");
 		defer_flush();
     }
 }
 
-void C_Code_Generator::emit_command(Ast* comm) {
+void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm) {
 	switch (comm->node_type) {
 		case AST_COMMAND_BLOCK:{
 			sprint("{\n");
@@ -435,7 +435,7 @@ void C_Code_Generator::emit_command(Ast* comm) {
                 
                 if(cm->flags & AST_FLAG_IS_DECLARATION){
                     if(cm->node_type == AST_DECL_VARIABLE){
-                        emit_decl(cm);
+                        emit_decl(type_table, cm);
                         Ast* expr = cm->decl_variable.assignment;
                         if(!expr){
                             sprint(" = ", TOKEN_STR(cm->decl_variable.name));
@@ -444,13 +444,13 @@ void C_Code_Generator::emit_command(Ast* comm) {
                         sprint(";\n");
                         if(expr){
                             if(expr->type_return->kind == KIND_ARRAY){
-                                emit_array_assignment(cm);
+                                emit_array_assignment(type_table, cm);
                             } else if(expr->type_return->kind == KIND_STRUCT) {
-                                emit_struct_assignment(cm);
+                                emit_struct_assignment(type_table, cm);
                             } else {
 								deferring = true;
                                 sprint("%.*s = ", TOKEN_STR(cm->decl_variable.name));
-                                emit_expression(cm->decl_variable.assignment);
+                                emit_expression(type_table, cm->decl_variable.assignment);
                                 sprint(";");
 								defer_flush();
 								deferring = false;
@@ -462,7 +462,7 @@ void C_Code_Generator::emit_command(Ast* comm) {
                         assert_msg(0, "scoped declaration of procedure, enum and union not yet implemented");
                     }
                 } else {
-				    emit_command(cm);
+				    emit_command(type_table, cm);
                 }
 				sprint("\n");
 			}
@@ -482,34 +482,34 @@ void C_Code_Generator::emit_command(Ast* comm) {
 
 			deferring = true;
             sprint("while(");
-            emit_expression(comm->comm_for.condition);
+            emit_expression(type_table, comm->comm_for.condition);
             sprint(")");
 			deferring = false;
 			defer_flush();
 
-            emit_command(comm->comm_for.body);
+            emit_command(type_table, comm->comm_for.body);
 			sprint("\nloop_%lld:;\n", id);
         }break;
 		case AST_COMMAND_IF:{
 
 			deferring = true;
             sprint("if(");
-            emit_expression(comm->comm_if.condition);
+            emit_expression(type_table, comm->comm_if.condition);
             sprint(")");
 			deferring = false;
 			defer_flush();
 
-            emit_command(comm->comm_if.body_true);
+            emit_command(type_table, comm->comm_if.body_true);
             if(comm->comm_if.body_false){
                 sprint(" else ");
-                emit_command(comm->comm_if.body_false);
+                emit_command(type_table, comm->comm_if.body_false);
             }
         }break;
 		case AST_COMMAND_RETURN:{
 			deferring = true;
             sprint("return ");
             if(comm->comm_return.expression){
-                emit_expression(comm->comm_return.expression);
+                emit_expression(type_table, comm->comm_return.expression);
             }
             sprint(";");
 			deferring = false;
@@ -522,10 +522,10 @@ void C_Code_Generator::emit_command(Ast* comm) {
 			if (type_regsize(rval->type_return) || rval->type_return->kind == KIND_FUNCTION) {
 				deferring = true;
 				if (comm->comm_var_assign.lvalue) {
-					emit_expression(comm->comm_var_assign.lvalue);
+					emit_expression(type_table, comm->comm_var_assign.lvalue);
 					sprint(" = ");
 				}
-				emit_expression(comm->comm_var_assign.rvalue);
+				emit_expression(type_table, comm->comm_var_assign.rvalue);
 				sprint(";");
 				deferring = false;
 				defer_flush();
@@ -535,44 +535,44 @@ void C_Code_Generator::emit_command(Ast* comm) {
 				if(rval->node_type == AST_EXPRESSION_BINARY || rval->node_type == AST_EXPRESSION_PROCEDURE_CALL){
 					deferring = true;
 					if (comm->comm_var_assign.lvalue) {
-                        emit_expression(comm->comm_var_assign.lvalue);
+                        emit_expression(type_table, comm->comm_var_assign.lvalue);
                         sprint(" = ");
                     }
-                    emit_expression(comm->comm_var_assign.rvalue);
+                    emit_expression(type_table, comm->comm_var_assign.rvalue);
                     sprint(";");
 					defer_flush();
 					deferring = false;
 				} else if(rval->node_type == AST_EXPRESSION_VARIABLE && 
 					(rval->type_return->kind == KIND_STRUCT || rval->type_return->kind == KIND_UNION)){
                     if (comm->comm_var_assign.lvalue) {
-                        emit_expression(comm->comm_var_assign.lvalue);
+                        emit_expression(type_table, comm->comm_var_assign.lvalue);
                         sprint(" = ");
                     }
-                    emit_expression(comm->comm_var_assign.rvalue);
+                    emit_expression(type_table, comm->comm_var_assign.rvalue);
                     sprint(";");
                 } else if(rval->node_type == AST_EXPRESSION_LITERAL && rval->expr_literal.type == LITERAL_STRUCT) {
                     sprint("{\n");
                     sprint("char* __t_base = (char*)&(");
-                    emit_expression(comm->comm_var_assign.lvalue);
+                    emit_expression(type_table, comm->comm_var_assign.lvalue);
                     sprint(");\n");
-                    emit_struct_assignment_from_base(0, rval);
+                    emit_struct_assignment_from_base(type_table, 0, rval);
                     sprint("}\n");
                 } else if(rval->node_type == AST_EXPRESSION_LITERAL && rval->expr_literal.type == LITERAL_ARRAY) {
                     sprint("{\n");
                     sprint("char* __t_base = (char*)(");
-                    emit_expression(comm->comm_var_assign.lvalue);
+                    emit_expression(type_table, comm->comm_var_assign.lvalue);
                     sprint(");\n");
-                    emit_array_assignment_from_base(0, rval);
+                    emit_array_assignment_from_base(type_table, 0, rval);
                     sprint("}\n");
 				} else if (rval->type_return->kind == KIND_ARRAY) {
 					// dst
 					sprint("{\nchar* __arr_dst = (char*)(");
-					emit_expression(comm->comm_var_assign.lvalue);
+					emit_expression(type_table, comm->comm_var_assign.lvalue);
 					sprint(");\n");
 
 					// src
 					sprint("char* __arr_src = (char*)(");
-					emit_expression(rval);
+					emit_expression(type_table, rval);
 					sprint(");\n");
 
 					sprint("__memory_copy(__arr_dst, __arr_src, %llu);\n", rval->type_return->type_size_bits / 8);
@@ -585,12 +585,12 @@ void C_Code_Generator::emit_command(Ast* comm) {
 	}
 }
 
-void C_Code_Generator::emit_temp_assignment(Ast* expr) {
+void C_Code_Generator::emit_temp_assignment(Type_Instance** type_table, Ast* expr) {
 	deferring = false;
 	if (expr->type_return->kind == KIND_ARRAY) {
 		sprint("char ");
 	} else {
-		emit_type(expr->type_return);
+		emit_type(type_table, expr->type_return);
 	}
 	sprint(" __temp_v_%lld", temp_variable);
     if (expr->type_return->kind == KIND_ARRAY) {
@@ -598,13 +598,13 @@ void C_Code_Generator::emit_temp_assignment(Ast* expr) {
     }
     sprint(";\n");
 
-	emit_expression(expr);
+	emit_expression(type_table, expr);
 	deferring = true;
 	sprint("__temp_v_%lld", temp_variable);
 	temp_variable += 1;
 }
 
-void C_Code_Generator::emit_expression_binary(Ast* expr){
+void C_Code_Generator::emit_expression_binary(Type_Instance** type_table, Ast* expr){
     switch(expr->expr_binary.op){
         case OP_BINARY_PLUS:
         case OP_BINARY_MINUS:
@@ -625,22 +625,22 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
         case OP_BINARY_LOGIC_OR:
         case OP_BINARY_NOT_EQUAL: {
 			sprint("((");
-            emit_expression(expr->expr_binary.left);
+            emit_expression(type_table, expr->expr_binary.left);
 			sprint(")");
 			sprint(binop_op_to_string(expr->expr_binary.op));
-            emit_expression(expr->expr_binary.right);
+            emit_expression(type_table, expr->expr_binary.right);
 			sprint(")");
         }break;
 
 		case OP_BINARY_DOT: {
 			if(expr->expr_binary.left->flags & AST_FLAG_ENUM_ACCESSOR) {
-				emit_expression(expr->expr_binary.right);
+				emit_expression(type_table, expr->expr_binary.right);
 			} else {
 				sprint("((");
-				emit_expression(expr->expr_binary.left);
+				emit_expression(type_table, expr->expr_binary.left);
 				sprint(")");
 				sprint(binop_op_to_string(expr->expr_binary.op));
-				emit_expression(expr->expr_binary.right);
+				emit_expression(type_table, expr->expr_binary.right);
 				sprint(")");
 			}
 		}break;
@@ -650,17 +650,17 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
 
 			if(expr->type_return->kind != KIND_ARRAY){
 				sprint("*(");
-				emit_type(indexed_type);
+				emit_type(type_table, indexed_type);
 				sprint(")");
 			}
 
 			sprint("(");
 
 			sprint("(char*)");
-			emit_expression(expr->expr_binary.left);
+			emit_expression(type_table, expr->expr_binary.left);
 			sprint(" + ");
 
-			emit_expression(expr->expr_binary.right);
+			emit_expression(type_table, expr->expr_binary.right);
 			sprint(" * ");
 
 			if(indexed_type->kind == KIND_POINTER){
@@ -674,12 +674,12 @@ void C_Code_Generator::emit_expression_binary(Ast* expr){
     }
 }
 
-void C_Code_Generator::emit_expression(Ast* expr){
+void C_Code_Generator::emit_expression(Type_Instance** type_table, Ast* expr){
     assert(expr->flags & AST_FLAG_IS_EXPRESSION || expr->node_type == AST_DATA);
 
     switch(expr->node_type){
         case AST_EXPRESSION_BINARY:{
-            emit_expression_binary(expr);
+            emit_expression_binary(type_table, expr);
         }break;
         case AST_EXPRESSION_LITERAL:{
 			//assert_msg(expr->type_return->kind == KIND_PRIMITIVE, "integer literal of type not primitive");
@@ -735,27 +735,27 @@ void C_Code_Generator::emit_expression(Ast* expr){
 				}break;
 				case LITERAL_ARRAY: {
 					if (deferring) {
-						emit_temp_assignment(expr);
+						emit_temp_assignment(type_table, expr);
 					} else {
-						emit_array_assignment_to_temp(expr);
+						emit_array_assignment_to_temp(type_table, expr);
 					}
 				}break;
 				case LITERAL_STRUCT: {
 					if (deferring) {
-						emit_temp_assignment(expr);
+						emit_temp_assignment(type_table, expr);
 					} else {
-						emit_struct_assignment_to_temp(expr);
+						emit_struct_assignment_to_temp(type_table, expr);
 					}
 				} break;
             }
         }break;
         case AST_EXPRESSION_PROCEDURE_CALL:{
             sprint("(");
-            emit_expression(expr->expr_proc_call.caller);
+            emit_expression(type_table, expr->expr_proc_call.caller);
             sprint(")(");
             for(s32 i = 0; i < expr->expr_proc_call.args_count; ++i){
                 if(i != 0) sprint(",");
-                emit_expression(expr->expr_proc_call.args[i]);
+                emit_expression(type_table, expr->expr_proc_call.args[i]);
             }
 			sprint(")");
         }break;
@@ -770,7 +770,7 @@ void C_Code_Generator::emit_expression(Ast* expr){
                 }break;
                 case OP_UNARY_CAST:{
 					sprint("(");
-					emit_type(expr->expr_unary.type_to_cast);
+					emit_type(type_table, expr->expr_unary.type_to_cast);
 					sprint(")");
                 }break;
                 case OP_UNARY_DEREFERENCE:{
@@ -784,13 +784,13 @@ void C_Code_Generator::emit_expression(Ast* expr){
                 }break;
                 case OP_UNARY_PLUS: break;
             }
-            emit_expression(expr->expr_unary.operand);
+            emit_expression(type_table, expr->expr_unary.operand);
 			sprint(")");
         }break;
         case AST_EXPRESSION_VARIABLE:{
             Ast* decl = decl_from_name(expr->scope, expr->expr_variable.name);
             if(decl->node_type == AST_DECL_CONSTANT){
-                emit_expression(decl->decl_constant.value);
+                emit_expression(type_table, decl->decl_constant.value);
             } else {
                 if(expr->expr_variable.name->value.data == compiler_tags[COMPILER_TAG_MAIN_PROC].data){
                     sprint("__");
@@ -887,17 +887,17 @@ void C_Code_Generator::emit_data_decl(Ast* decl) {
     }
 }
 
-void C_Code_Generator::emit_proc(Ast* decl) {
+void C_Code_Generator::emit_proc(Type_Instance** type_table, Ast* decl) {
 	if (decl->decl_procedure.flags & DECL_PROC_FLAG_FOREIGN) return;
 
-	emit_decl(decl);
+	emit_decl(type_table, decl);
 	
 	// body
-	emit_command(decl->decl_procedure.body);
+	emit_command(type_table, decl->decl_procedure.body);
 	sprint("\n\n");
 }
 
-void C_Code_Generator::emit_function_typedef(Type_Instance* type) {
+void C_Code_Generator::emit_function_typedef(Type_Instance** type_table, Type_Instance* type) {
 	assert(type->kind == KIND_FUNCTION);
 	assert(type->flags & TYPE_FLAG_INTERNALIZED);
 	sprint("typedef ");
@@ -906,7 +906,7 @@ void C_Code_Generator::emit_function_typedef(Type_Instance* type) {
 	if (rettype->kind == KIND_FUNCTION) {
 		sprint("__func_type_%p*", rettype);
 	} else {
-		emit_type(rettype);
+		emit_type(type_table, rettype);
 	}
 	sprint(" __func_type_%p(", type);
 
@@ -914,7 +914,7 @@ void C_Code_Generator::emit_function_typedef(Type_Instance* type) {
 
 	for (size_t i = 0; i < nargs; ++i) {
 		if (i != 0) sprint(", ");
-		emit_type(type->function_desc.arguments_type[i]);
+		emit_type(type_table, type->function_desc.arguments_type[i]);
 	}
 
 	sprint(");\n");
@@ -924,6 +924,8 @@ void C_Code_Generator::emit_function_typedef(Type_Instance* type) {
 
 Type_Instance* fill_type_table_relative_pointer(Type_Instance** type_table) {
 	Light_Arena* arena = arena_create(65536);
+	Light_Arena* type_table_copy = arena_create(65536);
+	
 	u8* extra_space = 0;
 	u8* start = (u8*)arena->ptr;
 	u8* offset = start;
@@ -1027,6 +1029,18 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	sprint("\tfor(u64 i = 0; i < size; ++i) ((char*)dest)[i] = ((char*)src)[i];\n");
 	sprint("}\n");
 
+
+	/*
+	sprint("char* __type_table = \"");
+	// inside string
+	Type_Instance* tt = fill_type_table_relative_pointer(type_table);
+	Ast_Data d;
+	d.data = (u8*)tt;
+	d.length_bytes = sizeof(Type_Instance) * array_get_length(type_table);
+	sprint_data(&d);
+	sprint("\";\n");
+	*/
+
     // forward declarations of types
     Ast** type_decl_arr = type_decl_array_get();
     for(size_t i = 0; i < array_get_length(type_decl_arr); ++i){
@@ -1043,40 +1057,14 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
     for (size_t i = 0; i < array_get_length(type_table); ++i) {
 		Type_Instance* type = type_table[i];
 		if (type->kind == KIND_FUNCTION) {
-			emit_function_typedef(type);
+			emit_function_typedef(type_table, type);
 		}
 	}
-
-	/*
-	// emit type info to data segment
-	sprint("typedef enum {\n");
-	sprint("   _KIND_UNKNOWN = 0,\n   _KIND_PRIMTIVE,\n   _KIND_POINTER,\n   _KIND_STRUCT,\n   _KIND_UNION,\n   _KIND_ARRAY,\n   _KIND_FUNCTION,\n   _KIND_ALIAS\n");
-	sprint("} __Type_Kind;\n");
-
-	sprint("typedef enum {\n");
-	sprint("   _TYPE_PRIMITIVE_UNKNOWN = 0,\n   _TYPE_PRIMITIVE_S8 = 0,\n   _TYPE_PRIMITIVE_S16,\n   _TYPE_PRIMITIVE_S32,\n   _TYPE_PRIMITIVE_S64");
-	sprint("   _TYPE_PRIMITIVE_U8, \n   _TYPE_PRIMITIVE_U16, \n   _TYPE_PRIMITIVE_U32, \n   _TYPE_PRIMITIVE_U64,\n");
-	sprint("   _TYPE_PRIMITIVE_R32, \n   _TYPE_PRIMITIVE_R64, \n   _TYPE_PRIMITIVE_BOOL, \n   _TYPE_PRIMITIVE_VOID,\n");
-	sprint("} __Type_Primitive;");
-	*/
-
-	sprint("typedef struct {\n"
-	"   u8  reserved[%d];\n"
-	"} __Type_Instance;\n", sizeof(Type_Instance) * array_get_length(type_table));
-
-	sprint("char* __type_table = \"");
-	// inside string
-	Type_Instance* tt = fill_type_table_relative_pointer(type_table);
-	Ast_Data d;
-	d.data = (u8*)tt;
-	d.length_bytes = sizeof(Type_Instance) * array_get_length(type_table);
-	sprint_data(&d);
-	sprint("\";\n");
     
     // emit structs and proc declarations
     for(size_t i = 0; i < array_get_length(type_decl_arr); ++i){
         Ast* decl = type_decl_arr[i];
-        emit_decl(decl);
+        emit_decl(type_table, decl);
         sprint(";\n");
     }
 	
@@ -1090,7 +1078,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
             decl->node_type == AST_DECL_VARIABLE) 
 		{
 			deferring = true;
-			emit_decl(decl, true);
+			emit_decl(type_table, decl, true);
 			sprint(";\n");
 			deferring = false;
 			defer_flush();
@@ -1103,7 +1091,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* decl = toplevel[i];
 		if (decl->node_type == AST_DECL_PROCEDURE) {
-			emit_proc(decl);
+			emit_proc(type_table, decl);
 		}
 	}
 
@@ -1120,17 +1108,17 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 				// emit expression
                 switch(decl->decl_variable.assignment->type_return->kind){
                     case KIND_ARRAY:{
-                        emit_array_assignment(decl);
+                        emit_array_assignment(type_table, decl);
                     }break;
                     case KIND_STRUCT:{
-                        emit_struct_assignment(decl);
+                        emit_struct_assignment(type_table, decl);
                     }break;
                     case KIND_FUNCTION:
                     case KIND_POINTER:
                     case KIND_PRIMITIVE:{
 						deferring = true;
 			            sprint("\t%.*s = ", TOKEN_STR(decl->decl_variable.name));
-				        emit_expression(decl->decl_variable.assignment);
+				        emit_expression(type_table, decl->decl_variable.assignment);
 						deferring = false;
 						defer_flush();
                     }break;
