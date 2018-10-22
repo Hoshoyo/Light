@@ -85,7 +85,10 @@ const u32 TYPE_FLAG_STRONG = FLAG(5);
 struct Type_Instance {
 	Type_Kind kind;
 	u32 flags;
-	s32 type_queue_index;
+	union {
+		s32 type_queue_index;
+		s32 type_table_index;
+	};
 	s64 type_size_bits;
 	union {
 		Type_Primitive primitive;

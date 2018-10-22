@@ -920,6 +920,88 @@ void C_Code_Generator::emit_function_typedef(Type_Instance* type) {
 	sprint(");\n");
 }
 
+#include <light_arena.h>
+
+Type_Instance* fill_type_table_relative_pointer(Type_Instance** type_table) {
+	Light_Arena* arena = arena_create(65536);
+	u8* extra_space = 0;
+	u8* start = (u8*)arena->ptr;
+	u8* offset = start;
+
+	for (size_t i = 0; i < array_get_length(type_table); ++i) {
+		type_table[i]->type_table_index = (s32)i;
+	}
+
+	for (size_t i = 0; i < array_get_length(type_table); ++i) {
+		Type_Instance* type = type_table[i];
+		switch (type->kind) {
+			case KIND_PRIMITIVE: break;
+			case KIND_POINTER: {
+				type->pointer_to = (Type_Instance*)type->pointer_to->type_table_index;
+			} break;
+			case KIND_STRUCT: {
+				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(Type_Instance*));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
+					((Type_Instance**)extra_space)[j] = (Type_Instance*)type->struct_desc.fields_types[j]->type_queue_index;
+				}
+				// TODO(psv): leaking here for now
+				type->struct_desc.fields_types = (Type_Instance**)offset;
+
+				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(string));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
+					((string*)extra_space)[j] = (string)type->struct_desc.fields_names[j];
+				}
+				type->struct_desc.fields_names = (string*)offset;
+
+				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(s64));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
+					((s64*)extra_space)[j] = (s64)type->struct_desc.offset_bits[j];
+				}
+				type->struct_desc.offset_bits = (s64*)offset;
+			} break;
+			case KIND_UNION: {
+				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(Type_Instance*));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < array_get_length(type->union_desc.fields_types); ++j) {
+					((Type_Instance**)extra_space)[j] = (Type_Instance*)type->union_desc.fields_types[j]->type_queue_index;
+				}
+				type->union_desc.fields_types = (Type_Instance**)offset;
+
+				extra_space = (u8*)arena_alloc(arena, type->union_desc.fields_count * sizeof(string));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->union_desc.fields_count; ++j) {
+					((string*)extra_space)[j] = (string)type->union_desc.fields_names[j];
+				}
+				type->union_desc.fields_names = (string*)offset;
+			} break;
+			case KIND_ARRAY: {
+				type->array_desc.array_of = (Type_Instance*)type->array_desc.array_of->type_table_index;
+			} break;
+			case KIND_FUNCTION: {
+				extra_space = (u8*)arena_alloc(arena, type->function_desc.num_arguments *sizeof(Type_Instance*));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->function_desc.num_arguments; ++j) {
+					((Type_Instance**)extra_space)[j] = (Type_Instance*)type->function_desc.arguments_type[j]->type_table_index;
+				}
+				type->function_desc.arguments_type = (Type_Instance**)offset;
+
+				extra_space = (u8*)arena_alloc(arena, type->function_desc.num_arguments * sizeof(string*));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->function_desc.num_arguments; ++j) {
+					((string*)extra_space)[j] = (string)type->function_desc.arguments_names[j];
+				}
+				type->function_desc.arguments_names = (string*)offset;
+			} break;
+			default: break;
+		}
+	}
+
+	return *type_table;
+}
+
 int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_table) {
     sprint("typedef char s8;\n");
     sprint("typedef short s16;\n");
@@ -964,6 +1046,32 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 			emit_function_typedef(type);
 		}
 	}
+
+	/*
+	// emit type info to data segment
+	sprint("typedef enum {\n");
+	sprint("   _KIND_UNKNOWN = 0,\n   _KIND_PRIMTIVE,\n   _KIND_POINTER,\n   _KIND_STRUCT,\n   _KIND_UNION,\n   _KIND_ARRAY,\n   _KIND_FUNCTION,\n   _KIND_ALIAS\n");
+	sprint("} __Type_Kind;\n");
+
+	sprint("typedef enum {\n");
+	sprint("   _TYPE_PRIMITIVE_UNKNOWN = 0,\n   _TYPE_PRIMITIVE_S8 = 0,\n   _TYPE_PRIMITIVE_S16,\n   _TYPE_PRIMITIVE_S32,\n   _TYPE_PRIMITIVE_S64");
+	sprint("   _TYPE_PRIMITIVE_U8, \n   _TYPE_PRIMITIVE_U16, \n   _TYPE_PRIMITIVE_U32, \n   _TYPE_PRIMITIVE_U64,\n");
+	sprint("   _TYPE_PRIMITIVE_R32, \n   _TYPE_PRIMITIVE_R64, \n   _TYPE_PRIMITIVE_BOOL, \n   _TYPE_PRIMITIVE_VOID,\n");
+	sprint("} __Type_Primitive;");
+	*/
+
+	sprint("typedef struct {\n"
+	"   u8  reserved[%d];\n"
+	"} __Type_Instance;\n", sizeof(Type_Instance) * array_get_length(type_table));
+
+	sprint("char* __type_table = \"");
+	// inside string
+	Type_Instance* tt = fill_type_table_relative_pointer(type_table);
+	Ast_Data d;
+	d.data = (u8*)tt;
+	d.length_bytes = sizeof(Type_Instance) * array_get_length(type_table);
+	sprint_data(&d);
+	sprint("\";\n");
     
     // emit structs and proc declarations
     for(size_t i = 0; i < array_get_length(type_decl_arr); ++i){
