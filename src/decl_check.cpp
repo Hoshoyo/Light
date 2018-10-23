@@ -211,8 +211,9 @@ Type_Instance* type_from_alias(Scope* scope, Type_Instance* type, bool rep_undec
 	} else if(d->node_type == AST_DECL_ENUM) {
 		return resolve_type(scope, d->decl_enum.type_hint, rep_undeclared, error);
 	} else {
-		// TODO(psv): error here
+		*error |= report_type_error(TYPE_ERROR_FATAL, type->alias.name, "'%.*s' is not a type declaration nor alias\n", TOKEN_STR(type->alias.name));
 	}
+	return 0;
 }
 
 // resolves and internalizes type if it can, if the type was resolved set TYPE_FLAG_INTERNALIZE
