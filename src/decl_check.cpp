@@ -89,9 +89,12 @@ Type_Error decl_insert_into_symbol_table(Ast* node, Token* name, char* descripto
 	}
 	s64 index = symbol_table_entry_exist(&node->scope->symb_table, name);
 	if (index != -1) {
-		error |= report_redeclaration(descriptor, name, symbol_table_get_entry(&node->scope->symb_table, index));
-	}
-	else {
+		if(node->node_type == AST_DECL_PROCEDURE && node->decl_procedure.flags & DECL_PROC_FLAG_FOREIGN) {
+			// allow redeclaration
+		} else {
+			error |= report_redeclaration(descriptor, name, symbol_table_get_entry(&node->scope->symb_table, index));
+		}
+	} else {
 		symbol_table_add(&node->scope->symb_table, name, node);
 	}
 	return error;
