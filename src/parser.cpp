@@ -240,13 +240,20 @@ void Parser::parse_directive(Scope* scope) {
 			// keep relative path to import other files from 
 			// relative path and not absolute
 			//
-			string solo_path = string_new_append(&lexer->path, (char*)import_str->value.data, import_str->value.length);
-			char* b = make_c_string(solo_path);
-
+			char* ptr = 0;
 			size_t size = 0;
-			char* ptr = ho_realpath(b, &size);
-			free(b);
-			string_free(&solo_path);
+
+			char* import_c_str = make_c_string((char*)import_str->value.data, import_str->value.length);
+			if(ho_file_exists(import_c_str)) {
+				ptr = import_c_str;
+				size = import_str->value.length;
+			} else {
+				string solo_path = string_new_append(&lexer->path, (char*)import_str->value.data, import_str->value.length);
+				char* b = make_c_string(solo_path);
+				ptr = ho_realpath(b, &size);
+				free(b);
+				string_free(&solo_path);
+			}
 
 			if(ptr) {
 				s64 file_index = file_table_push(ptr);
