@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <libgen.h>
 
 typedef int HANDLE;
 #define INVALID_HANDLE_VALUE -1
@@ -38,6 +39,9 @@ extern "C" int HO_API ho_createfile(const char* filename, int access_flags, int 
 extern "C" int HO_API ho_openfile(const char* filename, int access_flags);
 extern "C" void HO_API ho_closefile(int file);
 extern "C" s64 HO_API ho_getfilesize(const char* filename);
+extern "C" bool HO_API ho_file_exists(const char* filename);
+extern "C" const char* HO_API ho_current_exe_path();
+extern "C" const char* HO_API ho_current_exe_full_path();
 
 /*
 	If mem is 0 this functions allocates file_size bytes for the file
@@ -78,6 +82,35 @@ double Timer::GetTime()
 	QueryPerformanceCounter(&li);
 	return double(li.QuadPart) / this->g_freq;
 }*/
+
+bool HO_API ho_file_exists(const char* filepath) {
+	int r = access(filepath, F_OK);
+	return r == 0;
+}
+
+const char* HO_API ho_current_exe_path() {
+	char result[PATH_MAX] = {0};
+	ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+
+	const char *path;
+	if (count != -1) {
+		path = dirname(result);
+		return path;
+	}
+
+	return 0;
+}
+
+const char* HO_API ho_current_exe_full_path() {
+	char result[PATH_MAX] = {0};
+	ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+
+	char* path = (char*)malloc(count + 1);
+	path[count] = 0;
+	memcpy(path, result, count);
+
+	return path;
+}
 
 /* Allocations */
 void* HO_API ho_bigalloc_rw(size_t size)

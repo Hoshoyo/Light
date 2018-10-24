@@ -49,6 +49,7 @@ HANDLE HO_API ho_createfile(const char* filename, int access_flags, int action_f
 HANDLE HO_API ho_openfile(const char* filename, int access_flags);
 void HO_API ho_closefile(HANDLE file);
 u64 HO_API ho_getfilesize(const char* filename);
+const char* HO_API ho_current_exe_path();
 
 /*
 	If mem is 0 this functions allocates file_size bytes for the file
@@ -82,6 +83,28 @@ double Timer::GetTime()
 	LARGE_INTEGER li;
 	QueryPerformanceCounter(&li);
 	return (double(li.QuadPart) / this->g_freq) * 1000.0;
+}
+
+const char* HO_API ho_current_exe_path() {
+	HMODULE hModule = GetModuleHandle(NULL);
+	CHAR path[MAX_PATH];
+	GetModuleFileNameA(hModule, path, MAX_PATH);
+
+	size_t length = strlen(path);
+	size_t i = length - 1;
+	for (; i >= 0; --i) {
+		if (path[i] == '\\' || path[i] == '/') {
+			++i;
+			break;
+		}
+	}
+
+	path[i] = 0;
+
+	char* result = (char*)malloc(i + 1);
+	memcpy(result, path, i + 1);
+
+	return result;
 }
 
 // return the number of directories found

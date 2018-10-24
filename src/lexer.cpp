@@ -111,6 +111,18 @@ void Lexer::init() {
 
 extern double total_file_load_time = 0;
 
+Lexer_Error Lexer::start_internal(const char* data) {
+	this->filename = string_make("internal.li");
+
+	filedata = (char*)data;
+
+	lex_file();
+	current_token = 0;
+	global_lexer_line_count += this->line_count;
+
+	return LEXER_OK;
+}
+
 Lexer_Error Lexer::start(const char* filename, Token* location)
 {
 	this->filename = string_make(filename);

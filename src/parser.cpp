@@ -44,10 +44,30 @@ void queue_file_for_parsing(Token* token) {
 	array_push(parsing_queue.queue_imports, &token);
 }
 
+char internal_data[] = R"(
+string :: struct {
+	length   : s64;
+	capacity : s64;
+	data     : ^u8;
+}
+)";
+
 Ast** parse_files_in_queue(Scope* global_scope) {
 	TIME_FUNC();
 	// TODO(psv): check for double include
 	// TODO(psv): include recursively
+
+	{
+		// internal
+		Lexer lexer;
+		if(lexer.start_internal(internal_data) != LEXER_OK) {
+			return 0;
+		}
+
+		Parser parser(&lexer, global_scope);
+		Ast** ast_top_level = parser.parse_top_level();
+		array_push(parsing_queue.files_toplevels, &ast_top_level);
+	}
 
 	// Main files
 	size_t mlen = array_get_length(parsing_queue.queue_main);

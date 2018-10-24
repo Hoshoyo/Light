@@ -153,6 +153,7 @@ struct Lexer
 	s64    current_col   = 0;
 	Token* token_array   = 0;
 
+	Lexer_Error start_internal(const char* data);
 	Lexer_Error start(const char* filename, Token* location = 0);
 
 	void rewind();
