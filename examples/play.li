@@ -30,7 +30,7 @@ main :: () -> s32 {
 	return 0;
 }
 
-MessageBoxA :: (hwnd : ^void, txt : ^u8, caption : ^u8, type : u32) -> s32 #foreign("user32.dll");
+MessageBoxA :: (hwnd : ^void, txt : ^u8, caption : ^u8, type : u32) -> s32 #foreign("user32");
 
 // RCX = 1
 // RDX = 2

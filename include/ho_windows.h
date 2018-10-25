@@ -50,6 +50,8 @@ HANDLE HO_API ho_openfile(const char* filename, int access_flags);
 void HO_API ho_closefile(HANDLE file);
 u64 HO_API ho_getfilesize(const char* filename);
 const char* HO_API ho_current_exe_path();
+bool HO_API ho_file_exists(const char* filename);
+const char* HO_API ho_current_exe_full_path();
 
 /*
 	If mem is 0 this functions allocates file_size bytes for the file
@@ -83,6 +85,28 @@ double Timer::GetTime()
 	LARGE_INTEGER li;
 	QueryPerformanceCounter(&li);
 	return (double(li.QuadPart) / this->g_freq) * 1000.0;
+}
+
+bool HO_API ho_file_exists(const char* filename) {
+	WIN32_FIND_DATA info;
+
+	HANDLE search_handle = FindFirstFileEx(filename, FindExInfoStandard, &info, FindExSearchNameMatch, NULL, FIND_FIRST_EX_LARGE_FETCH);
+	if (search_handle == INVALID_HANDLE_VALUE)
+		return false;
+	FindClose(search_handle);
+	return true;
+}
+
+const char* HO_API ho_current_exe_full_path() {
+	HMODULE hModule = GetModuleHandle(NULL);
+	CHAR path[MAX_PATH];
+	DWORD length = GetModuleFileNameA(hModule, path, MAX_PATH);
+
+	char* result = (char*)malloc(length + 1);
+	result[length] = 0;
+	memcpy(result, path, length + 1);
+
+	return result;
 }
 
 const char* HO_API ho_current_exe_path() {
