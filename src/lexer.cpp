@@ -742,6 +742,25 @@ u64 literal_char_to_u64(Token* t) {
 	if (t->value.length == 1) {
 		res = (u64)t->value.data[0];
 	} else if (t->value.length > 1) {
+		if (t->value.length == 2) {
+			if (t->value.data[0] == '\\') {
+				switch(t->value.data[1]) {
+					case 'a': return '\a';
+					case 'b': return '\b';
+					case 'f': return '\f';
+					case 'n': return '\n';
+					case 'r': return '\r';
+					case 't': return '\t';
+					case 'v': return '\v';
+					case '\\': return '\\';
+					case '\'': return '\'';
+					case '\"': return '\"';
+					default:
+						assert_msg(0, "character literal not yet supported"); 
+						break;
+				}
+			}
+		}
 		assert_msg(0, "character literal not yet supported");
 	} else {
 		assert_msg(0, "literal token has negative length");

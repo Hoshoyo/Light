@@ -1,0 +1,82 @@
+#import "linux/print.li"
+malloc :: (size : u64) -> ^void #foreign("c");
+
+Tokenizer :: struct {
+    stream : string;
+    line   : s32;
+    column : s32;
+    index  : s32;
+}
+
+Token :: struct {
+    type   : Token_Type;
+    data   : string;
+    line   : s32;
+    column : s32;
+}
+
+Token_Type :: enum {
+    TOKEN_IDENTIFIER : 1,
+    TOKEN_LITERAL_FLOAT : 2
+}
+
+is_white_space :: (c : u8) -> bool {
+    return c == '\n' || c == ' ' || c == '\v' || c == '\t' || c == '\r';
+}
+
+is_letter :: (c : u8) -> bool {
+    return c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z';
+}
+
+is_number :: (c : u8) -> bool {
+    return c >= '0' && c <= '9';
+}
+
+token_next :: (tokenizer : ^Tokenizer) -> Token {
+    result : Token;
+    stream := tokenizer.stream.data;
+    index  := tokenizer.index;
+
+    while is_white_space(stream[index]) {
+        if stream[index] == '\n' {
+            tokenizer.line += 1;
+        } else {
+            tokenizer.column += 1;
+        }
+        index += 1;
+    }
+
+    if is_letter(stream[index]) {
+        start := index;
+        while is_letter(stream[index]) || is_number(stream[index]) || stream[index] == '_' {
+            index += 1;
+            tokenizer.column += 1;
+        }
+        result.data.length = [s64](index - start);
+        result.data.data = stream + start;
+        result.data.capacity = -1;
+    } else if(is_number(stream[index])) {
+
+    } else {
+        result.data.length = 1;
+        result.data.data = stream + 1;
+        result.data.capacity = -1;
+        index += 1;
+    }
+
+    print_string(result.data);
+    print_string("\n");
+
+    tokenizer.index = index;
+    return result;
+}
+
+main :: () -> s32 {
+    result := read_entire_file("examples/cube.obj", malloc);
+    tokenizer: Tokenizer;
+    tokenizer.stream = result;
+
+    token_next(&tokenizer);
+
+    return 0;
+}
