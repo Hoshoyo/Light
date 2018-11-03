@@ -922,24 +922,35 @@ void C_Code_Generator::emit_function_typedef(Type_Instance** type_table, Type_In
 
 #include <light_arena.h>
 
-Type_Instance* fill_type_table_relative_pointer(Type_Instance** type_table) {
+Type_Instance* fill_type_table_relative_pointer(Type_Instance** type_table, Type_Table_Copy* ttc) {
+	// TODO(psv): replace arena with contiguous memory allocator
+	// @IMPORTANT
 	Light_Arena* arena = arena_create(65536);
-	Light_Arena* type_table_copy = arena_create(65536);
-	
+	Light_Arena* strings_type = arena_create(65536);
+	//u8* strings_type = array_create(u8, 65536);
+	Type_Instance* type_table_copy = (Type_Instance*)calloc(array_get_length(type_table), sizeof(Type_Instance));
+
 	u8* extra_space = 0;
+	u8* extra_string_space = 0;
+	u8* start_strings = (u8*)strings_type->ptr;
 	u8* start = (u8*)arena->ptr;
 	u8* offset = start;
 
-	for (size_t i = 0; i < array_get_length(type_table); ++i) {
-		type_table[i]->type_table_index = (s32)i;
-	}
+	ttc->start_extra_mem = start;
+	ttc->start_extra_strings = start_strings;
 
 	for (size_t i = 0; i < array_get_length(type_table); ++i) {
+		type_table[i]->type_table_index = (s32)i;
+		type_table_copy[i] = *type_table[i];
+	}
+
+	for (size_t i = 0, s = 0; i < array_get_length(type_table); ++i) {
 		Type_Instance* type = type_table[i];
+		Type_Instance* type_copy = &type_table_copy[i];
 		switch (type->kind) {
 			case KIND_PRIMITIVE: break;
 			case KIND_POINTER: {
-				type->pointer_to = (Type_Instance*)type->pointer_to->type_table_index;
+				type_table_copy[i].pointer_to = (Type_Instance*)type_table_copy[i].pointer_to->type_table_index;
 			} break;
 			case KIND_STRUCT: {
 				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(Type_Instance*));
@@ -948,60 +959,111 @@ Type_Instance* fill_type_table_relative_pointer(Type_Instance** type_table) {
 					((Type_Instance**)extra_space)[j] = (Type_Instance*)type->struct_desc.fields_types[j]->type_queue_index;
 				}
 				// TODO(psv): leaking here for now
-				type->struct_desc.fields_types = (Type_Instance**)offset;
+				type_copy->struct_desc.fields_types = (Type_Instance**)offset;
 
 				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(string));
 				offset = (u8*)(extra_space - start);
 				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
 					((string*)extra_space)[j] = (string)type->struct_desc.fields_names[j];
+					s64 length = ((string*)extra_space)[j].length;
+					extra_string_space = (u8*)arena_alloc(strings_type, length);
+					memcpy(extra_string_space, ((string*)extra_space)[j].data, length);
+					ttc->extra_strings_bytes += length;
+					((string*)extra_space)[j].data = (u8*)(extra_string_space - start_strings);
 				}
-				type->struct_desc.fields_names = (string*)offset;
+				type_copy->struct_desc.fields_names = (string*)offset;
 
 				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(s64));
 				offset = (u8*)(extra_space - start);
 				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
 					((s64*)extra_space)[j] = (s64)type->struct_desc.offset_bits[j];
 				}
-				type->struct_desc.offset_bits = (s64*)offset;
+				type_copy->struct_desc.offset_bits = (s64*)offset;
 			} break;
+
 			case KIND_UNION: {
 				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(Type_Instance*));
 				offset = (u8*)(extra_space - start);
 				for (size_t j = 0; j < array_get_length(type->union_desc.fields_types); ++j) {
 					((Type_Instance**)extra_space)[j] = (Type_Instance*)type->union_desc.fields_types[j]->type_queue_index;
 				}
-				type->union_desc.fields_types = (Type_Instance**)offset;
+				type_copy->union_desc.fields_types = (Type_Instance**)offset;
 
 				extra_space = (u8*)arena_alloc(arena, type->union_desc.fields_count * sizeof(string));
 				offset = (u8*)(extra_space - start);
 				for (size_t j = 0; j < type->union_desc.fields_count; ++j) {
 					((string*)extra_space)[j] = (string)type->union_desc.fields_names[j];
+					s64 length = ((string*)extra_space)[j].length;
+					extra_string_space = (u8*)arena_alloc(strings_type, length);
+					memcpy(extra_string_space, ((string*)extra_space)[j].data, length);
+					ttc->extra_strings_bytes += length;
+					((string*)extra_space)[j].data = (u8*)(extra_string_space - start_strings);
 				}
-				type->union_desc.fields_names = (string*)offset;
+				type_copy->union_desc.fields_names = (string*)offset;
 			} break;
+
 			case KIND_ARRAY: {
-				type->array_desc.array_of = (Type_Instance*)type->array_desc.array_of->type_table_index;
+				type_copy->array_desc.array_of = (Type_Instance*)type->array_desc.array_of->type_table_index;
 			} break;
 			case KIND_FUNCTION: {
-				extra_space = (u8*)arena_alloc(arena, type->function_desc.num_arguments *sizeof(Type_Instance*));
+				extra_space = (u8*)arena_alloc(arena, type->function_desc.num_arguments * sizeof(Type_Instance*));
 				offset = (u8*)(extra_space - start);
 				for (size_t j = 0; j < type->function_desc.num_arguments; ++j) {
 					((Type_Instance**)extra_space)[j] = (Type_Instance*)type->function_desc.arguments_type[j]->type_table_index;
 				}
-				type->function_desc.arguments_type = (Type_Instance**)offset;
+				type_copy->function_desc.arguments_type = (Type_Instance**)offset;
 
 				extra_space = (u8*)arena_alloc(arena, type->function_desc.num_arguments * sizeof(string*));
 				offset = (u8*)(extra_space - start);
 				for (size_t j = 0; j < type->function_desc.num_arguments; ++j) {
 					((string*)extra_space)[j] = (string)type->function_desc.arguments_names[j];
+					s64 length = ((string*)extra_space)[j].length;
+					extra_string_space = (u8*)arena_alloc(strings_type, length);
+					memcpy(extra_string_space, ((string*)extra_space)[j].data, length);
+					ttc->extra_strings_bytes += length;
+					((string*)extra_space)[j].data = (u8*)(extra_string_space - start_strings);
 				}
-				type->function_desc.arguments_names = (string*)offset;
+				type_copy->function_desc.arguments_names = (string*)offset;
 			} break;
 			default: break;
 		}
 	}
+	ttc->extra_mem_bytes = (u8*)arena->ptr - start;
 
-	return *type_table;
+	return type_table_copy;
+}
+
+void C_Code_Generator::emit_type_strings(Type_Table_Copy* ttc) {
+	sprint("u8* __type_strings = \"");
+
+	Ast_Data d;
+	d.data = ttc->start_extra_strings;
+	d.length_bytes = ttc->extra_strings_bytes;
+	sprint_data(&d);
+
+	sprint("\";\n\n");
+
+	// ----
+
+	sprint("u8* __type_extra = \"");
+
+	Ast_Data d_te;
+	d_te.data = ttc->start_extra_mem;
+	d_te.length_bytes = ttc->extra_mem_bytes;
+	sprint_data(&d_te);
+
+	sprint("\";\n\n");
+
+	// ----
+
+	sprint("u8* __type_table = \"");
+
+	Ast_Data d_tt;
+	d_tt.data = (u8*)ttc->type_table;
+	d_tt.length_bytes = ttc->type_table_length * sizeof(Type_Instance*);
+	sprint_data(&d_tt);
+
+	sprint("\";\n\n");
 }
 
 int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_table) {
@@ -1029,17 +1091,12 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	sprint("\tfor(u64 i = 0; i < size; ++i) ((char*)dest)[i] = ((char*)src)[i];\n");
 	sprint("}\n");
 
+	Type_Table_Copy ttc = { 0 };
+	Type_Instance* tt = fill_type_table_relative_pointer(type_table, &ttc);
+	ttc.type_table = tt;
+	ttc.type_table_length = array_get_length(type_table);
+	emit_type_strings(&ttc);
 
-	/*
-	sprint("char* __type_table = \"");
-	// inside string
-	Type_Instance* tt = fill_type_table_relative_pointer(type_table);
-	Ast_Data d;
-	d.data = (u8*)tt;
-	d.length_bytes = sizeof(Type_Instance) * array_get_length(type_table);
-	sprint_data(&d);
-	sprint("\";\n");
-	*/
 
     // forward declarations of types
     Ast** type_decl_arr = type_decl_array_get();

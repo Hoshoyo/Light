@@ -99,6 +99,7 @@ struct Type_Instance {
 		Type_Function  function_desc;
 		Type_Alias     alias;
 	};
+	u8* offset_datasegment;
 };
 
 inline bool type_primitive_int_signed(Type_Primitive p) {
