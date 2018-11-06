@@ -62,7 +62,9 @@ Type_Error evaluate_directive(Ast* expr, u32 flags) {
 		assert(internalized_type->type_size_bits > 0);
 		expr->expr_literal.value_u64 = internalized_type->type_size_bits / 8;
 	} break;
-	case EXPR_DIRECTIVE_TYPEOF:
+	case EXPR_DIRECTIVE_TYPEOF: {
+		assert_msg(0, "Invalid code path");
+	}break;
 	default:
 		assert_msg(0, "unimplemented directive evaluation");
 		break;
@@ -93,11 +95,17 @@ Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags) {
 				assert(type_regsize(type));
 				interpreter_to_ast_expr(&interp, type, expr);
 			}
-		} else {
+		} else if(expr->expr_directive.type == EXPR_DIRECTIVE_SIZEOF) {
 			// Evaluate directive first, then type check
 			// This could be #run #sizeof #typeof etc.
 			*error |= evaluate_directive(expr, flags);
 			if (*error) return 0;
+		} else if(expr->expr_directive.type == EXPR_DIRECTIVE_TYPEOF) {
+			// TODO: implement internal ^Type_Info
+			Type_Instance* typeof_expr_type = infer_from_expression(expr->expr_directive.expr, error, flags);
+			if(*error & TYPE_ERROR_FATAL) return typeof_expr_type;
+			expr->type_return = type_pointer_get(TYPE_PRIMITIVE_VOID);
+			return expr->type_return;
 		}
 	}
 

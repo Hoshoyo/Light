@@ -678,6 +678,15 @@ void C_Code_Generator::emit_expression(Type_Instance** type_table, Ast* expr){
     assert(expr->flags & AST_FLAG_IS_EXPRESSION || expr->node_type == AST_DATA);
 
     switch(expr->node_type){
+		case AST_EXPRESSION_DIRECTIVE: {
+			if(expr->expr_directive.type == EXPR_DIRECTIVE_TYPEOF) {
+				Type_Instance* type = expr->expr_directive.expr->type_return;
+				//printf("type table index: %d\n", type->type_table_index);
+				sprint("(__type_table + %d)", type->type_table_index * sizeof(User_Type_Info));
+			} else {
+				assert_msg(0, "unimplemented expression directive");
+			}
+		}break;
         case AST_EXPRESSION_BINARY:{
             emit_expression_binary(type_table, expr);
         }break;

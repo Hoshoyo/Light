@@ -49,6 +49,7 @@ string compiler_tags[] = {
 	{sizeof("end")     - 1, -1, (u8*)"end"},
 	{sizeof("typedef") - 1, -1, (u8*)"typedef" },
 	{sizeof("sizeof")  - 1, -1, (u8*)"sizeof" },
+	{sizeof("typeof")  - 1, -1, (u8*)"typeof" },
 	{sizeof("run")     - 1, -1, (u8*)"run" },
 };
 

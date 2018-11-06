@@ -215,6 +215,10 @@ Ast* Parser::parse_directive_expression(Scope* scope) {
 		// #sizeof directive
 		Type_Instance* type = parse_type();
 		return ast_create_expr_sizeof(type, scope, directive);
+	} else if (directive->value.data == compiler_tags[COMPILER_TAG_TYPEOF].data) {
+		// #typeof directive
+		Ast* expr = parse_expression(scope);
+		return ast_create_expr_typeof(expr, scope, directive);
 	} else if(directive->value.data == compiler_tags[COMPILER_TAG_RUN].data) {
 		// #run directive
 		Ast* expr = parse_expression(scope);

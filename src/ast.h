@@ -408,6 +408,7 @@ struct Ast {
 Scope* scope_create(Ast* creator, Scope* parent, u32 flags);
 
 Ast* ast_create_expr_sizeof(Type_Instance* type, Scope* scope, Token* directive_token);
+Ast* ast_create_expr_typeof(Ast* expr, Scope* scope, Token* directive_token);
 Ast* ast_create_expr_run(Scope* scope, Token* directive_token, Ast* expr);
 
 Ast* ast_create_data(Data_Type type, Scope* scope, Token* location, u8* data, s64 length_bytes, Type_Instance* data_type);

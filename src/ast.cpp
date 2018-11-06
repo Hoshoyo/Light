@@ -72,6 +72,22 @@ Ast* ast_create_expr_sizeof(Type_Instance* type, Scope* scope, Token* directive_
 	return d;
 }
 
+Ast* ast_create_expr_typeof(Ast* expr, Scope* scope, Token* directive_token) {
+	Ast* d = ALLOC_AST();
+
+	d->node_type = AST_EXPRESSION_DIRECTIVE;
+	d->type_return = 0;
+	d->scope = scope;
+	d->flags = AST_FLAG_IS_EXPRESSION | AST_FLAG_IS_DIRECTIVE;
+	d->infer_queue_index = -1;
+
+	d->expr_directive.type = EXPR_DIRECTIVE_TYPEOF;
+	d->expr_directive.expr = expr;
+	d->expr_directive.token = directive_token;
+
+	return d;
+}
+
 Ast* ast_create_data(Data_Type type, Scope* scope, Token* location, u8* data, s64 length_bytes, Type_Instance* data_type) {
 	static s32 id = 0;
 	Ast* d = ALLOC_AST();
