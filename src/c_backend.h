@@ -2,6 +2,17 @@
 #include "ast.h"
 #include "type.h"
 #include "type_table.h"
+#include "user_types.h"
+
+struct User_Type_Table {
+	u8* start_extra_mem;
+	u8* start_extra_strings;
+	s64 extra_strings_bytes;
+	s64 extra_mem_bytes;
+
+	User_Type_Info* type_table;
+	s64 type_table_length;
+};
 
 struct Type_Table_Copy {
 	u8* start_extra_mem;
@@ -50,7 +61,12 @@ struct C_Code_Generator {
 	void emit_default_value(Type_Instance* type);
 	void emit_typedef(Type_Instance** type_table, Type_Instance* type, Token* name, char* prefix);
 	void emit_function_typedef(Type_Instance** type_table, Type_Instance* type);
+
+	#if 0
 	void emit_type_strings(Type_Table_Copy* ttc);
+	#else
+	void emit_type_strings(User_Type_Table* ttc);
+	#endif
 
 	void emit_data_decl(Ast* decl);
 

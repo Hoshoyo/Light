@@ -1,10 +1,14 @@
-string :: struct {
-    length   : s64;
-    capacity : s64;
-    data     : ^u8;
+Type_Kind : u32 : enum {
+	KIND_UNKNOWN   : 0,
+	KIND_PRIMITIVE : 1,
+	KIND_STRUCT    : 2,
+	KIND_UNION     : 3,
+	KIND_ARRAY     : 4,
+	KIND_FUNCTION  : 5,
+	KIND_ALIAS     : 6
 }
-/*
-Type_Primitive :: enum {
+
+Type_Primitive : u32 : enum {
 	TYPE_UNKNOWN        : 0,
 	TYPE_PRIMITIVE_S8   : 1,
 	TYPE_PRIMITIVE_S16  : 2,
@@ -20,6 +24,35 @@ Type_Primitive :: enum {
 	TYPE_PRIMITIVE_VOID : 12
 }
 
+Type_Array :: struct {
+	array_of  : ^Type_Info;
+	dimension : u64;
+}
+
+Type_Union :: struct {
+	name         : string;
+	fields_types : ^^Type_Info;
+	fields_names : ^string;
+	fields_count : s32;
+	alignment    : s32;
+}
+
+Type_Struct :: struct {
+	name         : string;
+	fields_types : ^^Type_Info;
+	fields_names : ^string;
+	fields_offsets_bits : ^s64;
+	fields_count : s32;
+	alignment    : s32;
+}
+
+Type_Function :: struct {
+	return_type     : ^Type_Info;
+	arguments_type  : ^^Type_Info;
+	arguments_name  : ^string;
+	arguments_count : s32;
+}
+
 Type_Desc :: union {
     primitive     : Type_Primitive;
     pointer_to    : ^Type_Info;
@@ -27,14 +60,11 @@ Type_Desc :: union {
     struct_desc   : Type_Struct;
     union_desc    : Type_Union;
     function_desc : Type_Function;
-    alias         : Type_Alias;
 }
 
 Type_Info :: struct {
-    kind           : Type_Kind;
-	flags          : u32;
-	reserved       : s32;
-	type_size_bits : s64;
-    description    : Type_Desc;
+    kind            : Type_Kind;
+	flags           : u32;
+	type_size_bytes : s64;
+    description     : Type_Desc;
 }
-*/

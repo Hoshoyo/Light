@@ -1040,7 +1040,11 @@ Type_Instance* fill_type_table_relative_pointer(Type_Instance** type_table, Type
 	return type_table_copy;
 }
 
+#if 0
 void C_Code_Generator::emit_type_strings(Type_Table_Copy* ttc) {
+#else
+void C_Code_Generator::emit_type_strings(User_Type_Table* ttc) {
+#endif
 	sprint("u8* __type_strings = \"");
 
 	Ast_Data d;
@@ -1073,6 +1077,149 @@ void C_Code_Generator::emit_type_strings(Type_Table_Copy* ttc) {
 	sprint("\";\n\n");
 }
 
+inline User_Type_Info type_instance_to_user(Type_Instance& t) {
+	User_Type_Info result = {};
+	result.kind = t.kind;
+	result.type_size_bytes = t.type_size_bits / 8;
+
+	switch(t.kind) {
+		case KIND_PRIMITIVE:
+			result.description.primitive = t.primitive;
+			break;
+		case KIND_POINTER:
+			result.description.pointer_to = (User_Type_Info*)t.pointer_to;
+			break;
+		case KIND_ARRAY:
+			result.description.array_desc.array_of = (User_Type_Info*)t.array_desc.array_of;
+			result.description.array_desc.dimension = t.array_desc.dimension;
+			break;
+		case KIND_STRUCT:
+			result.description.struct_desc.name = t.struct_desc.name->value;
+			result.description.struct_desc.fields_count = t.struct_desc.fields_count;
+			result.description.struct_desc.alignment = t.struct_desc.alignment;
+			result.description.struct_desc.fields_types = (User_Type_Info**)t.struct_desc.fields_types;
+			result.description.struct_desc.fields_names = t.struct_desc.fields_names;
+			result.description.struct_desc.fields_offsets_bits = t.struct_desc.offset_bits;
+			break;
+		case KIND_UNION:
+			result.description.union_desc.name = t.union_desc.name->value;
+			result.description.union_desc.fields_count = t.union_desc.fields_count;
+			result.description.union_desc.alignment = t.union_desc.alignment;
+			result.description.union_desc.fields_types = (User_Type_Info**)t.union_desc.fields_types;
+			result.description.union_desc.fields_names = t.union_desc.fields_names;
+			break;
+		case KIND_FUNCTION:
+			result.description.function_desc.arguments_count = t.function_desc.num_arguments;
+			result.description.function_desc.arguments_name = t.function_desc.arguments_names;
+			result.description.function_desc.arguments_type = (User_Type_Info**)t.function_desc.arguments_type;
+			result.description.function_desc.return_type = (User_Type_Info*)t.function_desc.return_type;
+			break;
+		default: assert_msg(0, "invalid type kind"); break;
+	}
+
+	return result;
+}
+
+User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table* utt) {
+	// TODO(psv): replace arena with contiguous memory allocator
+	// @IMPORTANT
+	Light_Arena* arena = arena_create(65536);
+	Light_Arena* strings_type = arena_create(65536);
+	//u8* strings_type = array_create(u8, 65536);
+	User_Type_Info* user_tt = (User_Type_Info*)calloc(array_get_length(type_table), sizeof(User_Type_Info));
+
+	u8* extra_space = 0;
+	u8* extra_string_space = 0;
+	u8* start_strings = (u8*)strings_type->ptr;
+	u8* start = (u8*)arena->ptr;
+	u8* offset = start;
+
+	utt->start_extra_mem = start;
+	utt->start_extra_strings = start_strings;
+
+	for (size_t i = 0; i < array_get_length(type_table); ++i) {
+		type_table[i]->type_table_index = (s32)i;
+		user_tt[i] = type_instance_to_user(*type_table[i]);
+	}
+
+	for (size_t i = 0, s = 0; i < array_get_length(type_table); ++i) {
+		Type_Instance* type = type_table[i];
+		User_Type_Info* type_copy = &user_tt[i];
+		switch (type->kind) {
+			case KIND_PRIMITIVE: break;
+			case KIND_POINTER: {
+				user_tt[i].description.pointer_to = (User_Type_Info*)((Type_Instance*)user_tt[i].description.pointer_to)->type_table_index;
+			} break;
+			case KIND_STRUCT: {
+				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(User_Type_Info*));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
+					((User_Type_Info**)extra_space)[j] = (User_Type_Info*)((Type_Instance*)type->struct_desc.fields_types[j])->type_queue_index;
+				}
+				// TODO(psv): leaking here for now
+				type_copy->description.struct_desc.fields_types = (User_Type_Info**)offset;
+
+				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(string));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
+					((string*)extra_space)[j] = (string)type->struct_desc.fields_names[j];
+					s64 length = ((string*)extra_space)[j].length;
+					extra_string_space = (u8*)arena_alloc(strings_type, length);
+					memcpy(extra_string_space, ((string*)extra_space)[j].data, length);
+					utt->extra_strings_bytes += length;
+					((string*)extra_space)[j].data = (u8*)(extra_string_space - start_strings);
+				}
+				type_copy->description.struct_desc.fields_names = (string*)offset;
+
+				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(s64));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
+					((s64*)extra_space)[j] = (s64)type->struct_desc.offset_bits[j];
+				}
+				type_copy->description.struct_desc.fields_offsets_bits = (s64*)offset;
+			} break;
+
+			case KIND_UNION: {
+				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(User_Type_Info*));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < array_get_length(type->union_desc.fields_types); ++j) {
+					((User_Type_Info**)extra_space)[j] = (User_Type_Info*)((Type_Instance*)type->union_desc.fields_types[j])->type_queue_index;
+				}
+				type_copy->description.union_desc.fields_types = (User_Type_Info**)offset;
+
+				extra_space = (u8*)arena_alloc(arena, type->union_desc.fields_count * sizeof(string));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->union_desc.fields_count; ++j) {
+					((string*)extra_space)[j] = (string)type->union_desc.fields_names[j];
+					s64 length = ((string*)extra_space)[j].length;
+					extra_string_space = (u8*)arena_alloc(strings_type, length);
+					memcpy(extra_string_space, ((string*)extra_space)[j].data, length);
+					utt->extra_strings_bytes += length;
+					((string*)extra_space)[j].data = (u8*)(extra_string_space - start_strings);
+				}
+				type_copy->description.union_desc.fields_names = (string*)offset;
+			} break;
+
+			case KIND_ARRAY: {
+				type_copy->description.array_desc.array_of = (User_Type_Info*)((Type_Instance*)type->array_desc.array_of)->type_table_index;
+			} break;
+			case KIND_FUNCTION: {
+				extra_space = (u8*)arena_alloc(arena, type->function_desc.num_arguments * sizeof(User_Type_Info*));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->function_desc.num_arguments; ++j) {
+					((User_Type_Info**)extra_space)[j] = (User_Type_Info*)((Type_Instance*)type->function_desc.arguments_type[j])->type_table_index;
+				}
+				type_copy->description.function_desc.arguments_type = (User_Type_Info**)offset;
+
+			} break;
+			default: break;
+		}
+	}
+	utt->extra_mem_bytes = (u8*)arena->ptr - start;
+
+	return user_tt;
+}
+
 int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_table) {
     sprint("typedef char s8;\n");
     sprint("typedef short s16;\n");
@@ -1098,12 +1245,19 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	sprint("\tfor(u64 i = 0; i < size; ++i) ((char*)dest)[i] = ((char*)src)[i];\n");
 	sprint("}\n");
 
+#if 0
 	Type_Table_Copy ttc = { 0 };
 	Type_Instance* tt = fill_type_table_relative_pointer(type_table, &ttc);
 	ttc.type_table = tt;
 	ttc.type_table_length = array_get_length(type_table);
 	emit_type_strings(&ttc);
-
+#else
+	User_Type_Table utt = { 0 };
+	User_Type_Info* tt = fill_user_type_table(type_table, &utt);
+	utt.type_table = tt;
+	utt.type_table_length = array_get_length(type_table);
+	emit_type_strings(&utt);
+#endif
 
     // forward declarations of types
     Ast** type_decl_arr = type_decl_array_get();
