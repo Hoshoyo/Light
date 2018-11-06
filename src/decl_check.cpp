@@ -260,7 +260,9 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 				return 0;
 			}
 			//type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared);
-			type->pointer_to = resolve_type(scope, struct_decl->decl_struct.type_info, rep_undeclared, error);
+			Type_Instance* resolved_type = resolve_type(scope, struct_decl->decl_struct.type_info, rep_undeclared, error);
+			if (!resolved_type) return 0;
+			type->pointer_to = resolved_type;
 			return internalize_type(&type, scope, true);
 		} else if(type->pointer_to->kind == KIND_ALIAS) {
 			Type_Instance* tpf = type_from_alias(scope, type->pointer_to, rep_undeclared, error);
@@ -270,12 +272,14 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 				}
 				return 0;
 			}
-			type->pointer_to = resolve_type(scope, tpf, rep_undeclared, error);
-			if(!type->pointer_to) return 0;
+			Type_Instance* resolved_type = resolve_type(scope, tpf, rep_undeclared, error);
+			if(resolved_type) return 0;
+			type->pointer_to = resolved_type;
 			return internalize_type(&type, scope, true);
 		} else {
-			type->pointer_to = resolve_type(scope, type->pointer_to, rep_undeclared, error);
-			if (!type->pointer_to) return 0;
+			Type_Instance* resolved_type = resolve_type(scope, type->pointer_to, rep_undeclared, error);
+			if (resolved_type) return 0;
+			type->pointer_to = resolved_type;
 			return internalize_type(&type, scope, true);
 		}
 	} break;
