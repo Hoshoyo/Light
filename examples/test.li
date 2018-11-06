@@ -1,7 +1,6 @@
-main :: () -> s32 {
-    return 0;
-}
+#import "windows/print.li"
 
-Foo :: struct {
-	f : ^Foo;
+main :: () -> s32 {
+	//a := 1 + 2 + 3;
+    return 0;
 }

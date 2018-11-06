@@ -814,6 +814,11 @@ int C_Code_Generator::sprint_data(Ast_Data* data) {
 	for (s64 i = 0; i < data->length_bytes; ++i) {
 		u8 d = data->data[i];
 		switch (d) {
+		case '"': {
+			buffer[aux_len++] = '\\';
+			buffer[aux_len++] = '"';
+			length_reduced += 1;
+		} break;
 		case '\\': {
 			buffer[aux_len++] = '\\';
 			d = data->data[++i];
@@ -1013,6 +1018,7 @@ Type_Instance* fill_type_table_relative_pointer(Type_Instance** type_table, Type
 				}
 				type_copy->function_desc.arguments_type = (Type_Instance**)offset;
 
+#if 0
 				extra_space = (u8*)arena_alloc(arena, type->function_desc.num_arguments * sizeof(string*));
 				offset = (u8*)(extra_space - start);
 				for (size_t j = 0; j < type->function_desc.num_arguments; ++j) {
@@ -1024,6 +1030,7 @@ Type_Instance* fill_type_table_relative_pointer(Type_Instance** type_table, Type
 					((string*)extra_space)[j].data = (u8*)(extra_string_space - start_strings);
 				}
 				type_copy->function_desc.arguments_names = (string*)offset;
+#endif
 			} break;
 			default: break;
 		}
