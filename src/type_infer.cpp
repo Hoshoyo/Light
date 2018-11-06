@@ -218,7 +218,9 @@ Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 fla
 				expr->type_return = cast_to;
 				return cast_to;
 			} else if (infered->kind == KIND_ARRAY && cast_to->kind == KIND_POINTER) {
-				assert(type_strong(infered) && type_strong(cast_to));
+				//assert(type_strong(infered) && type_strong(cast_to));
+				assert(type_strong(cast_to));
+				type_propagate(cast_to, expr->expr_unary.operand);
 				expr->type_return = cast_to;
 				return cast_to;
 			} else if (infered->kind == KIND_FUNCTION && cast_to->kind == KIND_POINTER) {
@@ -529,6 +531,16 @@ Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 				} else if (strong->kind == KIND_POINTER && expr->expr_literal.type == LITERAL_POINTER) {
 					// null converts to any type
 					expr->type_return = strong;
+				} else if(strong->kind == KIND_POINTER && expr->expr_literal.type == LITERAL_ARRAY) {
+					size_t nexpr = 0;
+					if(expr->expr_literal.array_exprs){
+						nexpr = array_get_length(expr->expr_literal.array_exprs);
+					}
+					for(size_t i = 0; i < nexpr; ++i){
+						type_propagate(strong->pointer_to, expr->expr_literal.array_exprs[i]);
+					}
+					expr->type_return->array_desc.array_of = strong->array_desc.array_of;
+					internalize_type(&expr->type_return, expr->scope, true);
 				}
 			} else {
 				if(expr->expr_literal.type == LITERAL_ARRAY){

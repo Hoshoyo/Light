@@ -1,6 +1,7 @@
-#import "windows/print.li"
+#import "linux/print.li"
 
 main :: () -> s32 {
-	//a := 1 + 2 + 3;
+	a := [^s32]array{1, 2, 3};
+    
     return 0;
 }
