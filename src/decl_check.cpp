@@ -273,12 +273,12 @@ Type_Instance* resolve_type(Scope* scope, Type_Instance* type, bool rep_undeclar
 				return 0;
 			}
 			Type_Instance* resolved_type = resolve_type(scope, tpf, rep_undeclared, error);
-			if(resolved_type) return 0;
+			if(!resolved_type) return 0;
 			type->pointer_to = resolved_type;
 			return internalize_type(&type, scope, true);
 		} else {
 			Type_Instance* resolved_type = resolve_type(scope, type->pointer_to, rep_undeclared, error);
-			if (resolved_type) return 0;
+			if (!resolved_type) return 0;
 			type->pointer_to = resolved_type;
 			return internalize_type(&type, scope, true);
 		}

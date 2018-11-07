@@ -817,6 +817,21 @@ void C_Code_Generator::emit_expression(Type_Instance** type_table, Ast* expr){
     }
 }
 
+int C_Code_Generator::sprint_data_raw(Ast_Data* data) {
+	u32 aux_len = ptr;
+	for (s64 i = 0; i < data->length_bytes; ++i) {
+		u8 d = data->data[i];
+		buffer[aux_len++] = '\\';
+		buffer[aux_len++] = 'x';
+		buffer[aux_len++] = CHAR_HIGH_HEX(d);
+		buffer[aux_len++] = CHAR_LOW_HEX(d);
+	}
+
+	int bytes_written = aux_len - ptr;
+	ptr += bytes_written;
+	return bytes_written;
+}
+
 int C_Code_Generator::sprint_data(Ast_Data* data) {
 	u32 aux_len = ptr;
 	s64 length_reduced = 0;
@@ -939,8 +954,8 @@ void C_Code_Generator::emit_function_typedef(Type_Instance** type_table, Type_In
 Type_Instance* fill_type_table_relative_pointer(Type_Instance** type_table, Type_Table_Copy* ttc) {
 	// TODO(psv): replace arena with contiguous memory allocator
 	// @IMPORTANT
-	Light_Arena* arena = arena_create(65536);
-	Light_Arena* strings_type = arena_create(65536);
+	Light_Arena* arena = arena_create(65536 * 10);
+	Light_Arena* strings_type = arena_create(65536 * 10);
 	//u8* strings_type = array_create(u8, 65536);
 	Type_Instance* type_table_copy = (Type_Instance*)calloc(array_get_length(type_table), sizeof(Type_Instance));
 
@@ -1059,7 +1074,7 @@ void C_Code_Generator::emit_type_strings(User_Type_Table* ttc) {
 	Ast_Data d;
 	d.data = ttc->start_extra_strings;
 	d.length_bytes = ttc->extra_strings_bytes;
-	sprint_data(&d);
+	sprint_data_raw(&d);
 
 	sprint("\";\n\n");
 
@@ -1070,7 +1085,7 @@ void C_Code_Generator::emit_type_strings(User_Type_Table* ttc) {
 	Ast_Data d_te;
 	d_te.data = ttc->start_extra_mem;
 	d_te.length_bytes = ttc->extra_mem_bytes;
-	sprint_data(&d_te);
+	sprint_data_raw(&d_te);
 
 	sprint("\";\n\n");
 
@@ -1080,8 +1095,8 @@ void C_Code_Generator::emit_type_strings(User_Type_Table* ttc) {
 
 	Ast_Data d_tt;
 	d_tt.data = (u8*)ttc->type_table;
-	d_tt.length_bytes = ttc->type_table_length * sizeof(Type_Instance*);
-	sprint_data(&d_tt);
+	d_tt.length_bytes = ttc->type_table_length * sizeof(User_Type_Info);
+	sprint_data_raw(&d_tt);
 
 	sprint("\";\n\n");
 }
@@ -1132,8 +1147,8 @@ inline User_Type_Info type_instance_to_user(Type_Instance& t) {
 User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table* utt) {
 	// TODO(psv): replace arena with contiguous memory allocator
 	// @IMPORTANT
-	Light_Arena* arena = arena_create(65536);
-	Light_Arena* strings_type = arena_create(65536);
+	Light_Arena* arena = arena_create(65536 * 10);
+	Light_Arena* strings_type = arena_create(65536 * 10);
 	//u8* strings_type = array_create(u8, 65536);
 	User_Type_Info* user_tt = (User_Type_Info*)calloc(array_get_length(type_table), sizeof(User_Type_Info));
 

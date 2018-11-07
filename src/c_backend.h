@@ -38,6 +38,7 @@ struct C_Code_Generator {
 
 	int sprint(char* msg, ...);
 	int sprint_data(Ast_Data* data);
+	int sprint_data_raw(Ast_Data* data);
 	bool deferring;
 
 	void defer_flush();

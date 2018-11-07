@@ -1,5 +1,7 @@
 /*
 #import "linux/print.li"
+*/
+#import "windows/print.li"
 
 Type_Kind : u32 : enum {
 	KIND_UNKNOWN   : 0,
@@ -39,7 +41,7 @@ Type_Union :: struct {
 	fields_count : s32;
 	alignment    : s32;
 }
-*/
+
 
 Type_Struct :: struct {
 	name         : string;
@@ -49,7 +51,7 @@ Type_Struct :: struct {
 	fields_count : s32;
 	alignment    : s32;
 }
-/*
+
 Type_Function :: struct {
 	return_type     : ^Type_Info;
 	arguments_type  : ^^Type_Info;
@@ -59,26 +61,28 @@ Type_Function :: struct {
 
 Type_Desc :: union {
     primitive     : Type_Primitive;
-    //pointer_to    : ^Type_Info;
-    //array_desc    : Type_Array;
-    //struct_desc   : Type_Struct;
-    //union_desc    : Type_Union;
-    //function_desc : Type_Function;
+    pointer_to    : ^Type_Info;
+    array_desc    : Type_Array;
+    struct_desc   : Type_Struct;
+    union_desc    : Type_Union;
+    function_desc : Type_Function;
 }
 
 Type_Info :: struct {
-    kind            : Type_Kind;
+	kind            : Type_Kind;
 	flags           : u32;
 	type_size_bytes : s64;
     description     : Type_Desc;
 }
+
 main :: () -> s32 {
-    b := 1;
+	
+    b : [4]s32;
     a := #typeof b;
     c := *[^Type_Info]a;
 
-    //print_u32(c);
+    print_s32([s32]c.type_size_bytes);
+	
 
     return 0;
 }
-*/
