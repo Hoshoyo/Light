@@ -1175,6 +1175,11 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 				user_tt[i].description.pointer_to = (User_Type_Info*)((Type_Instance*)user_tt[i].description.pointer_to)->type_table_index;
 			} break;
 			case KIND_STRUCT: {
+				extra_string_space = (u8*)arena_alloc(strings_type, type->struct_desc.name->value.length);
+				memcpy(extra_string_space, type->struct_desc.name->value.data, type->struct_desc.name->value.length);
+				utt->extra_strings_bytes += type->struct_desc.name->value.length;
+				user_tt[i].description.struct_desc.name.data = (u8*)(extra_string_space - start_strings);
+
 				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(User_Type_Info*));
 				offset = (u8*)(extra_space - start);
 				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
