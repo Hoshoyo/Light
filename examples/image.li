@@ -1,0 +1,99 @@
+#import "windows/print.li"
+
+stbi_load :: (filename : ^u8, w : ^s32, h : ^s32, channels : ^s32, desired_channels : s32) -> ^u8 #foreign("stb_image");
+stbi_write_png :: (filename : ^u8, w : s32, h : s32, comp : s32, data : ^void, stride_in_bytes : s32) -> s32 #foreign("stb_image_write");
+
+malloc :: (size : u64) -> ^void #foreign("msvcrt");
+sqrt :: (v : r64) -> r64 #foreign("msvcrt");
+
+Complex :: struct {
+	re : r64;
+	im : r64;
+}
+
+complex_multiply :: (l : Complex, r : Complex) -> Complex {
+    // (a + bi) * (c + di)
+    // ac + adi + cbi - bd
+    // ac - bd + i(ad + cb)
+    result : Complex;
+    result.re = l.re * r.re - l.im * r.im;
+    result.im = l.re * r.im + l.im * r.re;
+    return result;
+}
+
+complex_sum :: (l : Complex, r : Complex) -> Complex{
+    // (a + bi) + (c + di)
+    // (a + c) + (b + d)i
+    result : Complex;
+    result.re = l.re + r.re;
+    result.im = l.im + r.im;
+    return result;
+}
+
+QueryPerformanceFrequency :: (frequency : ^u64) -> bool #foreign("Kernel32");
+QueryPerformanceCounter :: (lpPerformanceCount : ^u64) -> bool #foreign("Kernel32");
+Sleep :: (milis : u32) -> void #foreign("Kernel32");
+
+frequency : u64;
+timer_init :: () {
+    QueryPerformanceFrequency(&frequency);
+}
+
+get_time :: () -> r64 {
+    pcount : u64;
+    QueryPerformanceCounter(&pcount);
+    return [r64]pcount / [r64]frequency * 1000.0;
+}
+
+modify_image :: (image : ^u8, width : s64, height : s64, scale : r64, xoff : r64, yoff : r64) {
+	for y := 0; y < height; y += 1 {
+		for x := 0; x < width; x += 1 {
+			index := (y * width * 4) + x * 4;
+
+			half_scale := scale / 2.0;
+
+			x_coord := ([r64]x / [r64]width) * scale - half_scale;
+			y_coord := ([r64]y / [r64]height) * scale - half_scale;
+
+            r : u8;
+            g : u8;
+            b : u8;
+
+			z : Complex;
+            coord := Complex:{x_coord, y_coord};
+
+			for it := 0; it < 256; it += 1 {
+				z = complex_sum(complex_multiply(z, z), coord); //z * z + coord;
+				v := z.re * z.re + z.im * z.im;
+				if sqrt(v) > 2.0 {
+                    r = [u8]it;
+                    g = [u8]it;
+                    b = [u8]it;
+					break;
+				}
+			}
+			*[^u32](image + index) = 0xff000000 | ([u32]r << 16) | ([u32]g << 8) | [u32]b;
+		}
+	}
+}
+
+main :: () -> s32 {
+    timer_init();
+
+    WIDTH  :: 800;
+    HEIGHT :: 800;
+
+    im := [^u8]malloc([u64](WIDTH * HEIGHT) * #sizeof s32 * 4);
+
+    start := get_time();
+    modify_image(im, WIDTH, HEIGHT, 2.0, 0.0, 0.0);
+    end := get_time();
+
+    print_string("Elapsed time: ");
+    print_r64(end - start);
+    print_string(" ms.\n");
+
+    stbi_write_png("out.png".data, [s32]WIDTH, [s32]HEIGHT, 4, im, [s32]WIDTH * 4);
+
+    return 0;
+}

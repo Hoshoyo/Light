@@ -80,13 +80,9 @@ foo :: struct {
 }
 
 main :: () -> s32 {
-	
-    b : foo;
-    a := #typeof b;
-    c := *[^Type_Info]a;
-
-    print_s64([s64]c.description.struct_desc.name.data);
-	
+	i := 0
+	space := ' '
+	number := 2.0;
 
     return 0;
 }
