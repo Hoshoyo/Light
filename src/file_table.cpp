@@ -43,4 +43,5 @@ s64 file_table_push(char* fullpath) {
     } else {
         return -1;
     }
+	return index;
 }

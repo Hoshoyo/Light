@@ -1,50 +1,17 @@
-main :: () -> s32 {
-	/*
-	a : [4][4]s64;
-	
-	for i := 0; i < 4; i += 1 {
-		for j := 0; j < 4; j += 1 {
-			a[i][j] = i * j;
-		}
-	}
-	*/
-	//return [s32]a[3][8];
-	a : [8]u8;
-	a[0] = 'H';
-	a[1] = 'e';
-	a[2] = 'l';
-	a[3] = 'l';
-	a[4] = 'o';
-	
-	b : [6]u8;
-	b[0] = 'W';
-	b[1] = 'o';
-	b[2] = 'r';
-	b[3] = 'l';
-	b[4] = 'd';
-	
-	//MessageBoxA(null, "Hello".data, "Hello".data, 0);
-	MessageBoxA(null, [^u8]a, [^u8]b, 0);
-	//MessageBoxA([^void]1, [^u8]2, [^u8]3, 5);
-	
-	return 0;
+#import "x11/x11.li"
+
+Window_Info :: struct {
+	width : s32;
+	height : s32;
+	display : ^Display;
+	window_handle : u64;
+	vi : ^XVisualInfo;
+	swa : XSetWindowAttributes;
+	ctx : GLXContext;
+	cmap : Colormap;
 }
 
-MessageBoxA :: (hwnd : ^void, txt : ^u8, caption : ^u8, type : u32) -> s32 #foreign("user32");
-
-// RCX = 1
-// RDX = 2
-// R8  = 3
-// R9  = 4
-
-/*
-56 / 8 = 7
-48 / 8 = 6
-32 / 8 = 4
-0  / 8 = 0
-
-8 - 1 = 7
-8 - 2 = 6
-8 - 4 = 4
-8 - 8 = 0
-*/
+main :: () -> s32 {
+	f : Window_Info;
+	return 0;
+}

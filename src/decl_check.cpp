@@ -988,6 +988,7 @@ Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 	}
 
 	size_t infer_queue_length = array_get_length(g_infer_queue);
+
 	while(infer_queue_length > 0) {
 		error_code = TYPE_OK;
 
@@ -1003,6 +1004,12 @@ Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 
 		// dependency detection
 		if(infer_queue_length == array_get_length(g_infer_queue)) {
+			fprintf(stderr, "%d Dependencies unresolved:\n\n", infer_queue_length);
+			for (size_t i = 0; i < infer_queue_length; i++) {
+				DEBUG_print_node(stderr, g_infer_queue[i]);
+				fprintf(stderr, "\n\n");
+			}
+
 			return report_type_error(TYPE_ERROR_FATAL, "dependencied unresolved detected, stopping");
 		}
 		infer_queue_length = array_get_length(g_infer_queue);
