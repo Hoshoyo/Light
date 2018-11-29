@@ -199,6 +199,12 @@ print_r64 :: (v : r64) -> s64 {
     return print_string_l([^u8]buffer, len);
 }
 
+println_ptr :: (ptr : ^void) -> s64 {
+    l := print_u64([u64]ptr);
+    l += print_string("\n");
+    return l;
+}
+
 print_string_c :: (s : ^u8) -> s64 {
     write(STDOUT_FILENO, [^void]s, [u64]string_length(s));
 }

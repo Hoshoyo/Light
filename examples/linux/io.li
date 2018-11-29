@@ -5,6 +5,7 @@ STDERR_FILENO	: s32 : 2;	/* Standard error output.  */
 O_RDONLY : s32 : 0;
 O_WRONLY : s32 : 1;
 O_RDWR   : s32 : 2;
+O_CREAT  : s32 : 100;
 
 timespec :: struct {
     tv_sec  : s64;		/* Seconds.  */
@@ -62,4 +63,19 @@ read_entire_file :: (filename : string, allocator : (u64)->^void) -> string {
     result.data = [^u8]memory;
 
     return result;
+}
+
+write_file :: (filename : string, buffer : ^void, buffer_size : u64) -> bool {
+    descriptor := open(filename.data, O_WRONLY|O_CREAT);
+
+    if descriptor == -1 {
+        return false;
+    }
+
+    written := write(descriptor, buffer, buffer_size);
+
+    if written != 0 {
+        return true;
+    }
+    return false;
 }

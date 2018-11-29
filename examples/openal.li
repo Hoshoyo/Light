@@ -1,0 +1,126 @@
+#import "linux/print.li"
+
+usleep :: (micro : u64) -> s32 #foreign("c");
+malloc :: (size : u64) -> ^void #foreign("c");
+
+#foreign("openal")
+
+ALCdevice : typedef : void;
+ALCcontext : typedef : void;
+
+alGenBuffers :: (n : s32, buffers : ^u32) -> void;
+alBufferData :: (buffer : u32, format : u32, data : ^void, size : s32, freq : s32) -> void;
+
+alGenSources :: (n : s32, sources : ^u32) -> void;
+alDeleteSources :: (n : s32, sources : u32) -> void;
+alSourcef :: (source : u32, param : u32, value : r32) -> void;
+alSource3f :: (source : u32, param : u32, value1 : r32, value2 : r32, value3 : r32) -> void;
+alSourcefv :: (source : u32, param : u32, values : ^r32) -> void;
+alSourcei :: (source : u32, param : u32, value : s32) -> void;
+alSource3i :: (source : u32, param : u32, value1 : s32, value2 : s32, value3 : s32) -> void;
+alSourceiv :: (source : u32, param : u32, values : ^s32) -> void;
+alSourcePlay :: (source : u32) -> void;
+alSourceStop :: (source : u32) -> void;
+alSourceRewind :: (source : u32) -> void;
+alSourcePause :: (source : u32) -> void;
+
+
+alListenerf :: (param : u32, value : r32) -> void;
+alListener3f :: (param : u32, value1 : r32, value2 : r32, value3 : r32) -> void;
+
+alcGetString :: (device : ^ALCdevice, param : u32) -> ^u8;
+alcOpenDevice :: (devicename : ^u8) -> ^ALCdevice;
+alcCloseDevice :: (device : ^ALCdevice) -> bool;
+alcCreateContext :: (device : ^ALCdevice, attrlist : ^s32) -> ^ALCcontext;
+alcMakeContextCurrent :: (context : ^ALCcontext) -> bool;
+alcDestroyContext :: (context : ^ALCcontext) -> void; 
+
+ALC_DEFAULT_DEVICE_SPECIFIER : u32 : 0x1004;
+
+AL_FORMAT_MONO8 : u32 :    0x1100;
+AL_FORMAT_MONO16 : u32 :   0x1101;
+AL_FORMAT_STEREO8 : u32 :  0x1102;
+AL_FORMAT_STEREO16 : u32 : 0x1103;
+
+AL_PITCH : u32 :       0x1003;
+AL_POSITION : u32 :    0x1004;
+AL_DIRECTION : u32 :   0x1005;
+AL_VELOCITY : u32 :    0x1006;
+AL_LOOPING : u32 :     0x1007;
+AL_BUFFER : u32 :      0x1009;
+AL_GAIN : u32 :        0x100A;
+
+#end
+
+run :: () {
+    counter : s32 = 0;
+    hz : s32 = 256;
+    sample_rate : s32 = 48000;
+    period : s32 = sample_rate / hz;
+    bytes_per_sample : s32 = 2 * #sizeof s16;
+    buf_size : s32 = sample_rate * bytes_per_sample * 16;
+    sample_index : s32 = 0;
+
+    bytes_to_lock : s32 = sample_index*bytes_per_sample % buf_size;
+
+    wave : ^s16 = [^s16]malloc([u64]buf_size);
+
+    for i : s32 = 0; i < buf_size / #sizeof s16; i += 1 {
+        cond := ((sample_index / (period/2)) % 2) == 0;
+        if cond {
+            wave[i] = 8000;
+        } else {
+            wave[i] = -8000;
+        }
+        sample_index += 1;
+    }
+
+    buffer_id : u32;
+    alGenBuffers(1, &buffer_id);
+    alBufferData(buffer_id, AL_FORMAT_MONO16, wave, buf_size, sample_rate);
+
+    // set listener
+    alListener3f(AL_POSITION, 0.0, 0.0, 0.0);
+    alListener3f(AL_VELOCITY, 0.0, 0.0, 0.0);
+
+    // source (player)
+    
+    alGenSources(1, &source_id);
+    alSourcef(source_id, AL_GAIN, 0.5);
+    alSourcef(source_id, AL_PITCH, 1.0);
+    alSource3f(source_id, AL_POSITION, -30.0, 0.0, 0.0);
+
+    // play
+    alSourcei(source_id, AL_BUFFER, [s32]buffer_id);
+    alSourcePlay(source_id);
+}
+
+source_id : u32;
+
+main :: () -> s32 {
+    // initialize 
+    defname := alcGetString(null, ALC_DEFAULT_DEVICE_SPECIFIER);
+
+    openal_output_device  := alcOpenDevice(defname);
+    println_ptr(openal_output_device);
+    
+    openal_output_context := alcCreateContext(openal_output_device, null);
+    println_ptr(openal_output_device);
+
+    alcMakeContextCurrent(openal_output_context);
+
+    x := -30.0;
+    run();
+
+    while true {
+        alSource3f(source_id, AL_POSITION, x, 0.0, 1.0);
+        alSource3f(source_id, AL_VELOCITY, 10.0, 0.0, 0.0);
+        x += 0.06;
+        usleep(5000);
+    }
+
+    // Clean-up
+    alcMakeContextCurrent(null);
+    alcDestroyContext(openal_output_context);
+    alcCloseDevice(openal_output_device);
+}
