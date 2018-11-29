@@ -498,11 +498,13 @@ void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm) {
             sprint(")");
 			deferring = false;
 			defer_flush();
-
+			sprint("{");
             emit_command(type_table, comm->comm_if.body_true);
+			sprint("}");
             if(comm->comm_if.body_false){
-                sprint(" else ");
+                sprint(" else {");
                 emit_command(type_table, comm->comm_if.body_false);
+				sprint("}");
             }
         }break;
 		case AST_COMMAND_RETURN:{
