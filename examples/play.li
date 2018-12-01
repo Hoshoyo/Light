@@ -1,17 +1,13 @@
-#import "x11/x11.li"
-
-Window_Info :: struct {
-	width : s32;
-	height : s32;
-	display : ^Display;
-	window_handle : u64;
-	vi : ^XVisualInfo;
-	swa : XSetWindowAttributes;
-	ctx : GLXContext;
-	cmap : Colormap;
-}
+#import "ast.li"
+#import "windows/print.li"
 
 main :: () -> s32 {
-	f : Window_Info;
+	a : ^s64;
+	b : ^s32;
+	
+	//c := [^Type_Info]#typeof a;
+	
+	//println_ptr(c.description.pointer_to);
+	
 	return 0;
 }
