@@ -1,7 +1,8 @@
-#import "linux/print.li"
+//#import "linux/print.li"
+#import "wav.li"
 
 usleep :: (micro : u64) -> s32 #foreign("c");
-malloc :: (size : u64) -> ^void #foreign("c");
+//malloc :: (size : u64) -> ^void #foreign("c");
 
 #foreign("openal")
 
@@ -51,7 +52,33 @@ AL_BUFFER : u32 :      0x1009;
 AL_GAIN : u32 :        0x100A;
 
 #end
+run :: () {
+    wave_file := wave_load("/home/hoshoyo/Downloads/button-25.wav");
+    print_wave_file_info(wave_file);
 
+    buffer_id : u32;
+    alGenBuffers(1, &buffer_id);
+    alBufferData(buffer_id, AL_FORMAT_STEREO16, &wave_file.data, [s32]wave_file.subchunk2_size, [s32]wave_file.sample_rate);
+
+    // set listener
+    alListener3f(AL_POSITION, 0.0, 0.0, 0.0);
+    alListener3f(AL_VELOCITY, 0.0, 0.0, 0.0);
+
+    // source (player)
+    
+    alGenSources(1, &source_id);
+    alSourcef(source_id, AL_GAIN, 0.5);
+    alSourcef(source_id, AL_PITCH, 1.0);
+    alSource3f(source_id, AL_POSITION, 0.0, 0.0, 0.0);
+    alSourcei(source_id, AL_LOOPING, 1);
+
+    // play
+    alSourcei(source_id, AL_BUFFER, [s32]buffer_id);
+    alSourcePlay(source_id);
+}
+
+
+/*
 run :: () {
     counter : s32 = 0;
     hz : s32 = 256;
@@ -94,6 +121,7 @@ run :: () {
     alSourcei(source_id, AL_BUFFER, [s32]buffer_id);
     alSourcePlay(source_id);
 }
+*/
 
 source_id : u32;
 
@@ -109,14 +137,10 @@ main :: () -> s32 {
 
     alcMakeContextCurrent(openal_output_context);
 
-    x := -30.0;
     run();
-
+    
     while true {
-        alSource3f(source_id, AL_POSITION, x, 0.0, 1.0);
-        alSource3f(source_id, AL_VELOCITY, 10.0, 0.0, 0.0);
-        x += 0.06;
-        usleep(5000);
+        usleep(1000);
     }
 
     // Clean-up
