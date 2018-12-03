@@ -24,5 +24,17 @@ main :: () -> s32 {
 
 ```
 
+You can find more examples in the `examples` directory.
+
 ## Build
-At the moment the master build is too unstable. Coming soon :)
+
+### Linux Build
+
+* Dependencies: `nasm` and `gcc`.
+  - To install dependencies on Ubuntu run: sudo apt-get install nasm.
+* To build run `make` at the root directory.
+* The executable is build at `bin/gcc/light`
+
+### Windows
+
+Dependencies: Visual Studio 2017. (masm and cl)

@@ -58,6 +58,6 @@ print_wave_file_info :: (wave : ^Wave_File) {
 }
 
 wave_load :: (filename : string) -> ^Wave_File {
-    file := read_entire_file("/home/hoshoyo/Downloads/button-25.wav", malloc);
+    file := read_entire_file(filename, malloc);
     return [^Wave_File]file.data;
 }

@@ -53,7 +53,7 @@ AL_GAIN : u32 :        0x100A;
 
 #end
 run :: () {
-    wave_file := wave_load("/home/hoshoyo/Downloads/button-25.wav");
+    wave_file := wave_load("/home/mconf/Downloads/button-25.wav");
     print_wave_file_info(wave_file);
 
     buffer_id : u32;
