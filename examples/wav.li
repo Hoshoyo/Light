@@ -1,0 +1,63 @@
+#import "linux/print.li"
+#import "linux/io.li"
+
+malloc :: (size : u64) -> ^void #foreign("c");
+
+Wave_File :: struct {
+    // RIFF
+    chunk_id   : [4]u8; // 'RIFF'
+    chunk_size : u32;
+    format     : [4]u8; // 'WAVE'
+
+    // fmt sub-chunk
+    subchunk1_id    : [4]u8; // 'fmt '
+    subchunk1_size  : u32;   // 16 for PCM
+    audio_format    : u16;   // PCM=1
+    num_channels    : u16;   // Mono=1, Stereo=2
+    sample_rate     : u32;   // 8000, 44100, 48000
+    byte_rate       : u32;   // SampleRate * NumChannels * BitsPerSample/8
+    block_align     : u16;   // NumChannels * BitsPerSample/8
+    bits_per_sample : u16;   // 8 bits = 8, 16 bits = 16, etc.
+
+    // data sub-chunk
+    subchunk2_id  : [4]u8; // 'data'
+    subchunk2_size : u32;   // subchunk2 size
+
+    data : ^u8;
+}
+
+println :: () {
+    print_string("\n");
+}
+
+print_wave_file_info :: (wave : ^Wave_File) {
+    print_string_l([^u8]wave.chunk_id, 4);
+    println();
+    print_string_l([^u8]wave.format, 4);
+    println();
+    print_string_l([^u8]wave.subchunk1_id, 4);
+    println();
+    print_string_l([^u8]wave.subchunk2_id, 4);
+    println();
+
+    print_string("bits per sample: ");
+    print_s32([s32]wave.bits_per_sample);
+    println();
+
+    print_string("sample rate: ");
+    print_s32([s32]wave.sample_rate);
+    println();
+
+    print_string("num channels: ");
+    print_s32([s32]wave.num_channels);
+    println();
+
+    print_string("subchunk2_size: ");
+    print_s32([s32]wave.subchunk2_size);
+    println();
+}
+
+wave_load :: (filename : string) -> ^Wave_File {
+    file := read_entire_file("/home/hoshoyo/Downloads/button-25.wav", malloc);
+    return [^Wave_File]file.data;
+}
