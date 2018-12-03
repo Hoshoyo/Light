@@ -190,7 +190,8 @@ main :: () -> s32 {
 	cube := cube_new();
 
 	while true {
-		glClearColor(1.0, 0.0, 1.0, 1.0);
+		// 126,192,238
+		glClearColor(126.0 / 255.0, 192.0 / 255.0, 238.0 / 255.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
 
 		width : s32;
@@ -211,7 +212,7 @@ main :: () -> s32 {
 		render_cube(cube);
 
 		glXSwapBuffers (info.display, info.window_handle);
-		usleep(1000);
+		//usleep(1000);
 	}
 
 	release_opengl(&info);
