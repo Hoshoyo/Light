@@ -24,6 +24,13 @@ struct Type_Table_Copy {
 	s64 type_table_length;
 };
 
+struct RuntimeBuffer {
+	char* data;
+	s64   ptr;
+
+	int sprint(char* msg, ...);
+};
+
 struct C_Code_Generator {
 	char* in_filename;
 
@@ -71,7 +78,7 @@ struct C_Code_Generator {
 
 	void emit_data_decl(Ast* decl);
 
-    int  c_generate_top_level(Ast** toplevel, Type_Instance** type_table);
+    int  c_generate_top_level(Ast** toplevel, Type_Instance** type_table, RuntimeBuffer* runtime_buffer);
 
 };
 

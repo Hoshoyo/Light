@@ -14,6 +14,29 @@ static void report_fatal_error(char* msg, ...) {
 
 bool print_debug_c = false;
 
+int RuntimeBuffer::sprint(char* msg, ...) {
+	va_list args;
+	va_start(args, msg);
+	int num_written = 0;
+
+	num_written = vsprintf(data + ptr, msg, args);
+	ptr += num_written;
+
+	va_end(args);
+
+	if (print_debug_c) {
+		va_list args;
+		va_start(args, msg);
+		int num_written = 0;
+
+		num_written = vfprintf(stdout, msg, args);
+		fflush(stdout);
+
+		va_end(args);
+	}
+	return num_written;
+}
+
 int C_Code_Generator::sprint(char* msg, ...) {
 	va_list args;
 	va_start(args, msg);
@@ -1146,7 +1169,7 @@ inline User_Type_Info type_instance_to_user(Type_Instance& t) {
 	return result;
 }
 
-User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table* utt) {
+User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table* utt, RuntimeBuffer* runtime_buffer) {
 	// TODO(psv): replace arena with contiguous memory allocator
 	// @IMPORTANT
 	Light_Arena* arena = arena_create(65536 * 10);
@@ -1168,6 +1191,7 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 		user_tt[i] = type_instance_to_user(*type_table[i]);
 	}
 
+	runtime_buffer->sprint("*(u8**)(__type_table + 880) = __type_table;\n");
 	for (size_t i = 0, s = 0; i < array_get_length(type_table); ++i) {
 		Type_Instance* type = type_table[i];
 		User_Type_Info* type_copy = &user_tt[i];
@@ -1175,6 +1199,7 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 			case KIND_PRIMITIVE: break;
 			case KIND_POINTER: {
 				user_tt[i].description.pointer_to = (User_Type_Info*)((Type_Instance*)user_tt[i].description.pointer_to)->type_table_index;
+				//runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_table + %lld;\n", (u8*)&user_tt[i].description.pointer_to - (u8*)user_tt, (s64)user_tt[i].description.pointer_to * sizeof(User_Type_Info));
 			} break;
 			case KIND_STRUCT: {
 				extra_string_space = (u8*)arena_alloc(strings_type, type->struct_desc.name->value.length);
@@ -1251,7 +1276,7 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 	return user_tt;
 }
 
-int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_table) {
+int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_table, RuntimeBuffer* runtime_buffer) {
     sprint("typedef char s8;\n");
     sprint("typedef short s16;\n");
     sprint("typedef int s32;\n");
@@ -1284,7 +1309,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	emit_type_strings(&ttc);
 #else
 	User_Type_Table utt = { 0 };
-	User_Type_Info* tt = fill_user_type_table(type_table, &utt);
+	User_Type_Info* tt = fill_user_type_table(type_table, &utt, runtime_buffer);
 	utt.type_table = tt;
 	utt.type_table_length = array_get_length(type_table);
 	emit_type_strings(&utt);
@@ -1350,6 +1375,8 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 #elif defined(__linux__)
     sprint("\nint __entry() {\n");
 #endif
+	sprint(runtime_buffer->data);
+
 	for (size_t i = 0; i < ndecls; ++i) {
 		Ast* decl = toplevel[i];
 		if (decl->node_type == AST_DECL_VARIABLE) {
@@ -1406,11 +1433,14 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
     C_Code_Generator code_generator = {};
 	code_generator.buffer = (char*)ho_bigalloc_rw(1 << 24);
 	code_generator.defer_buffer = (char*)ho_bigalloc_rw(1 << 20);
+	RuntimeBuffer runtime_buffer;
+	runtime_buffer.data = (char*)ho_bigalloc_rw(1 << 20);
+	runtime_buffer.ptr = 0;
 
     Timer timer;
 
     double start = timer.GetTime();
-    int err = code_generator.c_generate_top_level(toplevel, type_table);
+    int err = code_generator.c_generate_top_level(toplevel, type_table, &runtime_buffer);
     double end = timer.GetTime();
     printf("C generation elapsed: %fms\n", (end - start));
 
@@ -1429,14 +1459,14 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 	// Execute commands to compile .c
 	char cmdbuffer[1024];
 #if defined(_WIN32) || defined(_WIN64)
-	sprintf(cmdbuffer, "gcc -w -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
+	sprintf(cmdbuffer, "gcc --static -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 	int len = sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe -L%.*s..\\..\\lib -lKernel32",
 		fname_len, out_obj.data, fname_len, out_obj.data, comp_path.length, comp_path.data);
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -w -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
+	int len = sprintf(cmdbuffer, "ld --omagic %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
 		fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
 #endif
 	size_t libs_length = 0;
