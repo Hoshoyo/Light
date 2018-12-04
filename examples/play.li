@@ -1,13 +1,24 @@
 #import "ast.li"
-#import "windows/print.li"
+#import "linux/print.li"
+
+foo :: struct {
+	hello : s32;
+}
+
+nl :: () {
+	print_string("\n");
+}
 
 main :: () -> s32 {
-	a : ^s64;
-	b : ^s32;
-	
-	//c := [^Type_Info]#typeof a;
-	
-	//println_ptr(c.description.pointer_to);
-	
+	b : foo;
+	a := [^Type_Info]#typeof b;
+	ftypes := a.description.struct_desc.fields_types;
+	print_s32(a.description.struct_desc.fields_count);
+	nl();
+	print_u32(ftypes[0].description.primitive);
+	nl();
+	print_string(a.description.struct_desc.fields_names[0]);
+
+
 	return 0;
 }

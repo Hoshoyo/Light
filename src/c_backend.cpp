@@ -1094,7 +1094,7 @@ void C_Code_Generator::emit_type_strings(Type_Table_Copy* ttc) {
 #else
 void C_Code_Generator::emit_type_strings(User_Type_Table* ttc) {
 #endif
-	sprint("u8* __type_strings = \"");
+	sprint("u8 __type_strings[] = \"");
 
 	Ast_Data d;
 	d.data = ttc->start_extra_strings;
@@ -1105,7 +1105,7 @@ void C_Code_Generator::emit_type_strings(User_Type_Table* ttc) {
 
 	// ----
 
-	sprint("u8* __type_extra = \"");
+	sprint("u8 __type_extra[] = \"");
 
 	Ast_Data d_te;
 	d_te.data = ttc->start_extra_mem;
@@ -1116,7 +1116,7 @@ void C_Code_Generator::emit_type_strings(User_Type_Table* ttc) {
 
 	// ----
 
-	sprint("u8* __type_table = \"");
+	sprint("u8 __type_table[] = \"");
 
 	Ast_Data d_tt;
 	d_tt.data = (u8*)ttc->type_table;
@@ -1191,7 +1191,6 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 		user_tt[i] = type_instance_to_user(*type_table[i]);
 	}
 
-	runtime_buffer->sprint("*(u8**)(__type_table + 880) = __type_table;\n");
 	for (size_t i = 0, s = 0; i < array_get_length(type_table); ++i) {
 		Type_Instance* type = type_table[i];
 		User_Type_Info* type_copy = &user_tt[i];
@@ -1199,21 +1198,29 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 			case KIND_PRIMITIVE: break;
 			case KIND_POINTER: {
 				user_tt[i].description.pointer_to = (User_Type_Info*)((Type_Instance*)user_tt[i].description.pointer_to)->type_table_index;
-				//runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_table + %lld;\n", (u8*)&user_tt[i].description.pointer_to - (u8*)user_tt, (s64)user_tt[i].description.pointer_to * sizeof(User_Type_Info));
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_table + %lld;\n", 
+					(u8*)&user_tt[i].description.pointer_to - (u8*)user_tt, (s64)user_tt[i].description.pointer_to * sizeof(User_Type_Info));
 			} break;
 			case KIND_STRUCT: {
 				extra_string_space = (u8*)arena_alloc(strings_type, type->struct_desc.name->value.length);
 				memcpy(extra_string_space, type->struct_desc.name->value.data, type->struct_desc.name->value.length);
 				utt->extra_strings_bytes += type->struct_desc.name->value.length;
 				user_tt[i].description.struct_desc.name.data = (u8*)(extra_string_space - start_strings);
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_strings + %lld;\n", 
+					(u8*)&user_tt[i].description.struct_desc.name.data - (u8*)user_tt, (s64)(u8*)(extra_string_space - start_strings));
 
 				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(User_Type_Info*));
 				offset = (u8*)(extra_space - start);
 				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
-					((User_Type_Info**)extra_space)[j] = (User_Type_Info*)((Type_Instance*)type->struct_desc.fields_types[j])->type_queue_index;
+					s64 type_queue_index = ((Type_Instance*)type->struct_desc.fields_types[j])->type_queue_index;
+					((User_Type_Info**)extra_space)[j] = (User_Type_Info*)type_queue_index;
+					runtime_buffer->sprint("*(u8**)(__type_extra + %lld) = __type_table + %lld;\n", 
+						(u8*)&((User_Type_Info**)extra_space)[j] - start, type_queue_index * sizeof(User_Type_Info));
 				}
 				// TODO(psv): leaking here for now
 				type_copy->description.struct_desc.fields_types = (User_Type_Info**)offset;
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_extra + %lld;\n",
+					(u8*)&user_tt[i].description.struct_desc.fields_types - (u8*)user_tt, (s64)offset);
 
 				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(string));
 				offset = (u8*)(extra_space - start);
@@ -1224,8 +1231,13 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 					memcpy(extra_string_space, ((string*)extra_space)[j].data, length);
 					utt->extra_strings_bytes += length;
 					((string*)extra_space)[j].data = (u8*)(extra_string_space - start_strings);
+
+					runtime_buffer->sprint("*(u8**)(__type_extra + %lld) = __type_strings + %lld;\n",
+						(u8*)&((string*)extra_space)[j] - start, (s64)(extra_string_space - start_strings));
 				}
 				type_copy->description.struct_desc.fields_names = (string*)offset;
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_extra + %lld;\n",
+					(u8*)&user_tt[i].description.struct_desc.fields_names - (u8*)user_tt, offset);
 
 				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(s64));
 				offset = (u8*)(extra_space - start);
@@ -1459,14 +1471,14 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 	// Execute commands to compile .c
 	char cmdbuffer[1024];
 #if defined(_WIN32) || defined(_WIN64)
-	sprintf(cmdbuffer, "gcc --static -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
+	sprintf(cmdbuffer, "gcc -w -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 	int len = sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe -L%.*s..\\..\\lib -lKernel32",
 		fname_len, out_obj.data, fname_len, out_obj.data, comp_path.length, comp_path.data);
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -w -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-	int len = sprintf(cmdbuffer, "ld --omagic %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
+	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
 		fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
 #endif
 	size_t libs_length = 0;
