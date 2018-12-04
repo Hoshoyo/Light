@@ -1094,7 +1094,7 @@ void C_Code_Generator::emit_type_strings(Type_Table_Copy* ttc) {
 #else
 void C_Code_Generator::emit_type_strings(User_Type_Table* ttc) {
 #endif
-	sprint("u8* __type_strings = \"");
+	sprint("u8 __type_strings[] = \"");
 
 	Ast_Data d;
 	d.data = ttc->start_extra_strings;
@@ -1105,7 +1105,7 @@ void C_Code_Generator::emit_type_strings(User_Type_Table* ttc) {
 
 	// ----
 
-	sprint("u8* __type_extra = \"");
+	sprint("u8 __type_extra[]  = \"");
 
 	Ast_Data d_te;
 	d_te.data = ttc->start_extra_mem;
@@ -1116,7 +1116,7 @@ void C_Code_Generator::emit_type_strings(User_Type_Table* ttc) {
 
 	// ----
 
-	sprint("u8* __type_table = \"");
+	sprint("u8 __type_table[]  = \"");
 
 	Ast_Data d_tt;
 	d_tt.data = (u8*)ttc->type_table;
@@ -1174,7 +1174,6 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 	// @IMPORTANT
 	Light_Arena* arena = arena_create(65536 * 10);
 	Light_Arena* strings_type = arena_create(65536 * 10);
-	//u8* strings_type = array_create(u8, 65536);
 	User_Type_Info* user_tt = (User_Type_Info*)calloc(array_get_length(type_table), sizeof(User_Type_Info));
 
 	u8* extra_space = 0;
@@ -1191,7 +1190,6 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 		user_tt[i] = type_instance_to_user(*type_table[i]);
 	}
 
-	runtime_buffer->sprint("*(u8**)(__type_table + 880) = __type_table;\n");
 	for (size_t i = 0, s = 0; i < array_get_length(type_table); ++i) {
 		Type_Instance* type = type_table[i];
 		User_Type_Info* type_copy = &user_tt[i];
@@ -1199,7 +1197,7 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 			case KIND_PRIMITIVE: break;
 			case KIND_POINTER: {
 				user_tt[i].description.pointer_to = (User_Type_Info*)((Type_Instance*)user_tt[i].description.pointer_to)->type_table_index;
-				//runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_table + %lld;\n", (u8*)&user_tt[i].description.pointer_to - (u8*)user_tt, (s64)user_tt[i].description.pointer_to * sizeof(User_Type_Info));
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_table + %lld;\n", (u8*)&user_tt[i].description.pointer_to - (u8*)user_tt, (s64)user_tt[i].description.pointer_to * sizeof(User_Type_Info));
 			} break;
 			case KIND_STRUCT: {
 				extra_string_space = (u8*)arena_alloc(strings_type, type->struct_desc.name->value.length);
