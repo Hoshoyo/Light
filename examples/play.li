@@ -1,24 +1,101 @@
 #import "ast.li"
 #import "linux/print.li"
 
-foo :: struct {
+foo :: union {
 	hello : s32;
+	world : [4]r32;
 }
 
 nl :: () {
 	print_string("\n");
 }
 
+/*
+// Expected UNKNOWN?
+print :: (format : string, ) -> s64 {
+
+}
+*/
+
+print_type :: (type : ^Type_Info) {
+	if type.kind == Type_Kind.PRIMITIVE {
+		print_primitive_type(type.info.primitive);
+	} else if type.kind == Type_Kind.POINTER {
+		print_string("^");
+		print_type(type.info.pointer_to);
+	} else if type.kind == Type_Kind.ARRAY {
+		print_string("[");
+		print_s64([s64]type.info.array_desc.dimension);
+		print_string("]");
+		print_type(type.info.array_desc.array_of);
+	} else if type.kind == Type_Kind.STRUCT {
+		print_string(type.info.struct_desc.name);
+		print_string(" :: struct {\n");
+
+		sd := type.info.struct_desc;
+		for i : s32 = 0; i < sd.fields_count; i += 1 {
+			print_string("\t");
+			print_string(sd.fields_names[i]);
+			print_string(" : ");
+			print_type(sd.fields_types[i]);
+			print_string(";\n");
+		}
+		print_string("}\n");
+	} else if type.kind == Type_Kind.UNION {
+		print_string(type.info.union_desc.name);
+		print_string(" :: union {\n");
+
+		sd := type.info.union_desc;
+		for i : s32 = 0; i < sd.fields_count; i += 1 {
+			print_string("\t");
+			print_string(sd.fields_names[i]);
+			print_string(" : ");
+			print_type(sd.fields_types[i]);
+			print_string(";\n");
+		}
+		print_string("}\n");
+	} else {
+		// TODO: implement
+	}
+}
+
+
+print_primitive_type :: (t : Type_Primitive) {
+	if t == Type_Primitive.S8 {
+		print_string("s8");
+	} else if t == Type_Primitive.S16 {
+		print_string("s16");
+	} else if t == Type_Primitive.S32 {
+		print_string("s32");
+	} else if t == Type_Primitive.S64 {
+		print_string("s64");
+	} else if t == Type_Primitive.U8 {
+		print_string("u8");
+	} else if t == Type_Primitive.U16 {
+		print_string("u16");
+	} else if t == Type_Primitive.U32 {
+		print_string("u32");
+	} else if t == Type_Primitive.U64 {
+		print_string("u64");
+	} else if t == Type_Primitive.R32 {
+		print_string("r32");
+	} else if t == Type_Primitive.R64 {
+		print_string("r64");
+	} else if t == Type_Primitive.BOOL {
+		print_string("bool");
+	} else if t == Type_Primitive.VOID {
+		print_string("void");
+	}
+}
+
 main :: () -> s32 {
 	b : foo;
 	a := [^Type_Info]#typeof b;
-	ftypes := a.description.struct_desc.fields_types;
-	print_s32(a.description.struct_desc.fields_count);
-	nl();
-	print_u32(ftypes[0].description.primitive);
-	nl();
-	print_string(a.description.struct_desc.fields_names[0]);
+	ftypes := a.info.struct_desc.fields_types;
 
+	//print_string("field count: ");
+	//print_s32(a.info.struct_desc.fields_count);
+	print_type(a);
 
 	return 0;
 }

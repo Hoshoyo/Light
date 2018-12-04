@@ -1224,6 +1224,7 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 
 				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(string));
 				offset = (u8*)(extra_space - start);
+				
 				for (size_t j = 0; j < type->struct_desc.fields_count; ++j) {
 					((string*)extra_space)[j] = (string)type->struct_desc.fields_names[j];
 					s64 length = ((string*)extra_space)[j].length;
@@ -1233,8 +1234,9 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 					((string*)extra_space)[j].data = (u8*)(extra_string_space - start_strings);
 
 					runtime_buffer->sprint("*(u8**)(__type_extra + %lld) = __type_strings + %lld;\n",
-						(u8*)&((string*)extra_space)[j] - start, (s64)(extra_string_space - start_strings));
+						(s64)&((string*)offset + j)->data, (s64)(extra_string_space - start_strings));
 				}
+
 				type_copy->description.struct_desc.fields_names = (string*)offset;
 				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_extra + %lld;\n",
 					(u8*)&user_tt[i].description.struct_desc.fields_names - (u8*)user_tt, offset);
@@ -1245,15 +1247,42 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 					((s64*)extra_space)[j] = (s64)type->struct_desc.offset_bits[j];
 				}
 				type_copy->description.struct_desc.fields_offsets_bits = (s64*)offset;
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_extra + %lld;\n",
+					(u8*)&user_tt[i].description.struct_desc.fields_offsets_bits - (u8*)user_tt, offset);
 			} break;
 
 			case KIND_UNION: {
+				extra_string_space = (u8*)arena_alloc(strings_type, type->union_desc.name->value.length);
+				memcpy(extra_string_space, type->union_desc.name->value.data, type->union_desc.name->value.length);
+				utt->extra_strings_bytes += type->union_desc.name->value.length;
+				user_tt[i].description.union_desc.name.data = (u8*)(extra_string_space - start_strings);
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_strings + %lld;\n", 
+					(u8*)&user_tt[i].description.union_desc.name.data - (u8*)user_tt, (s64)(u8*)(extra_string_space - start_strings));
+
 				extra_space = (u8*)arena_alloc(arena, type->struct_desc.fields_count * sizeof(User_Type_Info*));
 				offset = (u8*)(extra_space - start);
 				for (size_t j = 0; j < array_get_length(type->union_desc.fields_types); ++j) {
-					((User_Type_Info**)extra_space)[j] = (User_Type_Info*)((Type_Instance*)type->union_desc.fields_types[j])->type_queue_index;
+					s64 type_queue_index = ((Type_Instance*)type->union_desc.fields_types[j])->type_queue_index;
+					((User_Type_Info**)extra_space)[j] = (User_Type_Info*)type_queue_index;
+					runtime_buffer->sprint("*(u8**)(__type_extra + %lld) = __type_table + %lld;\n", 
+						(u8*)&((User_Type_Info**)extra_space)[j] - start, type_queue_index * sizeof(User_Type_Info));
 				}
 				type_copy->description.union_desc.fields_types = (User_Type_Info**)offset;
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_extra + %lld;\n",
+					(u8*)&user_tt[i].description.union_desc.fields_types - (u8*)user_tt, (s64)offset);
+
+				extra_space = (u8*)arena_alloc(arena, type->union_desc.fields_count * sizeof(User_Type_Info*));
+				offset = (u8*)(extra_space - start);
+				for (size_t j = 0; j < type->union_desc.fields_count; ++j) {
+					s64 type_queue_index = ((Type_Instance*)type->union_desc.fields_types[j])->type_queue_index;
+					((User_Type_Info**)extra_space)[j] = (User_Type_Info*)type_queue_index;
+					runtime_buffer->sprint("*(u8**)(__type_extra + %lld) = __type_table + %lld;\n", 
+						(u8*)&((User_Type_Info**)extra_space)[j] - start, type_queue_index * sizeof(User_Type_Info));
+				}
+				// TODO(psv): leaking here for now
+				type_copy->description.union_desc.fields_types = (User_Type_Info**)offset;
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_extra + %lld;\n",
+					(u8*)&user_tt[i].description.union_desc.fields_types - (u8*)user_tt, (s64)offset);
 
 				extra_space = (u8*)arena_alloc(arena, type->union_desc.fields_count * sizeof(string));
 				offset = (u8*)(extra_space - start);
@@ -1264,12 +1293,19 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 					memcpy(extra_string_space, ((string*)extra_space)[j].data, length);
 					utt->extra_strings_bytes += length;
 					((string*)extra_space)[j].data = (u8*)(extra_string_space - start_strings);
+
+					runtime_buffer->sprint("*(u8**)(__type_extra + %lld) = __type_strings + %lld;\n",
+						(s64)&((string*)offset + j)->data, (s64)(extra_string_space - start_strings));
 				}
 				type_copy->description.union_desc.fields_names = (string*)offset;
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_extra + %lld;\n",
+					(u8*)&user_tt[i].description.union_desc.fields_names - (u8*)user_tt, offset);
 			} break;
 
 			case KIND_ARRAY: {
 				type_copy->description.array_desc.array_of = (User_Type_Info*)((Type_Instance*)type->array_desc.array_of)->type_table_index;
+				runtime_buffer->sprint("*(u8**)(__type_table + %lld) = __type_table + %lld;\n", 
+					(u8*)&user_tt[i].description.array_desc.array_of - (u8*)user_tt, (s64)user_tt[i].description.array_desc.array_of * sizeof(User_Type_Info));
 			} break;
 			case KIND_FUNCTION: {
 				extra_space = (u8*)arena_alloc(arena, type->function_desc.num_arguments * sizeof(User_Type_Info*));
