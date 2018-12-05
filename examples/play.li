@@ -47,19 +47,6 @@ print_type :: (type : ^Type_Info) {
 			print_string(";\n");
 		}
 		print_string("}\n");
-<<<<<<< HEAD
-=======
-	} else if type.kind == Type_Kind.FUNCTION {
-		print_string("(");
-		for i : s32 = 0; i < type.info.function_desc.arguments_count; i += 1 {
-			if i != 0 print_string(", ");
-			print_type(type.info.function_desc.arguments_type[i]);
-		}
-		print_string(") -> ");
-		print_type(type.info.function_desc.return_type);
-	} else {
-		// TODO: implement
->>>>>>> dd633494c01f6bc1dbb8fbc501d5f96de517b23c
 	}
 }
 
@@ -94,15 +81,9 @@ print_primitive_type :: (t : Type_Primitive) {
 
 main :: () -> s32 {
 	b : foo;
-<<<<<<< HEAD
 	//print_string("field count: ");
 	//print_s32(a.info.struct_desc.fields_count);
 	print_type([^Type_Info]#typeof b);
-=======
-	a := [^Type_Info]#typeof b;
-
-	print_type(a);
->>>>>>> dd633494c01f6bc1dbb8fbc501d5f96de517b23c
 
 	return 0;
 }

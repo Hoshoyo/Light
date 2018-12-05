@@ -1,0 +1,42 @@
+#import "../examples/ast.li"
+#import "memory.li"
+
+Dynamic_Array :: struct {
+    allocator   : (u64) -> ^void;
+    reallocator : (^void, u64) -> ^void;
+    deallocator : (^void) -> void;
+    type_info   : ^Type_Info;
+
+    length      : s64;
+    capacity    : s64;
+    data        : ^void;
+}
+
+dynamic_array_create :: (type_info : ^Type_Info) -> Dynamic_Array {
+    da : Dynamic_Array;
+    da.allocator = memory_alloc;
+    da.reallocator = memory_realloc;
+    da.deallocator = memory_free;
+    da.type_info = type_info;
+}
+
+dynamic_array_push :: (arr : ^Dynamic_Array, data : ^void) -> s64 {
+    arr.data = (arr.memory_alloc)(arr.type_info.size_bytes * 2);
+    /*
+    if arr.capacity == 0 {
+        arr.data = (arr.memory_alloc)(arr.type_info.size_bytes * 2);
+        arr.capacity = 2;
+    } else if arr.length == arr.capacity {
+        arr.data = (arr.memory_realloc)(arr.data, arr.type_info.size_bytes * arr.capacity * 2 + 1);
+        arr.capacity = arr.capacity * 2 + 1;
+    }
+    memory_copy([^u8]arr.data + arr.type_info.size_bytes * arr.length, data, arr.type_info.size_bytes);
+    arr.length += 1;
+
+    return arr.length - 1;
+    */
+}
+
+main :: () -> s32 {
+    return 0;
+}

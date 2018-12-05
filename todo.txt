@@ -2,6 +2,7 @@
 
 - fix bug where enum value not being declared causes a crash in compilation if used
 
+- default values for procedure arguments and structure fields.
 - multiple line strings avoid lexer line counter
 - variadic functions
 - better error when enum type mismatch happens
