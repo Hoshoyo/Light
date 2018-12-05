@@ -379,7 +379,10 @@ Ast* Parser::parse_decl_proc(Token* name, Scope* scope) {
 		for (;;) {
 			if (nargs != 0)
 				require_and_eat(',');
-			Token* name = require_and_eat(TOKEN_IDENTIFIER);
+			Token* name = lexer->eat_token();
+			if (name->type != TOKEN_IDENTIFIER) {
+				report_syntax_error(name, "expected argument declaration but got '%.*s'\n", TOKEN_STR(name));
+			}
 			Ast* arg = parse_decl_variable(name, arguments_scope);
 			array_push(arguments, &arg);
 			++nargs;
