@@ -1,0 +1,144 @@
+#import "../examples/ast.li"
+#import "memory.li"
+
+HASH_TABLE_DEFAULT_CAPACITY : s64 : 1024;
+
+Hash_Entry :: struct {
+    hash     : u64;
+    data     : ^void;
+    size     : u64;
+    occupied : bool;
+    collided : bool;
+}
+
+Hash_Table :: struct {
+    entries         : ^Hash_Entry;
+    entry_count     : s64;
+    entry_capacity  : s64;
+    collision_count : s64;
+
+    hash_function   : (^void, u64) -> u64;
+    equal_function  : (^void, u64, ^void, u64) -> bool;
+}
+
+hash_table_default_hash :: (data : ^void, size : u64) -> u64 {
+    hash : u64 = 14695981039346656037;
+    fnv_prime : u64 = 1099511628211;
+    for i :u64= 0; i < size; i += 1 {
+        hash = hash * fnv_prime;
+        hash = hash ^ [u64]([^u8]data)[i];
+    }
+    return hash;
+}
+
+hash_table_default_equal :: (v1 : ^void, size1 : u64, v2 : ^void, size2 : u64) -> bool {
+    if size1 != size2 return false;
+    return memory_compare(v1, v2, size1) == 0;
+}
+
+hash_table_create :: (entry_type_info : ^Type_Info) -> Hash_Table {
+    table : Hash_Table;
+
+    table.hash_function = hash_table_default_hash;
+    table.equal_function = hash_table_default_equal;
+
+    table.entry_capacity = HASH_TABLE_DEFAULT_CAPACITY;
+    table.entry_count = 0;
+    table.collision_count = 0;
+    table.entries = [^Hash_Entry]memory_alloc([u64]table.entry_capacity * #sizeof Hash_Entry);
+
+    return table;
+}
+
+hash_table_delete :: (table : Hash_Table) -> bool {
+    memory_free(table.entries);
+}
+
+// TODO: use reflection to detect type automatically
+hash_table_entry_exist :: (table : Hash_Table, data : ^void, size : u64, out_index : ^u64) -> bool {
+    hash := (table.hash_function)(data, size);
+	index := hash % [u64]table.entry_capacity;
+
+	while table.entries[index].occupied {
+		if (table.entries[index].hash == hash) {
+			if !table.entries[index].collided {
+                if out_index != null { *out_index = index; }
+				return true;
+			} else {
+                if (table.equal_function)(data, size, table.entries[index].data, table.entries[index].size) {
+                    if out_index != null {*out_index = index;}
+                    return true;
+                }
+			}
+		}
+
+		index += 1;
+		if index == [u64]table.entry_capacity
+			index = 0;
+	}
+	return false;
+}
+
+hash_table_push :: (table : Hash_Table, data : ^void, size : u64) -> u64 {
+    hash := (table.hash_function)(data, size);
+    index := hash % [u64]table.entry_capacity;
+
+    collided := false;
+
+    while table.entries[index].occupied {
+        if table.entries[index].hash == hash {
+            table.entries[index].collided = true;
+            if (table.equal_function)(data, size, table.entries[index].data, table.entries[index].size) {
+                return index;
+            }
+            table.collision_count += 1;
+        }
+        
+        index += 1;
+        if index == [u64]table.entry_capacity {
+            index = 0;
+        }
+    }
+
+    table.entries[index].hash = hash;
+    table.entries[index].data = data;
+    table.entries[index].occupied = true;
+    table.entries[index].collided = collided;
+    table.entry_count += 1;
+
+    return index;
+}
+
+hash_table_remove :: (table : Hash_Table, data : ^void, size : u64) -> bool {
+    index : u64;
+    if hash_table_entry_exist(table, data, size, &index) {
+        table.entries[index].occupied = false;
+        table.entries[index].collided = false;
+        table.entry_count -= 1;
+        return true;
+    }
+    return false;
+}
+
+#import "../examples/linux/print.li"
+
+main :: () -> s32 {
+    entry : s32 = 3;
+
+    // create hash table
+    hash_table := hash_table_create([^Type_Info]#typeof entry);
+
+    ei := hash_table_push(hash_table, &entry, #sizeof s32);
+    hash_table_remove(hash_table, &entry, #sizeof s32);
+
+    // check entry existence
+    if hash_table_entry_exist(hash_table, &entry, #sizeof s32, null) {
+        print_string("Entry exists!\n");
+    } else {
+        print_string("Entry does not exist.\n");
+    }
+
+    // delete hash table
+    hash_table_delete(hash_table);
+    return 0;
+}

@@ -114,7 +114,7 @@ void hash_table_add(String_Hash_Table* table, string s) {
 
 	while (table->entries[index].occupied) {
 		if (table->entries[index].hash == hash) {
-			// colisao entre hash's
+			// TODO: verify if it is the same entry
 			table->entries[index].collided = true;
 			table->hash_collision_count++;
 		}

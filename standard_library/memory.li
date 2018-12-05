@@ -1,0 +1,35 @@
+// Temporary C functions
+#foreign("c")
+
+calloc :: (count : u64, size : u64) -> ^void;
+free :: (block : ^void) -> void;
+realloc :: (block : ^void, size : u64) -> ^void;
+memcpy :: (dst : ^void, src : ^void, size : u64) -> ^void;
+memset :: (ptr : ^void, value : s32, num : u64) -> ^void;
+memcmp :: (dst : ^void, src : ^void, size : u64) -> s32;
+
+#end
+
+memory_alloc :: (size : u64) -> ^void {
+    return calloc(1, size);
+}
+
+memory_free :: (block : ^void) -> void {
+    free(block);
+}
+
+memory_realloc :: (block : ^void, size : u64) -> ^void {
+    return realloc(block, size);
+}
+
+memory_copy :: (dst : ^void, src : ^void, size : u64) -> ^void {
+    return memcpy(dst, src, size);
+}
+
+memory_compare :: (dst : ^void, src : ^void, size : u64) -> s32 {
+    return memcmp(dst, src, size);
+}
+
+memory_set :: (ptr : ^void, value : u8, size : u64) -> ^void {
+    return memset(ptr, [s32]value, size);
+}
