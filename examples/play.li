@@ -10,13 +10,6 @@ nl :: () {
 	print_string("\n");
 }
 
-/*
-// Expected UNKNOWN?
-print :: (format : string, ) -> s64 {
-
-}
-*/
-
 print_type :: (type : ^Type_Info) {
 	if type.kind == Type_Kind.PRIMITIVE {
 		print_primitive_type(type.info.primitive);
@@ -54,6 +47,14 @@ print_type :: (type : ^Type_Info) {
 			print_string(";\n");
 		}
 		print_string("}\n");
+	} else if type.kind == Type_Kind.FUNCTION {
+		print_string("(");
+		for i : s32 = 0; i < type.info.function_desc.arguments_count; i += 1 {
+			if i != 0 print_string(", ");
+			print_type(type.info.function_desc.arguments_type[i]);
+		}
+		print_string(") -> ");
+		print_type(type.info.function_desc.return_type);
 	} else {
 		// TODO: implement
 	}
@@ -91,10 +92,7 @@ print_primitive_type :: (t : Type_Primitive) {
 main :: () -> s32 {
 	b : foo;
 	a := [^Type_Info]#typeof b;
-	ftypes := a.info.struct_desc.fields_types;
 
-	//print_string("field count: ");
-	//print_s32(a.info.struct_desc.fields_count);
 	print_type(a);
 
 	return 0;

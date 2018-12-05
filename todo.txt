@@ -1,6 +1,6 @@
 #todo
-- fix bug where enum value not being declared causes a crash in compilation if used
 
+- fix bug where enum value not being declared causes a crash in compilation if used
 
 - multiple line strings avoid lexer line counter
 - variadic functions
