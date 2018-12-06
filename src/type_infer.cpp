@@ -1192,6 +1192,13 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 					// @TODO: IMPLEMENT namespaces
 
 					if (expr->expr_binary.left->flags & AST_FLAG_ENUM_ACCESSOR) {
+						Ast* decl_enum = decl_from_name(expr->scope, expr->expr_binary.left->expr_variable.name);
+						Ast* decl = decl_from_name_scoped(decl_enum->decl_enum.enum_scope, expr->expr_binary.right->expr_variable.name);
+						if (!decl) {
+							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "'%.*s' is not a field of the enum '%.*s'\n", 
+								TOKEN_STR(expr->expr_binary.right->expr_variable.name), TOKEN_STR(expr->expr_binary.left->expr_variable.name));
+							return 0;
+						}
 						expr->type_return = expr->expr_binary.left->type_return;
 						return defer_check_against(expr, check_against, expr->type_return, error);
 					} else {

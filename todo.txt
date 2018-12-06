@@ -1,7 +1,4 @@
 #todo
-
-- fix bug where enum value not being declared causes a crash in compilation if used
-
 - default values for procedure arguments and structure fields.
 - multiple line strings avoid lexer line counter
 - variadic functions
@@ -30,6 +27,7 @@
 
 #changelog - most recent first
 06/12/2018
+    - fix bug where enum value not being declared causes a crash in compilation if used
     - fix bug with struct and union accessing searching all scopes until top level.
 29/09/2018
 	- make ^T cast to ^void implicitly (fixed the opposite)
