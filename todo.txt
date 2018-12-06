@@ -29,6 +29,8 @@
 - check cast to static array
 
 #changelog - most recent first
+06/12/2018
+    - fix bug with struct and union accessing searching all scopes until top level.
 29/09/2018
 	- make ^T cast to ^void implicitly (fixed the opposite)
 	- implement sizeof

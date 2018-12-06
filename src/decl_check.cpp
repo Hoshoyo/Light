@@ -1034,6 +1034,18 @@ Type_Error decl_check_top_level(Scope* global_scope, Ast** ast_top_level) {
 	return error_code;
 }
 
+// Searches only in the current scope.
+Ast* decl_from_name_scoped(Scope* scope, Token* name) {
+	if (scope->symb_table.entries_count > 0) {
+		s64 index = symbol_table_entry_exist(&scope->symb_table, name);
+		if (index != -1) {
+			return scope->symb_table.entries[index].decl_node;
+		}
+	}
+	return 0;
+}
+
+// Searches every scope until the top level.
 Ast* decl_from_name(Scope* scope, Token* name) {
 	TIME_FUNC();
 	// Try to find the declaration with that name within the scope passed

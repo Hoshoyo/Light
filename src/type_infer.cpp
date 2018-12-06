@@ -1206,7 +1206,9 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 						Ast* decl_struct = decl_from_name(expr->scope, lt->struct_desc.name);
 						assert_msg(decl_struct, "how can we not get a struct that has a type defined?");
 					
-						Ast* decl = decl_from_name(decl_struct->decl_struct.struct_scope, expr->expr_binary.right->expr_variable.name);
+						// In a struct or union field accessing, only the current scope can be accessed
+						// unless a namespace merging is performed (something like 'using').
+						Ast* decl = decl_from_name_scoped(decl_struct->decl_struct.struct_scope, expr->expr_binary.right->expr_variable.name);
 						if(!decl){
 							*error |= report_type_error(TYPE_ERROR_FATAL, expr, "'%.*s' is not a field of struct '%.*s'\n", 
 								TOKEN_STR(expr->expr_binary.right->expr_variable.name), TOKEN_STR(decl_struct->decl_struct.name));
@@ -1215,6 +1217,7 @@ Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Err
 							expr->expr_binary.right->scope = decl_struct->decl_struct.struct_scope;
 							expr->expr_binary.right->expr_variable.decl = decl;
 						}
+						
 						assert(type_strong(decl->decl_variable.variable_type));
 
 						expr->flags |= AST_FLAG_LVALUE;
