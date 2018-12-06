@@ -1,27 +1,28 @@
 Type_Kind : u32 : enum {
-	KIND_UNKNOWN   : 0,
-	KIND_PRIMITIVE : 1,
-	KIND_STRUCT    : 2,
-	KIND_UNION     : 3,
-	KIND_ARRAY     : 4,
-	KIND_FUNCTION  : 5,
-	KIND_ALIAS     : 6
+	UNKNOWN      : 0,
+	PRIMITIVE    : 1,
+	POINTER      : 2,
+	STRUCT       : 3,
+	UNION        : 4,
+	ARRAY        : 5,
+	FUNCTION     : 6,
+	ALIAS        : 7
 }
 
 Type_Primitive : u32 : enum {
-	TYPE_UNKNOWN        : 0,
-	TYPE_PRIMITIVE_S8   : 1,
-	TYPE_PRIMITIVE_S16  : 2,
-	TYPE_PRIMITIVE_S32  : 3,
-	TYPE_PRIMITIVE_S64  : 4,
-	TYPE_PRIMITIVE_U8   : 5,
-	TYPE_PRIMITIVE_U16  : 6,
-	TYPE_PRIMITIVE_U32  : 7,
-	TYPE_PRIMITIVE_U64  : 8,
-	TYPE_PRIMITIVE_R32  : 9,
-	TYPE_PRIMITIVE_R64  : 10,
-	TYPE_PRIMITIVE_BOOL : 11,
-	TYPE_PRIMITIVE_VOID : 12
+	UNKNOWN : 0,
+	S8   : 1,
+	S16  : 2,
+	S32  : 3,
+	S64  : 4,
+	U8   : 5,
+	U16  : 6,
+	U32  : 7,
+	U64  : 8,
+	R32  : 9,
+	R64  : 10,
+	BOOL : 11,
+	VOID : 12
 }
 
 Type_Array :: struct {
@@ -64,8 +65,8 @@ Type_Desc :: union {
 }
 
 Type_Info :: struct {
-	kind            : Type_Kind;
-	flags           : u32;
-	type_size_bytes : s64;
-    description     : Type_Desc;
+	kind       : Type_Kind;
+	flags      : u32;
+	size_bytes : s64;
+    info       : Type_Desc;
 }
