@@ -1,5 +1,5 @@
 #import "ast.li"
-#import "linux/print.li"
+#import "windows/print.li"
 
 foo :: union {
 	hello : s32;

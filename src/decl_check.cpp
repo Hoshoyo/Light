@@ -159,13 +159,12 @@ Type_Error decl_check_redefinition(Scope* scope, Ast* node) {
 			/*
 				enum values have their own namespace and should not be put as global variables
 			*/
-			/*
 
 				for (size_t i = 0; i < node->decl_enum.fields_count; ++i) {
 					error |= decl_insert_into_symbol_table(node->decl_enum.fields[i],
 						node->decl_enum.fields[i]->decl_constant.name, "enum field");
 				}
-			*/
+
 		}break;
 		case AST_DECL_CONSTANT: {
 			error |= decl_insert_into_symbol_table(node, node->decl_constant.name, "constant");
@@ -889,7 +888,7 @@ Type_Error type_checking_decl(Scope* scope, Ast* node) {
 			}
 			error_code |= type_error;
 
-			if (node->scope->level > 0)
+			if (node->scope->level > 0 && !(node->scope->flags & SCOPE_ENUM))
 				error_code |= decl_insert_into_symbol_table(node, node->decl_constant.name, "constant");
 		}break;
 		case AST_DECL_PROCEDURE: {
