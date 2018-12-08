@@ -119,26 +119,3 @@ hash_table_remove :: (table : Hash_Table, data : ^void, size : u64) -> bool {
     }
     return false;
 }
-
-#import "../examples/linux/print.li"
-
-main :: () -> s32 {
-    entry : s32 = 3;
-
-    // create hash table
-    hash_table := hash_table_create([^Type_Info]#typeof entry);
-
-    ei := hash_table_push(hash_table, &entry, #sizeof s32);
-    hash_table_remove(hash_table, &entry, #sizeof s32);
-
-    // check entry existence
-    if hash_table_entry_exist(hash_table, &entry, #sizeof s32, null) {
-        print_string("Entry exists!\n");
-    } else {
-        print_string("Entry does not exist.\n");
-    }
-
-    // delete hash table
-    hash_table_delete(hash_table);
-    return 0;
-}

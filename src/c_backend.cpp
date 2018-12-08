@@ -449,15 +449,27 @@ void C_Code_Generator::emit_struct_assignment(Type_Instance** type_table, Ast* d
     }
 }
 
-void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm, s64 deferred_index, s64 loop_id_defer) {
+static Scope* get_scope_loop(Scope* scope, u64 level) {
+	while (scope) {
+		if (scope->flags & SCOPE_LOOP) --level;
+		if (level <= 0) return scope;
+		if (scope->flags & SCOPE_PROCEDURE_BODY) return false;
+		if (scope->flags & SCOPE_ENUM) return false;
+		if (scope->flags & SCOPE_STRUCTURE) return false;
+		scope = scope->parent;
+	}
+	return 0;
+}
+
+void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm, s64 deferred_index) {
 	switch (comm->node_type) {
 		case AST_COMMAND_BLOCK:{
 			sprint("{\n");
 			bool deferred = false;
 			for (s32 i = 0; i < comm->comm_block.command_count; ++i) {
                 Ast* cm = comm->comm_block.commands[i];
-				if(deferred_index == i && loop_id != -1) {
-					sprint("loop_defer_%lld:\n", loop_id_defer);
+				if(deferred_index == i && comm->comm_block.block_scope->flags & SCOPE_LOOP) {
+					sprint("loop_defer_%lld:\n", get_scope_loop(comm->comm_block.block_scope, 1));
 					deferred = true;
 				}
                 
@@ -494,19 +506,22 @@ void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm, s64 d
                 }
 				sprint("\n");
 			}
-			if (loop_id_defer >= 0 && !deferred) {
-				sprint("loop_defer_%lld:\n", loop_id_defer);
-				sprint("continue;\n");
+			if (!deferred && comm->comm_block.block_scope->flags & SCOPE_LOOP) {
+				Scope* s =  get_scope_loop(comm->comm_block.block_scope, 1);
+				if (s) {
+					sprint("loop_defer_%llu:\n", s);
+					sprint("continue;\n");
+				}
 			}
 			sprint("}");
 		}break;
 		case AST_COMMAND_BREAK: {
 			//sprint("break;");
 			s64 level = comm->comm_break.level->expr_literal.value_u64;
-			sprint("goto loop_%lld;", loop_id - level);
+			sprint("goto loop_%lld;", get_scope_loop(comm->scope, (u64)level));
 		}break;
 		case AST_COMMAND_CONTINUE: {
-            sprint("goto loop_defer_%lld;", loop_id - 1);
+            sprint("goto loop_defer_%lld;", get_scope_loop(comm->scope, 1));
 		}break;
 		case AST_COMMAND_FOR:{
 			s64 id = alloc_loop_id();
@@ -518,8 +533,8 @@ void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm, s64 d
             sprint(")");
 			deferring = false;
 			defer_flush();
-            emit_command(type_table, comm->comm_for.body, comm->comm_for.body->comm_block.command_count - comm->comm_for.deferred_commands, id);
-			sprint("\nloop_%lld:;\n", id);
+            emit_command(type_table, comm->comm_for.body, comm->comm_for.body->comm_block.command_count - comm->comm_for.deferred_commands);
+			sprint("\nloop_%lld:;\n", get_scope_loop(comm->comm_for.body->comm_block.block_scope, 1));
         }break;
 		case AST_COMMAND_IF:{
 

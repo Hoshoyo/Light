@@ -89,8 +89,16 @@ s32_to_str :: (val : s32, buffer : [16]u8) -> s64 {
 }
 
 r32_to_str :: (v : r32, buffer : [32]u8) -> s64 {
-    l : s64 = s32_to_str([s32]v, [[16]u8][^u8]buffer);
-    precision := 4;
+    zero_neg := 0;
+    l : s64 = 0;
+    if [s32]v == 0 {
+        zero_neg += 1;
+        l += 1;
+        buffer[0] = '-';
+    }
+
+    l += s32_to_str([s32]v, [[16]u8]([^u8]buffer + zero_neg));
+    precision := 15;
 
     if v < 0.0 {
         v = -v;
@@ -112,20 +120,23 @@ r32_to_str :: (v : r32, buffer : [32]u8) -> s64 {
         buffer[l] = [u8]fractional_part + '0';
         fractional_part = fractional_part - [r32][s32]fractional_part;
         l += 1;
-        precision -= 1;
     }
 
     return l;
 }
 
 r64_to_str :: (v : r64, buffer : [64]u8) -> s64 {
-    l : s64 = s64_to_str([s64]v, [[32]u8][^u8]buffer);
+    zero_neg := 0;
+    l : s64 = 0;
+    if [s32]v == 0 {
+        zero_neg += 1;
+        l += 1;
+        buffer[0] = '-';
+    }
+
+    l += s64_to_str([s64]v, [[32]u8]([^u8]buffer + zero_neg));
     precision := 31;
 
-	if v < 0.0 {
-		v = -v;
-    }
-	
     fractional_part := v - [r64][s64]v;
 
     buffer[l] = '.';
