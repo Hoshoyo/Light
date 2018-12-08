@@ -1168,19 +1168,19 @@ Ast* Parser::parse_comm_while(Scope* scope) {
 	if (body->node_type == AST_COMMAND_BLOCK) {
 		if (body->comm_block.block_scope)
 			body->comm_block.block_scope->flags |= SCOPE_LOOP;
-		return ast_create_comm_for(scope, condition, body);
+		return ast_create_comm_for(scope, condition, body, 0);
 	}
 	else {
 		Ast** commands = array_create(Ast*, 1);
 		array_push(commands, &body);
 		Ast* inner = ast_create_comm_block(scope, scope_create(0, scope, SCOPE_LOOP), commands, 0, 1);
 
-		Ast* for_cmd = ast_create_comm_for(scope, condition, inner);
+		Ast* for_cmd = ast_create_comm_for(scope, condition, inner, 0);
 		inner->comm_block.creator = for_cmd;
 
 		inner->comm_block.block_scope->creator_node = for_cmd;
 		inner->comm_block.block_scope->decl_count = 1;
-		return ast_create_comm_for(scope, condition, inner);
+		return ast_create_comm_for(scope, condition, inner, 0);
 	}
 }
 
@@ -1217,19 +1217,19 @@ Ast* Parser::parse_comm_for(Scope* scope) {
 		if (!body->comm_block.commands && deferred) {
 			body->comm_block.commands = array_create(Ast*, array_get_length(deferred));
 		}
-		comm_for = ast_create_comm_for(for_scope, condition, body);
+		comm_for = ast_create_comm_for(for_scope, condition, body, array_get_length(deferred));
 	} else {
 		Ast** commands = array_create(Ast*, 1);
 		array_push(commands, &body);
 		Ast* inner = ast_create_comm_block(for_scope, scope_create(0, for_scope, SCOPE_LOOP), commands, 0, 1);
 		body = inner;
 		
-		Ast* for_cmd = ast_create_comm_for(for_scope, condition, inner);
+		Ast* for_cmd = ast_create_comm_for(for_scope, condition, inner, array_get_length(deferred));
 		inner->comm_block.creator = for_cmd;
 
 		inner->comm_block.block_scope->creator_node = for_cmd;
 		inner->comm_block.block_scope->decl_count = 1;
-		comm_for = ast_create_comm_for(for_scope, condition, inner);
+		comm_for = ast_create_comm_for(for_scope, condition, inner, array_get_length(deferred));
 	}
 
 	// fill deferred

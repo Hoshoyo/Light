@@ -409,7 +409,7 @@ Ast* ast_create_comm_if(Scope* scope, Ast* condition, Ast* command_true, Ast* co
 	return ci;
 }
 
-Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body) {
+Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body, s64 deferred_commands) {
 	Ast* cf = ALLOC_AST();
 
 	cf->node_type = AST_COMMAND_FOR;
@@ -421,6 +421,7 @@ Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body) {
 	cf->comm_for.condition = condition;
 	cf->comm_for.body = body;
 	cf->comm_for.id = -1;
+	cf->comm_for.deferred_commands = deferred_commands;
 
 	return cf;
 }

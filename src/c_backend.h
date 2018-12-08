@@ -62,7 +62,7 @@ struct C_Code_Generator {
 
     void emit_decl(Type_Instance** type_table, Ast* decl, bool forward = false);
 	void emit_proc(Type_Instance** type_table, Ast* decl);
-	void emit_command(Type_Instance** type_table, Ast* comm);
+	void emit_command(Type_Instance** type_table, Ast* comm, s64 deferred_index = -1, s64 loop_id_defer = -1);
 	void emit_expression(Type_Instance** type_table, Ast* expr);
 	void emit_expression_binary(Type_Instance** type_table, Ast* expr);
 	void emit_temp_assignment(Type_Instance** type_table, Ast* expr);

@@ -449,12 +449,17 @@ void C_Code_Generator::emit_struct_assignment(Type_Instance** type_table, Ast* d
     }
 }
 
-void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm) {
+void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm, s64 deferred_index, s64 loop_id_defer) {
 	switch (comm->node_type) {
 		case AST_COMMAND_BLOCK:{
 			sprint("{\n");
+			bool deferred = false;
 			for (s32 i = 0; i < comm->comm_block.command_count; ++i) {
                 Ast* cm = comm->comm_block.commands[i];
+				if(deferred_index == i && loop_id != -1) {
+					sprint("loop_defer_%lld:\n", loop_id_defer);
+					deferred = true;
+				}
                 
                 if(cm->flags & AST_FLAG_IS_DECLARATION){
                     if(cm->node_type == AST_DECL_VARIABLE){
@@ -489,6 +494,10 @@ void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm) {
                 }
 				sprint("\n");
 			}
+			if (loop_id_defer >= 0 && !deferred) {
+				sprint("loop_defer_%lld:\n", loop_id_defer);
+				sprint("continue;\n");
+			}
 			sprint("}");
 		}break;
 		case AST_COMMAND_BREAK: {
@@ -497,7 +506,7 @@ void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm) {
 			sprint("goto loop_%lld;", loop_id - level);
 		}break;
 		case AST_COMMAND_CONTINUE: {
-            sprint("continue;");
+            sprint("goto loop_defer_%lld;", loop_id - 1);
 		}break;
 		case AST_COMMAND_FOR:{
 			s64 id = alloc_loop_id();
@@ -509,8 +518,7 @@ void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm) {
             sprint(")");
 			deferring = false;
 			defer_flush();
-
-            emit_command(type_table, comm->comm_for.body);
+            emit_command(type_table, comm->comm_for.body, comm->comm_for.body->comm_block.command_count - comm->comm_for.deferred_commands, id);
 			sprint("\nloop_%lld:;\n", id);
         }break;
 		case AST_COMMAND_IF:{

@@ -266,7 +266,7 @@ inline Type_Instance* type_setup_ptr(Type_Instance* p) {
 	res->flags = TYPE_FLAG_SIZE_RESOLVED;
 	res->type_size_bits = type_pointer_size_bits();
 	res->pointer_to = p;
-	internalize_type(&res, false);
+	internalize_type(&res, 0, false);
 	return res;
 }
 
@@ -290,7 +290,7 @@ inline Type_Instance* type_setup_primitive(Type_Primitive p) {
 		case TYPE_PRIMITIVE_BOOL: res->type_size_bits = 8; break;
 		case TYPE_PRIMITIVE_VOID: res->type_size_bits = 0; break;
 	}
-	internalize_type(&res, false);
+	internalize_type(&res, 0, false);
 	return res;
 }
 

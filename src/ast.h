@@ -266,6 +266,7 @@ struct Ast_Comm_For {
 	Ast* condition;		// EXPRESSION (boolean)
 	Ast* body;			// COMMAND
 	s64  id;
+	s64  deferred_commands;
 };
 struct Ast_Comm_Break {
 	Ast*   level;			// INT LITERAL [0, MAX_INT]
@@ -429,7 +430,7 @@ Ast* ast_create_expr_unary(Scope* scope, Ast* operand, Operator_Unary op, Token*
 
 Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** commands, Ast* creator, s32 command_count);
 Ast* ast_create_comm_if(Scope* scope, Ast* condition, Ast* command_true, Ast* command_false);
-Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body);
+Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body, s64 deferred_commands);
 Ast* ast_create_comm_break(Scope* scope, Ast* lit, Token* token);
 Ast* ast_create_comm_continue(Scope* scope, Token* token);
 Ast* ast_create_comm_return(Scope* scope, Ast* expr, Token* token);
