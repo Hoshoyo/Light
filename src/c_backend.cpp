@@ -453,9 +453,9 @@ static Scope* get_scope_loop(Scope* scope, u64 level) {
 	while (scope) {
 		if (scope->flags & SCOPE_LOOP) --level;
 		if (level <= 0) return scope;
-		if (scope->flags & SCOPE_PROCEDURE_BODY) return false;
-		if (scope->flags & SCOPE_ENUM) return false;
-		if (scope->flags & SCOPE_STRUCTURE) return false;
+		if (scope->flags & SCOPE_PROCEDURE_BODY) return 0;
+		if (scope->flags & SCOPE_ENUM) return 0;
+		if (scope->flags & SCOPE_STRUCTURE) return 0;
 		scope = scope->parent;
 	}
 	return 0;
