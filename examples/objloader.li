@@ -1,5 +1,7 @@
 #import "linux/print.li"
-malloc :: (size : u64) -> ^void #foreign("c");
+#import "../standard_library/hash_table.li"
+#import "../standard_library/dynamic_array.li"
+
 exit :: (status : s32) -> void #foreign("c");
 
 Tokenizer :: struct {
@@ -44,6 +46,7 @@ token_next :: (tokenizer : ^Tokenizer) -> Token {
     while is_white_space(stream[index]) {
         if stream[index] == '\n' {
             tokenizer.line += 1;
+            tokenizer.column = 0;
         } else {
             tokenizer.column += 1;
         }
@@ -214,12 +217,15 @@ ivec3 :: struct {
 }
 
 main :: () -> s32 {
-    result := read_entire_file("/home/hoshoyo/dev/objloader/cube.obj", malloc);
+    iv : ivec3;
+    idx : u64;
+    table := hash_table_create(#typeof iv);
+    index_array := dynamic_array_create(#typeof idx);
+
+    result := read_entire_file("/home/hoshoyo/dev/objloader/cube.obj", memory_alloc);
 
     tokenizer: Tokenizer;
     tokenizer.stream = result;
-
-    loaded_object : Object;
 
     while true {
         token := token_next(&tokenizer);
@@ -248,14 +254,14 @@ main :: () -> s32 {
                 if object_name.type != Token_Type.TOKEN_IDENTIFIER {
                     return syntax_error("Expected object name.\n", object_name);
                 }
-                loaded_object.name = object_name.data;
+                //loaded_object.name = object_name.data;
             } else if string_equal(token.data, "g") {
                 // name of the object
                 object_name := token_next(&tokenizer);
                 if object_name.type != Token_Type.TOKEN_IDENTIFIER {
                     return syntax_error("Expected object name.\n", object_name);
                 }
-                loaded_object.name = object_name.data;
+                //loaded_object.name = object_name.data;
             } else if string_equal(token.data, "v") {
                 // vertice
                 v : vec3;
@@ -296,16 +302,39 @@ main :: () -> s32 {
                     expect_symbol(&tokenizer, '/');
                     err = parse_s32(&tokenizer, &face[f].z);
                     if err != 0 return -1;
+
+                    print_ivec3(face[f]);
+                    print_string(" -> ");
+
+                    index := hash_table_push(table, &face[f], #sizeof ivec3);
+                    dynamic_array_push(&index_array, &index);
+                    print_u64(index);
+                    print_string("\n");
                 }
             }
         }
 
         if token.type == Token_Type.TOKEN_EOF {
-            break 1;
+            break;
         }
     }
 
+    for i := 0; i < index_array.length; i += 1 {
+        print_u64(([^u64]index_array.data)[i]);
+        print_string("\n");
+    }
+
     return 0;
+}
+
+print_ivec3 :: (v : ivec3) {
+    print_string("{");
+    print_s32(v.x);
+    print_string(", ");
+    print_s32(v.y);
+    print_string(", ");
+    print_s32(v.z);
+    print_string("}");
 }
 
 print_vec3 :: (v : vec3) {

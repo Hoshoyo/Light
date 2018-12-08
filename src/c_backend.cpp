@@ -468,7 +468,7 @@ void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm, s64 d
 			bool deferred = false;
 			for (s32 i = 0; i < comm->comm_block.command_count; ++i) {
                 Ast* cm = comm->comm_block.commands[i];
-				if(deferred_index == i && comm->comm_block.block_scope->flags & SCOPE_LOOP) {
+				if(deferred_index == i && comm->comm_block.block_scope && comm->comm_block.block_scope->flags & SCOPE_LOOP) {
 					sprint("loop_defer_%lld:\n", get_scope_loop(comm->comm_block.block_scope, 1));
 					deferred = true;
 				}
@@ -506,7 +506,7 @@ void C_Code_Generator::emit_command(Type_Instance** type_table, Ast* comm, s64 d
                 }
 				sprint("\n");
 			}
-			if (!deferred && comm->comm_block.block_scope->flags & SCOPE_LOOP) {
+			if (!deferred && comm->comm_block.block_scope && comm->comm_block.block_scope->flags & SCOPE_LOOP) {
 				Scope* s =  get_scope_loop(comm->comm_block.block_scope, 1);
 				if (s) {
 					sprint("loop_defer_%llu:\n", s);

@@ -87,10 +87,21 @@ hash_table_push :: (table : Hash_Table, data : ^void, size : u64) -> u64 {
 
     while table.entries[index].occupied {
         if table.entries[index].hash == hash {
-            table.entries[index].collided = true;
+            print_string("FOUND: ");
+            print_u64(index);
+            print_string("\n");
+            print_u64(size);
+            print_string("\n");
+            print_u64(table.entries[index].size);
+            print_string("\n");
+
+            print_ivec3(*[^ivec3]data);
+            print_string("\n");
+
             if (table.equal_function)(data, size, table.entries[index].data, table.entries[index].size) {
                 return index;
             }
+            table.entries[index].collided = true;
             table.collision_count += 1;
         }
         
@@ -102,6 +113,7 @@ hash_table_push :: (table : Hash_Table, data : ^void, size : u64) -> u64 {
 
     table.entries[index].hash = hash;
     table.entries[index].data = data;
+    table.entries[index].size = size;
     table.entries[index].occupied = true;
     table.entries[index].collided = collided;
     table.entry_count += 1;
