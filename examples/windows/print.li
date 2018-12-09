@@ -10,14 +10,6 @@ string_length :: (s : ^u8) -> s64 {
     return c;
 }
 
-memcpy :: (dest : ^void, src : ^void, size : u64) -> ^void {
-	i :u64= 0;
-	while i < size {
-		*[^u8]([^u8]dest + i) = *[^u8]([^u8]src + i);
-		i += 1;
-	}
-}
-
 u64_to_str_base16 :: (value : u64, leading_zeros : bool, buffer : ^s8) -> s64
 {
     i := 0;

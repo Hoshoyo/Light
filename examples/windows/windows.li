@@ -156,12 +156,49 @@ OFSTRUCT :: struct {
 	szPathName : [128]s8;
 }
 
+
+FILETIME :: struct {
+    dwLowDateTime  : u32;
+    dwHighDateTime : u32;
+}
+
+WIN32_FIND_DATA :: struct {
+    dwFileAttributes : u32;
+    ftCreationTime : FILETIME;
+    ftLastAccessTime : FILETIME;
+    ftLastWriteTime : FILETIME;
+    nFileSizeHigh : u32;
+    nFileSizeLow : u32;
+    dwReserved0 : u32;
+    dwReserved1 : u32;
+    cFileName : [260]s8;
+    cAlternateFileName : [14]s8;
+}
+
+FINDEX_INFO_LEVELS :: enum {
+    FindExInfoStandard : 0,
+    FindExInfoBasic : 1,
+    FindExInfoMaxInfoLevel : 2
+}
+
+FINDEX_SEARCH_OPS :: enum {
+    FindExSearchNameMatch : 0,
+    FindExSearchLimitToDirectories : 1,
+    FindExSearchLimitToDevices : 2,
+    FindExSearchMaxSearchOp : 3
+}
+
+FIND_FIRST_EX_CASE_SENSITIVE   : u32 : 0x00000001;
+FIND_FIRST_EX_LARGE_FETCH      : u32 : 0x00000002;
+
 EXIT_SUCCESS      : s32 : 0;
 EXIT_FAILED       : s32 : -1;
 
 STD_INPUT_HANDLE  : u32 : -10;
 STD_OUTPUT_HANDLE : u32 : -11;
 STD_ERROR_HANDLE  : u32 : -12;
+
+INVALID_HANDLE_VALUE : ^void : [^void]-1;
 
 OF_CANCEL           : u32 : 0x00000800;
 OF_CREATE           : u32 : 0x00001000;
@@ -301,6 +338,9 @@ CloseHandle :: (handle_object : ^void) -> bool;
 CreateFileA  :: (filename : ^u8, desired_access : u32, share_mode : u32, security_attribs : ^SECURITY_ATTRIBUTES, creation_disposition : u32, flags_and_attribs : u32, handle_template_file : ^void) -> ^void;
 CreateDirectory :: (pathname : ^u8, security_attribs : ^SECURITY_ATTRIBUTES) -> bool;
 CreateDirectoryEx :: (template_directory : ^u8, new_directory : ^u8, security_attribs : ^SECURITY_ATTRIBUTES) -> bool;
+FindFirstFileExA :: (lpFileName : ^u8, fInfoLevelId : FINDEX_INFO_LEVELS, lpFindFileData : ^void, fSearchOp : FINDEX_SEARCH_OPS, lpSearchFilter : ^void, dwAdditionalFlags : u32) -> ^void;
+
+FindClose :: (hFindFile : ^void) -> bool;
 
 VirtualAlloc :: (address : ^void, size : u64, allocation_type : u32, protect : u32) -> ^void;
 VirtualFree  :: (address : ^void, size : u64, free_type : u32) -> bool;

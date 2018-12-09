@@ -1530,11 +1530,18 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 
 	// Execute commands to compile .c
 	char cmdbuffer[1024];
+#define GCC_COMPILER 1
 #if defined(_WIN32) || defined(_WIN64)
+#if GCC_COMPILER
 	sprintf(cmdbuffer, "gcc -w -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 	int len = sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe -L%.*s..\\..\\lib -lKernel32",
 		fname_len, out_obj.data, fname_len, out_obj.data, comp_path.length, comp_path.data);
+#else
+	int len = sprintf(cmdbuffer, "cl /nologo /MT /Zi %.*s /link /OUT:\"%.*s.exe\" /SUBSYSTEM:CONSOLE /ENTRY:__entry /LIBPATH:..\\..\\lib Kernel32.lib",
+		out_obj.length, out_obj.data, fname_len, out_obj.data);
+#endif
+
 #elif defined(__linux__)
     sprintf(cmdbuffer, "gcc -w -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
@@ -1545,9 +1552,13 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 	if (libs_to_link) {
 		libs_length = array_get_length(libs_to_link);
 	}
+#if GCC_COMPILER
 	for (size_t i = 0; i < libs_length; ++i) {
 		len += sprintf(cmdbuffer + len, " -l%.*s", libs_to_link[i].length, libs_to_link[i].data);
 	}
+#else
+	len += sprintf(cmdbuffer + len, " libcmtd.lib libvcruntimed.lib libucrtd.lib libcpmtd.lib ");
+#endif
 	system(cmdbuffer);
 	ho_bigfree(code_generator.buffer, 1 << 20);
 }
