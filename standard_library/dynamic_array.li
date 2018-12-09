@@ -1,4 +1,5 @@
 #import "../examples/ast.li"
+#import "../examples/linux/print.li"
 #import "memory.li"
 
 Dynamic_Array :: struct {
@@ -21,10 +22,14 @@ dynamic_array_create :: (type_info : ^Type_Info) -> Dynamic_Array {
     return da;
 }
 
+DYNAMIC_ARRAY_DEFAULT_CAPACITY : s64 : 1024;
+
+getchar :: () -> u8 #foreign("c");
+
 dynamic_array_push :: (arr : ^Dynamic_Array, data : ^void) -> s64 {
     if arr.capacity == 0 {
-        arr.data = (arr.allocator)([u64]arr.type_info.size_bytes * 2);
-        arr.capacity = 2;
+        arr.data = (arr.allocator)([u64]arr.type_info.size_bytes * [u64]DYNAMIC_ARRAY_DEFAULT_CAPACITY);
+        arr.capacity = DYNAMIC_ARRAY_DEFAULT_CAPACITY;
     } else if arr.length == arr.capacity {
         arr.data = (arr.reallocator)(arr.data, [u64]arr.type_info.size_bytes * [u64]arr.capacity * 2 + 1);
         arr.capacity = arr.capacity * 2 + 1;
@@ -33,4 +38,25 @@ dynamic_array_push :: (arr : ^Dynamic_Array, data : ^void) -> s64 {
     arr.length += 1;
 
     return arr.length - 1;
+}
+
+dynamic_array_print :: (arr : ^Dynamic_Array) -> void {
+    print_string("\nlength:    ");
+    print_s64(arr.length);
+    print_string("\ntype size: ");
+    print_s64(arr.type_info.size_bytes);
+    print_string("\ncapacity:  ");
+    print_s64(arr.capacity);
+    print_string("\ndata ptr:  ");
+    print_u64([u64]arr.data);
+    print_string("\n");
+
+    for i := 0; i < arr.length; i += 1 {
+        print_s64(i);
+        print_string(" - ");
+        print_hex_dump(&([^u8]arr.data)[i], [u64]arr.type_info.size_bytes);
+        print_string("\n");
+    }
+
+    print_string("\n");
 }

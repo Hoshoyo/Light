@@ -196,9 +196,10 @@ expect_symbol :: (tokenizer : ^Tokenizer, symbol : u8) -> s32 {
 
 Object :: struct {
     name : string;
-    positions : ^vec3;
+    vertices: Dynamic_Array;
+    indices : Dynamic_Array;
 }
-
+/*
 vec3 :: struct {
     x : r32;
     y : r32;
@@ -209,18 +210,30 @@ vec2 :: struct {
     x : r32;
     y : r32;
 }
-
+*/
 ivec3 :: struct {
     x : s32;
     y : s32;
     z : s32;
 }
 
-main :: () -> s32 {
+load_cube :: (res : ^Object) -> s32 {
     iv : ivec3;
+    fv3 : vec3;
+    fv2 : vec2;
     idx : u64;
+    ida : u32;
+    v3d : Vertex;
     table := hash_table_create(#typeof iv);
+    
     index_array := dynamic_array_create(#typeof idx);
+    index_array_i := dynamic_array_create(#typeof ida);
+    position_array := dynamic_array_create(#typeof fv3);
+    texcoord_array := dynamic_array_create(#typeof fv2);
+    normals_array := dynamic_array_create(#typeof fv3);
+    vertices_array := dynamic_array_create(#typeof v3d);
+    aux_index_array := dynamic_array_create(#typeof idx);
+    triangle_count : u64 = 0;
 
     result := read_entire_file("/home/hoshoyo/dev/objloader/cube.obj", memory_alloc);
 
@@ -230,7 +243,7 @@ main :: () -> s32 {
     while true {
         token := token_next(&tokenizer);
 
-        print_token(token);
+        //print_token(token);
 
         if token.type == Token_Type.TOKEN_COMMENT continue;
 
@@ -269,14 +282,16 @@ main :: () -> s32 {
                 parse_float(&tokenizer, &v.y);
                 parse_float(&tokenizer, &v.z);
 
+                dynamic_array_push(&position_array, &v);
                 print_vec3(v);
             } else if string_equal(token.data, "vt") {
                 // texture coordinate
                 v : vec2;
                 parse_float(&tokenizer, &v.x);
                 parse_float(&tokenizer, &v.y);
-
-                print_vec2(v);
+                
+                dynamic_array_push(&texcoord_array, &v);
+                //print_vec2(v);
             } else if string_equal(token.data, "vn") {
                 // normals
                 v : vec3;
@@ -284,11 +299,12 @@ main :: () -> s32 {
                 parse_float(&tokenizer, &v.y);
                 parse_float(&tokenizer, &v.z);
 
-                print_vec3(v);
+                dynamic_array_push(&normals_array, &v);
+                //print_vec3(v);
             } else if string_equal(token.data, "s") {
                 v : s64;
                 parse_s64(&tokenizer, &v);
-                print_s64(v);
+                //print_s64(v);
             } else if string_equal(token.data, "f") {
                 // face / triangle
                 face : [3]ivec3;
@@ -303,13 +319,16 @@ main :: () -> s32 {
                     err = parse_s32(&tokenizer, &face[f].z);
                     if err != 0 return -1;
 
-                    print_ivec3(face[f]);
-                    print_string(" -> ");
-
-                    index := hash_table_push(table, &face[f], #sizeof ivec3);
+                    index : u64;
+                    if !hash_table_entry_exist(table, &face[f], #sizeof ivec3, &index) {
+                        vecmem := [^ivec3]memory_alloc(#sizeof ivec3);
+                        memory_copy(vecmem, &face[f], #sizeof ivec3);
+                        index = hash_table_push(table, vecmem, #sizeof ivec3);
+                        table.entries[index].extra = triangle_count;
+                        dynamic_array_push(&aux_index_array, &index);
+                        triangle_count += 1;
+                    }
                     dynamic_array_push(&index_array, &index);
-                    print_u64(index);
-                    print_string("\n");
                 }
             }
         }
@@ -320,9 +339,31 @@ main :: () -> s32 {
     }
 
     for i := 0; i < index_array.length; i += 1 {
-        print_u64(([^u64]index_array.data)[i]);
-        print_string("\n");
+        hash_table_index := *([^u64]index_array.data + i);
+
+        entry := table.entries[hash_table_index];
+        ii : u32 = [u32]entry.extra;
+
+        dynamic_array_push(&index_array_i, &ii);
     }
+
+    for i := 0; i < aux_index_array.length; i += 1 {
+        hash_table_index := *([^u64]aux_index_array.data + i);
+        entry := table.entries[hash_table_index];
+        vecs := [^ivec3]entry.data;
+
+        vertex := Vertex:{
+            *([^vec3]position_array.data + (vecs.x - 1)),
+            *([^vec2]texcoord_array.data + (vecs.y - 1)),
+            *([^vec3]normals_array.data + (vecs.z - 1))
+        };
+
+        dynamic_array_push(&vertices_array, &vertex);
+    }
+    // TODO: release all unused arrays
+
+    res.vertices = vertices_array;
+    res.indices = index_array_i;
 
     return 0;
 }
@@ -378,26 +419,3 @@ print_token :: (t : Token) -> void {
     }
     print_string("\n");
 }
-
-/*
-main :: () -> s32 {
-    entry : s32 = 3;
-
-    // create hash table
-    hash_table := hash_table_create([^Type_Info]#typeof entry);
-
-    ei := hash_table_push(hash_table, &entry, #sizeof s32);
-    hash_table_remove(hash_table, &entry, #sizeof s32);
-
-    // check entry existence
-    if hash_table_entry_exist(hash_table, &entry, #sizeof s32, null) {
-        print_string("Entry exists!\n");
-    } else {
-        print_string("Entry does not exist.\n");
-    }
-
-    // delete hash table
-    hash_table_delete(hash_table);
-    return 0;
-}
-*/

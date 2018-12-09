@@ -94,22 +94,17 @@ s64_to_str :: (val : s64, buffer : [32]u8) -> s64 {
 }
 
 r32_to_str :: (v : r32, buffer : [32]u8) -> s64 {
-    zero_neg := 0;
-    l : s64 = 0;
-    if [s32]v == 0 {
-        zero_neg += 1;
-        l += 1;
-        buffer[0] = '-';
-    }
+    l := 0;
+	if v < 0.0 {
+		buffer[l] = '-';
+		l += 1;
+		v = -v;
+	}
 
-    l += s32_to_str([s32]v, [[16]u8]([^u8]buffer + zero_neg));
-    precision := 15;
+	l += s32_to_str([s32]v, [[16]u8]([^u8]buffer + l));
+	precision := 6;
 
-    if v < 0.0 {
-        v = -v;
-    }
-
-    fractional_part := v - [r32][s32]v;
+	fractional_part := v - [r32][s32]v;
 
     buffer[l] = '.';
     l += 1;
@@ -125,24 +120,23 @@ r32_to_str :: (v : r32, buffer : [32]u8) -> s64 {
         buffer[l] = [u8]fractional_part + '0';
         fractional_part = fractional_part - [r32][s32]fractional_part;
         l += 1;
+        precision -= 1;
     }
-
-    return l;
+	return l;
 }
 
 r64_to_str :: (v : r64, buffer : [64]u8) -> s64 {
-    zero_neg := 0;
-    l : s64 = 0;
-    if [s32]v == 0 {
-        zero_neg += 1;
-        l += 1;
-        buffer[0] = '-';
-    }
+    l := 0;
+	if v < 0.0 {
+		buffer[l] = '-';
+		l += 1;
+		v = -v;
+	}
 
-    l += s64_to_str([s64]v, [[32]u8]([^u8]buffer + zero_neg));
-    precision := 31;
+	l += s32_to_str([s32]v, [[16]u8]([^u8]buffer + l));
+	precision := 6;
 
-    fractional_part := v - [r64][s64]v;
+	fractional_part := v - [r64][s32]v;
 
     buffer[l] = '.';
     l += 1;
@@ -156,11 +150,11 @@ r64_to_str :: (v : r64, buffer : [64]u8) -> s64 {
     while precision > 0 && fractional_part > 0.0 {
         fractional_part *= 10.0;
         buffer[l] = [u8]fractional_part + '0';
-        fractional_part = fractional_part - [r64][s64]fractional_part;
+        fractional_part = fractional_part - [r64][s32]fractional_part;
         l += 1;
+        precision -= 1;
     }
-
-    return l;
+	return l;
 }
 
 print_bool :: (v : bool) -> s64 {
@@ -231,4 +225,24 @@ print_string_l :: (s : ^u8, length : s64) -> s64 {
 
 print_string :: (s : string) -> s64 {
     write(STDOUT_FILENO, [^void]s.data, [u64]s.length);
+}
+
+byte_to_hex_ascii :: (b : u8) -> u8 {
+    if b <= 9 {
+        return b + 0x30;
+    } else {
+        return b + 0x37;
+    }
+}
+
+print_hex_dump :: (data : ^u8, size : u64) {
+    for i :u64= 0; i < size; i += 1 {
+        if i != 0 && i % 2 == 0 {
+            print_string(" ");
+        }
+        v := byte_to_hex_ascii((data[i] & 0xf0) >> 4);
+        write(STDOUT_FILENO, &v, 1);
+        v = byte_to_hex_ascii(data[i] & 0x0f);
+        write(STDOUT_FILENO, &v, 1);
+    }
 }
