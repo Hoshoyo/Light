@@ -1542,16 +1542,14 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 		out_obj.length, out_obj.data, fname_len, out_obj.data);
 #endif
 
-#elif defined(__linux__) || defined(__APPLE__)
     sprintf(cmdbuffer, "gcc -w -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
-#ifdef defined(__linux___
+#elif defined(__linux__)
 	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
 		fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
-#else
+#elif defined(__APPLE__)
   int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -lc",// -lc -lX11 -lGL",
     fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
-#endif
 #endif
 	size_t libs_length = 0;
 	if (libs_to_link) {

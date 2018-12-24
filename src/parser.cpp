@@ -232,7 +232,35 @@ void Parser::parse_directive(Scope* scope) {
 	require_and_eat('#');
 
 	Token* directive = lexer->eat_token();
-	if(directive->type != TOKEN_IDENTIFIER) {
+
+	if (directive->type == TOKEN_KEYWORD_IF) {
+		// @Temporary
+		Token* next = lexer->eat_token();
+#if defined(_WIN32) || #defined(_WIN64)
+		if(!str_equal(next->value, MAKE_STRING("WINDOWS"))) 
+#elif defined(__linux__)
+		if(!str_equal(next->value, MAKE_STRING("LINUX"))) 
+#elif defined(__APPLE__)
+		if(!str_equal(next->value, MAKE_STRING("OSX"))) 
+		#endif
+		{
+			// eat until #endif
+			Token* next;
+			while(1) {
+				next = lexer->eat_token();
+				if(next->type == TOKEN_END_OF_STREAM){
+					return;
+				}
+				if(next->type == '#') {
+					next = lexer->eat_token();
+					if(str_equal(next->value, MAKE_STRING("endif"))) {
+						break;
+					}
+				}
+			}
+		}
+		return;
+	} else if (directive->type != TOKEN_IDENTIFIER) {
 		report_syntax_error(directive, "expected compiler directive but got '%.*s'\n", TOKEN_STR(directive));
 	}
 
@@ -292,6 +320,8 @@ void Parser::parse_directive(Scope* scope) {
 		} else {
 			report_syntax_error(directive, "#end directive is not ending any directive block\n");
 		}
+	} else if(str_equal(directive->value, MAKE_STRING("endif"))) {
+
 	} else {
 		report_syntax_error(directive, "unrecognized compiler directive '%.*s'\n", TOKEN_STR(directive));
 	}
