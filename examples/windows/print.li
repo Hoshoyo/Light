@@ -1,4 +1,7 @@
 #import "windows.li"
+
+memcpy :: (dst : ^void, src : ^void, size : u64) -> ^void #foreign("msvcrt");
+
 stdout := GetStdHandle(STD_OUTPUT_HANDLE);
 
 string_length :: (s : ^u8) -> s64 {

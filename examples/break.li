@@ -1,5 +1,10 @@
-//#import "./examples/windows/print.li"
+#if WINDOWS
+#import "./examples/windows/print.li"
+#endif
+
+#if LINUX
 #import "linux/print.li"
+#endif
 
 main :: () -> s32 {
 	

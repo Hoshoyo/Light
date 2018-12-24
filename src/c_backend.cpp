@@ -263,7 +263,11 @@ void C_Code_Generator::emit_decl(Type_Instance** type_table, Ast* decl, bool for
 				sprint(" %.*s(", TOKEN_STR(decl->decl_procedure.name));
 			} else {
 				if (decl->decl_procedure.flags & DECL_PROC_FLAG_MAIN) {
+#if defined(_WIN32) || defined(_WIN64)
+					sprint(" __%.*s(", TOKEN_STR(decl->decl_procedure.name));
+#else
 					sprint(" %.*s(", TOKEN_STR(decl->decl_procedure.name));
+#endif
 				} else {
 					sprint(" %.*s(", TOKEN_STR(decl->decl_procedure.name));
 				}
@@ -1529,22 +1533,14 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 
 	// Execute commands to compile .c
 	char cmdbuffer[1024];
-#define GCC_COMPILER 1
-#if defined(_WIN32) || defined(_WIN64)
-#if GCC_COMPILER
 	sprintf(cmdbuffer, "gcc -w -c -g %.*s -o %.*s.obj", out_obj.length, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
+
+#if defined(_WIN32) || defined(_WIN64)
 	int len = sprintf(cmdbuffer, "ld %.*s.obj -e__entry -nostdlib -o %.*s.exe -L%.*s..\\..\\lib -lKernel32",
 		fname_len, out_obj.data, fname_len, out_obj.data, comp_path.length, comp_path.data);
-#else
-	int len = sprintf(cmdbuffer, "cl /nologo /MT /Zi %.*s /link /OUT:\"%.*s.exe\" /SUBSYSTEM:CONSOLE /ENTRY:__entry /LIBPATH:..\\..\\lib Kernel32.lib",
-		out_obj.length, out_obj.data, fname_len, out_obj.data);
-#endif
-
-    sprintf(cmdbuffer, "gcc -w -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
-	system(cmdbuffer);
 #elif defined(__linux__)
-	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
+	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",
 		fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
 #elif defined(__APPLE__)
   int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -lc",// -lc -lX11 -lGL",
@@ -1554,13 +1550,12 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 	if (libs_to_link) {
 		libs_length = array_get_length(libs_to_link);
 	}
-#if GCC_COMPILER
+
 	for (size_t i = 0; i < libs_length; ++i) {
 		len += sprintf(cmdbuffer + len, " -l%.*s", libs_to_link[i].length, libs_to_link[i].data);
 	}
-#else
-	len += sprintf(cmdbuffer + len, " libcmtd.lib libvcruntimed.lib libucrtd.lib libcpmtd.lib ");
-#endif
+
+	// Run the linker
 	system(cmdbuffer);
 	ho_bigfree(code_generator.buffer, 1 << 20);
 }
