@@ -10,6 +10,10 @@
 #define assert_msg(X, MSG) do{ if(!(X)) { fprintf(stderr, "assertion failed %s:%d '%s'\n", __FILE__, __LINE__, MSG); exit(-1); }} while(0)
 #endif
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -90,7 +94,15 @@ bool HO_API ho_file_exists(const char* filepath) {
 
 const char* HO_API ho_current_exe_path() {
 	char result[PATH_MAX] = {0};
-	ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+  ssize_t count;
+#ifdef __linux__
+	count = readlink("/proc/self/exe", result, PATH_MAX);
+#else
+  uint32_t size = sizeof(result);
+  if (_NSGetExecutablePath(result, &size) != 0)
+    printf("buffer too small; need size %u\n", size);
+  count = strlen(result);
+#endif
 
 	const char *path;
 	if (count != -1) {
@@ -103,7 +115,15 @@ const char* HO_API ho_current_exe_path() {
 
 const char* HO_API ho_current_exe_full_path() {
 	char result[PATH_MAX] = {0};
-	ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+  ssize_t count;
+#ifdef __linux__
+	count = readlink("/proc/self/exe", result, PATH_MAX);
+#else
+  uint32_t size = sizeof(result);
+  if (_NSGetExecutablePath(result, &size) != 0)
+    printf("buffer too small; need size %u\n", size);
+  count = strlen(result);
+#endif
 
 	char* path = (char*)malloc(count + 1);
 	path[count] = 0;

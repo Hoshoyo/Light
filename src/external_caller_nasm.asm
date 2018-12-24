@@ -5,8 +5,13 @@ section .text
 ; rdx  pointer to stack
 ; r8   size of stack
 ;call_external proc
+%ifdef OSX
+global _call_external
+_call_external:
+%else
 global call_external
 call_external:
+%endif
 	push rbp
 	push rdi
 	push rdx

@@ -7,7 +7,7 @@
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #define RUNTIME_BYTECODE_ASSERT_FAIL(X) MessageBoxA(0, X, "Assert Failed", MB_ICONERROR)
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #define RUNTIME_BYTECODE_ASSERT_FAIL(X) printf(X)
 #endif
 

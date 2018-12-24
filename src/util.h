@@ -77,7 +77,7 @@ struct TimeFunc {
 
 #if defined(_WIN64) || defined(_WIN32)
 #define TIME_FUNC() TimeFunc time_##__FUNCTION__##(__FUNCTION__)
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #define TIME_FUNC() TimeFunc time_function(__FUNCTION__)
 #define TIME_FUNC_NAMED(X) TimeFunc time_function_named(X)
 #endif

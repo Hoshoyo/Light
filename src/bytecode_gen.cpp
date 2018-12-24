@@ -8,7 +8,7 @@
 #if defined(_WIN64)
 void* load_address_of_external_function(string* name, HMODULE library);
 HMODULE load_library_dynamic(string* library);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 typedef void* HMODULE;
 #include <dlfcn.h>
 void* load_address_of_external_function(string* name, void* library);

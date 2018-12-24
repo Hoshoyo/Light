@@ -19,7 +19,7 @@ typedef double r64;
 
 #if defined(_WIN32) || defined(_WIN64)
 #include "ho_windows.h"
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 #define HO_API
 #include <stdlib.h>
 #include <string.h>

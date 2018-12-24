@@ -263,7 +263,7 @@ void C_Code_Generator::emit_decl(Type_Instance** type_table, Ast* decl, bool for
 				sprint(" %.*s(", TOKEN_STR(decl->decl_procedure.name));
 			} else {
 				if (decl->decl_procedure.flags & DECL_PROC_FLAG_MAIN) {
-					sprint(" __%.*s(", TOKEN_STR(decl->decl_procedure.name));
+					sprint(" %.*s(", TOKEN_STR(decl->decl_procedure.name));
 				} else {
 					sprint(" %.*s(", TOKEN_STR(decl->decl_procedure.name));
 				}
@@ -1444,7 +1444,7 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 	// Global variable initialization
 #if defined(_WIN32) || defined(_WIN64)    
 	sprint("\nvoid __entry() {\n");
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     sprint("\nint __entry() {\n");
 #endif
 	sprint(runtime_buffer->data);
@@ -1480,8 +1480,8 @@ int C_Code_Generator::c_generate_top_level(Ast** toplevel, Type_Instance** type_
 
 #if defined(_WIN32) || defined(_WIN64)
 	sprint("\tExitProcess(__main());\n");
-#elif defined(__linux__)
-	sprint("\treturn __main();\n");
+#elif defined(__linux__) || defined(__APPLE__)
+	sprint("\treturn main();\n");
 #endif
 	sprint("}");
 
@@ -1542,11 +1542,16 @@ void c_generate(Ast** toplevel, Type_Instance** type_table, char* filename, char
 		out_obj.length, out_obj.data, fname_len, out_obj.data);
 #endif
 
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
     sprintf(cmdbuffer, "gcc -w -c %s -o %.*s.obj", out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
+#ifdef defined(__linux___
 	int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -s -dynamic-linker /lib64/ld-linux-x86-64.so.2 -lc",// -lc -lX11 -lGL",
 		fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
+#else
+  int len = sprintf(cmdbuffer, "ld %.*s.obj %.*s../../temp/c_entry.o -o %.*s -lc",// -lc -lX11 -lGL",
+    fname_len, out_obj.data, comp_path.length, comp_path.data, fname_len, out_obj.data);
+#endif
 #endif
 	size_t libs_length = 0;
 	if (libs_to_link) {

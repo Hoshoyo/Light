@@ -934,7 +934,7 @@ void DEBUG_print_return_command(FILE* out, Ast* node)
 void DEBUG_print_break_command(FILE* out, Ast* node)
 {
 	fprintf(out, "break ");
-	if (node->comm_break.level > 0)
+	if (node->comm_break.level != 0)
 		DEBUG_print_expression(out, node->comm_break.level);
 }
 

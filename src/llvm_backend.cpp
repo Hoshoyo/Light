@@ -963,7 +963,7 @@ void llvm_generate_ir(Ast** toplevel, Type_Instance** type_table, char* filename
 		fname_len, out_obj.data, fname_len, out_obj.data);
 	system(cmdbuffer);
 }
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 void llvm_generate_ir(Ast** toplevel, Type_Instance** type_table, char* filename) {
 	LLVM_Code_Generator code_generator = {};
 	code_generator.in_filename = filename;
