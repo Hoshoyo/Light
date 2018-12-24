@@ -236,13 +236,13 @@ void Parser::parse_directive(Scope* scope) {
 	if (directive->type == TOKEN_KEYWORD_IF) {
 		// @Temporary
 		Token* next = lexer->eat_token();
-#if defined(_WIN32) || #defined(_WIN64)
+#if defined(_WIN32) || defined(_WIN64)
 		if(!str_equal(next->value, MAKE_STRING("WINDOWS"))) 
 #elif defined(__linux__)
 		if(!str_equal(next->value, MAKE_STRING("LINUX"))) 
 #elif defined(__APPLE__)
 		if(!str_equal(next->value, MAKE_STRING("OSX"))) 
-		#endif
+#endif
 		{
 			// eat until #endif
 			Token* next;
