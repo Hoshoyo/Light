@@ -1197,7 +1197,6 @@ User_Type_Info* fill_user_type_table(Type_Instance** type_table, User_Type_Table
 	// @IMPORTANT
 	Light_Arena* arena = arena_create(65536 * 10);
 	Light_Arena* strings_type = arena_create(65536 * 10);
-	//u8* strings_type = array_create(u8, 65536);
 	User_Type_Info* user_tt = (User_Type_Info*)calloc(array_get_length(type_table), sizeof(User_Type_Info));
 
 	u8* extra_space = 0;
