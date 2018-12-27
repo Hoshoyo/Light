@@ -123,6 +123,21 @@ syntax_error :: (err : string, token : Token) -> s32 {
     return -1;
 }
 
+str_to_s64 :: (str : string) -> s64 {
+    result : s64;
+    tenths : s64 = 1;
+
+    for i := str.length - 1; i >= 0; i -= 1, tenths *= 10 {
+        result += ([s64]str.data[i] - 0x30) * tenths;
+    }
+    print_string("string = ");
+    print_string(str);
+    print_string(" -> s64 = ");
+    print_s64(result);
+    print_string("\n");
+    return result;
+}
+
 parse_s32 :: (tokenizer : ^Tokenizer, out_int : ^s32) -> s32 {
     i : s64;
     r := parse_s64(tokenizer, &i);
@@ -142,13 +157,7 @@ parse_s64 :: (tokenizer : ^Tokenizer, out_int : ^s64) -> s32 {
         return syntax_error("expected integer", token);
     }
 
-    result := 0;
-    multiplier := 10;
-
-    for i := 0; i < token.data.length; i += 1 {
-		result += [s64](token.data.data[i] - 0x30);
-		multiplier *= multiplier;
-	}
+    result := str_to_s64(token.data);
     *out_int = result * sign;
     return 0;
 }
@@ -167,18 +176,21 @@ parse_float :: (tokenizer : ^Tokenizer, out_r32 : ^r32) -> s32 {
     }
 
     result := 0.0;
-	multiplier := 10.0;
-	m := 1.0;
+	tenths := 1.0;
+	frac_tenths := 0.1;
+    point_index := 0;
+    text := token.data.data;
 
-	for i := 0; i < token.data.length; i += 1 {
-		if token.data.data[i] == '.' {
-			multiplier = 0.1;
-			m = 0.1;
-			continue;
-		}
-		result += m * [r32](token.data.data[i] - 0x30);
-		m *= multiplier;
-	}
+    while text[point_index] != '.' {
+        point_index += 1;
+    }
+
+	for i := point_index - 1; i >= 0; i -= 1, tenths *= 10.0 {
+        result += [r32](text[i] - 0x30) * tenths;
+    }
+    for i := point_index + 1; i < token.data.length; i += 1, frac_tenths *= 0.1 {
+        result += [r32](text[i] - 0x30) * frac_tenths;
+    }
 
     *out_r32 = result * sign;
     return 0;
@@ -235,7 +247,7 @@ load_cube :: (res : ^Object) -> s32 {
     aux_index_array := dynamic_array_create(#typeof idx);
     triangle_count : u64 = 0;
 
-    result := read_entire_file("/home/hoshoyo/dev/objloader/cube.obj", memory_alloc);
+    result := read_entire_file("/home/hoshoyo/dev/objloader/house.obj", memory_alloc);
 
     tokenizer: Tokenizer;
     tokenizer.stream = result;
@@ -343,10 +355,16 @@ load_cube :: (res : ^Object) -> s32 {
 
         entry := table.entries[hash_table_index];
         ii : u32 = [u32]entry.extra;
+        print_string("index: ");
+        print_u32(ii);
+        print_string("\n");
 
         dynamic_array_push(&index_array_i, &ii);
     }
 
+    print_string("Aux array length: ");
+    print_s64(aux_index_array.length);
+    print_string("\n");
     for i := 0; i < aux_index_array.length; i += 1 {
         hash_table_index := *([^u64]aux_index_array.data + i);
         entry := table.entries[hash_table_index];
@@ -357,6 +375,11 @@ load_cube :: (res : ^Object) -> s32 {
             *([^vec2]texcoord_array.data + (vecs.y - 1)),
             *([^vec3]normals_array.data + (vecs.z - 1))
         };
+
+        print_vec3(vertex.position);
+        print_vec2(vertex.texture_coord);
+        print_vec3(vertex.normal);
+        print_string("\n");
 
         dynamic_array_push(&vertices_array, &vertex);
     }
