@@ -1,11 +1,15 @@
 #include "lightvm.h"
+#include <stdarg.h>
 
 static bool start_with(const char* start, const char* str, s32* count) {
     *count = 0;
-    while(*start++ == *str++) {
+    while(1) {
+        if(!start[*count])
+            return 1;
+        if(start[*count] != str[*count])
+            return 0;
         (*count)++;
     }
-    return !(*(start - 1));
 }
 
 static bool is_number(char c) {
@@ -41,10 +45,16 @@ get_register(const char** at, u8* byte_size) {
     } else {
         if(**at == 's') { // rsp
             (*at)++;
+            reg = RSP;
         } else if(**at == 'b') { // rbp
             (*at)++;
+            reg = RBP;
         } else if(**at == 'i') { // rip
             (*at)++;
+            reg = RIP;
+        } else if(**at == 'd') { // rdp
+            (*at)++;
+            reg = RDP;
         }
         assert(**at == 'p');
         (*at)++;
@@ -150,6 +160,8 @@ instruction_type(const char** at) {
         type = LVM_COPY;
     } else if(start_with("hlt", *at, &count)) {
         type = LVM_HLT;
+    } else {
+        assert(0);
     }
     (*at) += count;
     return type;
@@ -339,6 +351,7 @@ light_vm_instruction_get(const char* s, u64* immediate) {
                 instruction.ifloat.dst_reg = get_float_register(&at);
                 EAT_COMMA;
                 if(*at == '[') {
+                    at++;
                     instruction.ifloat.src_reg = get_register(&at, 0);
                     eat_whitespace(&at);
                     if(*at == '+' || *at == '-') {
@@ -391,4 +404,34 @@ light_vm_push(Light_VM_State* vm_state, const char* instruction) {
     u64 imm = 0;
     Light_VM_Instruction i = light_vm_instruction_get(instruction, &imm);
     return light_vm_push_instruction(vm_state, i, imm);
+}
+
+Light_VM_Intruction_Info 
+light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...) {
+    char buffer[256] = {0};
+    va_list args;
+    va_start(args, instruction);
+    vsprintf(buffer, instruction, args);
+    va_end(args);
+
+    u64 imm = 0;
+    Light_VM_Instruction i = light_vm_instruction_get(buffer, &imm);
+    return light_vm_push_instruction(vm_state, i, imm);
+}
+
+void*
+light_vm_push_data_segment(Light_VM_State* vm_state, Light_VM_Data data) {
+    void* ptr = (vm_state->data.block +vm_state->data_offset);
+
+    switch(data.byte_size) {
+        case 1: *(u8*)ptr = data.unsigned_byte; break;
+        case 2: *(u16*)ptr = data.unsigned_word; break;
+        case 4: *(u32*)ptr = data.unsigned_dword; break;
+        case 8: *(u64*)ptr = data.unsigned_qword; break;
+        default: assert(0); break;
+    }
+
+    vm_state->data_offset += data.byte_size;
+
+    return ptr;
 }

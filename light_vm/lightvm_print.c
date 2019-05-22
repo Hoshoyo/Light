@@ -29,6 +29,7 @@ print_register(FILE* out, u8 reg, u8 byte_size) {
         case RIP: fprintf(out, "RIP"); break;
         case RSP: fprintf(out, "RSP"); break;
         case RBP: fprintf(out, "RBP"); break;
+        case RDP: fprintf(out, "RDP"); break;
         case R_FLAGS: fprintf(out, "R_FLAGS"); break;
         default: fprintf(out, "Invalid register"); break;
     }
@@ -324,7 +325,29 @@ light_vm_debug_dump_registers(FILE* out, Light_VM_State* state) {
     fprintf(out, "R6: 0x%llx \t R7: 0x%llx\n", state->registers[R6], state->registers[R7]);
     fprintf(out, "\n");
     fprintf(out, "RSP: 0x%llx \t RBP: 0x%llx\n", state->registers[RSP], state->registers[RBP]);
-    fprintf(out, "RIP: 0x%llx \t FLG: 0x%llx\n", state->registers[RIP], state->registers[R_FLAGS]);
+    fprintf(out, "RIP: 0x%llx \t RDP: 0x%llx\n", state->registers[RIP], state->registers[RDP]);
+    fprintf(out, "\n");
+    fprintf(out, "FR0: %f \t FR1: %f\n", state->f32registers[FR0], state->f32registers[FR1]);
+    fprintf(out, "FR2: %f \t FR3: %f\n", state->f32registers[FR2], state->f32registers[FR3]);
+    fprintf(out, "FR4: %f \t FR5: %f\n", state->f64registers[FR4], state->f64registers[FR5]);
+    fprintf(out, "FR6: %f \t FR7: %f\n", state->f64registers[FR6], state->f64registers[FR7]);
+    fprintf(out, "\n");
+    fprintf(out, "Carry: %d ", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->carry);
+    fprintf(out, "Zero: %d ", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->zerof);
+    fprintf(out, "Sign: %d ", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->sign);
+    fprintf(out, "Overflow: %d", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->overflow);
+    fprintf(out, "\n");
+}
+
+void 
+light_vm_debug_dump_registers_dec(FILE* out, Light_VM_State* state) {
+    fprintf(out, "R0: %lld \t R1: %lld\n", state->registers[R0], state->registers[R1]);
+    fprintf(out, "R2: %lld \t R3: %lld\n", state->registers[R2], state->registers[R3]);
+    fprintf(out, "R4: %lld \t R5: %lld\n", state->registers[R4], state->registers[R5]);
+    fprintf(out, "R6: %lld \t R7: %lld\n", state->registers[R6], state->registers[R7]);
+    fprintf(out, "\n");
+    fprintf(out, "RSP: 0x%llx \t RBP: 0x%llx\n", state->registers[RSP], state->registers[RBP]);
+    fprintf(out, "RIP: 0x%llx \t RDP: 0x%llx\n", state->registers[RIP], state->registers[RDP]);
     fprintf(out, "\n");
     fprintf(out, "FR0: %f \t FR1: %f\n", state->f32registers[FR0], state->f32registers[FR1]);
     fprintf(out, "FR2: %f \t FR3: %f\n", state->f32registers[FR2], state->f32registers[FR3]);
