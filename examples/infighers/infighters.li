@@ -185,6 +185,7 @@ main :: () -> s32 {
 
 	screen_width : s32;
 	screen_height : s32;
+
 	screen_size(&info, &screen_width, &screen_height);
 
 	cube := cube_new();

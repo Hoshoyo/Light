@@ -247,7 +247,11 @@ load_cube :: (res : ^Object) -> s32 {
     aux_index_array := dynamic_array_create(#typeof idx);
     triangle_count : u64 = 0;
 
-    result := read_entire_file("/home/hoshoyo/dev/objloader/house.obj", memory_alloc);
+    result := read_entire_file("/home/hoshoyo/dev/squiggly/res/models/plane.obj", memory_alloc);
+
+    if result.length == 0 {
+        print_string("could not load file\n");
+    }
 
     tokenizer: Tokenizer;
     tokenizer.stream = result;
