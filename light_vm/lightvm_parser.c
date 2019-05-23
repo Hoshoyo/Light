@@ -16,6 +16,14 @@ static bool is_number(char c) {
     return (c >= '0' && c <= '9');
 }
 
+static bool is_hex_number(char c) {
+    return (
+        (c >= '0' && c <= '9') || 
+        (c >= 'a' && c <= 'f') ||
+        (c >= 'A' && c <= 'F')
+        );
+}
+
 static u8
 get_float_register(const char** at) {
     u8 reg = 0;
@@ -164,6 +172,12 @@ instruction_type(const char** at) {
         type = LVM_FBLT;
     } else if(start_with("call", *at, &count)) {
         type = LVM_CALL;
+    } else if(start_with("ret", *at, &count)) {
+        type = LVM_RET;
+    } else if(start_with("pop", *at, &count)) {
+        type = LVM_POP;
+    } else if(start_with("push", *at, &count)) {
+        type = LVM_PUSH;
     } else if(start_with("copy", *at, &count)) {
         type = LVM_COPY;
     } else if(start_with("hlt", *at, &count)) {
@@ -217,7 +231,7 @@ parse_number(const char** at, u8* size_bytes) {
     if(**at == '0') {
         // hex
         int len = 2;
-        for(; is_number((*at)[len]); ++len);
+        for(; is_hex_number((*at)[len]); ++len);
         result = parse_int_hex(*at, len);
         (*at) += len;
     } else {
@@ -388,6 +402,7 @@ light_vm_instruction_get(const char* s, u64* immediate) {
         } break;
 
         // Comparison/Branch
+        case LVM_CALL:
         case LVM_FBEQ: case LVM_FBNE: case LVM_FBGT: case LVM_FBLT:
         case LVM_BEQ: case LVM_BNE: case LVM_BLT_S:
         case LVM_BGT_S: case LVM_BLE_S: case LVM_BGE_S:
@@ -409,7 +424,7 @@ light_vm_instruction_get(const char* s, u64* immediate) {
             }
         } break;
 
-        case LVM_EXTCALL: case LVM_CALL:
+        case LVM_EXTCALL:
             break;
 
         // TODO(psv):

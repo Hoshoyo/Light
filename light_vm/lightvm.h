@@ -163,25 +163,6 @@ typedef struct {
     u32   immediate_byte_size; // immediate value only
 } Light_VM_Instruction_Info;
 
-Light_VM_State* light_vm_init();
-Light_VM_Instruction_Info light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, u64 immediate);
-Light_VM_Instruction_Info light_vm_push(Light_VM_State* vm_state, const char* instruction);
-Light_VM_Instruction_Info light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...);
-
-// -------------------------------------
-// ----------- Printing ----------------
-// -------------------------------------
-void print_instruction(FILE* out, Light_VM_Instruction instr, u64 imm);
-void light_vm_debug_dump_registers(FILE* out, Light_VM_State* state);
-void light_vm_debug_dump_registers_dec(FILE* out, Light_VM_State* state);
-void light_vm_debug_dump_code(FILE* out, Light_VM_State* state);
-
-Light_VM_Instruction light_vm_instruction_get(const char* s, u64* immediate);
-
-void light_vm_execute(Light_VM_State* state);
-void light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr);
-
-
 typedef struct {
     u8 byte_size;
     union {
@@ -197,4 +178,31 @@ typedef struct {
         r64 float64;
     };
 } Light_VM_Data;
-void* light_vm_push_data_segment(Light_VM_State* vm_state, Light_VM_Data data);
+
+Light_VM_State*           light_vm_init();
+Light_VM_Instruction_Info light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, u64 immediate);
+Light_VM_Instruction_Info light_vm_push(Light_VM_State* vm_state, const char* instruction);
+Light_VM_Instruction_Info light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...);
+Light_VM_Instruction      light_vm_instruction_get(const char* s, u64* immediate);
+void*                     light_vm_push_data_segment(Light_VM_State* vm_state, Light_VM_Data data);
+s32                       light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instruction_Info to);
+void*                     light_vm_push_r32_to_datasegment(Light_VM_State* state, r32 f);
+void*                     light_vm_push_r64_to_datasegment(Light_VM_State* state, r64 f);
+
+// -------------------------------------
+// ----------- Printing ----------------
+// -------------------------------------
+enum {
+    LVM_PRINT_FLOATING_POINT_REGISTERS = FLAG(0),
+    LVM_PRINT_DECIMAL                  = FLAG(1),
+    LVM_PRINT_FLAGS_REGISTER           = FLAG(2),
+}; 
+void light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, u64 imm);
+void light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags);
+void light_vm_debug_dump_code(FILE* out, Light_VM_State* state);
+
+// -------------------------------------
+// ----------- Execution ---------------
+// -------------------------------------
+void light_vm_execute(Light_VM_State* state, bool print_steps);
+void light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr);
