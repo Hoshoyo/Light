@@ -151,19 +151,19 @@ print_call_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
         case LVM_EXTCALL: fprintf(out, "EXTCALL "); break;
         default: fprintf(out, "Invalid call instruction"); break;
     }
-    switch(instr.call.addr_mode) {
-        case CALL_ADDR_MODE_IMMEDIATE_ABSOLUTE:{
+    switch(instr.branch.addr_mode) {
+        case BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE:{
             fprintf(out, "0x%llx", imm);
         } break;
-        case CALL_ADDR_MODE_IMMEDIATE_RELATIVE:{
+        case BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE:{
             print_immediate(out, instr.imm_size_bytes, imm);
         } break;
-        case CALL_ADDR_MODE_REGISTER:{
-            print_register(out, instr.call.reg, 8);
+        case BRANCH_ADDR_MODE_REGISTER:{
+            print_register(out, instr.branch.reg, 8);
         } break;
-        case CALL_ADDR_MODE_REGISTER_INDIRECT:{
+        case BRANCH_ADDR_MODE_REGISTER_INDIRECT:{
             fprintf(out, "[");
-            print_register(out, instr.call.reg, 8);
+            print_register(out, instr.branch.reg, 8);
             fprintf(out, "]");
         } break;
         default: fprintf(out, "Invalid call addressing mode"); break;
@@ -225,6 +225,35 @@ print_float_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
 }
 
 void
+print_float_branch_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
+    switch(instr.type) {
+        case LVM_FBEQ: fprintf(out, "FBEQ "); break;
+        case LVM_FBNE: fprintf(out, "FBNE "); break;
+        case LVM_FBGT: fprintf(out, "FBGT "); break;
+        case LVM_FBLT: fprintf(out, "FBLT "); break;
+        default: fprintf(out, "Invalid float branch instruction"); break;        
+    }
+    switch(instr.branch.addr_mode) {
+        case BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE:
+            print_immediate(out, instr.imm_size_bytes, imm);
+            break;
+        case BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE:
+            print_immediate(out, instr.imm_size_bytes, imm);
+            fprintf(out, "(rel)");
+            break;
+        case BRANCH_ADDR_MODE_REGISTER:
+            print_register(out, instr.branch.reg, 8);
+            break;
+        case BRANCH_ADDR_MODE_REGISTER_INDIRECT:
+            fprintf(out, "[");
+            print_register(out, instr.branch.reg, 8);
+            fprintf(out, "]");
+            break;
+        default: fprintf(out, "Invalid branch addressing mode"); break;
+    }
+}
+
+void
 print_branch_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
     switch(instr.type) {
         case LVM_BEQ:   fprintf(out, "BEQ "); break;
@@ -241,7 +270,24 @@ print_branch_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
         default: fprintf(out, "Invalid comparison instruction"); break;
     }
 
-    print_immediate(out, instr.imm_size_bytes, imm);
+    switch(instr.branch.addr_mode) {
+        case BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE:
+            print_immediate(out, instr.imm_size_bytes, imm);
+            break;
+        case BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE:
+            print_immediate(out, instr.imm_size_bytes, imm);
+            fprintf(out, "(rel)");
+            break;
+        case BRANCH_ADDR_MODE_REGISTER:
+            print_register(out, instr.branch.reg, 8);
+            break;
+        case BRANCH_ADDR_MODE_REGISTER_INDIRECT:
+            fprintf(out, "[");
+            print_register(out, instr.branch.reg, 8);
+            fprintf(out, "]");
+            break;
+        default: fprintf(out, "Invalid branch addressing mode"); break;
+    }
 }
 
 void 
@@ -293,6 +339,13 @@ print_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
         case LVM_BGE_U:
         case LVM_JMP:
             print_branch_instruction(out, instr, imm);
+            break;
+
+        case LVM_FBEQ:
+        case LVM_FBNE:
+        case LVM_FBGT:
+        case LVM_FBLT:
+            print_float_branch_instruction(out, instr, imm);
             break;
 
         case LVM_EXTCALL:

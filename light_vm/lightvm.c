@@ -101,8 +101,8 @@ light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, 
         } break;
 
         case LVM_EXTCALL: case LVM_CALL:
-            if( instr.call.addr_mode == CALL_ADDR_MODE_IMMEDIATE_ABSOLUTE ||
-                instr.call.addr_mode == CALL_ADDR_MODE_IMMEDIATE_RELATIVE) 
+            if( instr.branch.addr_mode == BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE ||
+                instr.branch.addr_mode == BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE) 
             {
                 info.immediate_byte_size = instr.imm_size_bytes;
                 push_immediate(vm_state, info.immediate_byte_size, immediate);
@@ -381,6 +381,50 @@ light_vm_execute_float_instruction(Light_VM_State* state, Light_VM_Instruction i
     }
 }
 
+bool
+light_vm_execute_float_branch_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
+    void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
+    u64 imm_val = get_value_off_immediate(state, instr, address_of_imm);
+
+    bool branch = false;
+
+    switch(instr.type) {
+        case LVM_FBEQ:{
+            branch = state->rfloat_flags.equal;
+        }break;
+        case LVM_FBNE:{
+            branch = !state->rfloat_flags.equal;
+        }break;
+        case LVM_FBGT:{
+            branch = state->rfloat_flags.bigger_than;
+        }break;
+        case LVM_FBLT:{
+            branch = state->rfloat_flags.less_than;
+        }break;
+        default: assert(0); break;
+    }
+
+    if(branch){        
+        switch(instr.branch.addr_mode) {
+            case BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE:
+                state->registers[RIP] = imm_val;
+                break;
+            case BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE:
+                state->registers[RIP] += imm_val;
+                break;
+            case BRANCH_ADDR_MODE_REGISTER:
+                state->registers[RIP] = state->registers[instr.branch.reg];
+                break;
+            case BRANCH_ADDR_MODE_REGISTER_INDIRECT:
+                state->registers[RIP] = *(u64*)state->registers[instr.branch.reg];
+                break;
+            default: assert(0); break;
+        }
+    }
+
+    return branch;
+}
+
 // Return if the branch is taken or not
 bool
 light_vm_execute_branch_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
@@ -424,8 +468,23 @@ light_vm_execute_branch_instruction(Light_VM_State* state, Light_VM_Instruction 
         }break;
         default: assert(0); break;
     }
-    if(branch)
-        state->registers[RIP] += imm_val;
+    if(branch){        
+        switch(instr.branch.addr_mode) {
+            case BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE:
+                state->registers[RIP] = imm_val;
+                break;
+            case BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE:
+                state->registers[RIP] += imm_val;
+                break;
+            case BRANCH_ADDR_MODE_REGISTER:
+                state->registers[RIP] = state->registers[instr.branch.reg];
+                break;
+            case BRANCH_ADDR_MODE_REGISTER_INDIRECT:
+                state->registers[RIP] = *(u64*)state->registers[instr.branch.reg];
+                break;
+            default: assert(0); break;
+        }
+    }
     return branch;
 }
 
@@ -509,10 +568,15 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
         case LVM_BLE_U:
         case LVM_BGE_U:
         case LVM_JMP:{
-            if(!light_vm_execute_branch_instruction(state, instr)) {
-                advance_ip = true;
-            }
+            advance_ip = !light_vm_execute_branch_instruction(state, instr);
         } break;
+
+        case LVM_FBEQ:
+        case LVM_FBNE:
+        case LVM_FBGT:
+        case LVM_FBLT:
+            advance_ip = !light_vm_execute_float_branch_instruction(state, instr);
+            break;
 
         case LVM_EXTCALL:
         case LVM_CALL:

@@ -154,6 +154,14 @@ instruction_type(const char** at) {
         type = LVM_BGE_U;
     } else if(start_with("jmp", *at, &count)) {
         type = LVM_JMP;
+    } else if(start_with("fbeq", *at, &count)) {
+        type = LVM_FBEQ;
+    } else if(start_with("fbne", *at, &count)) {
+        type = LVM_FBNE;
+    } else if(start_with("fbgt", *at, &count)) {
+        type = LVM_FBGT;
+    } else if(start_with("fblt", *at, &count)) {
+        type = LVM_FBLT;
     } else if(start_with("call", *at, &count)) {
         type = LVM_CALL;
     } else if(start_with("copy", *at, &count)) {
@@ -380,12 +388,26 @@ light_vm_instruction_get(const char* s, u64* immediate) {
         } break;
 
         // Comparison/Branch
+        case LVM_FBEQ: case LVM_FBNE: case LVM_FBGT: case LVM_FBLT:
         case LVM_BEQ: case LVM_BNE: case LVM_BLT_S:
         case LVM_BGT_S: case LVM_BLE_S: case LVM_BGE_S:
         case LVM_BLT_U: case LVM_BGT_U: case LVM_BLE_U:
-        case LVM_BGE_U: case LVM_JMP:
-            *immediate = parse_number(&at, &instruction.imm_size_bytes);
-            break;
+        case LVM_BGE_U: case LVM_JMP:{
+            if(is_number(*at)) {
+                *immediate = parse_number(&at, &instruction.imm_size_bytes);
+                instruction.branch.addr_mode = BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE;
+                // TODO(psv): always relative for now, figure out a syntax for absolute
+            } else if(*at == '[') {
+                at++;
+                instruction.branch.reg = get_register(&at, 0);
+                instruction.branch.addr_mode = BRANCH_ADDR_MODE_REGISTER_INDIRECT;
+                assert(*at == ']');
+                at++;
+            } else {
+                instruction.branch.reg = get_register(&at, 0);
+                instruction.branch.addr_mode = BRANCH_ADDR_MODE_REGISTER;
+            }
+        } break;
 
         case LVM_EXTCALL: case LVM_CALL:
             break;

@@ -90,10 +90,10 @@ typedef enum {
 } Light_VM_Float_Addressing_Mode;
 
 typedef enum {
-    CALL_ADDR_MODE_IMMEDIATE_ABSOLUTE,  // call 0x1234567
-    CALL_ADDR_MODE_IMMEDIATE_RELATIVE,  // call 0x32
-    CALL_ADDR_MODE_REGISTER,            // call r0
-    CALL_ADDR_MODE_REGISTER_INDIRECT,   // call [r0]
+    BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE,  // call 0x1234567
+    BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE,  // call 0x32
+    BRANCH_ADDR_MODE_REGISTER,            // call r0
+    BRANCH_ADDR_MODE_REGISTER_INDIRECT,   // call [r0]
 } Light_VM_Call_Addressing_Mode;
 
 typedef struct {
@@ -113,7 +113,7 @@ typedef struct {
     // is always 64 bit
     u32 reg         : 4; // 4
     u32 addr_mode   : 4; // 8
-} Light_VM_Instruction_Call;
+} Light_VM_Instruction_Branch;
 
 typedef struct {
     u32 src_reg     : 4; // 4
@@ -129,7 +129,7 @@ typedef struct {
         Light_VM_Instruction_Binary     binary;
         Light_VM_Instruction_Unary      unary;
         Light_VM_Instruction_Float      ifloat;
-        Light_VM_Instruction_Call       call;
+        Light_VM_Instruction_Branch       branch;
     };
 } Light_VM_Instruction;
 
