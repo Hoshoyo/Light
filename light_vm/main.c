@@ -23,16 +23,13 @@ int main() {
     void* addr2 = push_float(state, 3.14f);
 
     light_vm_push(state, "mov r0, 0x5");
-    light_vm_push(state, "not r0");
-    //light_vm_push(state, "mov r1, 0x4");
-    //light_vm_push(state, "muls r0, r1");
-    //light_vm_push_fmt(state, "fmov fr0, [rdp + %d]", addr2 - state->data.block);
+    light_vm_push(state, "mov r1, 0x5");
+    light_vm_push(state, "cmp r0, r1");
+    Light_VM_Instruction_Info b = light_vm_push(state, "beq 0x09");
     light_vm_push(state, "hlt");
 
-    light_vm_debug_dump_code(stdout, state);
-
+    //light_vm_debug_dump_code(stdout, state);
     light_vm_execute(state);
-
     light_vm_debug_dump_registers(stdout, state);
     //light_vm_debug_dump_registers_dec(stdout, state);
 

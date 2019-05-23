@@ -4,6 +4,11 @@
 #define true 1
 #define false 0
 
+extern u16 cmp_flags_8(u8 l, u8 r);
+extern u16 cmp_flags_16(u16 l, u16 r);
+extern u16 cmp_flags_32(u32 l, u32 r);
+extern u16 cmp_flags_64(u64 l, u64 r);
+
 Light_VM_State*
 light_vm_init() {
     Light_VM_State* state = (Light_VM_State*)calloc(1, sizeof(*state));
@@ -32,9 +37,9 @@ push_immediate(Light_VM_State* state, u8 size_bytes, u64 imm) {
     state->code_offset += size_bytes;
 }
 
-Light_VM_Intruction_Info 
+Light_VM_Instruction_Info 
 light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, u64 immediate) {
-    Light_VM_Intruction_Info info = {0};
+    Light_VM_Instruction_Info info = {0};
     info.byte_size = (u32)sizeof(Light_VM_Instruction);
     info.offset_address = vm_state->code_offset;
     info.absolute_address = vm_state->code.block + vm_state->code_offset;
@@ -201,8 +206,19 @@ light_vm_execute_binary_arithmetic_instruction(Light_VM_State* state, Light_VM_I
     }
 
     switch(instr.type) {
+        u16 flags = 0;
         case LVM_CMP: {
-
+            switch(instr.binary.bytesize) {
+                case 1: flags = cmp_flags_8(*(u8*)dst, *(u8*)src); break;
+                case 2: flags = cmp_flags_16(*(u16*)dst, *(u16*)src); break;
+                case 4: flags = cmp_flags_32(*(u32*)dst, *(u32*)src); break;
+                case 8: flags = cmp_flags_64(*(u64*)dst, *(u64*)src); break;
+                default: assert(0); break;
+            }
+            state->rflags.carry = (flags >> 8) & 0x1;
+            state->rflags.zerof = (flags >> 14) & 0x1;
+            state->rflags.sign = (flags >> 15) & 0x1;
+            state->rflags.overflow = (flags >> 19) & 0x1;
         }break;
 
         case LVM_MOV: {
@@ -333,7 +349,15 @@ light_vm_execute_float_instruction(Light_VM_State* state, Light_VM_Instruction i
 
     switch(instr.type) {
         case LVM_FCMP:{
-
+            if(float_32_register(instr.ifloat.dst_reg)) {
+                state->rfloat_flags.bigger_than = *(r32*)dst > *(r32*)src;
+                state->rfloat_flags.less_than = *(r32*)dst < *(r32*)src;
+                state->rfloat_flags.equal = *(r32*)dst == *(r32*)src;
+            } else {
+                state->rfloat_flags.bigger_than = *(r64*)dst > *(r64*)src;
+                state->rfloat_flags.less_than = *(r64*)dst < *(r64*)src;
+                state->rfloat_flags.equal = *(r64*)dst == *(r64*)src;
+            }
         }break;
         case LVM_FMOV:{
             if(float_32_register(instr.ifloat.dst_reg))
@@ -355,6 +379,54 @@ light_vm_execute_float_instruction(Light_VM_State* state, Light_VM_Instruction i
         }break;
         default: assert(0); break;
     }
+}
+
+// Return if the branch is taken or not
+bool
+light_vm_execute_branch_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
+    void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
+    u64 imm_val = get_value_off_immediate(state, instr, address_of_imm);
+
+    bool branch = false;
+    switch(instr.type) {
+        case LVM_BEQ:{
+            branch = (state->rflags.zerof);
+        }break;
+        case LVM_BNE:{
+            branch = !(state->rflags.zerof);
+        }break;
+        case LVM_BLT_S: {
+            branch = (state->rflags.sign != state->rflags.overflow);
+        }break;
+        case LVM_BGT_S:{
+            branch = (!state->rflags.zerof && (state->rflags.sign == state->rflags.overflow));
+        }break;
+        case LVM_BLE_S:{
+            branch = (state->rflags.zerof || (state->rflags.sign != state->rflags.overflow));
+        }break;
+        case LVM_BGE_S:{
+            branch = state->rflags.sign == state->rflags.overflow;
+        }break;
+        case LVM_BLT_U:{
+            branch = state->rflags.carry;
+        }break;
+        case LVM_BGT_U:{
+            branch = !state->rflags.carry && !state->rflags.zerof;
+        }break;
+        case LVM_BLE_U:{
+            branch = state->rflags.carry || state->rflags.zerof;
+        }break;
+        case LVM_BGE_U:{
+            branch = !state->rflags.carry;
+        }break;
+        case LVM_JMP:{
+            branch = true;
+        }break;
+        default: assert(0); break;
+    }
+    if(branch)
+        state->registers[RIP] += imm_val;
+    return branch;
 }
 
 void
@@ -436,8 +508,11 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
         case LVM_BGT_U:
         case LVM_BLE_U:
         case LVM_BGE_U:
-        case LVM_JMP:
-            break;
+        case LVM_JMP:{
+            if(!light_vm_execute_branch_instruction(state, instr)) {
+                advance_ip = true;
+            }
+        } break;
 
         case LVM_EXTCALL:
         case LVM_CALL:
@@ -449,7 +524,7 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
         case LVM_ASSERT:  break;
 
         // Halt
-        case LVM_HLT:  break;
+        case LVM_HLT: break;
 
         default: {
         }break;
@@ -469,7 +544,14 @@ light_vm_execute(Light_VM_State* state) {
     for(u64 i = 0;; ++i) {
         Light_VM_Instruction in = *(Light_VM_Instruction*)(state->registers[RIP]);
 
+#if 0
+        void* addr_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
+        u64 imm = get_value_off_immediate(state, in, addr_of_imm);
+        print_instruction(stdout, in, imm);
+#endif
+
         if(in.type == LVM_HLT) break;
+
         light_vm_execute_instruction(state, in);
     }
 }

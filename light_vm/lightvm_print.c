@@ -30,7 +30,6 @@ print_register(FILE* out, u8 reg, u8 byte_size) {
         case RSP: fprintf(out, "RSP"); break;
         case RBP: fprintf(out, "RBP"); break;
         case RDP: fprintf(out, "RDP"); break;
-        case R_FLAGS: fprintf(out, "R_FLAGS"); break;
         default: fprintf(out, "Invalid register"); break;
     }
     switch(byte_size) {
@@ -332,10 +331,10 @@ light_vm_debug_dump_registers(FILE* out, Light_VM_State* state) {
     fprintf(out, "FR4: %f \t FR5: %f\n", state->f64registers[FR4], state->f64registers[FR5]);
     fprintf(out, "FR6: %f \t FR7: %f\n", state->f64registers[FR6], state->f64registers[FR7]);
     fprintf(out, "\n");
-    fprintf(out, "Carry: %d ", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->carry);
-    fprintf(out, "Zero: %d ", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->zerof);
-    fprintf(out, "Sign: %d ", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->sign);
-    fprintf(out, "Overflow: %d", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->overflow);
+    fprintf(out, "Carry: %d ",   state->rflags.carry);
+    fprintf(out, "Zero: %d ",    state->rflags.zerof);
+    fprintf(out, "Sign: %d ",    state->rflags.sign);
+    fprintf(out, "Overflow: %d", state->rflags.overflow);
     fprintf(out, "\n");
 }
 
@@ -354,10 +353,10 @@ light_vm_debug_dump_registers_dec(FILE* out, Light_VM_State* state) {
     fprintf(out, "FR4: %f \t FR5: %f\n", state->f64registers[FR4], state->f64registers[FR5]);
     fprintf(out, "FR6: %f \t FR7: %f\n", state->f64registers[FR6], state->f64registers[FR7]);
     fprintf(out, "\n");
-    fprintf(out, "Carry: %d ", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->carry);
-    fprintf(out, "Zero: %d ", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->zerof);
-    fprintf(out, "Sign: %d ", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->sign);
-    fprintf(out, "Overflow: %d", ((Light_VM_Flags_Register*)&state->registers[R_FLAGS])->overflow);
+    fprintf(out, "Carry: %d ",   state->rflags.carry);
+    fprintf(out, "Zero: %d ",    state->rflags.zerof);
+    fprintf(out, "Sign: %d ",    state->rflags.sign);
+    fprintf(out, "Overflow: %d", state->rflags.overflow);
     fprintf(out, "\n");
 }
 

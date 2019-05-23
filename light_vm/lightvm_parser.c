@@ -399,14 +399,14 @@ light_vm_instruction_get(const char* s, u64* immediate) {
     return instruction;
 }
 
-Light_VM_Intruction_Info 
+Light_VM_Instruction_Info 
 light_vm_push(Light_VM_State* vm_state, const char* instruction) {
     u64 imm = 0;
     Light_VM_Instruction i = light_vm_instruction_get(instruction, &imm);
     return light_vm_push_instruction(vm_state, i, imm);
 }
 
-Light_VM_Intruction_Info 
+Light_VM_Instruction_Info 
 light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...) {
     char buffer[256] = {0};
     va_list args;

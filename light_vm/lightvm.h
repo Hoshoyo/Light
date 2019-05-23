@@ -14,7 +14,6 @@ typedef enum {
     R0, R1, R2, R3, R4, R5, R6, R7,
     // Special registers
     RSP, RBP, RIP, RDP,
-    R_FLAGS,
     R_COUNT,
 } Light_VM_Registers;
 
@@ -31,6 +30,7 @@ typedef enum {
 
     // Floating point
     LVM_FADD, LVM_FSUB, LVM_FMUL, LVM_FDIV, LVM_FMOV,
+    LVM_FBEQ, LVM_FBNE, LVM_FBGT, LVM_FBLT,
 
     // Comparison/Branch
     LVM_FCMP,
@@ -58,11 +58,17 @@ typedef enum {
 } Light_VM_Instruction_Type;
 
 typedef struct {
-    u64 carry    : 1;
-    u64 zerof    : 1;
-    u64 sign     : 1;
-    u64 overflow : 1;
+    u32 carry    : 1;
+    u32 zerof    : 1;
+    u32 sign     : 1;
+    u32 overflow : 1;
 } Light_VM_Flags_Register;
+
+typedef struct {
+    u32 bigger_than : 1;
+    u32 less_than   : 1;
+    u32 equal       : 1;
+} Light_VM_Float_Flags_Register;
 
 typedef enum {
     BIN_ADDR_MODE_REG_TO_REG,     // mov rax, rbx
@@ -137,6 +143,8 @@ typedef struct {
 
 // State
 typedef struct {
+    Light_VM_Flags_Register       rflags;
+    Light_VM_Float_Flags_Register rfloat_flags;
     u64    registers[R_COUNT];
     r64    f64registers[FREG_COUNT];
     r32    f32registers[FREG_COUNT];
@@ -153,12 +161,12 @@ typedef struct {
     void* absolute_address;
     u32   byte_size;           // instruction only
     u32   immediate_byte_size; // immediate value only
-} Light_VM_Intruction_Info;
+} Light_VM_Instruction_Info;
 
 Light_VM_State* light_vm_init();
-Light_VM_Intruction_Info light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, u64 immediate);
-Light_VM_Intruction_Info light_vm_push(Light_VM_State* vm_state, const char* instruction);
-Light_VM_Intruction_Info light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...);
+Light_VM_Instruction_Info light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, u64 immediate);
+Light_VM_Instruction_Info light_vm_push(Light_VM_State* vm_state, const char* instruction);
+Light_VM_Instruction_Info light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...);
 
 // -------------------------------------
 // ----------- Printing ----------------

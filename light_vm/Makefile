@@ -1,3 +1,4 @@
 all:
-	gcc -g *.c -o lightvm
+	nasm -felf64 lvm.asm
+	gcc -g *.c lvm.o -o lightvm
 	./lightvm
