@@ -178,6 +178,8 @@ instruction_type(const char** at) {
         type = LVM_POP;
     } else if(start_with("push", *at, &count)) {
         type = LVM_PUSH;
+    } else if(start_with("expush", *at, &count)) {
+        type = LVM_EXPUSH;
     } else if(start_with("copy", *at, &count)) {
         type = LVM_COPY;
     } else if(start_with("hlt", *at, &count)) {
@@ -395,7 +397,7 @@ light_vm_instruction_get(const char* s, u64* immediate) {
         } break;
 
         // Unary instructions
-        case LVM_NOT: case LVM_PUSH: case LVM_POP:{
+        case LVM_NOT: case LVM_PUSH: case LVM_POP: case LVM_EXPUSH: {
             u8 byte_size = 0;
             instruction.unary.reg = get_register(&at, &byte_size);
             instruction.unary.byte_size = byte_size;

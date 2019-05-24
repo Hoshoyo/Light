@@ -50,6 +50,7 @@ typedef enum {
 
     // Proc
     LVM_CALL, LVM_PUSH, LVM_POP, LVM_RET,
+    LVM_EXPUSH,
 
     // Utils
     LVM_COPY, LVM_ASSERT, LVM_EXTCALL,
@@ -129,13 +130,42 @@ typedef struct {
         Light_VM_Instruction_Binary     binary;
         Light_VM_Instruction_Unary      unary;
         Light_VM_Instruction_Float      ifloat;
-        Light_VM_Instruction_Branch       branch;
+        Light_VM_Instruction_Branch     branch;
     };
 } Light_VM_Instruction;
 
 // -------------------------------------
 // ---------- Generation----------------
 // -------------------------------------
+
+typedef struct {
+    u8 byte_size;
+    union {
+        u8    unsigned_byte;
+        u16   unsigned_word;
+        u32   unsigned_dword;
+        u64   unsigned_qword;
+        s8    signed_byte;
+        s16   signed_word;
+        s32   signed_dword;
+        s64   signed_qword;
+        r32   float32;
+        r64   float64;
+        void* ptr;
+    };
+} Light_VM_Data;
+
+typedef struct {
+    s32 int_arg_count;
+    s32 float_arg_count;
+    
+    u64 int_values[256];
+    u64 float_values[256];
+
+    u8  int_index[256];
+    u8  float_index[256];
+} Light_VM_EXT_Stack;
+
 typedef struct {
     s32   size;
     void* block;
@@ -148,6 +178,7 @@ typedef struct {
     u64    registers[R_COUNT];
     r64    f64registers[FREG_COUNT];
     r32    f32registers[FREG_COUNT];
+    Light_VM_EXT_Stack ext_stack;
     Memory data;
     u64 data_offset;
     Memory stack;
@@ -162,22 +193,6 @@ typedef struct {
     u32   byte_size;           // instruction only
     u32   immediate_byte_size; // immediate value only
 } Light_VM_Instruction_Info;
-
-typedef struct {
-    u8 byte_size;
-    union {
-        u8  unsigned_byte;
-        u16 unsigned_word;
-        u32 unsigned_dword;
-        u64 unsigned_qword;
-        s8  signed_byte;
-        s16 signed_word;
-        s32 signed_dword;
-        s64 signed_qword;
-        r32 float32;
-        r64 float64;
-    };
-} Light_VM_Data;
 
 Light_VM_State*           light_vm_init();
 Light_VM_Instruction_Info light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, u64 immediate);

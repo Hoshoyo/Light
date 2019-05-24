@@ -9,6 +9,14 @@ extern u16 cmp_flags_16(u16 l, u16 r);
 extern u16 cmp_flags_32(u32 l, u32 r);
 extern u16 cmp_flags_64(u64 l, u64 r);
 
+static void
+ext_clear_stack(Light_VM_State* state) {
+}
+
+static void
+ext_push_reg_to_stack(Light_VM_State* state, u8 reg, u8 kind) {
+}
+
 Light_VM_State*
 light_vm_init() {
     Light_VM_State* state = (Light_VM_State*)calloc(1, sizeof(*state));
@@ -466,6 +474,32 @@ light_vm_execute_float_branch_instruction(Light_VM_State* state, Light_VM_Instru
 }
 
 void
+light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
+    void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
+    void* jmp_address = 0;
+
+    // Jump to destination address
+    switch(instr.branch.addr_mode) {
+        case BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE:{
+            u64 imm_val = get_value_off_immediate(state, instr, address_of_imm);
+            jmp_address = (void*)imm_val;
+        } break;
+        case BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE:{
+            assert(0); // invalid
+        } break;
+        case BRANCH_ADDR_MODE_REGISTER:
+            jmp_address = (void*)state->registers[instr.branch.reg];
+            break;
+        case BRANCH_ADDR_MODE_REGISTER_INDIRECT:
+            jmp_address = (void*)*(u64*)state->registers[instr.branch.reg];
+            break;
+        default: assert(0); break;
+    }
+
+
+}
+
+void
 light_vm_execute_call_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
 
@@ -648,6 +682,7 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             break;
 
         case LVM_EXTCALL:
+            light_vm_execute_external_call_instruction(state, instr);
             break;
         case LVM_CALL:{
             // Same as:

@@ -79,7 +79,13 @@ void example5(Light_VM_State* state) {
     light_vm_patch_immediate_distance(branch, start);
 }
 
+
 int main() {
+    printf("int values: %llu\n", (u64)&((Light_VM_EXT_Stack*)0)->int_values);
+    printf("int index:  %llu\n", (u64)&((Light_VM_EXT_Stack*)0)->int_index);
+    printf("float values: %llu\n", (u64)&((Light_VM_EXT_Stack*)0)->float_values);
+    printf("float index:  %llu\n", (u64)&((Light_VM_EXT_Stack*)0)->float_index);
+
     Light_VM_State* state = light_vm_init();
 
     void* dll = dlopen("libc.so.6", RTLD_NOW);
