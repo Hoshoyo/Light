@@ -169,7 +169,13 @@ get_value_of_register(Light_VM_State* state, u8 reg, u8 byte_size) {
     return 0;
 }
 
-static u64 
+// @VolatileRegisters:
+// In order to make the compiler properly know that we use the address
+// of the immediate value in functions to properly assign the destination
+// We declare the return as a volatile, meaning no strict aliasing rules
+// for optimizations remove the address of the local value, which we need
+// it to exist.
+static u64 volatile
 get_value_of_immediate(Light_VM_State* state, Light_VM_Instruction instr, void* address_of_imm) {
     u64 value = 0;
     switch(instr.imm_size_bytes) {
@@ -215,8 +221,9 @@ void
 light_vm_execute_binary_arithmetic_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
 
-    void* dst = 0;
-    void* src = 0;
+    // VolatileRegisters:
+    void* volatile dst = 0;
+    void* volatile src = 0;
     switch(instr.binary.addr_mode) {
         // mov r0, r1
         case BIN_ADDR_MODE_REG_TO_REG:{
@@ -263,8 +270,9 @@ light_vm_execute_binary_arithmetic_instruction(Light_VM_State* state, Light_VM_I
         }break;
         // mov r0, 0x123
         case BIN_ADDR_MODE_IMM_TO_REG:{
+            // VolatileRegisters:
             u64 volatile imm_value = get_value_of_immediate(state, instr, address_of_imm);
-            src = &imm_value;
+            src = (void*)&imm_value;
             dst = &state->registers[instr.binary.dst_reg];
         }break;
     }
@@ -448,6 +456,7 @@ light_vm_execute_float_instruction(Light_VM_State* state, Light_VM_Instruction i
 bool
 light_vm_execute_float_branch_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
+    // VolatileRegisters:
     u64 volatile imm_val = get_value_of_immediate(state, instr, address_of_imm);
 
     bool branch = false;
@@ -497,8 +506,7 @@ light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instr
     // Jump to destination address
     switch(instr.branch.addr_mode) {
         case BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE:{
-            u64 volatile imm_val = get_value_of_immediate(state, instr, address_of_imm);
-            jmp_address = (void*)imm_val;
+            jmp_address = (void*)get_value_of_immediate(state, instr, address_of_imm);
         } break;
         case BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE:{
             assert(0); // invalid
@@ -512,8 +520,9 @@ light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instr
         default: assert(0); break;
     }
 
+    // VolatileRegisters:
     u64 volatile flt_ret = 0;
-    u64 res = lvm_ext_call(&state->ext_stack, jmp_address, &flt_ret);
+    u64 res = lvm_ext_call(&state->ext_stack, jmp_address, (u64*)&flt_ret);
     state->registers[R0] = res;
     state->f32registers[FR0] = *(r32*)&flt_ret; // return value of r32 in FR0
     state->f64registers[FR4] = *(r64*)&flt_ret; // return value of r64 in FR4
@@ -528,10 +537,12 @@ light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction in
 
     switch(instr.push.addr_mode) {
         case PUSH_ADDR_MODE_IMMEDIATE:{
+            // VolatileRegisters:
             u64 volatile imm = get_value_of_immediate(state, instr, address_of_imm);
-            src = &imm;
+            src = (void*)&imm;
         } break;
         case PUSH_ADDR_MODE_IMMEDIATE_INDIRECT:{
+            // VolatileRegisters:
             u64 volatile imm = get_value_of_immediate(state, instr, address_of_imm);
             src = (void*)imm;
         } break;
@@ -563,10 +574,12 @@ light_vm_execute_expush_instruction(Light_VM_State* state, Light_VM_Instruction 
 
     switch(instr.push.addr_mode) {
         case PUSH_ADDR_MODE_IMMEDIATE:{
+            // VolatileRegisters:
             u64 volatile imm = get_value_of_immediate(state, instr, address_of_imm);
-            src = &imm;
+            src = (void*)&imm;
         } break;
         case PUSH_ADDR_MODE_IMMEDIATE_INDIRECT:{
+            // VolatileRegisters:
             u64 volatile imm = get_value_of_immediate(state, instr, address_of_imm);
             src = (void*)imm;
         } break;

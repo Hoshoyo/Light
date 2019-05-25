@@ -1,7 +1,7 @@
 #include <stdio.h>
+#include <string.h>
 #include "ast.h"
 #include "lightvm.h"
-#include "light_array.h"
 
 #if defined(__linux__)
 #include <dlfcn.h>
@@ -183,6 +183,34 @@ void example9(Light_VM_State* state) {
     assert(memcmp((void*)state->registers[R0], (void*)state->registers[RDP], sizeof(str) - 1) == 0);
 }
 
+s32 func_add(int a, int b) {
+    return a + b;
+}
+
+void example10(Light_VM_State* state) {
+    // test call of immediate absolute
+    light_vm_push(state, "mov r0d, 2");
+    light_vm_push(state, "mov r1d, 3");
+    light_vm_push(state, "expushi r0d");
+    light_vm_push(state, "expushi r1d");
+
+    Light_VM_Instruction entry = {
+        .type = LVM_EXTCALL,
+        .imm_size_bytes = 8,
+        .branch = {
+            .addr_mode = BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE,
+        },
+    };
+    Light_VM_Instruction_Info entry_info = light_vm_push_instruction(state, entry, 0);
+
+    light_vm_push(state, "hlt");
+
+    *(void**)(((Light_VM_Instruction*)entry_info.absolute_address) + 1) = func_add;
+
+    light_vm_execute(state, 0, 0);
+    light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
+}
+
 int main() {
     Light_VM_State* state = light_vm_init();
 
@@ -195,6 +223,7 @@ int main() {
     example7(state);
     example8(state);
     example9(state);
+    example10(state);
 
     //light_vm_debug_dump_code(stdout, state);
     //light_vm_execute(state, 0);
