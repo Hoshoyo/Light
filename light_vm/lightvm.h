@@ -50,7 +50,7 @@ typedef enum {
 
     // Proc
     LVM_CALL, LVM_PUSH, LVM_POP, LVM_RET,
-    LVM_EXPUSH,
+    LVM_EXPUSHI, LVM_EXPUSHF, LVM_EXPOP,
 
     // Utils
     LVM_COPY, LVM_ASSERT, LVM_EXTCALL,
@@ -97,6 +97,13 @@ typedef enum {
     BRANCH_ADDR_MODE_REGISTER_INDIRECT,   // call [r0]
 } Light_VM_Call_Addressing_Mode;
 
+typedef enum {
+    PUSH_ADDR_MODE_IMMEDIATE,
+    PUSH_ADDR_MODE_IMMEDIATE_INDIRECT,
+    PUSH_ADDR_MODE_REGISTER,
+    PUSH_ADDR_MODE_REGISTER_INDIRECT,
+} Light_VM_Push_Addressing_Mode;
+
 typedef struct {
     u32 src_reg     : 4; // 4
     u32 dst_reg     : 4; // 8
@@ -124,6 +131,12 @@ typedef struct {
 } Light_VM_Instruction_Float;
 
 typedef struct {
+    u32 reg       : 4; // 4
+    u32 addr_mode : 4; // 8
+    u32 byte_size : 4; // 12
+} Light_VM_Instruction_Push;
+
+typedef struct {
     u8 type;
     u8 imm_size_bytes;
     union {
@@ -131,6 +144,7 @@ typedef struct {
         Light_VM_Instruction_Unary      unary;
         Light_VM_Instruction_Float      ifloat;
         Light_VM_Instruction_Branch     branch;
+        Light_VM_Instruction_Push       push;
     };
 } Light_VM_Instruction;
 
@@ -155,6 +169,10 @@ typedef struct {
     };
 } Light_VM_Data;
 
+// This struct cannot be changed
+// It is directly linked to the external caller
+// and therefore limits the number of arguments of
+// an external call to 256
 typedef struct {
     s32 int_arg_count;
     s32 float_arg_count;
@@ -221,3 +239,5 @@ void light_vm_debug_dump_code(FILE* out, Light_VM_State* state);
 // -------------------------------------
 void light_vm_execute(Light_VM_State* state, bool print_steps);
 void light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr);
+
+extern u64 lvm_ext_call(void* stack, void* proc);

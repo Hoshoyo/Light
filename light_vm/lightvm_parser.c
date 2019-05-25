@@ -178,8 +178,14 @@ instruction_type(const char** at) {
         type = LVM_POP;
     } else if(start_with("push", *at, &count)) {
         type = LVM_PUSH;
-    } else if(start_with("expush", *at, &count)) {
-        type = LVM_EXPUSH;
+    } else if(start_with("expushi", *at, &count)) {
+        type = LVM_EXPUSHI;
+    } else if(start_with("expushf", *at, &count)) {
+        type = LVM_EXPUSHF;
+    } else if(start_with("expop", *at, &count)) {
+        type = LVM_EXPOP;
+    } else if(start_with("extcall", *at, &count)) {
+        type = LVM_EXTCALL;
     } else if(start_with("copy", *at, &count)) {
         type = LVM_COPY;
     } else if(start_with("hlt", *at, &count)) {
@@ -354,7 +360,7 @@ light_vm_instruction_get(const char* s, u64* immediate) {
         case LVM_FADD: case LVM_FSUB:
         case LVM_FMUL: case LVM_FDIV:
         case LVM_FCMP: case LVM_FMOV: {
-            if(*at == '[') {
+            if(*at == '[') {    
                 at++;
                 instruction.ifloat.dst_reg = get_register(&at, 0);
                 eat_whitespace(&at);
@@ -397,14 +403,49 @@ light_vm_instruction_get(const char* s, u64* immediate) {
         } break;
 
         // Unary instructions
-        case LVM_NOT: case LVM_PUSH: case LVM_POP: case LVM_EXPUSH: {
+        case LVM_NOT: case LVM_POP: {
             u8 byte_size = 0;
             instruction.unary.reg = get_register(&at, &byte_size);
             instruction.unary.byte_size = byte_size;
         } break;
 
+        case LVM_PUSH: case LVM_EXPUSHI: case LVM_EXPUSHF: {
+            u8 byte_size = 0;
+            if(is_number(*at)) {
+                *immediate = parse_number(&at, &instruction.imm_size_bytes);
+                instruction.push.addr_mode = PUSH_ADDR_MODE_IMMEDIATE;
+                instruction.push.byte_size = instruction.imm_size_bytes;
+            } else if(*at == '[') {
+                at++;
+                if(is_number(*at)) {
+                    *immediate = parse_number(&at, &instruction.imm_size_bytes);
+                    instruction.imm_size_bytes = 8; // force an address size
+                    instruction.push.addr_mode = PUSH_ADDR_MODE_IMMEDIATE_INDIRECT;
+                } else {
+                    if(type == LVM_EXPUSHF) {
+                        instruction.push.reg = get_float_register(&at);
+                    } else {
+                        instruction.push.reg = get_register(&at, &byte_size);
+                    }
+                    instruction.push.addr_mode = PUSH_ADDR_MODE_REGISTER_INDIRECT;
+                    instruction.push.byte_size = byte_size;
+                }
+                assert(*at == ']');
+                at++;
+            } else {
+                if(type == LVM_EXPUSHF) {
+                    instruction.push.reg = get_float_register(&at);
+
+                } else {
+                    instruction.push.reg = get_register(&at, &byte_size);
+                }
+                instruction.push.addr_mode = PUSH_ADDR_MODE_REGISTER;
+                instruction.push.byte_size = byte_size;
+            }
+        } break;
+
         // Comparison/Branch
-        case LVM_CALL:
+        case LVM_CALL: case LVM_EXTCALL:
         case LVM_FBEQ: case LVM_FBNE: case LVM_FBGT: case LVM_FBLT:
         case LVM_BEQ: case LVM_BNE: case LVM_BLT_S:
         case LVM_BGT_S: case LVM_BLE_S: case LVM_BGE_S:
@@ -425,9 +466,6 @@ light_vm_instruction_get(const char* s, u64* immediate) {
                 instruction.branch.addr_mode = BRANCH_ADDR_MODE_REGISTER;
             }
         } break;
-
-        case LVM_EXTCALL:
-            break;
 
         // TODO(psv):
         case LVM_COPY:   break;

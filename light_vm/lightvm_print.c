@@ -134,10 +134,38 @@ print_binary_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
 }
 
 void
+print_push_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
+    switch(instr.type) {
+        case LVM_PUSH:   fprintf(out, "PUSH "); break;
+        case LVM_EXPUSHI: fprintf(out, "EXPUSHI "); break;
+        case LVM_EXPUSHF: fprintf(out, "EXPUSHF "); break;
+        default: fprintf(out, "Invalid push instruction"); break;
+    }
+    switch(instr.push.addr_mode) {
+        case PUSH_ADDR_MODE_IMMEDIATE:{
+            print_immediate(out, instr.imm_size_bytes, immediate);
+        } break;
+        case PUSH_ADDR_MODE_IMMEDIATE_INDIRECT:{
+            fprintf(out, "[");
+            print_immediate(out, instr.imm_size_bytes, immediate);
+            fprintf(out, "]");
+        } break;
+        case PUSH_ADDR_MODE_REGISTER:{
+            print_register(out, instr.push.reg, instr.push.byte_size);
+        } break;
+        case PUSH_ADDR_MODE_REGISTER_INDIRECT:{
+            fprintf(out, "[");
+            print_register(out, instr.push.reg, 8);
+            fprintf(out, "]");
+        } break;
+        default: fprintf(out, "Invalid push addressing mode"); break;
+    }
+}
+
+void
 print_unary_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
     switch(instr.type) {
         case LVM_NOT:  fprintf(out, "NOT "); break;
-        case LVM_PUSH: fprintf(out, "PUSH "); break;
         case LVM_POP:  fprintf(out, "POP "); break;
         default: fprintf(out, "Invalid unary instruction"); break;
     }
@@ -321,10 +349,17 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
 
         // Unary instructions
         case LVM_NOT:
-        case LVM_PUSH:
         case LVM_POP:
             print_unary_instruction(out, instr, imm);
             break;
+
+        case LVM_PUSH:
+        case LVM_EXPUSHI:
+        case LVM_EXPUSHF:
+            print_push_instruction(out, instr, imm);
+            break;
+
+        case LVM_EXPOP: fprintf(out, "EXPOP"); break;
 
         // Comparison/Branch
         case LVM_BEQ:

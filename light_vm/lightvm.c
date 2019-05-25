@@ -11,10 +11,8 @@ extern u16 cmp_flags_64(u64 l, u64 r);
 
 static void
 ext_clear_stack(Light_VM_State* state) {
-}
-
-static void
-ext_push_reg_to_stack(Light_VM_State* state, u8 reg, u8 kind) {
+    state->ext_stack.int_arg_count = 0;
+    state->ext_stack.float_arg_count = 0;
 }
 
 Light_VM_State*
@@ -496,6 +494,103 @@ light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instr
         default: assert(0); break;
     }
 
+    lvm_ext_call(&state->ext_stack, jmp_address);
+}
+
+void
+light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
+    void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
+
+    void* dst = (void*)state->registers[RSP];
+    void* src = 0;
+
+    switch(instr.push.addr_mode) {
+        case PUSH_ADDR_MODE_IMMEDIATE:{
+            u64 imm = get_value_off_immediate(state, instr, address_of_imm);
+            src = &imm;
+        } break;
+        case PUSH_ADDR_MODE_IMMEDIATE_INDIRECT:{
+            u64 imm = get_value_off_immediate(state, instr, address_of_imm);
+            src = (void*)imm;
+        } break;
+        case PUSH_ADDR_MODE_REGISTER:{
+            src = &state->registers[instr.push.reg];
+        } break;
+        case PUSH_ADDR_MODE_REGISTER_INDIRECT:{
+            src = (void*)state->registers[instr.push.reg];
+        } break;
+        default: assert(0); break;
+    }
+
+    switch(instr.push.byte_size) {
+        case 1: *(u8*)dst = *(u8*)src; break;
+        case 2: *(u16*)dst = *(u16*)src; break;
+        case 4: *(u32*)dst = *(u32*)src; break;
+        case 8: *(u64*)dst = *(u64*)src; break;
+        default: assert(0); break;
+    }
+    state->registers[RSP] += instr.push.byte_size;
+}
+
+void
+light_vm_execute_expush_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
+    void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
+
+    void* src = 0;
+    u64* dst = 0;
+
+    switch(instr.push.addr_mode) {
+        case PUSH_ADDR_MODE_IMMEDIATE:{
+            u64 imm = get_value_off_immediate(state, instr, address_of_imm);
+            src = &imm;
+        } break;
+        case PUSH_ADDR_MODE_IMMEDIATE_INDIRECT:{
+            u64 imm = get_value_off_immediate(state, instr, address_of_imm);
+            src = (void*)imm;
+        } break;
+        case PUSH_ADDR_MODE_REGISTER:{
+            if(instr.type == LVM_EXPUSHI) {
+                src = &state->registers[instr.push.reg];
+            } else if(instr.type == LVM_EXPUSHF) {
+                if(float_32_register(instr.push.reg)) {
+                    src = &state->f32registers[instr.push.reg];
+                } else {
+                    src = &state->f64registers[instr.push.reg];
+                }
+            }
+        } break;
+        case PUSH_ADDR_MODE_REGISTER_INDIRECT:{
+            src = (void*)state->registers[instr.push.reg];
+        } break;
+        default: assert(0); break;
+    }
+
+    s32 total_arg_count = state->ext_stack.int_arg_count + state->ext_stack.float_arg_count;
+    switch(instr.type) {
+        case LVM_EXPUSHI:{
+            dst = &state->ext_stack.int_values[state->ext_stack.int_arg_count];
+            state->ext_stack.int_index[state->ext_stack.int_arg_count] = total_arg_count;
+            state->ext_stack.int_arg_count++;
+            switch(instr.push.byte_size) {
+                case 1: *dst = (u64)*(u8*)src; break;
+                case 2: *dst = (u64)*(u16*)src; break;
+                case 4: *dst = (u64)*(u32*)src; break;
+                case 8: *dst = *(u64*)src; break;
+                default: assert(0); break;
+            }
+        }break;
+        case LVM_EXPUSHF:{
+            dst = &state->ext_stack.float_values[state->ext_stack.float_arg_count];
+            state->ext_stack.float_index[state->ext_stack.float_arg_count] = total_arg_count;
+            state->ext_stack.float_arg_count++;
+            if(float_32_register(instr.push.reg)) {
+                *dst = (u64)*(u32*)src;
+            } else {
+                *dst = *(u64*)src;
+            }
+        }break;
+        default: assert(0); break;
+    }
 
 }
 
@@ -636,15 +731,7 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             advance_ip = true;
         }break;
         case LVM_PUSH:{
-            void* dst = (void*)state->registers[RSP];
-            switch(instr.unary.byte_size) {
-                case 1: *(u8*)dst = *(u8*)&state->registers[instr.unary.reg]; break;
-                case 2: *(u16*)dst = *(u16*)&state->registers[instr.unary.reg]; break;
-                case 4: *(u32*)dst = *(u32*)&state->registers[instr.unary.reg]; break;
-                case 8: *(u64*)dst = *(u64*)&state->registers[instr.unary.reg]; break;
-                default: assert(0); break;
-            }
-            state->registers[RSP] += instr.unary.byte_size;
+            light_vm_execute_push_instruction(state, instr);
             advance_ip = true;
         }break;
         case LVM_POP:{
@@ -681,9 +768,22 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             advance_ip = !light_vm_execute_float_branch_instruction(state, instr);
             break;
 
+        // External calls
         case LVM_EXTCALL:
             light_vm_execute_external_call_instruction(state, instr);
+            advance_ip = true;
             break;
+        
+        case LVM_EXPUSHF:
+        case LVM_EXPUSHI: {
+            light_vm_execute_expush_instruction(state, instr);
+            advance_ip = true;
+        }break;
+        case LVM_EXPOP: {
+            ext_clear_stack(state);
+            advance_ip = true;
+        }break;
+
         case LVM_CALL:{
             // Same as:
             // push (rip + instruction_size)
