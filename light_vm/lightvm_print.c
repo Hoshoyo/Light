@@ -151,7 +151,11 @@ print_push_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
             fprintf(out, "]");
         } break;
         case PUSH_ADDR_MODE_REGISTER:{
-            print_register(out, instr.push.reg, instr.push.byte_size);
+            if(instr.type == LVM_EXPUSHF) {
+                print_float_register(out, instr.push.reg);
+            } else {
+                print_register(out, instr.push.reg, instr.push.byte_size);
+            }
         } break;
         case PUSH_ADDR_MODE_REGISTER_INDIRECT:{
             fprintf(out, "[");

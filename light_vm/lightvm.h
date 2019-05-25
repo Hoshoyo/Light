@@ -239,5 +239,6 @@ void light_vm_debug_dump_code(FILE* out, Light_VM_State* state);
 // -------------------------------------
 void light_vm_execute(Light_VM_State* state, bool print_steps);
 void light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr);
+void light_vm_reset(Light_VM_State* state);
 
 extern u64 lvm_ext_call(void* stack, void* proc);

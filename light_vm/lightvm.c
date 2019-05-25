@@ -9,12 +9,6 @@ extern u16 cmp_flags_16(u16 l, u16 r);
 extern u16 cmp_flags_32(u32 l, u32 r);
 extern u16 cmp_flags_64(u64 l, u64 r);
 
-static void
-ext_clear_stack(Light_VM_State* state) {
-    state->ext_stack.int_arg_count = 0;
-    state->ext_stack.float_arg_count = 0;
-}
-
 Light_VM_State*
 light_vm_init() {
     Light_VM_State* state = (Light_VM_State*)calloc(1, sizeof(*state));
@@ -780,14 +774,13 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             advance_ip = true;
         }break;
         case LVM_EXPOP: {
-            ext_clear_stack(state);
+            // Clear external stack
+            state->ext_stack.int_arg_count = 0;
+            state->ext_stack.float_arg_count = 0;
             advance_ip = true;
         }break;
 
         case LVM_CALL:{
-            // Same as:
-            // push (rip + instruction_size)
-            // jmp X
             light_vm_execute_call_instruction(state, instr);
         } break;
         case LVM_RET: {
@@ -812,11 +805,16 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
 }
 
 void
-light_vm_execute(Light_VM_State* state, bool print_steps) {
+light_vm_reset(Light_VM_State* state) {
     state->registers[RIP] = (u64)(Light_VM_Instruction*)(state->code.block);
     state->registers[RBP] = (u64)(Light_VM_Instruction*)(state->stack.block);
     state->registers[RSP] = state->registers[RBP];
     state->registers[RDP] = (u64)(Light_VM_Instruction*)(state->data.block);
+}
+
+void
+light_vm_execute(Light_VM_State* state, bool print_steps) {
+    light_vm_reset(state);
 
     for(u64 i = 0;; ++i) {
         Light_VM_Instruction in = *(Light_VM_Instruction*)(state->registers[RIP]);
