@@ -218,6 +218,7 @@ Light_VM_Instruction_Info light_vm_push(Light_VM_State* vm_state, const char* in
 Light_VM_Instruction_Info light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...);
 Light_VM_Instruction      light_vm_instruction_get(const char* s, u64* immediate);
 void*                     light_vm_push_data_segment(Light_VM_State* vm_state, Light_VM_Data data);
+void*                     light_vm_push_bytes_data_segment(Light_VM_State* vm_state, u8* bytes, s32 byte_count);
 s32                       light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instruction_Info to);
 void*                     light_vm_push_r32_to_datasegment(Light_VM_State* state, r32 f);
 void*                     light_vm_push_r64_to_datasegment(Light_VM_State* state, r64 f);
@@ -241,4 +242,4 @@ void light_vm_execute(Light_VM_State* state, bool print_steps);
 void light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr);
 void light_vm_reset(Light_VM_State* state);
 
-extern u64 lvm_ext_call(void* stack, void* proc);
+extern u64 lvm_ext_call(void* stack, void* proc, u64* flt_ret);

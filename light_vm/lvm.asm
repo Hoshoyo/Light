@@ -27,12 +27,14 @@ cmp_flags_64:
     lahf
     ret
 
-; u64 lvm_ext_call(void* stack, void* proc)
+; u64 lvm_ext_call(void* stack, void* proc, u64* float_return)
 ; stack pointer in RDI
 ; sfunction ptr in RSI
 lvm_ext_call:
     ; prologue
     push rbp
+    push rdx ; save float return pointer
+    push rdx ; just to align to 16bytes
     mov rbp, rsp
 
     mov r10, rsi        ; r10 = funcptr
@@ -227,5 +229,9 @@ no_more_args:
 
     ; epilogue
     mov	rsp, rbp
+    pop rdx ; retreive float return pointer
+    pop rdx
+    movq [rdx], xmm0 ; save the float return in the argument pointer(float_return)
+
 	pop	rbp
 	ret

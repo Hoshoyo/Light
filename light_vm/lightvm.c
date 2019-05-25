@@ -488,7 +488,11 @@ light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instr
         default: assert(0); break;
     }
 
-    lvm_ext_call(&state->ext_stack, jmp_address);
+    u64 flt_ret = 0;
+    u64 res = lvm_ext_call(&state->ext_stack, jmp_address, &flt_ret);
+    state->registers[R0] = res;
+    state->f32registers[FR0] = *(r32*)&flt_ret; // return value of r32 in FR0
+    state->f64registers[FR4] = *(r64*)&flt_ret; // return value of r64 in FR4
 }
 
 void

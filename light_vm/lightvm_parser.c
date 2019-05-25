@@ -1,5 +1,6 @@
 #include "lightvm.h"
 #include <stdarg.h>
+#include <string.h>
 
 static bool start_with(const char* start, const char* str, s32* count) {
     *count = 0;
@@ -510,5 +511,13 @@ light_vm_push_data_segment(Light_VM_State* vm_state, Light_VM_Data data) {
 
     vm_state->data_offset += data.byte_size;
 
+    return ptr;
+}
+
+void*
+light_vm_push_bytes_data_segment(Light_VM_State* vm_state, u8* bytes, s32 byte_count) {
+    void* ptr = (vm_state->data.block + vm_state->data_offset);
+    memcpy(ptr, bytes, byte_count);
+    vm_state->data_offset += byte_count;
     return ptr;
 }

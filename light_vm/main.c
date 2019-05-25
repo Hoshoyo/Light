@@ -2,7 +2,11 @@
 #include "ast.h"
 #include "lightvm.h"
 #include "light_array.h"
+
+#if defined(__linux__)
 #include <dlfcn.h>
+#include <unistd.h>
+#endif
 
 void example1(Light_VM_State* state) {
     // branch test
@@ -79,12 +83,13 @@ void example5(Light_VM_State* state) {
     light_vm_patch_immediate_distance(branch, start);
 }
 
-void addproc(int x, int y, float z) {
+r32 addproc(int x, int y, float z) {
     printf("%d %d %f\n", x, y, z);
+    return 1.544f;
 }
 
 void example6(Light_VM_State* state) {
-    // factorial procedural
+    // external call test
     light_vm_push(state, "mov r1, 0x2"); // r1 = 2
     light_vm_push(state, "mov r0, 0x5"); // r0 = 5
     light_vm_push(state, "mov r3, 0x4131999a");
@@ -98,6 +103,23 @@ void example6(Light_VM_State* state) {
     light_vm_push(state, "hlt");
 }
 
+#if defined(__linux__)
+void example7(Light_VM_State* state) {
+    char str[] = "Hello World!\n";
+    void* addr = light_vm_push_bytes_data_segment(state, str, sizeof(str) - 1);
+    light_vm_push(state, "mov r0, 1");
+    light_vm_push_fmt(state, "mov r1, %p", addr);
+    //light_vm_push(state, "mov r1, rdp");
+    light_vm_push_fmt(state, "mov r2, %d", sizeof(str) - 1);
+    light_vm_push(state, "expushi r0");
+    light_vm_push(state, "expushi r1");
+    light_vm_push(state, "expushi r2");
+    light_vm_push_fmt(state, "mov r3, %p", write);
+    light_vm_push(state, "extcall r3");
+    light_vm_push(state, "hlt");
+}
+#endif
+
 int main() {
     Light_VM_State* state = light_vm_init();
 
@@ -106,7 +128,8 @@ int main() {
     //example3(state);
     //example4(state);
     //example5(state);
-    example6(state);
+    //example6(state);
+    example7(state);
 
     //light_vm_debug_dump_code(stdout, state);
     light_vm_execute(state, 0);
