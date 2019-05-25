@@ -448,7 +448,7 @@ light_vm_execute_float_instruction(Light_VM_State* state, Light_VM_Instruction i
 bool
 light_vm_execute_float_branch_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
-    u64 imm_val = get_value_of_immediate(state, instr, address_of_imm);
+    u64 volatile imm_val = get_value_of_immediate(state, instr, address_of_imm);
 
     bool branch = false;
 
@@ -497,7 +497,7 @@ light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instr
     // Jump to destination address
     switch(instr.branch.addr_mode) {
         case BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE:{
-            u64 imm_val = get_value_of_immediate(state, instr, address_of_imm);
+            u64 volatile imm_val = get_value_of_immediate(state, instr, address_of_imm);
             jmp_address = (void*)imm_val;
         } break;
         case BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE:{
@@ -512,7 +512,7 @@ light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instr
         default: assert(0); break;
     }
 
-    u64 flt_ret = 0;
+    u64 volatile flt_ret = 0;
     u64 res = lvm_ext_call(&state->ext_stack, jmp_address, &flt_ret);
     state->registers[R0] = res;
     state->f32registers[FR0] = *(r32*)&flt_ret; // return value of r32 in FR0
@@ -528,11 +528,11 @@ light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction in
 
     switch(instr.push.addr_mode) {
         case PUSH_ADDR_MODE_IMMEDIATE:{
-            u64 imm = get_value_of_immediate(state, instr, address_of_imm);
+            u64 volatile imm = get_value_of_immediate(state, instr, address_of_imm);
             src = &imm;
         } break;
         case PUSH_ADDR_MODE_IMMEDIATE_INDIRECT:{
-            u64 imm = get_value_of_immediate(state, instr, address_of_imm);
+            u64 volatile imm = get_value_of_immediate(state, instr, address_of_imm);
             src = (void*)imm;
         } break;
         case PUSH_ADDR_MODE_REGISTER:{
@@ -563,11 +563,11 @@ light_vm_execute_expush_instruction(Light_VM_State* state, Light_VM_Instruction 
 
     switch(instr.push.addr_mode) {
         case PUSH_ADDR_MODE_IMMEDIATE:{
-            u64 imm = get_value_of_immediate(state, instr, address_of_imm);
+            u64 volatile imm = get_value_of_immediate(state, instr, address_of_imm);
             src = &imm;
         } break;
         case PUSH_ADDR_MODE_IMMEDIATE_INDIRECT:{
-            u64 imm = get_value_of_immediate(state, instr, address_of_imm);
+            u64 volatile imm = get_value_of_immediate(state, instr, address_of_imm);
             src = (void*)imm;
         } break;
         case PUSH_ADDR_MODE_REGISTER:{

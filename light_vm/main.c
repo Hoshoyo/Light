@@ -20,7 +20,6 @@ void example1(Light_VM_State* state) {
     light_vm_patch_immediate_distance(b, hlt);
 
     light_vm_execute(state, entry.absolute_address, 0);
-    light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
     assert(state->registers[R0] == 5 && state->registers[R1] == 5);
 }
 
@@ -126,13 +125,13 @@ void example6(Light_VM_State* state) {
 
     // Should print 2 5 11.100000
     light_vm_execute(state, entry.absolute_address, 0);
-    assert(state->registers[R0] == 14);
+    assert(state->f32registers[FR0] == 1.544f);
 }
 
 #if defined(__linux__)
 void example7(Light_VM_State* state) {
     char str[] = "Hello World!\n";
-    void* addr = light_vm_push_bytes_data_segment(state, str, sizeof(str) - 1);
+    void* addr = light_vm_push_bytes_data_segment(state, (u8*)str, sizeof(str) - 1);
     Light_VM_Instruction_Info entry = 
     light_vm_push(state, "mov r0, 1");
     light_vm_push_fmt(state, "mov r1, %p", addr);
@@ -154,7 +153,7 @@ void example7(Light_VM_State* state) {
 void example8(Light_VM_State* state) {
     // copy test
     char str[] = "Hello World";
-    void* addr = light_vm_push_bytes_data_segment(state, str, sizeof(str) - 1);
+    light_vm_push_bytes_data_segment(state, (u8*)str, sizeof(str) - 1);
     
     Light_VM_Instruction_Info entry = 
     light_vm_push(state, "mov r0, rdp");
@@ -171,7 +170,7 @@ void example8(Light_VM_State* state) {
 void example9(Light_VM_State* state) {
     // copy and alloc test
     char str[] = "Hello World";
-    void* addr = light_vm_push_bytes_data_segment(state, str, sizeof(str) - 1);
+    light_vm_push_bytes_data_segment(state, (u8*)str, sizeof(str) - 1);
     
     Light_VM_Instruction_Info entry = 
     light_vm_push(state, "mov r1, rdp");
@@ -188,14 +187,14 @@ int main() {
     Light_VM_State* state = light_vm_init();
 
     example1(state);
-    //example2(state);
-    //example3(state);
-    //example4(state);
-    //example5(state);
-    //example6(state);
-    //example7(state);
-    //example8(state);
-    //example9(state);
+    example2(state);
+    example3(state);
+    example4(state);
+    example5(state);
+    example6(state);
+    example7(state);
+    example8(state);
+    example9(state);
 
     //light_vm_debug_dump_code(stdout, state);
     //light_vm_execute(state, 0);

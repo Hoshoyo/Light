@@ -5,6 +5,10 @@ global cmp_flags_64
 
 global lvm_ext_call
 
+section .data
+hello: dd 1.5
+world: db 'Hello'
+
 section .text
 
 cmp_flags_8:
@@ -27,15 +31,24 @@ cmp_flags_64:
     lahf
     ret
 
+; preserve rbx, rsp, rbp, r12, r13, r14, and r15
 ; u64 lvm_ext_call(void* stack, void* proc, u64* float_return)
 ; stack pointer in RDI
 ; sfunction ptr in RSI
 lvm_ext_call:
+
     ; prologue
     push rbp
-    push rdx ; save float return pointer
-    push rdx ; just to align to 16bytes
     mov rbp, rsp
+
+    ; preserve registers
+    sub rsp, 48
+    mov [rsp], rdx
+    mov [rsp + 8], r15
+    mov [rsp + 16], r14
+    mov [rsp + 24], r13
+    mov [rsp + 32], r12
+    mov [rsp + 40], rbx
 
     mov r10, rsi        ; r10 = funcptr
 
@@ -227,11 +240,18 @@ push_float:
 no_more_args:
     call r10
 
+    ; restore registers saved
+    mov rdx, [rsp]
+    mov r15, [rsp + 8]
+    mov r14, [rsp + 16]
+    mov r13, [rsp + 24]
+    mov r12, [rsp + 32]
+    mov rbx, [rsp + 40]
+
+    movq [rdx], xmm0
+
     ; epilogue
     mov	rsp, rbp
-    pop rdx ; retreive float return pointer
-    pop rdx
-    movq [rdx], xmm0 ; save the float return in the argument pointer(float_return)
-
 	pop	rbp
+
 	ret
