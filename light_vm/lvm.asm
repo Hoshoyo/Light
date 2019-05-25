@@ -27,6 +27,7 @@ cmp_flags_64:
     lahf
     ret
 
+; u64 lvm_ext_call(void* stack, void* proc)
 ; stack pointer in RDI
 ; sfunction ptr in RSI
 lvm_ext_call:
@@ -171,35 +172,54 @@ no_more_float_reg_args:
     ; r13 = current int index*
     ; r14 = current float index*
 
+    xor r15, r15
+    mov r15d, r11d
+    dec r15
+    shl r15d, 3    ; multiply by 8
+    add rax, r15   ; put rax at the end of the int arguments
+
+    xor r15, r15
+    mov r15d, r12d
+    dec r15
+    shl r15d, 3
+    add rbx, r15   ; put rbx at the end of the float arguments
+
     add r11d, r12d ; count = int_count + float_count
-    mov r12, r11   ; r12 = count
-    and r12, 0x1   ; r12 = count % 2
+    mov r15, r11   ; r15 = count
+    and r15, 0x1   ; r15 = count % 2
+    shl r15, 3   ; 1 * 8 or 0 * 8
+    sub rsp, r15 ; stack must be 16 byte aligned, so if odd number of pushed arguments, adjust.
 
 pushing_args_to_stack:
     cmp r11d, 0
     je no_more_args
 
     mov r15b, [r13]
-    cmp r15b, [r14]
+    cmp r15b, 0
+    je push_float   ; there are no more integers
 
-    jg push_float ; int_index > float_index
+    mov r15b, [r14]
+    cmp r15b, 0
+    je push_integer ; there are no more floats
+
+    cmp r15b, [r13] ; cmp float_index, int_index
+
+    jl push_float ; float_index < int_index
 push_integer:
     mov r15, [rax]
     push r15
-    add rax, 8
+    sub rax, 8
     dec r11d
     jmp pushing_args_to_stack
 
 push_float:
     mov r15, [rbx]
     push r15
-    add rbx, 8
+    sub rbx, 8
     dec r11d
     jmp pushing_args_to_stack
 
 no_more_args:
-    shl r12, 8   ; 1 << 8 or 0 << 8
-    sub rsp, r12 ; stack must be 16 byte aligned, so if odd number of pushed arguments, adjust.
     call r10
 
     ; epilogue

@@ -79,23 +79,53 @@ void example5(Light_VM_State* state) {
     light_vm_patch_immediate_distance(branch, start);
 }
 
+void foozle(int a, float b, int c, int d, int e, int f, int g, int h, int i) {
+    printf("%d %f %d %d %d %d %d %d %d\n", a, b, c, d, e, f, g, h, i);
+}
+
+extern u64 lvm_ext_call(void* stack, void* proc);
 
 int main() {
-    printf("int values: %llu\n", (u64)&((Light_VM_EXT_Stack*)0)->int_values);
-    printf("int index:  %llu\n", (u64)&((Light_VM_EXT_Stack*)0)->int_index);
-    printf("float values: %llu\n", (u64)&((Light_VM_EXT_Stack*)0)->float_values);
-    printf("float index:  %llu\n", (u64)&((Light_VM_EXT_Stack*)0)->float_index);
 
-    Light_VM_State* state = light_vm_init();
+    Light_VM_EXT_Stack stack = {0};
+    stack.int_arg_count = 8;
+    stack.float_arg_count = 1;
 
+    stack.int_values[0] = 1;
+    stack.int_values[1] = 2;
+    stack.int_values[2] = 3;
+    stack.int_values[3] = 4;
+    stack.int_values[4] = 5;
+    stack.int_values[5] = 6;
+    stack.int_values[6] = 7;
+    stack.int_values[7] = 8;
+
+    stack.int_index[0] = 0;
+    stack.int_index[1] = 2;
+    stack.int_index[2] = 3;
+    stack.int_index[3] = 4;
+    stack.int_index[4] = 5;
+    stack.int_index[5] = 6;
+    stack.int_index[6] = 7;
+    stack.int_index[7] = 8;
+
+    stack.float_values[0] = 0x4048f5c3;
+
+    stack.float_index[0] = 1;
+
+    lvm_ext_call(&stack, foozle);
+
+    return 0;
+
+#if 0
     void* dll = dlopen("libc.so.6", RTLD_NOW);
     s64(*write_proc)(int, const void *, size_t) = (s64(*)(int, const void *, size_t))dlsym(dll, "write");
 
     write_proc(1, "foo", 3);
     //printf("%p\n", write_proc);
-    
-    return 0;
+#endif
 
+    Light_VM_State* state = light_vm_init();
     example4(state);
 
     //light_vm_debug_dump_code(stdout, state);
