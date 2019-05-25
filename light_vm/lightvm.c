@@ -9,6 +9,7 @@ extern u16 cmp_flags_8(u8 l, u8 r);
 extern u16 cmp_flags_16(u16 l, u16 r);
 extern u16 cmp_flags_32(u32 l, u32 r);
 extern u16 cmp_flags_64(u64 l, u64 r);
+extern u64 lvm_ext_call(void* stack, void* proc, u64* flt_ret);
 
 Light_VM_State*
 light_vm_init() {
@@ -24,6 +25,14 @@ light_vm_init() {
     state->stack.size = 1024 * 1024;
 
     return state;
+}
+
+void
+light_vm_free(Light_VM_State* state) {
+    free(state->data.block);
+    free(state->code.block);
+    free(state->stack.block);
+    free(state);
 }
 
 static void
@@ -254,7 +263,7 @@ light_vm_execute_binary_arithmetic_instruction(Light_VM_State* state, Light_VM_I
         }break;
         // mov r0, 0x123
         case BIN_ADDR_MODE_IMM_TO_REG:{
-            u64 imm_value = get_value_of_immediate(state, instr, address_of_imm);
+            u64 volatile imm_value = get_value_of_immediate(state, instr, address_of_imm);
             src = &imm_value;
             dst = &state->registers[instr.binary.dst_reg];
         }break;

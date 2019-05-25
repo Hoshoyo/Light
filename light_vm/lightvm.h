@@ -46,7 +46,7 @@ typedef enum {
     LVM_BLE_U, // Carry Flag = 1 or Zero Flag = 1
     LVM_BGE_U, // Carry Flag = 0
     // Jump
-    LVM_JMP, // Unconditionally
+    LVM_JMP,   // Unconditionally
 
     // Proc
     LVM_CALL, LVM_PUSH, LVM_POP, LVM_RET,
@@ -55,8 +55,8 @@ typedef enum {
 
     // Utils
     LVM_COPY, // copy r0, r1, r2 -> dst, src, size_bytes
-    LVM_ASSERT,
     LVM_ALLOC,
+    LVM_ASSERT,
 
     LVM_HLT, // Halt
 } Light_VM_Instruction_Type;
@@ -75,20 +75,20 @@ typedef struct {
 } Light_VM_Float_Flags_Register;
 
 typedef enum {
-    BIN_ADDR_MODE_REG_TO_REG,     // mov rax, rbx
-    BIN_ADDR_MODE_REG_TO_MEM,     // mov [rax], rbx
-    BIN_ADDR_MODE_REG_TO_IMM_MEM, // mov [0x1234], rbx
+    BIN_ADDR_MODE_REG_TO_REG,          // mov rax, rbx
+    BIN_ADDR_MODE_REG_TO_MEM,          // mov [rax], rbx
+    BIN_ADDR_MODE_REG_TO_IMM_MEM,      // mov [0x1234], rbx
     BIN_ADDR_MODE_REG_TO_MEM_OFFSETED, // mov [rax + 0x42], rbx
     BIN_ADDR_MODE_REG_OFFSETED_TO_REG, // mov rax, [rbx + 0x42]
-    BIN_ADDR_MODE_MEM_TO_REG,     // mov rax, [rbx]
-    BIN_ADDR_MODE_MEM_IMM_TO_REG, // mov rax, [0x1234]
-    BIN_ADDR_MODE_IMM_TO_REG,     // mov rax, 0x1234
+    BIN_ADDR_MODE_MEM_TO_REG,          // mov rax, [rbx]
+    BIN_ADDR_MODE_MEM_IMM_TO_REG,      // mov rax, [0x1234]
+    BIN_ADDR_MODE_IMM_TO_REG,          // mov rax, 0x1234
 } Light_VM_Binary_Addressing_Mode;
 
 typedef enum {
-    FLOAT_ADDR_MODE_REG_TO_REG, // fadd fr0, fr1
-    FLOAT_ADDR_MODE_REG_TO_MEM, // fadd [r0], fr2
-    FLOAT_ADDR_MODE_MEM_TO_REG, // fadd fr0, [r1]
+    FLOAT_ADDR_MODE_REG_TO_REG,          // fadd fr0, fr1
+    FLOAT_ADDR_MODE_REG_TO_MEM,          // fadd [r0], fr2
+    FLOAT_ADDR_MODE_MEM_TO_REG,          // fadd fr0, [r1]
     FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG, // fadd fr0, [r1 + 0x23]
     FLOAT_ADDR_MODE_REG_TO_MEM_OFFSETED, // fadd [r0 + 0x12], fr3
 } Light_VM_Float_Addressing_Mode;
@@ -108,46 +108,46 @@ typedef enum {
 } Light_VM_Push_Addressing_Mode;
 
 typedef struct {
-    u32 src_reg     : 4; // 4
-    u32 dst_reg     : 4; // 8
-    u32 bytesize    : 4; // 12
-    u32 addr_mode   : 4; // 20
-    u32 sign        : 1; // 1 negative, 0 positive
+    u32 src_reg     : 4;
+    u32 dst_reg     : 4;
+    u32 bytesize    : 4;
+    u32 addr_mode   : 4;
+    u32 sign        : 1; // 0 positive, 1 negative
 } Light_VM_Instruction_Binary;
 
 typedef struct {
-    u32 reg       : 4; // 4
-    u32 byte_size : 4; // 8
+    u32 reg       : 4;
+    u32 byte_size : 4;
 } Light_VM_Instruction_Unary;
 
 typedef struct {
     // is always 64 bit
-    u32 reg         : 4; // 4
-    u32 addr_mode   : 4; // 8
+    u32 reg         : 4;
+    u32 addr_mode   : 4;
 } Light_VM_Instruction_Branch;
 
 typedef struct {
-    u32 src_reg     : 4; // 4
-    u32 dst_reg     : 4; // 8
-    u32 sign        : 4; // 12 -> 0 positive, 1 negative
-    u32 addr_mode   : 4; // 16
+    u32 src_reg     : 4;
+    u32 dst_reg     : 4;
+    u32 sign        : 4; // 0 positive, 1 negative
+    u32 addr_mode   : 4;
 } Light_VM_Instruction_Float;
 
 typedef struct {
-    u32 reg       : 4; // 4
-    u32 addr_mode : 4; // 8
-    u32 byte_size : 4; // 12
+    u32 reg       : 4;
+    u32 addr_mode : 4;
+    u32 byte_size : 4;
 } Light_VM_Instruction_Push;
 
 typedef struct {
-    u32 dst_reg : 4;
-    u32 src_reg : 4;
+    u32 dst_reg        : 4;
+    u32 src_reg        : 4;
     u32 size_bytes_reg : 4;
 } Light_VM_Copy_Instruction;
 
 typedef struct {
-    u32 dst_reg : 4;
-    u32 size_reg : 4;
+    u32 dst_reg   : 4;
+    u32 size_reg  : 4;
     u32 byte_size : 4;
 } Light_VM_Alloc_Instruction;
 
@@ -210,16 +210,16 @@ typedef struct {
 typedef struct {
     Light_VM_Flags_Register       rflags;
     Light_VM_Float_Flags_Register rfloat_flags;
-    u64    registers[R_COUNT];
-    r64    f64registers[FREG_COUNT];
-    r32    f32registers[FREG_COUNT];
-    Light_VM_EXT_Stack ext_stack;
-    Memory data;
-    u64 data_offset;
-    Memory stack;
-    Memory heap;
-    Memory code;
-    u64 code_offset;
+    u64                           registers[R_COUNT];
+    r64                           f64registers[FREG_COUNT];
+    r32                           f32registers[FREG_COUNT];
+    Light_VM_EXT_Stack            ext_stack;
+    Memory                        data;
+    u64                           data_offset;
+    Memory                        stack;
+    Memory                        heap;
+    Memory                        code;
+    u64                           code_offset;
 } Light_VM_State;
 
 typedef struct {
@@ -230,6 +230,7 @@ typedef struct {
 } Light_VM_Instruction_Info;
 
 Light_VM_State*           light_vm_init();
+void                      light_vm_free(Light_VM_State* state);
 Light_VM_Instruction_Info light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, u64 immediate);
 Light_VM_Instruction_Info light_vm_push(Light_VM_State* vm_state, const char* instruction);
 Light_VM_Instruction_Info light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...);
@@ -258,5 +259,3 @@ void light_vm_debug_dump_code(FILE* out, Light_VM_State* state);
 void light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps);
 void light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr);
 void light_vm_reset(Light_VM_State* state);
-
-extern u64 lvm_ext_call(void* stack, void* proc, u64* flt_ret);

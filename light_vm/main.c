@@ -20,6 +20,7 @@ void example1(Light_VM_State* state) {
     light_vm_patch_immediate_distance(b, hlt);
 
     light_vm_execute(state, entry.absolute_address, 0);
+    light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
     assert(state->registers[R0] == 5 && state->registers[R1] == 5);
 }
 
@@ -187,14 +188,14 @@ int main() {
     Light_VM_State* state = light_vm_init();
 
     example1(state);
-    example2(state);
-    example3(state);
-    example4(state);
-    example5(state);
-    example6(state);
-    example7(state);
-    example8(state);
-    example9(state);
+    //example2(state);
+    //example3(state);
+    //example4(state);
+    //example5(state);
+    //example6(state);
+    //example7(state);
+    //example8(state);
+    //example9(state);
 
     //light_vm_debug_dump_code(stdout, state);
     //light_vm_execute(state, 0);
