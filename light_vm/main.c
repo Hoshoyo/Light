@@ -79,8 +79,8 @@ void example5(Light_VM_State* state) {
     light_vm_patch_immediate_distance(branch, start);
 }
 
-void foozle(int a, float b, int c, int d, int e, int f, int g, int h, int i) {
-    printf("%d %f %d %d %d %d %d %d %d\n", a, b, c, d, e, f, g, h, i);
+void foozle(int a, float b, int c, int d, int e, int f, int g, int h, int i, float f1, float f2, float f3, float f4, float f5, float f6, float f7, float f8) {
+    printf("%d %f %d %d %d %d %d %d %d %f %f %f %f %f %f %f %f\n", a, b, c, d, e, f, g, h, i, f1, f2, f3, f4, f5, f6, f7, f8);
 }
 
 extern u64 lvm_ext_call(void* stack, void* proc);
@@ -89,7 +89,7 @@ int main() {
 
     Light_VM_EXT_Stack stack = {0};
     stack.int_arg_count = 8;
-    stack.float_arg_count = 1;
+    stack.float_arg_count = 9;
 
     stack.int_values[0] = 1;
     stack.int_values[1] = 2;
@@ -109,9 +109,25 @@ int main() {
     stack.int_index[6] = 7;
     stack.int_index[7] = 8;
 
-    stack.float_values[0] = 0x4048f5c3;
+    stack.float_values[0] = 0x3f800000;
+    stack.float_values[1] = 0x40000000;
+    stack.float_values[2] = 0x40400000;
+    stack.float_values[3] = 0x40800000;
+    stack.float_values[4] = 0x40a00000;
+    stack.float_values[5] = 0x40c00000;
+    stack.float_values[6] = 0x40e00000;
+    stack.float_values[7] = 0x41000000;
+    stack.float_values[8] = 0x41100000;
 
     stack.float_index[0] = 1;
+    stack.float_index[1] = 9;
+    stack.float_index[2] = 10;
+    stack.float_index[3] = 11;
+    stack.float_index[4] = 12;
+    stack.float_index[5] = 13;
+    stack.float_index[6] = 14;
+    stack.float_index[7] = 15;
+    stack.float_index[8] = 16;
 
     lvm_ext_call(&stack, foozle);
 

@@ -184,27 +184,30 @@ no_more_float_reg_args:
     shl r15d, 3
     add rbx, r15   ; put rbx at the end of the float arguments
 
-    add r11d, r12d ; count = int_count + float_count
-    mov r15, r11   ; r15 = count
+    xor r15, r15
+    mov r15d, r11d ; r15 = int_count
+    add r15d, r12d ; r15 = int_count + float_count
     and r15, 0x1   ; r15 = count % 2
     shl r15, 3   ; 1 * 8 or 0 * 8
     sub rsp, r15 ; stack must be 16 byte aligned, so if odd number of pushed arguments, adjust.
 
 pushing_args_to_stack:
-    cmp r11d, 0
+    mov r15d, r11d
+    add r15d, r12d
+
+    cmp r15d, 0
     je no_more_args
 
-    mov r15b, [r13]
-    cmp r15b, 0
+    cmp r11b, 0
     je push_float   ; there are no more integers
 
-    mov r15b, [r14]
-    cmp r15b, 0
+    cmp r12b, 0
     je push_integer ; there are no more floats
 
+    mov r15b, [r14]
     cmp r15b, [r13] ; cmp float_index, int_index
 
-    jl push_float ; float_index < int_index
+    jg push_float ; float_index > int_index
 push_integer:
     mov r15, [rax]
     push r15
@@ -216,7 +219,7 @@ push_float:
     mov r15, [rbx]
     push r15
     sub rbx, 8
-    dec r11d
+    dec r12d
     jmp pushing_args_to_stack
 
 no_more_args:
