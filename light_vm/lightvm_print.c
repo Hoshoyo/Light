@@ -173,7 +173,16 @@ print_unary_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
         case LVM_POP:  fprintf(out, "POP "); break;
         default: fprintf(out, "Invalid unary instruction"); break;
     }
-    print_register(out, instr.unary.reg, instr.imm_size_bytes);
+    print_register(out, instr.unary.reg, instr.unary.byte_size);
+}
+
+void
+print_alloc_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
+    assert(instr.type == LVM_ALLOC);
+    fprintf(out, "ALLOC ");
+    print_register(out, instr.alloc.dst_reg, 8);
+    fprintf(out, ", ");
+    print_register(out, instr.alloc.size_reg, instr.alloc.byte_size);
 }
 
 void
@@ -322,6 +331,17 @@ print_branch_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
     }
 }
 
+void
+print_copy_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
+    assert(instr.type == LVM_COPY);
+    fprintf(out, "COPY ");
+    print_register(out, instr.copy.dst_reg, 8);
+    fprintf(out, ",");
+    print_register(out, instr.copy.src_reg, 8);
+    fprintf(out, ",");
+    print_register(out, instr.copy.size_bytes_reg, 8);
+}
+
 void 
 light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
     
@@ -393,8 +413,14 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
             break;
         case LVM_RET:  fprintf(out, "RET"); break;
 
+        case LVM_COPY:
+            print_copy_instruction(out, instr, imm);
+            break;
+        case LVM_ALLOC:
+            print_alloc_instruction(out, instr, imm);
+            break;
+
         // TODO(psv):
-        case LVM_COPY:    fprintf(out, "COPY"); break;
         case LVM_ASSERT:  fprintf(out, "ASSERT"); break;
 
         // Halt

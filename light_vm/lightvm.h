@@ -51,9 +51,12 @@ typedef enum {
     // Proc
     LVM_CALL, LVM_PUSH, LVM_POP, LVM_RET,
     LVM_EXPUSHI, LVM_EXPUSHF, LVM_EXPOP,
+    LVM_EXTCALL,
 
     // Utils
-    LVM_COPY, LVM_ASSERT, LVM_EXTCALL,
+    LVM_COPY, // copy r0, r1, r2 -> dst, src, size_bytes
+    LVM_ASSERT,
+    LVM_ALLOC,
 
     LVM_HLT, // Halt
 } Light_VM_Instruction_Type;
@@ -137,6 +140,18 @@ typedef struct {
 } Light_VM_Instruction_Push;
 
 typedef struct {
+    u32 dst_reg : 4;
+    u32 src_reg : 4;
+    u32 size_bytes_reg : 4;
+} Light_VM_Copy_Instruction;
+
+typedef struct {
+    u32 dst_reg : 4;
+    u32 size_reg : 4;
+    u32 byte_size : 4;
+} Light_VM_Alloc_Instruction;
+
+typedef struct {
     u8 type;
     u8 imm_size_bytes;
     union {
@@ -145,6 +160,8 @@ typedef struct {
         Light_VM_Instruction_Float      ifloat;
         Light_VM_Instruction_Branch     branch;
         Light_VM_Instruction_Push       push;
+        Light_VM_Copy_Instruction       copy;
+        Light_VM_Alloc_Instruction      alloc;
     };
 } Light_VM_Instruction;
 
@@ -238,7 +255,7 @@ void light_vm_debug_dump_code(FILE* out, Light_VM_State* state);
 // -------------------------------------
 // ----------- Execution ---------------
 // -------------------------------------
-void light_vm_execute(Light_VM_State* state, bool print_steps);
+void light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps);
 void light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr);
 void light_vm_reset(Light_VM_State* state);
 

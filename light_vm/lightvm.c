@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "lightvm.h"
 
 #define true 1
@@ -109,10 +110,12 @@ light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, 
             }
             break;
 
+        case LVM_ALLOC: case LVM_COPY: break;
+
         // TODO(psv):
-        case LVM_COPY: case LVM_ASSERT:
-        default: {
-        }break;
+        case LVM_ASSERT:
+
+        default: break;
     }
 
     return info;
@@ -145,8 +148,20 @@ light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instr
     return (to.absolute_address - from.absolute_address);
 }
 
+static u64
+get_value_of_register(Light_VM_State* state, u8 reg, u8 byte_size) {
+    switch(byte_size) {
+        case 1: return (u64)*(u8*)&state->registers[reg]; break;
+        case 2: return (u64)*(u16*)&state->registers[reg]; break;
+        case 4: return (u64)*(u32*)&state->registers[reg]; break;
+        case 8: return (u64)state->registers[reg]; break;
+        default: assert(0); break;
+    }
+    return 0;
+}
+
 static u64 
-get_value_off_immediate(Light_VM_State* state, Light_VM_Instruction instr, void* address_of_imm) {
+get_value_of_immediate(Light_VM_State* state, Light_VM_Instruction instr, void* address_of_imm) {
     u64 value = 0;
     switch(instr.imm_size_bytes) {
         case 1: value = (u64)*(u8*)address_of_imm; break;
@@ -159,7 +174,7 @@ get_value_off_immediate(Light_VM_State* state, Light_VM_Instruction instr, void*
 }
 
 static s64 
-get_signed_value_off_immediate(Light_VM_State* state, Light_VM_Instruction instr, void* address_of_imm) {
+get_signed_value_of_immediate(Light_VM_State* state, Light_VM_Instruction instr, void* address_of_imm) {
     s64 value = 0;
     switch(instr.imm_size_bytes) {
         case 1: value = (s64)*(s8*)address_of_imm; break;
@@ -213,17 +228,17 @@ light_vm_execute_binary_arithmetic_instruction(Light_VM_State* state, Light_VM_I
         case BIN_ADDR_MODE_REG_TO_MEM_OFFSETED:{
             src = &state->registers[instr.binary.src_reg];
             if(instr.binary.sign) {
-                dst = (void*)(state->registers[instr.binary.dst_reg] - get_value_off_immediate(state, instr, address_of_imm));
+                dst = (void*)(state->registers[instr.binary.dst_reg] - get_value_of_immediate(state, instr, address_of_imm));
             } else {
-                dst = (void*)(state->registers[instr.binary.dst_reg] + get_value_off_immediate(state, instr, address_of_imm));
+                dst = (void*)(state->registers[instr.binary.dst_reg] + get_value_of_immediate(state, instr, address_of_imm));
             }
         }break;
         // mov r0, [r1 + 0x213]
         case BIN_ADDR_MODE_REG_OFFSETED_TO_REG:{
             if(instr.binary.sign) {
-                src = (void*)(state->registers[instr.binary.src_reg] - get_value_off_immediate(state, instr, address_of_imm));
+                src = (void*)(state->registers[instr.binary.src_reg] - get_value_of_immediate(state, instr, address_of_imm));
             } else {
-                src = (void*)(state->registers[instr.binary.src_reg] + get_value_off_immediate(state, instr, address_of_imm));
+                src = (void*)(state->registers[instr.binary.src_reg] + get_value_of_immediate(state, instr, address_of_imm));
             }
             dst = &state->registers[instr.binary.dst_reg];
         }break;
@@ -239,7 +254,7 @@ light_vm_execute_binary_arithmetic_instruction(Light_VM_State* state, Light_VM_I
         }break;
         // mov r0, 0x123
         case BIN_ADDR_MODE_IMM_TO_REG:{
-            u64 imm_value = get_value_off_immediate(state, instr, address_of_imm);
+            u64 imm_value = get_value_of_immediate(state, instr, address_of_imm);
             src = &imm_value;
             dst = &state->registers[instr.binary.dst_reg];
         }break;
@@ -368,9 +383,9 @@ light_vm_execute_float_instruction(Light_VM_State* state, Light_VM_Instruction i
                 dst = &state->f64registers[instr.ifloat.dst_reg];
             }
             if(instr.ifloat.sign) {
-                src = (void*)(state->registers[instr.ifloat.src_reg] - get_value_off_immediate(state, instr, address_of_imm));
+                src = (void*)(state->registers[instr.ifloat.src_reg] - get_value_of_immediate(state, instr, address_of_imm));
             } else {
-                src = (void*)(state->registers[instr.ifloat.src_reg] + get_value_off_immediate(state, instr, address_of_imm));
+                src = (void*)(state->registers[instr.ifloat.src_reg] + get_value_of_immediate(state, instr, address_of_imm));
             }
         } break;
         case FLOAT_ADDR_MODE_REG_TO_MEM_OFFSETED: { // fadd [r0 + 0x12], fr3
@@ -380,9 +395,9 @@ light_vm_execute_float_instruction(Light_VM_State* state, Light_VM_Instruction i
                 src = &state->f64registers[instr.ifloat.src_reg];
             }
             if(instr.ifloat.sign) {
-                dst = (void*)(state->registers[instr.ifloat.dst_reg] - get_value_off_immediate(state, instr, address_of_imm));
+                dst = (void*)(state->registers[instr.ifloat.dst_reg] - get_value_of_immediate(state, instr, address_of_imm));
             } else {
-                dst = (void*)(state->registers[instr.ifloat.dst_reg] + get_value_off_immediate(state, instr, address_of_imm));
+                dst = (void*)(state->registers[instr.ifloat.dst_reg] + get_value_of_immediate(state, instr, address_of_imm));
             }
         } break;
     }
@@ -424,7 +439,7 @@ light_vm_execute_float_instruction(Light_VM_State* state, Light_VM_Instruction i
 bool
 light_vm_execute_float_branch_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
-    u64 imm_val = get_value_off_immediate(state, instr, address_of_imm);
+    u64 imm_val = get_value_of_immediate(state, instr, address_of_imm);
 
     bool branch = false;
 
@@ -473,7 +488,7 @@ light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instr
     // Jump to destination address
     switch(instr.branch.addr_mode) {
         case BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE:{
-            u64 imm_val = get_value_off_immediate(state, instr, address_of_imm);
+            u64 imm_val = get_value_of_immediate(state, instr, address_of_imm);
             jmp_address = (void*)imm_val;
         } break;
         case BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE:{
@@ -504,11 +519,11 @@ light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction in
 
     switch(instr.push.addr_mode) {
         case PUSH_ADDR_MODE_IMMEDIATE:{
-            u64 imm = get_value_off_immediate(state, instr, address_of_imm);
+            u64 imm = get_value_of_immediate(state, instr, address_of_imm);
             src = &imm;
         } break;
         case PUSH_ADDR_MODE_IMMEDIATE_INDIRECT:{
-            u64 imm = get_value_off_immediate(state, instr, address_of_imm);
+            u64 imm = get_value_of_immediate(state, instr, address_of_imm);
             src = (void*)imm;
         } break;
         case PUSH_ADDR_MODE_REGISTER:{
@@ -539,11 +554,11 @@ light_vm_execute_expush_instruction(Light_VM_State* state, Light_VM_Instruction 
 
     switch(instr.push.addr_mode) {
         case PUSH_ADDR_MODE_IMMEDIATE:{
-            u64 imm = get_value_off_immediate(state, instr, address_of_imm);
+            u64 imm = get_value_of_immediate(state, instr, address_of_imm);
             src = &imm;
         } break;
         case PUSH_ADDR_MODE_IMMEDIATE_INDIRECT:{
-            u64 imm = get_value_off_immediate(state, instr, address_of_imm);
+            u64 imm = get_value_of_immediate(state, instr, address_of_imm);
             src = (void*)imm;
         } break;
         case PUSH_ADDR_MODE_REGISTER:{
@@ -604,11 +619,11 @@ light_vm_execute_call_instruction(Light_VM_State* state, Light_VM_Instruction in
     // Jump to destination address
     switch(instr.branch.addr_mode) {
         case BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE:{
-            s64 imm_val = get_signed_value_off_immediate(state, instr, address_of_imm);
+            s64 imm_val = get_signed_value_of_immediate(state, instr, address_of_imm);
             state->registers[RIP] = imm_val;
         } break;
         case BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE:{
-            s64 imm_val = get_signed_value_off_immediate(state, instr, address_of_imm);
+            s64 imm_val = get_signed_value_of_immediate(state, instr, address_of_imm);
             state->registers[RIP] += imm_val;
         } break;
         case BRANCH_ADDR_MODE_REGISTER:
@@ -625,7 +640,7 @@ light_vm_execute_call_instruction(Light_VM_State* state, Light_VM_Instruction in
 bool
 light_vm_execute_branch_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
-    s64 imm_val = get_signed_value_off_immediate(state, instr, address_of_imm);
+    s64 imm_val = get_signed_value_of_immediate(state, instr, address_of_imm);
 
     bool branch = false;
     switch(instr.type) {
@@ -793,8 +808,22 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             state->registers[RSP] -= sizeof(u64);
         } break;
 
+        case LVM_COPY:{
+            memcpy(
+                (void*)state->registers[instr.copy.dst_reg], 
+                (void*)state->registers[instr.copy.src_reg], 
+                state->registers[instr.copy.size_bytes_reg]);
+            advance_ip = true;
+        } break;
+        
+        case LVM_ALLOC: {
+            u64 val = get_value_of_register(state, instr.alloc.size_reg, instr.alloc.byte_size);
+            void* mem = calloc(1, val);
+            state->registers[instr.alloc.dst_reg] = (u64)mem;
+            advance_ip = true;
+        } break;
+
         // TODO(psv):
-        case LVM_COPY:    break;
         case LVM_ASSERT:  break;
 
         // Halt
@@ -814,18 +843,41 @@ light_vm_reset(Light_VM_State* state) {
     state->registers[RBP] = (u64)(Light_VM_Instruction*)(state->stack.block);
     state->registers[RSP] = state->registers[RBP];
     state->registers[RDP] = (u64)(Light_VM_Instruction*)(state->data.block);
+
+    state->registers[R0] = 0;
+    state->registers[R1] = 0;
+    state->registers[R2] = 0;
+    state->registers[R3] = 0;
+    state->registers[R4] = 0;
+    state->registers[R5] = 0;
+    state->registers[R6] = 0;
+    state->registers[R7] = 0;
+
+    state->f32registers[FR0] = 0.0f;
+    state->f32registers[FR1] = 0.0f;
+    state->f32registers[FR2] = 0.0f;
+    state->f32registers[FR3] = 0.0f;
+
+    state->f64registers[FR4] = 0.0;
+    state->f64registers[FR5] = 0.0;
+    state->f64registers[FR6] = 0.0;
+    state->f64registers[FR7] = 0.0;
 }
 
 void
-light_vm_execute(Light_VM_State* state, bool print_steps) {
+light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
     light_vm_reset(state);
+
+    if(entry_point != 0) {
+        state->registers[RIP] = (u64)entry_point;
+    }
 
     for(u64 i = 0;; ++i) {
         Light_VM_Instruction in = *(Light_VM_Instruction*)(state->registers[RIP]);
 
         if(print_steps) {
             void* addr_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
-            u64 imm = get_value_off_immediate(state, in, addr_of_imm);
+            u64 imm = get_value_of_immediate(state, in, addr_of_imm);
             light_vm_print_instruction(stdout, in, imm);
         }
 

@@ -189,6 +189,8 @@ instruction_type(const char** at) {
         type = LVM_EXTCALL;
     } else if(start_with("copy", *at, &count)) {
         type = LVM_COPY;
+    } else if(start_with("alloc", *at, &count)) {
+        type = LVM_ALLOC;
     } else if(start_with("hlt", *at, &count)) {
         type = LVM_HLT;
     } else {
@@ -468,8 +470,29 @@ light_vm_instruction_get(const char* s, u64* immediate) {
             }
         } break;
 
+        case LVM_COPY:{
+            u8 dst = get_register(&at, 0);
+            EAT_COMMA;
+            u8 src = get_register(&at, 0);
+            EAT_COMMA;
+            u8 size = get_register(&at, 0);
+            instruction.copy.dst_reg = dst;
+            instruction.copy.src_reg = src;
+            instruction.copy.size_bytes_reg = size;
+        } break;
+
+        case LVM_ALLOC: {
+            // alloc r0, r1 -> dst, size
+            u8 byte_size = 0;
+            u8 dst = get_register(&at, 0);
+            EAT_COMMA;
+            u8 size_reg = get_register(&at, &byte_size);
+            instruction.alloc.byte_size = byte_size;
+            instruction.alloc.dst_reg = dst;
+            instruction.alloc.size_reg = size_reg;
+        } break;
+
         // TODO(psv):
-        case LVM_COPY:   break;
         case LVM_ASSERT: break;
 
     }

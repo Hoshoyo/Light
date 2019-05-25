@@ -10,6 +10,7 @@
 
 void example1(Light_VM_State* state) {
     // branch test
+    Light_VM_Instruction_Info entry = 
     light_vm_push(state, "mov r0, 0x5");
     light_vm_push(state, "mov r1, 0x5");
     light_vm_push(state, "cmp r0, r1");
@@ -17,15 +18,22 @@ void example1(Light_VM_State* state) {
     light_vm_push(state, "mov r2, 0x42");
     Light_VM_Instruction_Info hlt = light_vm_push(state, "hlt");
     light_vm_patch_immediate_distance(b, hlt);
+
+    light_vm_execute(state, entry.absolute_address, 0);
+    assert(state->registers[R0] == 5 && state->registers[R1] == 5);
 }
 
 void example2(Light_VM_State* state) {
     // push and pop test
+    Light_VM_Instruction_Info entry = 
     light_vm_push(state, "mov r0, 0x5");
     light_vm_push(state, "push r0");
     light_vm_push(state, "mov r0, 0x19");
     light_vm_push(state, "pop r1");
     light_vm_push(state, "hlt");
+
+    light_vm_execute(state, entry.absolute_address, 0);
+    assert(state->registers[R0] == 25 && state->registers[R1] == 5);
 }
 
 void example3(Light_VM_State* state) {
@@ -37,10 +45,14 @@ void example3(Light_VM_State* state) {
     light_vm_push(state, "ret");
 
     light_vm_patch_immediate_distance(call, proc);
+
+    light_vm_execute(state, call.absolute_address, 0);
+    assert(state->registers[R0] == 0x69);
 }
 
 void example4(Light_VM_State* state) {
     // factorial recursive
+    Light_VM_Instruction_Info entry = 
     light_vm_push(state, "mov r0, 0x5");
     Light_VM_Instruction_Info call = 
         light_vm_push(state, "call 0xff");
@@ -64,10 +76,14 @@ void example4(Light_VM_State* state) {
     light_vm_patch_immediate_distance(call, start);
     light_vm_patch_immediate_distance(trivial_branch, over_ret);
     light_vm_patch_immediate_distance(recursive_call, start);
+
+    light_vm_execute(state, entry.absolute_address, 0);
+    assert(state->registers[R0] == 120 && state->registers[R1] == 5);
 }
 
 void example5(Light_VM_State* state) {
     // factorial procedural
+    Light_VM_Instruction_Info entry = 
     light_vm_push(state, "mov r1, 0x1"); // r1 = 1
     light_vm_push(state, "mov r0, 0x5"); // r0 = 5
     
@@ -81,6 +97,9 @@ void example5(Light_VM_State* state) {
     light_vm_push(state, "hlt");
 
     light_vm_patch_immediate_distance(branch, start);
+
+    light_vm_execute(state, entry.absolute_address, 0);
+    assert(state->registers[R1] == 120);
 }
 
 r32 addproc(int x, int y, float z) {
@@ -90,6 +109,7 @@ r32 addproc(int x, int y, float z) {
 
 void example6(Light_VM_State* state) {
     // external call test
+    Light_VM_Instruction_Info entry = 
     light_vm_push(state, "mov r1, 0x2"); // r1 = 2
     light_vm_push(state, "mov r0, 0x5"); // r0 = 5
     light_vm_push(state, "mov r3, 0x4131999a");
@@ -100,13 +120,19 @@ void example6(Light_VM_State* state) {
     light_vm_push(state, "expushf fr0");
     light_vm_push_fmt(state, "mov r2, %p", (void*)addproc);
     light_vm_push(state, "extcall r2");
+    light_vm_push(state, "expop");
     light_vm_push(state, "hlt");
+
+    // Should print 2 5 11.100000
+    light_vm_execute(state, entry.absolute_address, 0);
+    assert(state->registers[R0] == 14);
 }
 
 #if defined(__linux__)
 void example7(Light_VM_State* state) {
     char str[] = "Hello World!\n";
     void* addr = light_vm_push_bytes_data_segment(state, str, sizeof(str) - 1);
+    Light_VM_Instruction_Info entry = 
     light_vm_push(state, "mov r0, 1");
     light_vm_push_fmt(state, "mov r1, %p", addr);
     //light_vm_push(state, "mov r1, rdp");
@@ -116,30 +142,69 @@ void example7(Light_VM_State* state) {
     light_vm_push(state, "expushi r2");
     light_vm_push_fmt(state, "mov r3, %p", write);
     light_vm_push(state, "extcall r3");
+    light_vm_push(state, "expop");
     light_vm_push(state, "hlt");
+
+    // Should print Hello World!\n
+    light_vm_execute(state, entry.absolute_address, 0);
 }
 #endif
+
+void example8(Light_VM_State* state) {
+    // copy test
+    char str[] = "Hello World";
+    void* addr = light_vm_push_bytes_data_segment(state, str, sizeof(str) - 1);
+    
+    Light_VM_Instruction_Info entry = 
+    light_vm_push(state, "mov r0, rdp");
+    light_vm_push_fmt(state, "adds r0, %d", sizeof(str) - 1);
+    light_vm_push(state, "mov r1, rdp");
+    light_vm_push_fmt(state, "mov r2, %d", sizeof(str) - 1);
+    light_vm_push(state, "copy r0, r1, r2");
+    light_vm_push(state, "hlt");
+
+    light_vm_execute(state, entry.absolute_address, 0);
+    assert(memcmp((void*)state->registers[R0], (void*)state->registers[R1], sizeof(str) - 1) == 0);
+}
+
+void example9(Light_VM_State* state) {
+    // copy and alloc test
+    char str[] = "Hello World";
+    void* addr = light_vm_push_bytes_data_segment(state, str, sizeof(str) - 1);
+    
+    Light_VM_Instruction_Info entry = 
+    light_vm_push(state, "mov r1, rdp");
+    light_vm_push_fmt(state, "mov r2, %d", sizeof(str) - 1);
+    light_vm_push(state, "alloc r0, r2");
+    light_vm_push(state, "copy r0, r1, r2");
+    light_vm_push(state, "hlt");
+
+    light_vm_execute(state, entry.absolute_address, 0);
+    assert(memcmp((void*)state->registers[R0], (void*)state->registers[RDP], sizeof(str) - 1) == 0);
+}
 
 int main() {
     Light_VM_State* state = light_vm_init();
 
-    //example1(state);
-    //example2(state);
-    //example3(state);
-    //example4(state);
-    //example5(state);
-    //example6(state);
+    example1(state);
+    example2(state);
+    example3(state);
+    example4(state);
+    example5(state);
+    example6(state);
     example7(state);
+    example8(state);
+    example9(state);
 
     //light_vm_debug_dump_code(stdout, state);
-    light_vm_execute(state, 0);
-    light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
+    //light_vm_execute(state, 0);
+    //light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
     //light_vm_debug_dump_registers_dec(stdout, state);
 
     return 0;   
 }
 
-#if 0    
+#if 0
     void* dll = dlopen("libc.so.6", RTLD_NOW);
     s64(*write_proc)(int, const void *, size_t) = (s64(*)(int, const void *, size_t))dlsym(dll, "write");
 
