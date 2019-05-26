@@ -1,6 +1,6 @@
 all:
 	@nasm -felf64 lvm.asm
-	@gcc -Wall -g -O2 *.c lvm.o -o lightvm -ldl -fno-strict-aliasing
+	@gcc -Wall -g *.c lvm.o -o lightvm -ldl -fno-strict-aliasing
 	@./lightvm
 
 lib:

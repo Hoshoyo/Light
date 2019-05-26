@@ -239,7 +239,7 @@ parse_int_hex(const char* text, int length) {
 static u64 
 parse_number(const char** at, u8* size_bytes) {
     u64 result = 0;
-    if(**at == '0') {
+    if(**at == '0' && (*at)[1] == 'x') {
         // hex
         int len = 2;
         for(; is_hex_number((*at)[len]); ++len);
