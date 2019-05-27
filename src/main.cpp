@@ -13,6 +13,7 @@
 #include "file_table.h"
 #include "interpreter.h"
 #include "bytecode_gen.h"
+#include "lightvm_gen.h"
 
 void initialize() {
 	TIME_FUNC();
@@ -88,7 +89,7 @@ int main(int argc, char** argv) {
 		//DEBUG_print_type_table_structs();
 	}
 
-#if 1
+#if 0
 	double bend_start = timer.GetTime();
 	c_generate(ast_top_level, g_type_table, argv[1], (char*)ho_current_exe_full_path(), g_lib_table);
 	double bend_end = timer.GetTime();
@@ -98,10 +99,7 @@ int main(int argc, char** argv) {
 	//print_profile();
 #else
 	{
-		Interpreter interp = init_interpreter();
-		bytecode_generate(&interp, ast_top_level);
-		run_interpreter(&interp);
-		//print_profile();
+		lvm_generate(ast_top_level);
 	}
 #endif
 	return 0;

@@ -1,3 +1,5 @@
+#include "ast.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include "lightvm.h"
@@ -48,7 +50,7 @@ push_immediate(Light_VM_State* state, u8 size_bytes, u64 imm) {
 }
 
 Light_VM_Instruction_Info 
-light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, u64 immediate) {
+light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, uint64_t immediate) {
     Light_VM_Instruction_Info info = {0};
     info.byte_size = (u32)sizeof(Light_VM_Instruction);
     info.offset_address = vm_state->code_offset;
@@ -148,13 +150,61 @@ light_vm_push_r64_to_datasegment(Light_VM_State* state, r64 f) {
 s32
 light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instruction_Info to) {
     switch(((Light_VM_Instruction*)from.absolute_address)->imm_size_bytes) {
-        case 1: *(u8*)(from.absolute_address + sizeof(Light_VM_Instruction)) = to.absolute_address - from.absolute_address; break;
-        case 2: *(u16*)(from.absolute_address + sizeof(Light_VM_Instruction)) = to.absolute_address - from.absolute_address; break;
-        case 4: *(u32*)(from.absolute_address + sizeof(Light_VM_Instruction)) = to.absolute_address - from.absolute_address; break;
-        case 8: *(u64*)(from.absolute_address + sizeof(Light_VM_Instruction)) = to.absolute_address - from.absolute_address; break;
+        case 1: *(u8*)(from.absolute_address +  1) = (void*)to.absolute_address - (void*)from.absolute_address; break;
+        case 2: *(u16*)(from.absolute_address + 1) = (void*)to.absolute_address - (void*)from.absolute_address; break;
+        case 4: *(u32*)(from.absolute_address + 1) = (void*)to.absolute_address - (void*)from.absolute_address; break;
+        case 8: *(u64*)(from.absolute_address + 1) = (void*)to.absolute_address - (void*)from.absolute_address; break;
         default: assert(0); break;
     }
-    return (to.absolute_address - from.absolute_address);
+    return ((void*)to.absolute_address - (void*)from.absolute_address);
+}
+
+uint64_t
+light_vm_offset_from_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info from) {
+    int64_t diff = (void*)from.absolute_address - state->code.block;
+    //return (uint64_t)diff;
+    if(diff < 0) {
+        // tranform to the appropriate sized u8
+        if(diff >= -128) {
+            int8_t d = (int8_t)diff;
+            return (uint64_t)d & 0xff;
+        } else if(diff >= -32768) {
+            int16_t d = (int16_t)diff;
+            return (uint64_t)d & 0xffff;
+        } else if(diff >= -2147483648) {
+            int32_t d = (int32_t)diff;
+            return (uint64_t)d & 0xffffffff;
+        } else {
+            return (uint64_t)diff;
+        }
+    } else {
+        return (uint64_t)diff;
+    }
+}
+
+// Returns the immediate size in bytes
+uint8_t
+light_vm_patch_to_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info to) {
+    Light_VM_Instruction* current_instr = (Light_VM_Instruction*)(state->code.block + state->code_offset);
+    s64 diff = (void*)to.absolute_address - state->code.block;
+    uint8_t imm_byte_size = 0;
+
+    if(diff <= 0xff) {
+        imm_byte_size = 1;
+        *(u8*)(current_instr + 1) = (u8)diff;
+    } else if(diff <= 0xffff) {
+        imm_byte_size = 2;
+        *(u16*)(current_instr + 1) = (u16)diff;
+    } else if(diff <= 0xffffffff) {
+        imm_byte_size = 4;
+        *(u32*)(current_instr + 1) = (u32)diff;
+    } else {
+        imm_byte_size = 8;
+        *(u64*)(current_instr + 1) = (u64)diff;
+    }
+    current_instr->imm_size_bytes = imm_byte_size = 1;
+
+    return imm_byte_size;
 }
 
 static u64
@@ -570,7 +620,7 @@ light_vm_execute_expush_instruction(Light_VM_State* state, Light_VM_Instruction 
     void* address_of_imm = ((void*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
 
     void* src = 0;
-    u64* dst = 0;
+    uint64_t* dst = 0;
 
     switch(instr.push.addr_mode) {
         case PUSH_ADDR_MODE_IMMEDIATE:{
@@ -656,6 +706,52 @@ light_vm_execute_call_instruction(Light_VM_State* state, Light_VM_Instruction in
             break;
         default: assert(0); break;
     }
+}
+
+bool
+light_vm_execute_cmpmov_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
+    bool value = false;
+    switch(instr.type) {
+        case LVM_MOVEQ:{
+            value = (state->rflags.zerof);
+        }break;
+        case LVM_MOVNE:{
+            value = !(state->rflags.zerof);
+        }break;
+        case LVM_MOVLT_S: {
+            value = (state->rflags.sign != state->rflags.overflow);
+        }break;
+        case LVM_MOVGT_S:{
+            value = (!state->rflags.zerof && (state->rflags.sign == state->rflags.overflow));
+        }break;
+        case LVM_MOVLE_S:{
+            value = (state->rflags.zerof || (state->rflags.sign != state->rflags.overflow));
+        }break;
+        case LVM_MOVGE_S:{
+            value = state->rflags.sign == state->rflags.overflow;
+        }break;
+        case LVM_MOVLT_U:{
+            value = state->rflags.carry;
+        }break;
+        case LVM_MOVGT_U:{
+            value = !state->rflags.carry && !state->rflags.zerof;
+        }break;
+        case LVM_MOVLE_U:{
+            value = state->rflags.carry || state->rflags.zerof;
+        }break;
+        case LVM_MOVGE_U:{
+            value = !state->rflags.carry;
+        }break;
+        default: assert(0); break;
+    }
+
+    if(value) {
+        state->registers[instr.unary.reg] = 1;
+    } else {
+        state->registers[instr.unary.reg] = 0;
+    }
+
+    return true;
 }
 
 // Return if the branch is taken or not
@@ -795,6 +891,19 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
         case LVM_JMP:{
             advance_ip = !light_vm_execute_branch_instruction(state, instr);
         } break;
+
+        case LVM_MOVEQ:
+        case LVM_MOVNE:
+        case LVM_MOVLT_S:
+        case LVM_MOVGT_S:
+        case LVM_MOVLE_S:
+        case LVM_MOVGE_S:
+        case LVM_MOVLT_U:
+        case LVM_MOVGT_U:
+        case LVM_MOVLE_U:
+        case LVM_MOVGE_U:{
+            advance_ip = light_vm_execute_cmpmov_instruction(state, instr);
+        }break;
 
         case LVM_FBEQ:
         case LVM_FBNE:

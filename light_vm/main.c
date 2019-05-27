@@ -2,6 +2,8 @@
 #include <string.h>
 #include "ast.h"
 #include "lightvm.h"
+#include <stdint.h>
+#include <assert.h>
 
 #if defined(__linux__)
 #include <dlfcn.h>
@@ -77,8 +79,12 @@ void example4(Light_VM_State* state) {
     light_vm_patch_immediate_distance(trivial_branch, over_ret);
     light_vm_patch_immediate_distance(recursive_call, start);
 
-    light_vm_execute(state, entry.absolute_address, 0);
+    light_vm_debug_dump_code(stdout, state);
+
+    light_vm_execute(state, entry.absolute_address, 1);
+    light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
     assert(state->registers[R0] == 120 && state->registers[R1] == 5);
+
 }
 
 void example5(Light_VM_State* state) {
@@ -211,19 +217,41 @@ void example10(Light_VM_State* state) {
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
 }
 
+void example11(Light_VM_State* state) {
+    // put garbage in r1 and r2
+    light_vm_push(state, "mov r1, 0xff");
+    light_vm_push(state, "mov r2, 0xff");
+
+    light_vm_push(state, "mov r0, 0x1");
+    light_vm_push(state, "cmp r0, 0x0");
+    light_vm_push(state, "moveq r1");
+    light_vm_push(state, "movne r2");
+
+    light_vm_push(state, "hlt");
+    light_vm_execute(state, 0, 0);
+    light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
+    assert(state->registers[R1] == 0 && state->registers[R2] == 1);
+}
+
 int main() {
     Light_VM_State* state = light_vm_init();
 
-    example1(state);
-    example2(state);
-    example3(state);
-    example4(state);
-    example5(state);
-    example6(state);
-    example7(state);
-    example8(state);
-    example9(state);
-    example10(state);
+    //example1(state);
+    //example2(state);
+    //example3(state);
+    //example4(state);
+    //example5(state);
+    //example6(state);
+    //example7(state);
+    //example8(state);
+    //example9(state);
+    //example10(state);
+    example11(state);
+
+    //Light_VM_Instruction_Info from = {0};
+    //from.absolute_address = state->code.block - 0x02;
+    //printf("0x%lx\n", light_vm_offset_from_current_instruction(state, from));
+    //Light_VM_Instruction_Info info = light_vm_push_fmt(state, "beq 0x%lx", light_vm_offset_from_current_instruction(state, from));
 
     //light_vm_debug_dump_code(stdout, state);
     //light_vm_execute(state, 0);

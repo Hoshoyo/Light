@@ -1,6 +1,8 @@
 #include "lightvm.h"
+#include <assert.h>
 #include <stdarg.h>
 #include <string.h>
+#include "common.h"
 
 static bool start_with(const char* start, const char* str, s32* count) {
     *count = 0;
@@ -113,6 +115,26 @@ instruction_type(const char** at) {
         type = LVM_DIV_U;
     } else if(start_with("modu", *at, &count)) {
         type = LVM_MOD_U;
+    } else if(start_with("moveq", *at, &count)) {
+        type = LVM_MOVEQ;
+    } else if(start_with("movne", *at, &count)) {
+        type = LVM_MOVNE;
+    } else if(start_with("movlts", *at, &count)) {
+        type = LVM_MOVLT_S;
+    } else if(start_with("movgts", *at, &count)) {
+        type = LVM_MOVGT_S;
+    } else if(start_with("movles", *at, &count)) {
+        type = LVM_MOVLE_S;
+    } else if(start_with("movges", *at, &count)) {
+        type = LVM_MOVGE_S;
+    } else if(start_with("movltu", *at, &count)) {
+        type = LVM_MOVLT_U;
+    } else if(start_with("movgtu", *at, &count)) {
+        type = LVM_MOVGT_U;
+    } else if(start_with("movleu", *at, &count)) {
+        type = LVM_MOVLE_U;
+    } else if(start_with("movgeu", *at, &count)) {
+        type = LVM_MOVGE_U;
     } else if(start_with("mov", *at, &count)) {
         type = LVM_MOV;
     } else if(start_with("shl", *at, &count)) {
@@ -268,7 +290,7 @@ parse_number(const char** at, u8* size_bytes) {
             
 
 Light_VM_Instruction
-light_vm_instruction_get(const char* s, u64* immediate) {
+light_vm_instruction_get(const char* s, uint64_t* immediate) {
     Light_VM_Instruction instruction = {0};
 
     const char* at = s;
@@ -406,11 +428,22 @@ light_vm_instruction_get(const char* s, u64* immediate) {
         } break;
 
         // Unary instructions
+        case LVM_MOVEQ:
+        case LVM_MOVNE:
+        case LVM_MOVLT_S:
+        case LVM_MOVGT_S:
+        case LVM_MOVLE_S:
+        case LVM_MOVGE_S:
+        case LVM_MOVLT_U:
+        case LVM_MOVGT_U:
+        case LVM_MOVLE_U:
+        case LVM_MOVGE_U:
         case LVM_NOT: case LVM_POP: {
             u8 byte_size = 0;
             instruction.unary.reg = get_register(&at, &byte_size);
             instruction.unary.byte_size = byte_size;
         } break;
+
 
         case LVM_PUSH: case LVM_EXPUSHI: case LVM_EXPUSHF: {
             u8 byte_size = 0;
@@ -502,7 +535,7 @@ light_vm_instruction_get(const char* s, u64* immediate) {
 
 Light_VM_Instruction_Info 
 light_vm_push(Light_VM_State* vm_state, const char* instruction) {
-    u64 imm = 0;
+    uint64_t imm = 0;
     Light_VM_Instruction i = light_vm_instruction_get(instruction, &imm);
     return light_vm_push_instruction(vm_state, i, imm);
 }
@@ -515,7 +548,7 @@ light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...) {
     vsprintf(buffer, instruction, args);
     va_end(args);
 
-    u64 imm = 0;
+    uint64_t imm = 0;
     Light_VM_Instruction i = light_vm_instruction_get(buffer, &imm);
     return light_vm_push_instruction(vm_state, i, imm);
 }

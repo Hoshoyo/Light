@@ -1,6 +1,9 @@
-#include "ast.h"
+#include <stdint.h>
 #include <stdio.h>
-#include <assert.h>
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 typedef enum {
     // Floating point registers
@@ -45,6 +48,18 @@ typedef enum {
     LVM_BGT_U, // Carry Flag = 0 and Zero Flag = 0
     LVM_BLE_U, // Carry Flag = 1 or Zero Flag = 1
     LVM_BGE_U, // Carry Flag = 0
+
+    LVM_MOVEQ,
+    LVM_MOVNE,
+    LVM_MOVLT_S,
+    LVM_MOVGT_S,
+    LVM_MOVLE_S,
+    LVM_MOVGE_S,
+    LVM_MOVLT_U,
+    LVM_MOVGT_U,
+    LVM_MOVLE_U,
+    LVM_MOVGE_U,
+
     // Jump
     LVM_JMP,   // Unconditionally
 
@@ -62,16 +77,16 @@ typedef enum {
 } Light_VM_Instruction_Type;
 
 typedef struct {
-    u32 carry    : 1;
-    u32 zerof    : 1;
-    u32 sign     : 1;
-    u32 overflow : 1;
+    uint32_t carry    : 1;
+    uint32_t zerof    : 1;
+    uint32_t sign     : 1;
+    uint32_t overflow : 1;
 } Light_VM_Flags_Register;
 
 typedef struct {
-    u32 bigger_than : 1;
-    u32 less_than   : 1;
-    u32 equal       : 1;
+    uint32_t bigger_than : 1;
+    uint32_t less_than   : 1;
+    uint32_t equal       : 1;
 } Light_VM_Float_Flags_Register;
 
 typedef enum {
@@ -108,52 +123,52 @@ typedef enum {
 } Light_VM_Push_Addressing_Mode;
 
 typedef struct {
-    u32 src_reg     : 4;
-    u32 dst_reg     : 4;
-    u32 bytesize    : 4;
-    u32 addr_mode   : 4;
-    u32 sign        : 1; // 0 positive, 1 negative
+    uint32_t src_reg     : 4;
+    uint32_t dst_reg     : 4;
+    uint32_t bytesize    : 4;
+    uint32_t addr_mode   : 4;
+    uint32_t sign        : 1; // 0 positive, 1 negative
 } Light_VM_Instruction_Binary;
 
 typedef struct {
-    u32 reg       : 4;
-    u32 byte_size : 4;
+    uint32_t reg       : 4;
+    uint32_t byte_size : 4;
 } Light_VM_Instruction_Unary;
 
 typedef struct {
     // is always 64 bit
-    u32 reg         : 4;
-    u32 addr_mode   : 4;
+    uint32_t reg         : 4;
+    uint32_t addr_mode   : 4;
 } Light_VM_Instruction_Branch;
 
 typedef struct {
-    u32 src_reg     : 4;
-    u32 dst_reg     : 4;
-    u32 sign        : 4; // 0 positive, 1 negative
-    u32 addr_mode   : 4;
+    uint32_t src_reg     : 4;
+    uint32_t dst_reg     : 4;
+    uint32_t sign        : 4; // 0 positive, 1 negative
+    uint32_t addr_mode   : 4;
 } Light_VM_Instruction_Float;
 
 typedef struct {
-    u32 reg       : 4;
-    u32 addr_mode : 4;
-    u32 byte_size : 4;
+    uint32_t reg       : 4;
+    uint32_t addr_mode : 4;
+    uint32_t byte_size : 4;
 } Light_VM_Instruction_Push;
 
 typedef struct {
-    u32 dst_reg        : 4;
-    u32 src_reg        : 4;
-    u32 size_bytes_reg : 4;
+    uint32_t dst_reg        : 4;
+    uint32_t src_reg        : 4;
+    uint32_t size_bytes_reg : 4;
 } Light_VM_Copy_Instruction;
 
 typedef struct {
-    u32 dst_reg   : 4;
-    u32 size_reg  : 4;
-    u32 byte_size : 4;
+    uint32_t dst_reg   : 4;
+    uint32_t size_reg  : 4;
+    uint32_t byte_size : 4;
 } Light_VM_Alloc_Instruction;
 
 typedef struct {
-    u8 type;
-    u8 imm_size_bytes;
+    uint8_t type;
+    uint8_t imm_size_bytes;
     union {
         Light_VM_Instruction_Binary     binary;
         Light_VM_Instruction_Unary      unary;
@@ -170,18 +185,18 @@ typedef struct {
 // -------------------------------------
 
 typedef struct {
-    u8 byte_size;
+    uint8_t byte_size;
     union {
-        u8    unsigned_byte;
-        u16   unsigned_word;
-        u32   unsigned_dword;
-        u64   unsigned_qword;
-        s8    signed_byte;
-        s16   signed_word;
-        s32   signed_dword;
-        s64   signed_qword;
-        r32   float32;
-        r64   float64;
+        uint8_t    unsigned_byte;
+        uint16_t   unsigned_word;
+        uint32_t   unsigned_dword;
+        uint64_t   unsigned_qword;
+        int8_t    signed_byte;
+        int16_t   signed_word;
+        int32_t   signed_dword;
+        int64_t   signed_qword;
+        float   float32;
+        double   float64;
         void* ptr;
     };
 } Light_VM_Data;
@@ -191,18 +206,18 @@ typedef struct {
 // and therefore limits the number of arguments of
 // an external call to 256
 typedef struct {
-    s32 int_arg_count;
-    s32 float_arg_count;
+    int32_t int_arg_count;
+    int32_t float_arg_count;
     
-    u64 int_values[256];
-    u64 float_values[256];
+    uint64_t int_values[256];
+    uint64_t float_values[256];
 
-    u8  int_index[256];
-    u8  float_index[256];
+    uint8_t  int_index[256];
+    uint8_t  float_index[256];
 } Light_VM_EXT_Stack;
 
 typedef struct {
-    s32   size;
+    int32_t   size;
     void* block;
 } Memory;
 
@@ -210,52 +225,58 @@ typedef struct {
 typedef struct {
     Light_VM_Flags_Register       rflags;
     Light_VM_Float_Flags_Register rfloat_flags;
-    u64                           registers[R_COUNT];
-    r64                           f64registers[FREG_COUNT];
-    r32                           f32registers[FREG_COUNT];
+    uint64_t                           registers[R_COUNT];
+    double                           f64registers[FREG_COUNT];
+    float                           f32registers[FREG_COUNT];
     Light_VM_EXT_Stack            ext_stack;
     Memory                        data;
-    u64                           data_offset;
+    uint64_t                           data_offset;
     Memory                        stack;
     Memory                        heap;
     Memory                        code;
-    u64                           code_offset;
+    uint64_t                           code_offset;
 } Light_VM_State;
 
 typedef struct {
-    u64   offset_address;
-    void* absolute_address;
-    u32   byte_size;           // instruction only
-    u32   immediate_byte_size; // immediate value only
+    uint64_t   offset_address;
+    Light_VM_Instruction* absolute_address;
+    uint32_t   byte_size;           // instruction only
+    uint32_t   immediate_byte_size; // immediate value only
 } Light_VM_Instruction_Info;
 
 Light_VM_State*           light_vm_init();
 void                      light_vm_free(Light_VM_State* state);
-Light_VM_Instruction_Info light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, u64 immediate);
+Light_VM_Instruction_Info light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, uint64_t immediate);
 Light_VM_Instruction_Info light_vm_push(Light_VM_State* vm_state, const char* instruction);
 Light_VM_Instruction_Info light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...);
-Light_VM_Instruction      light_vm_instruction_get(const char* s, u64* immediate);
+Light_VM_Instruction      light_vm_instruction_get(const char* s, uint64_t* immediate);
 void*                     light_vm_push_data_segment(Light_VM_State* vm_state, Light_VM_Data data);
-void*                     light_vm_push_bytes_data_segment(Light_VM_State* vm_state, u8* bytes, s32 byte_count);
-s32                       light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instruction_Info to);
-void*                     light_vm_push_r32_to_datasegment(Light_VM_State* state, r32 f);
-void*                     light_vm_push_r64_to_datasegment(Light_VM_State* state, r64 f);
+void*                     light_vm_push_bytes_data_segment(Light_VM_State* vm_state, uint8_t* bytes, int32_t byte_count);
+int32_t                   light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instruction_Info to);
+uint64_t                  light_vm_offset_from_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info from);
+uint8_t                   light_vm_patch_to_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info to);
+void*                     light_vm_push_float_to_datasegment(Light_VM_State* state, float f);
+void*                     light_vm_push_double_to_datasegment(Light_VM_State* state, double f);
 
 // -------------------------------------
 // ----------- Printing ----------------
 // -------------------------------------
 enum {
-    LVM_PRINT_FLOATING_POINT_REGISTERS = FLAG(0),
-    LVM_PRINT_DECIMAL                  = FLAG(1),
-    LVM_PRINT_FLAGS_REGISTER           = FLAG(2),
+    LVM_PRINT_FLOATING_POINT_REGISTERS = (1 << 0),
+    LVM_PRINT_DECIMAL                  = (1 << 1),
+    LVM_PRINT_FLAGS_REGISTER           = (1 << 2),
 }; 
-void light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, u64 imm);
-void light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags);
+void light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm);
+void light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, uint32_t flags);
 void light_vm_debug_dump_code(FILE* out, Light_VM_State* state);
 
 // -------------------------------------
 // ----------- Execution ---------------
 // -------------------------------------
-void light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps);
+void light_vm_execute(Light_VM_State* state, void* entry_point, int32_t print_steps);
 void light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr);
 void light_vm_reset(Light_VM_State* state);
+
+#if defined(__cplusplus)
+} // extern "C"
+#endif

@@ -1,4 +1,6 @@
 #include "lightvm.h"
+#include "ast.h"
+#include <assert.h>
 
 void
 print_float_register(FILE* out, u8 reg) {
@@ -295,6 +297,24 @@ print_float_branch_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
 }
 
 void
+print_cmpmov_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
+    switch(instr.type) {
+        case LVM_MOVEQ:   fprintf(out, "MOVEQ "); break;
+        case LVM_MOVNE:   fprintf(out, "MOVNE "); break;
+        case LVM_MOVLT_S: fprintf(out, "MOVLTS "); break;
+        case LVM_MOVGT_S: fprintf(out, "MOVGTS "); break;
+        case LVM_MOVLE_S: fprintf(out, "MOVLES "); break;
+        case LVM_MOVGE_S: fprintf(out, "MOVGES "); break;
+        case LVM_MOVLT_U: fprintf(out, "MOVLTU "); break;
+        case LVM_MOVGT_U: fprintf(out, "MOVGTU "); break;
+        case LVM_MOVLE_U: fprintf(out, "MOVLEU "); break;
+        case LVM_MOVGE_U: fprintf(out, "MOVGEU "); break;
+        default: fprintf(out, "Invalid comparison move instruction"); break;
+    }
+    print_register(out, instr.unary.reg, instr.unary.byte_size);
+}
+
+void
 print_branch_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
     switch(instr.type) {
         case LVM_BEQ:   fprintf(out, "BEQ "); break;
@@ -343,7 +363,7 @@ print_copy_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
 }
 
 void 
-light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
+light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm) {
     
     switch(instr.type) {
         case LVM_NOP: fprintf(out, "NOP"); break;
@@ -400,6 +420,19 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
             print_branch_instruction(out, instr, imm);
             break;
 
+        case LVM_MOVEQ:
+        case LVM_MOVNE:
+        case LVM_MOVLT_S:
+        case LVM_MOVGT_S:
+        case LVM_MOVLE_S:
+        case LVM_MOVGE_S:
+        case LVM_MOVLT_U:
+        case LVM_MOVGT_U:
+        case LVM_MOVLE_U:
+        case LVM_MOVGE_U:
+            print_cmpmov_instruction(out, instr, imm);
+            break;
+
         case LVM_FBEQ:
         case LVM_FBNE:
         case LVM_FBGT:
@@ -437,21 +470,21 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
 void 
 light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
     if(flags & LVM_PRINT_DECIMAL) {
-        fprintf(out, "R0: %lld \t R1: %lld\n", state->registers[R0], state->registers[R1]);
-        fprintf(out, "R2: %lld \t R3: %lld\n", state->registers[R2], state->registers[R3]);
-        fprintf(out, "R4: %lld \t R5: %lld\n", state->registers[R4], state->registers[R5]);
-        fprintf(out, "R6: %lld \t R7: %lld\n", state->registers[R6], state->registers[R7]);
+        fprintf(out, "R0: %ld \t R1: %ld\n", state->registers[R0], state->registers[R1]);
+        fprintf(out, "R2: %ld \t R3: %ld\n", state->registers[R2], state->registers[R3]);
+        fprintf(out, "R4: %ld \t R5: %ld\n", state->registers[R4], state->registers[R5]);
+        fprintf(out, "R6: %ld \t R7: %ld\n", state->registers[R6], state->registers[R7]);
         fprintf(out, "\n");
-        fprintf(out, "RSP: %lld \t RBP: %lld\n", state->registers[RSP], state->registers[RBP]);
-        fprintf(out, "RIP: %lld \t RDP: %lld\n", state->registers[RIP], state->registers[RDP]);
+        fprintf(out, "RSP: %ld \t RBP: %ld\n", state->registers[RSP], state->registers[RBP]);
+        fprintf(out, "RIP: %ld \t RDP: %ld\n", state->registers[RIP], state->registers[RDP]);
     } else {
-        fprintf(out, "R0: 0x%llx \t R1: 0x%llx\n", state->registers[R0], state->registers[R1]);
-        fprintf(out, "R2: 0x%llx \t R3: 0x%llx\n", state->registers[R2], state->registers[R3]);
-        fprintf(out, "R4: 0x%llx \t R5: 0x%llx\n", state->registers[R4], state->registers[R5]);
-        fprintf(out, "R6: 0x%llx \t R7: 0x%llx\n", state->registers[R6], state->registers[R7]);
+        fprintf(out, "R0: 0x%lx \t R1: 0x%lx\n", state->registers[R0], state->registers[R1]);
+        fprintf(out, "R2: 0x%lx \t R3: 0x%lx\n", state->registers[R2], state->registers[R3]);
+        fprintf(out, "R4: 0x%lx \t R5: 0x%lx\n", state->registers[R4], state->registers[R5]);
+        fprintf(out, "R6: 0x%lx \t R7: 0x%lx\n", state->registers[R6], state->registers[R7]);
         fprintf(out, "\n");
-        fprintf(out, "RSP: 0x%llx \t RBP: 0x%llx\n", state->registers[RSP], state->registers[RBP]);
-        fprintf(out, "RIP: 0x%llx \t RDP: 0x%llx\n", state->registers[RIP], state->registers[RDP]);
+        fprintf(out, "RSP: 0x%lx \t RBP: 0x%lx\n", state->registers[RSP], state->registers[RBP]);
+        fprintf(out, "RIP: 0x%lx \t RDP: 0x%lx\n", state->registers[RIP], state->registers[RDP]);
     }
     if(flags & LVM_PRINT_FLOATING_POINT_REGISTERS) {
         fprintf(out, "\n");
