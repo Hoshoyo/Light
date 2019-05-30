@@ -255,6 +255,7 @@ void*                     light_vm_push_bytes_data_segment(Light_VM_State* vm_st
 int32_t                   light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instruction_Info to);
 uint64_t                  light_vm_offset_from_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info from);
 uint8_t                   light_vm_patch_to_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info to);
+void                      light_vm_patch_from_to_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info from);
 void*                     light_vm_push_float_to_datasegment(Light_VM_State* state, float f);
 void*                     light_vm_push_double_to_datasegment(Light_VM_State* state, double f);
 

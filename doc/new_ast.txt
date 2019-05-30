@@ -1,0 +1,69 @@
+// Declarations
+Scope {
+    declaration count
+    size of stack decl in bytes
+    Symbol table
+}
+
+Variable {
+    Type Info {
+        size in bytes
+    }
+    storage type
+    alignment
+    offset from stack base
+}
+
+Struct {
+    alignment
+    size in bytes
+    field count
+    fields sizes
+    fields offsets
+}
+
+Union {
+    alignment
+    size in bytes
+    field count
+}
+
+// Should be transformed into another node type
+Enum {
+    * Should become a literal integer after typecheck
+    base type
+}
+
+Constant {
+    * Should become a literal value after constant evaluation
+    evaluated value
+        - primitive
+        - composite (size in bytes)
+}
+
+Typedef {
+    * Should become a normal type from a function
+}
+
+// Commands
+Block {
+    TODO(psv): defer calls
+}
+
+Assignment {
+    left side must evaluate to a pointer of type T
+    size in bytes
+
+    //
+    Evaluate lvalue first, get the pointer and pass
+    to the right side to be written into the memory
+    already when bigger than register size.
+}
+
+If {
+    
+}
+
+For {
+
+}

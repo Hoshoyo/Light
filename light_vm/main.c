@@ -81,7 +81,7 @@ void example4(Light_VM_State* state) {
 
     light_vm_debug_dump_code(stdout, state);
 
-    light_vm_execute(state, entry.absolute_address, 1);
+    light_vm_execute(state, entry.absolute_address, 0);
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
     assert(state->registers[R0] == 120 && state->registers[R1] == 5);
 
@@ -105,6 +105,8 @@ void example5(Light_VM_State* state) {
     light_vm_patch_immediate_distance(branch, start);
 
     light_vm_execute(state, entry.absolute_address, 0);
+    light_vm_debug_dump_code(stdout, state);
+    light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
     assert(state->registers[R1] == 120);
 }
 
@@ -240,13 +242,13 @@ int main() {
     //example2(state);
     //example3(state);
     //example4(state);
-    //example5(state);
+    example5(state);
     //example6(state);
     //example7(state);
     //example8(state);
     //example9(state);
     //example10(state);
-    example11(state);
+    //example11(state);
 
     //Light_VM_Instruction_Info from = {0};
     //from.absolute_address = state->code.block - 0x02;

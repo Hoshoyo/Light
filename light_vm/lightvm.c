@@ -161,7 +161,7 @@ light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instr
 
 uint64_t
 light_vm_offset_from_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info from) {
-    int64_t diff = (void*)from.absolute_address - state->code.block;
+    int64_t diff = (void*)from.absolute_address - state->code.block + state->code_offset;
     //return (uint64_t)diff;
     if(diff < 0) {
         // tranform to the appropriate sized u8
@@ -179,6 +179,18 @@ light_vm_offset_from_current_instruction(Light_VM_State* state, Light_VM_Instruc
         }
     } else {
         return (uint64_t)diff;
+    }
+}
+
+void
+light_vm_patch_from_to_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info from) {
+    int64_t off = state->code.block + state->code_offset - (void*)from.absolute_address;
+    switch(from.absolute_address->imm_size_bytes) {
+        case 1: *(u8*)(from.absolute_address + 1)  = (u8)off; break;
+        case 2: *(u16*)(from.absolute_address + 1) = (u16)off; break;
+        case 4: *(u32*)(from.absolute_address + 1) = (u32)off; break;
+        case 8: *(u64*)(from.absolute_address + 1) = off; break;
+        default: assert(0); break;
     }
 }
 

@@ -131,6 +131,7 @@ struct Scope {
 	s32           decl_count;
 	u32           flags;
 	s32           stack_allocation_offset;
+	s32           stack_current_offset;
 	Symbol_Table  symb_table;
 	Scope*        parent;
 	union {

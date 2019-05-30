@@ -1,3 +1,6 @@
 main :: () -> s32 {
-    return 0;
+    a : s32;
+    b : r32;
+    a = 2;
+    return a;
 }
