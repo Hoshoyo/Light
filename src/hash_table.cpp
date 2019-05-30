@@ -129,8 +129,6 @@ void hash_table_add(String_Hash_Table* table, string s) {
 	table->entries[index].occupied = true;
 	table->entries[index].collided = collided;
 	table->entries_count += 1;
-
-	table->entries_count++;
 }
 
 static bool hash_table_entries_equal(String_Hash_Table* table, String_Hash_Table::Entry* e1, String_Hash_Table::Entry* e2) {
