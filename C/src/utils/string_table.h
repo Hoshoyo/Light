@@ -7,6 +7,9 @@ typedef struct {
     char* data;
 } string;
 
+#define MAKE_STR(S, V) (string){ sizeof(S) - 1, V, S }
+#define MAKE_STR_LEN(S, L) (string){ L, 0, S }
+
 typedef enum {
     STRING_TABLE_OCCUPIED = (1 << 0),
     STRING_TABLE_COLLIDED = (1 << 1),

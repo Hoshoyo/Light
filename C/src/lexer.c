@@ -1,10 +1,10 @@
 #include "lexer.h"
+#include "utils/os.h"
 #include "global_tables.h"
+#include "utils/allocator.h"
 #include <stdio.h>
+#include <string.h>
 #include <light_array.h>
-
-#define MAKE_STR(S, V) (string){ sizeof(S) - 1, V, S }
-#define MAKE_STR_LEN(S, L) (string){ L, 0, S }
 
 static void
 initialize_global_identifiers_table() {
@@ -341,11 +341,22 @@ token_next(Light_Lexer* lexer) {
         }
 
 		// Token string
+        case '`': {
+            r.type = TOKEN_LITERAL_STRING;
+            at++;	// skip "
+            for (; *at && *at != '`'; ++at) {
+                if(*at == '\\' && at[1] == '`') {
+                    at += 2; // skip \ and `
+                }
+            }
+            at++; // skip closing `
+            r.length = at - r.data;
+        } break;
 		case '"': {
 			r.type = TOKEN_LITERAL_STRING;
 			at++;	// skip "
 
-			for (; *at != '"'; ++at) {
+			for (; *at && *at != '"'; ++at) {
 				if (*at == 0) {
 					break;
 				} else if (*at == '\\') {
@@ -563,7 +574,30 @@ lexer_internalize_keywords(Light_Lexer* lexer) {
 
 Light_Token* 
 lexer_file(Light_Lexer* lexer, const char* filename, u32 flags) {
+    FILE* file = fopen(filename, "rb");
 
+    if(!file) {
+        fprintf(stderr, "Could not load file %s\n", filename);
+        return 0;
+    }
+
+    fseek(file, 0, SEEK_END);
+    size_t length_bytes = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    
+    char* stream = light_alloc(length_bytes);
+
+    fread(stream, length_bytes, 1, file);
+    fclose(file);
+
+    // Copy filename to lexer
+    size_t filename_size = strlen(filename) + 1;
+    lexer->filepath = light_alloc(filename_size);
+    memcpy((void*)lexer->filepath, filename, filename_size);
+
+    lexer->filename = light_filename_from_path(lexer->filepath);
+
+    return lexer_cstr(lexer, stream, (s32)length_bytes, flags);
 }
 
 Light_Token* 
@@ -572,6 +606,7 @@ lexer_cstr(Light_Lexer* lexer, char* str, s32 length, u32 flags) {
     lexer_internalize_keywords(lexer);
 
     lexer->stream = str;
+    lexer->stream_size_bytes = (size_t)length;
 
 	Light_Token* tokens = array_new(Light_Token);
 
@@ -618,7 +653,99 @@ lexer_free(Light_Lexer* lexer) {
     // Free keyword table
     string_table_free(&lexer->keyword_table);
     lexer->keyword_table_initialized = false;
+
+    if(lexer->filepath) {
+        // do not free filename, since it is a substring of filepath
+        light_free(lexer->filepath);
+        light_free(lexer->stream);
+    }
 }
 
-const char*  token_to_str(Light_Token* token);
-const char*  token_type_to_str(Light_Token_Type token_type);
+const char* 
+token_type_to_str(Light_Token_Type token_type) {
+    switch(token_type) {
+        case TOKEN_END_OF_STREAM:        return "end of stream"; break;
+        case TOKEN_SYMBOL_NOT:           return "!"; break;
+        case TOKEN_SYMBOL_POUND:         return "#"; break;
+        case TOKEN_SYMBOL_DOLLAR:        return "$"; break;
+        case TOKEN_SYMBOL_MOD:           return "%%"; break;
+        case TOKEN_SYMBOL_AND:           return "&"; break;
+        case TOKEN_SYMBOL_OPEN_PAREN:    return "("; break;
+        case TOKEN_SYMBOL_CLOSE_PAREN:   return ")"; break;
+        case TOKEN_SYMBOL_TIMES:         return "*"; break;
+        case TOKEN_SYMBOL_PLUS:          return "+"; break;
+        case TOKEN_SYMBOL_COMMA:         return ","; break;
+        case TOKEN_SYMBOL_MINUS:         return "-"; break;
+        case TOKEN_SYMBOL_DOT:           return "."; break;
+        case TOKEN_SYMBOL_DIV:           return "/"; break;
+        case TOKEN_SYMBOL_COLON:         return ":"; break;
+        case TOKEN_SYMBOL_SEMICOLON:     return ";"; break;
+        case TOKEN_SYMBOL_LESS:          return "<"; break;
+        case TOKEN_SYMBOL_EQUAL:         return "="; break;
+        case TOKEN_SYMBOL_GREATER:       return ">"; break;
+        case TOKEN_SYMBOL_INTERROGATION: return "?"; break;
+        case TOKEN_SYMBOL_AT:            return "@"; break;
+        case TOKEN_SYMBOL_OPEN_BRACE:    return "{"; break;
+        case TOKEN_SYMBOL_CLOSE_BRACE:   return "}"; break;
+        case TOKEN_SYMBOL_CARAT:         return "^"; break;
+        case TOKEN_SYMBOL_BACK_TICK:     return "`"; break;
+        case TOKEN_SYMBOL_OPEN_BRACKET:  return "["; break;
+        case TOKEN_SYMBOL_CLOSE_BRACKET: return "]"; break;
+        case TOKEN_SYMBOL_PIPE:          return "|"; break;
+        case TOKEN_SYMBOL_TILDE:         return "~"; break;
+        case TOKEN_LITERAL_DEC_INT:      return "integer"; break;
+        case TOKEN_LITERAL_DEC_UINT:     return "unsigned integer"; break;
+        case TOKEN_LITERAL_HEX_INT:      return "hexadecimal integer"; break;
+        case TOKEN_LITERAL_BIN_INT:      return "binary integer"; break;
+        case TOKEN_LITERAL_FLOAT:        return "float literal"; break;
+        case TOKEN_LITERAL_CHAR:         return "character literal"; break;
+        case TOKEN_LITERAL_STRING:       return "string literal"; break;
+        case TOKEN_LITERAL_BOOL_TRUE:    return "true"; break;
+        case TOKEN_LITERAL_BOOL_FALSE:   return "false"; break;
+        case TOKEN_IDENTIFIER:           return "identifier"; break;
+        case TOKEN_ARROW:                return "->"; break;
+        case TOKEN_EQUAL_EQUAL:          return "=="; break;
+        case TOKEN_LESS_EQUAL:           return "<="; break;
+        case TOKEN_GREATER_EQUAL:        return ">="; break;
+        case TOKEN_NOT_EQUAL:            return "!="; break;
+        case TOKEN_LOGIC_OR:             return "||"; break;
+        case TOKEN_LOGIC_AND:            return "&&"; break;
+        case TOKEN_BITSHIFT_LEFT:        return "<<"; break;
+        case TOKEN_BITSHIFT_RIGHT:       return ">>"; break;
+        case TOKEN_PLUS_EQUAL:           return "+="; break;
+        case TOKEN_MINUS_EQUAL:          return "-="; break;
+        case TOKEN_TIMES_EQUAL:          return "*="; break;
+        case TOKEN_DIV_EQUAL:            return "/="; break;
+        case TOKEN_MOD_EQUAL:            return "%%="; break;
+        case TOKEN_AND_EQUAL:            return "&="; break;
+        case TOKEN_OR_EQUAL:             return "|="; break;
+        case TOKEN_XOR_EQUAL:            return "^="; break;
+        case TOKEN_SHL_EQUAL:            return "<<="; break;
+        case TOKEN_SHR_EQUAL:            return ">>="; break;
+        case TOKEN_SINT64:               return "s64"; break;
+        case TOKEN_SINT32:               return "s32"; break;
+        case TOKEN_SINT16:               return "s16"; break;
+        case TOKEN_SINT8:                return "s8"; break;
+        case TOKEN_UINT64:               return "u64"; break;
+        case TOKEN_UINT32:               return "u32"; break;
+        case TOKEN_UINT16:               return "u16"; break;
+        case TOKEN_UINT8:                return "u8"; break;
+        case TOKEN_REAL32:               return "r32"; break;
+        case TOKEN_REAL64:               return "r64"; break;
+        case TOKEN_BOOL:                 return "bool"; break;
+        case TOKEN_VOID:                 return "void"; break;
+        case TOKEN_KEYWORD_IF:           return "if"; break;
+        case TOKEN_KEYWORD_ELSE:         return "else"; break;
+        case TOKEN_KEYWORD_FOR:          return "for"; break;
+        case TOKEN_KEYWORD_WHILE:        return "while"; break;
+        case TOKEN_KEYWORD_BREAK:        return "break"; break;
+        case TOKEN_KEYWORD_CONTINUE:     return "continue"; break;
+        case TOKEN_KEYWORD_RETURN:       return "return"; break;
+        case TOKEN_KEYWORD_ENUM:         return "enum"; break;
+        case TOKEN_KEYWORD_STRUCT:       return "struct"; break;
+        case TOKEN_KEYWORD_UNION:        return "union"; break;
+        case TOKEN_KEYWORD_ARRAY:        return "array"; break;
+        case TOKEN_KEYWORD_NULL:         return "null"; break;
+        default:                         return "unknown"; break;
+    }
+}

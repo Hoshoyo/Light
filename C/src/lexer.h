@@ -119,12 +119,14 @@ typedef struct {
 } Light_Token;
 
 typedef struct {
-    char*        filename;
+    const char*  filename;
+	char*        filepath;
     s32          line;
     s32          column;
     s32          index;
     Light_Token* tokens;
     u8*          stream;
+    u64          stream_size_bytes;
 
     String_Table  keyword_table;
     bool          keyword_table_initialized;
@@ -138,5 +140,4 @@ Light_Token* lexer_peek_n(Light_Lexer* lexer, s32 n);
 void         lexer_rewind(Light_Lexer* lexer, s32 count);
 void         lexer_free(Light_Lexer* lexer);
 
-const char*  token_to_str(Light_Token* token);
 const char*  token_type_to_str(Light_Token_Type token_type);

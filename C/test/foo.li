@@ -1,0 +1,11 @@
+
+#if 0
+
+main :: () -> s32 {
+    #if 0
+    a := 32;
+    #endif
+    return 0;
+}
+
+#end

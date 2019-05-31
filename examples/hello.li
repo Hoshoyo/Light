@@ -4,3 +4,10 @@ main :: () -> s32 {
     a = 2;
     return a;
 }
+
+foo -> struct {
+
+}
+
+
+foo, i, j := 2, 4, 5;

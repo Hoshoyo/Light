@@ -1,0 +1,237 @@
+#import "../x11/x11.li"
+#import "../linux/print.li"
+#import "../GL/gl.li"
+#import "../GL/ho_gl.li"
+#import "renderer.li"
+
+Window_Info :: struct {
+	width : s32;
+	height : s32;
+	display : ^Display;
+	window_handle : u64;
+	vi : ^XVisualInfo;
+	swa : XSetWindowAttributes;
+	ctx : GLXContext;
+	cmap : Colormap;
+}
+
+init_opengl :: (info : ^Window_Info) -> s32 {
+    visual_attribs := array{
+		GLX_X_RENDERABLE, True,
+		GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
+		GLX_RENDER_TYPE, GLX_RGBA_BIT,
+		GLX_X_VISUAL_TYPE, GLX_TRUE_COLOR,
+		GLX_RED_SIZE, 8,
+		GLX_GREEN_SIZE, 8,
+		GLX_BLUE_SIZE, 8,
+		GLX_ALPHA_SIZE, 8,
+		GLX_DEPTH_SIZE, 24,
+		GLX_STENCIL_SIZE, 8,
+		GLX_DOUBLEBUFFER, True,
+		0
+	};
+	glx_minor : s32;
+	glx_major : s32;
+
+	if !glXQueryVersion(info.display, &glx_major, &glx_minor) || ((glx_major == 1) && (glx_minor < 3)) || (glx_major < 1){
+		print_string("invalid glx version!\n");
+		return -1;
+	}
+	// Getting framebuffer config
+	fbcount : s32;
+	fbc := glXChooseFBConfig(info.display, DefaultScreen(info.display), [^u32]visual_attribs, &fbcount);
+	if fbc == [^GLXFBConfig]0 {
+		print_string("Failed to get framebuffer configuration\n");
+		return -1;
+	}
+
+	best_fbc : s32 = -1;
+	worst_fbc : s32 = -1;
+	best_num_samp : s32 = -1;
+	worst_num_samp : s32 = 999;
+
+	for i :s32= 0; i < fbcount; i += 1 {
+		vi : ^XVisualInfo = glXGetVisualFromFBConfig(info.display, fbc[i]);
+		if vi != [^XVisualInfo]0 {
+			samp_buf : s32;
+			samples : s32;
+			glXGetFBConfigAttrib(info.display, fbc[i], GLX_SAMPLE_BUFFERS, &samp_buf);
+			glXGetFBConfigAttrib(info.display, fbc[i], GLX_SAMPLES       , &samples);
+			
+			print_string( "  Matching fbconfig ");
+			print_s32(i);
+			print_string(", visual ID 0x");
+			print_u32([u32](*vi).visualid);
+			print_string(": SAMPLE_BUFFERS = ");
+			print_s32(samp_buf);
+			print_string(", SAMPLES = ");
+			print_s32(samples);
+			print_string("\n");
+
+			if best_fbc < 0 || samp_buf != 0 && samples > best_num_samp {
+				best_fbc = i;
+				best_num_samp = samples;
+			}
+			if worst_fbc < 0 || samp_buf == 0 || samples < worst_num_samp {
+				worst_fbc = i;
+				worst_num_samp = samples;
+			}
+		}
+		XFree([^void]vi);
+	}
+
+	bestFbc := fbc[best_fbc];
+	XFree([^void]fbc);
+
+	print_string("best fbc: ");
+	print_s64([s64]bestFbc);
+	print_string("\n");
+
+
+	vi := glXGetVisualFromFBConfig(info.display, bestFbc);
+	print_string("Chosen visual ID = 0x");
+	print_u32([u32](*vi).visualid);
+	print_string("\n");
+	
+
+	swa : XSetWindowAttributes;
+	cmap : Colormap;
+
+	cmap = XCreateColormap(info.display, RootWindow(info.display, (*vi).screen), (*vi).visual, 0);
+	swa.colormap = cmap;
+	swa.background_pixmap = 0;
+	swa.border_pixel      = 0;
+	swa.event_mask        = StructureNotifyMask;
+	info.cmap = cmap;
+
+	print_string("Creating window\n");
+	win := XCreateWindow(info.display, RootWindow(info.display, (*vi).screen),
+		0, 0, 800, 600, 0, (*vi).depth, InputOutput, (*vi).visual,
+		CWBorderPixel|CWColormap|CWEventMask, &swa);
+
+	info.window_handle = win;
+
+	if win == 0 {
+		print_string("Failed to create window.\n");
+		return -1;
+	}
+
+	XFree([^void]vi);
+
+	XStoreName(info.display, win, "GL 3.0 Window".data);
+	
+	print_string("Mapping window\n");
+	XMapWindow(info.display, win);
+
+	glXCreateContextAttribsARB := [(^Display, GLXFBConfig, GLXContext, bool, ^s32) -> GLXContext]glXGetProcAddressARB("glXCreateContextAttribsARB".data);
+	ctx : GLXContext;
+
+	ctxErrorHandler : (^Display, ^XErrorEvent) -> s32;
+	XSetErrorHandler(ctxErrorHandler);
+
+	context_attribs := array {
+		GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
+		GLX_CONTEXT_MINOR_VERSION_ARB, 3,
+		GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+		//GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+		0
+	};
+
+	ctx = glXCreateContextAttribsARB(info.display, bestFbc, [^void]0, true, [^s32]context_attribs);
+	info.ctx = ctx;
+
+	XSync(info.display, false);
+
+	glXMakeCurrent(info.display, win, ctx);
+
+	// Verifying that context is a direct context
+	if (!glXIsDirect(info.display, ctx)) {
+		print_string( "Indirect GLX rendering context obtained\n" );
+	} else {
+		print_string( "Direct GLX rendering context obtained\n" );
+	}
+}
+
+release_opengl :: (info : ^Window_Info) -> s32 {
+	glXMakeCurrent(info.display, 0, null);
+	glXDestroyContext(info.display, info.ctx);
+
+	XDestroyWindow(info.display, info.window_handle);
+	XFreeColormap(info.display, info.cmap);
+	XCloseDisplay(info.display);
+}
+
+sleep :: (seconds : u32) -> s32 #foreign("c");
+usleep :: (useconds : u64) -> s32 #foreign("c");
+
+assert :: (expr : bool) -> void {
+	if !expr {
+		print_string("Assertion failed\n");
+		*[^u8]0 = 0;
+	}
+}
+
+main :: () -> s32 {
+	info : Window_Info;
+	info.display = XOpenDisplay([^s8]0);
+	if info.display == [^Display]0 {
+		print_string("could not open display\n");
+	}
+
+	if init_opengl(&info) == -1 return -1;
+	hogl_init_extensions();
+
+	render_context_init();
+
+	screen_width : s32;
+	screen_height : s32;
+
+	screen_size(&info, &screen_width, &screen_height);
+
+	cube := cube_new();
+
+	while true {
+		// 126,192,238
+		glClearColor(126.0 / 255.0, 192.0 / 255.0, 238.0 / 255.0, 1.0);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		width : s32;
+		height : s32;
+		window_size(&info, &width, &height);
+
+		wnd_ctx.width = width;
+		wnd_ctx.height = height;
+		
+		glViewport(0,0, width, height);
+
+		quad : Quad_2D;
+		quad = quad_new(vec2:{0.0, 0.0}, 100.0, 100.0, vec4:{1.0, 0.0, 0.0, 1.0});
+
+		render_quad_immediate(&quad);
+		render_immediate_flush();
+
+		render_cube(cube);
+
+		glXSwapBuffers (info.display, info.window_handle);
+		//usleep(1000);
+	}
+
+	release_opengl(&info);
+
+    return 0;
+}
+
+screen_size :: (info : ^Window_Info, width : ^s32, height : ^s32) {
+	scr := DefaultScreen(info.display);
+	screen := info.display.screens[scr];
+	*width = screen.width;
+	*height = screen.height;
+}
+
+window_size :: (info : ^Window_Info, width : ^s32, height : ^s32) {
+	attribs : XWindowAttributes;
+	XGetWindowAttributes(info.display, info.window_handle, &attribs);
+
+	*width = attribs.width;
+	*height = attribs.height;
+}
