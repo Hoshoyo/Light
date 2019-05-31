@@ -416,3 +416,6 @@ typedef struct Light_Ast_t {
 
 // Scope
 Light_Scope* scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags);
+
+// Ast
+Light_Ast* ast_new_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name);

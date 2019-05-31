@@ -19,15 +19,15 @@ typedef struct {
 Light_Ast** parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, u32* error);
 
 // Type
-Light_Ast* parse_type(Light_Parser* parser, Light_Scope* scope);
+Light_Type* parse_type(Light_Parser* parser, Light_Scope* scope, u32* error);
 
 // Declaration
-Light_Ast* parse_declaration(Light_Parser* parser, Light_Scope* scope);
+Light_Ast* parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error);
 
 // Command
-Light_Ast* parse_command(Light_Parser* parser, Light_Scope* scope);
+Light_Ast* parse_command(Light_Parser* parser, Light_Scope* scope, u32* error);
 
 // Expression
-Light_Ast* parse_expression(Light_Parser* parser, Light_Scope* scope);
+Light_Ast* parse_expression(Light_Parser* parser, Light_Scope* scope, u32* error);
 
 // Directives

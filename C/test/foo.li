@@ -1,11 +1,10 @@
 
-#if 0
+foo :: () -> s32 {}
 
-main :: () -> s32 {
-    #if 0
-    a := 32;
-    #endif
-    return 0;
-}
+foo -> struct {};
+foo -> union {};
+foo -> enum {}
 
-#end
+foo -> s32;
+foo -> () -> void;
+
