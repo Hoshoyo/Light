@@ -1,6 +1,5 @@
 #pragma once
 #include <stdint.h>
-#include "type.h"
 #include "lexer.h"
 
 typedef enum {
@@ -142,7 +141,7 @@ typedef struct {
 typedef struct {
 	struct Light_Ast_t*  operand;
 	Light_Token*         token_op;
-	Light_Type*          type_to_cast;
+	struct Light_Type_t* type_to_cast;
 	Light_Operator_Unary op;
 	uint32_t             flags;
 } Light_Ast_Expr_Unary;
@@ -168,7 +167,7 @@ typedef struct {
 		struct Light_Ast_t** struct_exprs;
 		struct {
 			struct Light_Ast_t** array_exprs;
-			Light_Type*          array_strong_type;
+			struct Light_Type_t* array_strong_type;
 		};
 	};
 } Light_Ast_Expr_Literal;
@@ -200,8 +199,8 @@ typedef struct {
 	Light_Expr_Directive_Type type;
 	Light_Token*              directive_token;
 	union {
-		struct Light_Ast_t* expr;
-		Light_Type*         type_expr;
+		struct Light_Ast_t*  expr;
+		struct Light_Type_t* type_expr;
 	};
 } Light_Ast_Expr_Directive;
 
@@ -256,10 +255,10 @@ typedef enum {
 } Light_Decl_Variable_Flags;
 
 typedef struct {
-    Light_Token*        name;
-	struct Light_Ast_t* assignment;		// Must be Expression
-    Light_Storage_Class storage_class;
-	Light_Type*         type;
+    Light_Token*         name;
+	struct Light_Ast_t*  assignment;		// Must be Expression
+    Light_Storage_Class  storage_class;
+	struct Light_Type_t* type;
 
 	uint32_t flags;
 	int32_t  alignment_bytes;
@@ -274,7 +273,7 @@ typedef enum {
 typedef struct {
 	Light_Token*          name;
 	struct Light_Ast_t**  fields;
-	Light_Type*           type_info;
+	struct Light_Type_t*  type_info;
 	Light_Scope*          struct_scope;
 
 	uint32_t flags;
@@ -286,7 +285,7 @@ typedef struct {
 typedef struct {
 	Light_Token*          name;
 	struct Light_Ast_t**  fields;
-	Light_Type*           type_info;
+	struct Light_Type_t*  type_info;
 	Light_Scope*          union_scope;
 
 	uint32_t flags;
@@ -304,8 +303,8 @@ typedef struct {
 	Light_Token*              name;
 	Light_Ast_Decl_Variable** arguments;       // Must be Light_Decl_Variable
 	struct Light_Ast*         body;			   // Must be a Light_Command_Block
-	Light_Type*               return_type;     // Type of the procedure return
-	Light_Type*               proc_type;       // Type of the procedure
+	struct Light_Type_t*      return_type;     // Type of the procedure return
+	struct Light_Type_t*      proc_type;       // Type of the procedure
 	Light_Scope*              arguments_scope;
 
 	uint32_t           flags;
@@ -315,9 +314,9 @@ typedef struct {
 } Light_Ast_Decl_Procedure;
 
 typedef struct {
-	Light_Token*        name;
-	struct Light_Ast_t* value_literal;
-	Light_Type*         type_info;
+	Light_Token*         name;
+	struct Light_Ast_t*  value_literal;
+	struct Light_Type_t* type_info;
 
 	uint32_t flags;
 } Light_Ast_Decl_Constant;
@@ -325,7 +324,7 @@ typedef struct {
 typedef struct {
 	Light_Token*          name;
 	Light_Ast_Decl_Constant** fields;
-	Light_Type*           type_hint;
+	struct Light_Type*    type_hint;
 	Light_Scope*          enum_scope;
 
 	uint32_t flags;
@@ -333,8 +332,8 @@ typedef struct {
 } Light_Ast_Decl_Enum;
 
 typedef struct {
-	Light_Token* name;
-	Light_Type*  type_referenced;
+	Light_Token*       name;
+	struct Light_Type_t* type_referenced;
 } Light_Ast_Decl_Typedef;
 
 typedef struct {
@@ -373,8 +372,8 @@ typedef struct Light_Ast_t {
     int32_t  id;
     uint32_t flags;
 
-    Light_Type*  type;
-    Light_Scope* scope_at;
+    struct Light_Type_t* type;
+    Light_Scope*         scope_at;
 
     union {
 		// Declarations
@@ -409,13 +408,123 @@ typedef struct Light_Ast_t {
     };
 } Light_Ast;
 
+// -------------- ------- ----------------
+// --------------  Types  ----------------
+// -------------- ------- ----------------
+
+typedef enum {
+    TYPE_KIND_NONE = 0,
+    TYPE_KIND_PRIMITIVE,
+    TYPE_KIND_POINTER,
+    TYPE_KIND_STRUCT,
+    TYPE_KIND_UNION,
+    TYPE_KIND_ARRAY,
+    TYPE_KIND_FUNCTION,
+	TYPE_KIND_ENUM,
+    TYPE_KIND_ALIAS,
+} Light_Type_Kind;
+
+typedef enum {
+    TYPE_PRIMITIVE_VOID = 0,
+    TYPE_PRIMITIVE_S8,
+    TYPE_PRIMITIVE_S16,
+    TYPE_PRIMITIVE_S32,
+    TYPE_PRIMITIVE_S64,
+    TYPE_PRIMITIVE_U8,
+    TYPE_PRIMITIVE_U16,
+    TYPE_PRIMITIVE_U32,
+    TYPE_PRIMITIVE_U64,
+    TYPE_PRIMITIVE_R32,
+    TYPE_PRIMITIVE_R64,
+    TYPE_PRIMITIVE_BOOL,
+
+    TYPE_PRIMITIVE_COUNT,
+} Light_Type_Primitive;
+
+typedef struct {
+    struct Light_Type_t* array_of;
+	bool        dimension_evaluated;
+	uint64_t    dimension;
+	union {
+		struct Light_Ast_t*   const_expr;
+	};
+} Light_Type_Array;
+
+typedef struct {
+	struct Light_Type_t** fields_types;
+    struct {
+        char**       fields_names;
+        int32_t*     fields_names_length;
+    };
+	int64_t*     offset_bits;
+	int32_t      fields_count;
+	int32_t      alignment_bytes;
+} Light_Type_Struct;
+
+typedef struct {
+	struct Light_Type_t** fields_types;
+    struct {
+        char**       fields_names;
+        int32_t*     fields_names_length;
+    };
+	int32_t      fields_count;
+	int32_t      alignment_bytes;
+} Light_Type_Union;
+
+typedef struct {
+    struct Light_Type_t*  return_type;
+	struct Light_Type_t** arguments_type;
+    struct {
+	    char**   arguments_names;
+        int32_t* arguments_names_length;
+    };
+	int32_t      arguments_count;
+} Light_Type_Function;
+
+typedef struct {
+	Light_Token**        fields_names;
+	Light_Ast**          fields_values;
+	s32                  field_count;
+	struct Light_Type_t* type_hint;
+} Light_Type_Enum;
+
+typedef struct {
+    Light_Token* name;
+    struct Light_Type_t*  alias_to;
+} Light_Type_Alias;
+
+typedef enum {
+    TYPE_FLAG_WEAK          = (1 << 1),
+    TYPE_FLAG_INTERNALIZED  = (1 << 2),
+    TYPE_FLAG_SIZE_RESOLVED = (1 << 3),
+} Light_Type_Flags;
+
+typedef struct Light_Type_t{
+    Light_Type_Kind kind;
+    uint32_t        flags;
+    uint32_t        size_bits;
+
+    union {
+        Light_Type_Primitive primitive;
+        struct Light_Type_t* pointer_to;
+        Light_Type_Array     array_info;
+        Light_Type_Struct    struct_info;
+        Light_Type_Union     union_info;
+        Light_Type_Function  function;
+		Light_Type_Enum      enumerator;
+        Light_Type_Alias     alias;
+    };
+} Light_Type;
 
 // -------------- --------- ----------------
 // -------------- Functions ----------------
 // -------------- --------- ----------------
 
 // Scope
-Light_Scope* scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags);
+Light_Scope* light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags);
 
 // Ast
-Light_Ast* ast_new_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name);
+Light_Ast* ast_new_typedef(Light_Scope* scope, struct Light_Type_t* type, Light_Token* name);
+
+s32 ast_print_node(Light_Ast* node);
+s32 ast_print_type(Light_Type* type);

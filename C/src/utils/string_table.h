@@ -36,4 +36,6 @@ bool   string_table_del(String_Table* table, string s);
 string string_table_get(String_Table* table, s32 index);
 
 // Hash functions
-u64    fnv_1_hash(const u8* s, u64 length);
+u64 fnv_1_hash(const u8* s, u64 length);
+u64 fnv_1_hash_from_start(u64 hash, const u8* s, u64 length);
+u64 fnv_1_hash_combine(u64 hash1, u64 hash2);

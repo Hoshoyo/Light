@@ -58,6 +58,7 @@ light_filename_from_path(const char* path) {
     size_t i = len - 1;
     for(; i >= 0; --i) {
         if(path[i] == '/') {
+            i++;
             break;
         }
     }

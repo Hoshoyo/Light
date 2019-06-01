@@ -425,6 +425,7 @@ token_next(Light_Lexer* lexer) {
 					r = token_number(at, lexer->line, lexer->column);
                     break;
 				}
+                r.flags |= TOKEN_FLAG_INTEGER_LITERAL;
 			} else if (is_letter(*at) || *at == '_') {
                 // identifier
 				for (; is_letter(*at) || is_number(*at) || *at == '_'; ++at);
@@ -619,7 +620,8 @@ lexer_cstr(Light_Lexer* lexer, char* str, s32 length, u32 flags) {
 
         if(t.type == TOKEN_END_OF_STREAM) break;
 
-        token_print(t);
+        if(flags & LIGHT_LEXER_PRINT_TOKENS)
+            token_print(t);
     }
 
 	lexer->tokens = tokens;

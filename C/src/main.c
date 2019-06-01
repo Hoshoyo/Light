@@ -1,8 +1,11 @@
+#define LIGHT_ARENA_IMPLEMENT
 #include <stdio.h>
 #include "lexer.h"
+#include "parser.h"
 #include "utils/os.h"
 #include "global_tables.h"
 #include <light_array.h>
+
 
 static void
 compiler_set_fullpath(const char* path) {
@@ -21,23 +24,37 @@ compiler_setup_global_import_table() {
 }
 
 static void
+compiler_setup_global_type_table() {
+    if(global_type_table.entries_capacity == 0) {
+        type_table_new(&global_type_table, 65536);
+    }
+}
+
+static void
 light_set_global_tables(const char* compiler_path) {
     compiler_set_fullpath(compiler_path);
     compiler_setup_global_import_table();
+    compiler_setup_global_type_table();
     global_imports_queue = array_new(string);
+    global_type_arena = arena_create(65536);
+    type_tables_initialize();
 }
 
 int main(int argc, char** argv) {
     light_set_global_tables(argv[0]);
 
-    //Light_Lexer lexer = {0};
-    //Light_Token* tokens = lexer_file(&lexer, "test/foo.li", 0);
+    Light_Lexer lexer = {0};
+    Light_Token* tokens = lexer_file(&lexer, "test/foo.li", 0);
 
-    const char* s = light_real_path("test/foo.li", 0);
-    //const char* f = light_path_from_filename("bin/light", 0);
-    //const char* s = light_real_path_from(f, 0, "../test/foo.li", 0);
-    printf("%s\n", s);
+    u32 parser_error = 0;
+    Light_Parser parser = {0};
+    parser.lexer = &lexer;
+    //parse_top_level(&parser, &lexer, 0, &parser_error);
 
+    
+    Light_Type* type = parse_type(&parser, 0, &parser_error);
+    ast_print_type(type);
 
+    printf("\n");
     return 0;
 }

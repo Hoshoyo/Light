@@ -107,6 +107,7 @@ typedef enum {
     TOKEN_FLAG_ASSIGNMENT_OPERATOR = (1 << 2),
     TOKEN_FLAG_BINARY_OPERATOR     = (1 << 3),
     TOKEN_FLAG_UNARY_OPERATOR      = (1 << 4),
+	TOKEN_FLAG_INTEGER_LITERAL     = (1 << 5),
 } Light_Token_Flag;
 
 typedef struct {
@@ -117,6 +118,10 @@ typedef struct {
     s32              length;
     u32              flags;
 } Light_Token;
+
+typedef enum {
+	LIGHT_LEXER_PRINT_TOKENS = (1 << 0),
+} Light_Lexer_Flags;
 
 typedef struct {
     const char*  filename;

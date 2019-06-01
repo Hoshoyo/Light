@@ -1,16 +1,17 @@
-#include "string_table.h"
-#include "allocator.h"
+#include "type_table.h"
+#include "utils/allocator.h"
+#include "type.h"
 
 void 
-string_table_new(String_Table* table, s32 capacity) {
-    table->entries = (String_Table_Entry*)light_alloc(capacity * sizeof(String_Table_Entry));
+type_table_new(Type_Table* table, s32 capacity) {
+    table->entries = (Type_Table_Entry*)light_alloc(capacity * sizeof(Type_Table_Entry));
     table->entries_capacity = capacity;
     table->entries_count = 0;
     table->hash_collision_count = 0;
 }
 
 void
-string_table_free(String_Table* table) {
+type_table_free(Type_Table* table) {
     light_free(table->entries);
     table->entries_capacity = 0;
     table->entries_count = 0;
@@ -18,13 +19,14 @@ string_table_free(String_Table* table) {
 }
 
 bool 
-string_table_add(String_Table* table, string s, s32* out_index) {
-    u64 hash = fnv_1_hash(s.data, s.length);
+type_table_add(Type_Table* table, Light_Type* t, s32* out_index) {
+    u64 hash = type_hash(t);
 	s32 index = (s32)(hash % table->entries_capacity);
 
 	while (table->entries[index].flags & STRING_TABLE_OCCUPIED) {
 		if (table->entries[index].hash == hash) {
             // The entry is already in the hash table
+            if(out_index) *out_index = index;
 			return false;
 		}
 
@@ -33,16 +35,17 @@ string_table_add(String_Table* table, string s, s32* out_index) {
 	}
 
 	table->entries[index].hash = hash;
-	table->entries[index].data = s;
+	table->entries[index].data = t;
 	table->entries[index].flags = STRING_TABLE_OCCUPIED;
 	table->entries_count += 1;
-	if(out_index) *out_index = index;
-	return index;
+    if(out_index) *out_index = index;
+
+    return true;
 }
 
 bool 
-string_table_entry_exist(String_Table* table, string s, s32* out_index, u64* out_hash) {
-    u64 hash = fnv_1_hash(s.data, s.length);
+type_table_entry_exist(Type_Table* table, Light_Type* t, s32* out_index, u64* out_hash) {
+    u64 hash = type_hash(t);
 	s32 index = (s32)(hash % table->entries_capacity);
 
 	while (table->entries[index].flags & STRING_TABLE_OCCUPIED) {
@@ -64,9 +67,9 @@ string_table_entry_exist(String_Table* table, string s, s32* out_index, u64* out
 }
 
 bool
-string_table_del(String_Table* table, string s) {
+type_table_del(Type_Table* table, Light_Type* t) {
     s32 index = 0;
-    if(string_table_entry_exist(table, s, &index, 0)) {
+    if(type_table_entry_exist(table, t, &index, 0)) {
 		table->entries[index].flags = 0;
         table->entries[index].hash = 0;
 		table->entries_count -= 1;
@@ -75,38 +78,7 @@ string_table_del(String_Table* table, string s) {
     return false;
 }
 
-string 
-string_table_get(String_Table* table, s32 index) {
+Light_Type*
+type_table_get(Type_Table* table, s32 index) {
     return table->entries[index].data;
-}
-
-// Hash functions
-u64
-fnv_1_hash(const u8* s, u64 length) {
-	u64 hash = 14695981039346656037ULL;
-	u64 fnv_prime = 1099511628211ULL;
-	for (u64 i = 0; i < length; ++i) {
-		hash = hash * fnv_prime;
-		hash = hash ^ s[i];
-	}
-	return hash;
-}
-
-u64 
-fnv_1_hash_from_start(u64 hash, const u8* s, u64 length) {
-	u64 fnv_prime = 1099511628211;
-	for (u64 i = 0; i < length; ++i) {
-		hash = hash * fnv_prime;
-		hash = hash ^ s[i];
-	}
-	return hash;
-}
-
-u64
-fnv_1_hash_combine(u64 hash1, u64 hash2) {
-	u64 fnv_prime = 1099511628211;
-	u64 hash = hash1;
-	hash = hash * fnv_prime;
-	hash = hash ^ hash2;
-	return hash;
 }

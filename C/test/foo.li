@@ -1,10 +1,1 @@
-
-foo :: () -> s32 {}
-
-foo -> struct {};
-foo -> union {};
-foo -> enum {}
-
-foo -> s32;
-foo -> () -> void;
-
+[32]s32
