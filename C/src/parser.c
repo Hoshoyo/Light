@@ -344,10 +344,9 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 			if (t == ':') {
 				command = parse_declaration(parser, scope, error);
 			} else if (t == '(') {
-                // TODO(psv):
-				// syntatic sugar void proc call
+				// Syntatic sugar void proc call
 				Light_Ast* pcall = parse_expression(parser, scope, error);
-				//command = ast_create_comm_variable_assignment(scope, 0, pcall);
+                command = ast_new_comm_assignment(scope, 0, pcall);
 			} else {
 				command = parse_comm_assignment(parser, scope, error);
 			}
@@ -442,8 +441,6 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 
 static Light_Ast*
 parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, Light_Scope* scope, u32* error) {
-    //assert((name && type) || (!name && !type));
-
     Light_Lexer* lexer = parser->lexer;
     if(!name) {
         name = lexer_next(lexer);
@@ -524,6 +521,7 @@ parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_sc
             case '#':{
                 // TODO(psv):
                 // parse_directive
+                assert(0);
             }break;
             case TOKEN_IDENTIFIER:{
                 Light_Ast* decl = parse_declaration(parser, global_scope, error);
@@ -821,69 +819,27 @@ Light_Ast* parse_expression_precedence9(Light_Parser* parser, Light_Scope* scope
 	return expr;
 }
 
-Light_Ast* parse_expression_left_dot(Light_Parser* parser, Light_Scope* scope, u32* error){
-	Light_Token* op = 0;
-	Light_Ast* expr = parse_expression_precedence10(parser, scope, error);
-    ReturnIfError();
-	while(true) {
-		op = lexer_peek(parser->lexer);
-		if(op->type == '['){
-			lexer_next(parser->lexer);
-			Light_Ast* r = parse_expression(parser, scope, error);
-            ReturnIfError();
-			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
-			*error |= parser_require_and_eat(parser, ']');
-            ReturnIfError();
-		} else if(op->type == '(') {
-			// procedure call
-			Light_Ast**  arguments = 0;
-			s32          args_count = 0;
-			
-			*error |= parser_require_and_eat(parser, '(');
-            ReturnIfError();
-
-			if (lexer_peek(parser->lexer)->type != ')') {
-				arguments = array_new(Light_Ast*);
-				for (;;) {
-					if (args_count != 0) {
-						*error |= parser_require_and_eat(parser, ',');
-                        ReturnIfError();
-                    }
-					Light_Ast* argument = parse_expression(parser, scope, error);
-					array_push(arguments, argument);
-					++args_count;
-					if (lexer_peek(parser->lexer)->type != ',')
-						break;
-				}
-			}
-			*error |= parser_require_and_eat(parser, ')');
-            ReturnIfError();
-
-			return ast_new_expr_proc_call(scope, expr, arguments, args_count);
-		} else {
-			break;
-		}
-	}
-	return expr;
-}
-
 Light_Ast* parse_expression_precedence8(Light_Parser* parser, Light_Scope* scope, u32* error) {
 	Light_Token* op = 0;
-	Light_Ast* expr = parse_expression_left_dot(parser, scope, error);
+	Light_Ast* expr = parse_expression_precedence9(parser, scope, error);
     ReturnIfError();
 	while(true) {
 		op = lexer_peek(parser->lexer);
 		if(op->type == '.'){
-			lexer_next(parser->lexer); // eat '.'
-			Light_Ast* r = parse_expression_precedence10(parser, scope, error);
-            ReturnIfError();
-			expr = ast_new_expr_binary(scope, expr, r, op, OP_BINARY_DOT);
-			while(true) {
+			lexer_next(parser->lexer);
+            Light_Token* ident = lexer_next(parser->lexer);
+            if(ident->type != TOKEN_IDENTIFIER) {
+                *error |= parser_error_fatal(parser, ident, "expected identifier after '.' operator, but got '%.*s'\n", TOKEN_STR(ident));
+                return 0;
+            }
+			Light_Ast* right = ast_new_expr_variable(scope, ident);
+			expr = ast_new_expr_binary(scope, expr, right, op, token_to_binary_op(op));
+
+            while(true) {
 				op = lexer_peek(parser->lexer);
 				if(op->type == '['){
 					lexer_next(parser->lexer);
 					Light_Ast* r = parse_expression(parser, scope, error);
-                    ReturnIfError();
 					expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
 					*error |= parser_require_and_eat(parser, ']');
                     ReturnIfError();
@@ -897,8 +853,9 @@ Light_Ast* parse_expression_precedence8(Light_Parser* parser, Light_Scope* scope
 	}
 	return expr;
 }
+
 Light_Ast* parse_expression_precedence7(Light_Parser* parser, Light_Scope* scope, u32* error) {
-	return parse_expression_precedence8(parser, scope, error);
+    return parse_expression_precedence8(parser, scope, error);
 }
 
 Light_Ast* parse_expression_precedence6(Light_Parser* parser, Light_Scope* scope, u32* error) {

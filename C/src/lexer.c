@@ -593,14 +593,14 @@ lexer_file(Light_Lexer* lexer, const char* filename, u32 flags) {
     size_t length_bytes = ftell(file);
     fseek(file, 0, SEEK_SET);
     
-    char* stream = light_alloc(length_bytes);
+    char* stream = light_alloc(length_bytes + 1);
 
     fread(stream, length_bytes, 1, file);
     fclose(file);
 
     // Copy filename to lexer
-    size_t filename_size = strlen(filename) + 1;
-    lexer->filepath = light_alloc(filename_size);
+    size_t filename_size = strlen(filename);
+    lexer->filepath = light_alloc(filename_size + 1);
     memcpy((void*)lexer->filepath, filename, filename_size);
 
     lexer->filename = light_filename_from_path(lexer->filepath);

@@ -77,7 +77,7 @@ ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
 
-    if(operand->type->flags & TYPE_FLAG_INTERNALIZED) {
+    if(operand->type && operand->type->flags & TYPE_FLAG_INTERNALIZED) {
         switch(op){
             case OP_UNARY_LOGIC_NOT:{
                 result->type = type_primitive_get(TYPE_PRIMITIVE_BOOL);
@@ -499,8 +499,26 @@ ast_print_expr_literal(Light_Ast* expr, u32 flags) {
             length += fprintf(out, "%.*s", TOKEN_STR(expr->expr_literal.token));
         }break;
         case LITERAL_POINTER: length += fprintf(out, "null"); break;
-        case LITERAL_ARRAY:
-        case LITERAL_STRUCT:
+        case LITERAL_ARRAY:{
+            length += fprintf(out, "array {");
+            for(u64 i = 0; i < array_length(expr->expr_literal.struct_exprs); ++i) {
+                if(i != 0) {
+                    length += fprintf(out, ", ");
+                }
+                length += ast_print_expression(expr->expr_literal.array_exprs[i], flags);
+            }
+            length += fprintf(out, "}");
+        }break;
+        case LITERAL_STRUCT:{
+            length += fprintf(out, "struct {");
+            for(u64 i = 0; i < array_length(expr->expr_literal.struct_exprs); ++i) {
+                if(i != 0) {
+                    length += fprintf(out, ", ");
+                }
+                length += ast_print_expression(expr->expr_literal.struct_exprs[i], flags);
+            }
+            length += fprintf(out, "}");
+        }break;
         default: length += fprintf(out, "<invalid literal>"); break;
     }
 }
@@ -591,7 +609,7 @@ ast_print_expression(Light_Ast* expr, u32 flags) {
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
 
-    length += fprintf(out, "(");
+    //length += fprintf(out, "(");
 
     switch(expr->kind) {
         case AST_EXPRESSION_BINARY:
@@ -614,7 +632,7 @@ ast_print_expression(Light_Ast* expr, u32 flags) {
         default: length += fprintf(out, "<invalid expression>"); break;
     }
 
-    length += fprintf(out, ")");
+    //length += fprintf(out, ")");
 
     return length;
 }
@@ -661,9 +679,12 @@ ast_print_node(Light_Ast* node, u32 flags) {
             }
         }break;
         case AST_COMMAND_ASSIGNMENT:{
-            length += ast_print_expression(node->comm_assignment.lvalue, flags);
-            length += fprintf(out, " = ");
+            if(node->comm_assignment.lvalue) {
+                length += ast_print_expression(node->comm_assignment.lvalue, flags);
+                length += fprintf(out, " = ");
+            }
             length += ast_print_expression(node->comm_assignment.rvalue, flags);
+            length += fprintf(out, ";");
         }break;
         case AST_COMMAND_BLOCK:{
             length += fprintf(out, "{\n");
