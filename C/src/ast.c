@@ -35,6 +35,39 @@ light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags) {
 }
 
 Light_Ast* 
+ast_new_expr_variable(Light_Scope* scope, Light_Token* name) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_VARIABLE;
+    result->scope_at = scope;
+    result->type = 0;
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+
+    result->expr_variable.name = name;
+    result->expr_variable.decl = 0;
+
+    return result;
+}
+
+Light_Ast* 
+ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_PROCEDURE_CALL;
+    result->scope_at = scope;
+    result->type = 0;
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+
+    result->expr_proc_call.arg_count = args_count;
+    result->expr_proc_call.args = arguments;
+    result->expr_proc_call.caller_expr = caller;
+
+    return result;
+}
+
+Light_Ast* 
 ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
@@ -95,9 +128,45 @@ ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light
     return result;
 }
 
+Light_Ast* 
+ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_LITERAL;
+    result->scope_at = scope;
+    result->type = type_from_token(token);
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+
+    result->expr_literal.token = token;
+    result->expr_literal.type = LITERAL_ARRAY;
+    result->expr_literal.array_exprs = array_exprs;
+    result->expr_literal.array_strong_type = 0;
+    result->expr_literal.storage_class = STORAGE_CLASS_STACK;
+    
+    return result;
+}
+
+Light_Ast* 
+ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* token, Light_Ast** struct_exprs) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_LITERAL;
+    result->scope_at = scope;
+    result->type = type_from_token(token);
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+
+    result->expr_literal.type = LITERAL_STRUCT;
+    result->expr_literal.token = token;
+    result->expr_literal.struct_exprs = struct_exprs;
+    result->expr_literal.storage_class = STORAGE_CLASS_STACK;
+    
+    return result;
+}
+
 Light_Ast*
 ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token) {
-
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_LITERAL;
@@ -120,17 +189,20 @@ ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token) {
         case TOKEN_LITERAL_DEC_UINT:    type = LITERAL_DEC_UINT; break;
         case TOKEN_LITERAL_FLOAT:       type = LITERAL_FLOAT; break;
         case TOKEN_LITERAL_HEX_INT:     type = LITERAL_HEX_INT; break;
+        case TOKEN_KEYWORD_NULL:        type = LITERAL_POINTER; break;
         default: type = 0; break;
     }
     result->expr_literal.type = type;
-    
-    switch(result->type->kind) {
-        case TYPE_KIND_POINTER: break; // value is 0
-        case TYPE_KIND_PRIMITIVE:{
-            literal_primitive_evaluate(result);
-        }break;
-        default: assert(0); break;
-    }
+
+    if(result->type) {
+        switch(result->type->kind) {
+            case TYPE_KIND_POINTER: break; // value is 0
+            case TYPE_KIND_PRIMITIVE:{
+                literal_primitive_evaluate(result);
+            }break;
+            default: assert(0); break;
+        }
+    }    
 
     return result;
 }
@@ -411,8 +483,140 @@ static FILE* ast_file_from_flags(u32 flags) {
 }
 
 s32
-ast_print_expression(Light_Ast* expr) {
-    printf("expr");
+ast_print_expr_literal(Light_Ast* expr, u32 flags) {
+    assert(expr->kind == AST_EXPRESSION_LITERAL);
+    FILE* out = ast_file_from_flags(flags);
+    s32 length = 0;
+
+    switch(expr->expr_literal.type) {
+        case LITERAL_BIN_INT:
+        case LITERAL_DEC_SINT:
+        case LITERAL_DEC_UINT:
+        case LITERAL_HEX_INT:
+        case LITERAL_BOOL:
+        case LITERAL_CHAR:
+        case LITERAL_FLOAT:{
+            length += fprintf(out, "%.*s", TOKEN_STR(expr->expr_literal.token));
+        }break;
+        case LITERAL_POINTER: length += fprintf(out, "null"); break;
+        case LITERAL_ARRAY:
+        case LITERAL_STRUCT:
+        default: length += fprintf(out, "<invalid literal>"); break;
+    }
+}
+
+s32
+ast_print_expr_binary(Light_Ast* expr, u32 flags) {
+    assert(expr->kind == AST_EXPRESSION_BINARY);
+    FILE* out = ast_file_from_flags(flags);
+    s32 length = 0;
+
+    length += ast_print_expression(expr->expr_binary.left, flags);
+    switch(expr->expr_binary.op) {
+        case OP_BINARY_PLUS:    length += fprintf(out, " + "); break;
+        case OP_BINARY_MINUS:   length += fprintf(out, " - "); break;
+        case OP_BINARY_MULT:    length += fprintf(out, " * "); break;
+        case OP_BINARY_DIV:     length += fprintf(out, " / "); break;
+        case OP_BINARY_MOD:     length += fprintf(out, " & "); break;
+        case OP_BINARY_AND:     length += fprintf(out, " %% "); break;
+        case OP_BINARY_OR:      length += fprintf(out, " | "); break;
+        case OP_BINARY_XOR:     length += fprintf(out, " ^ "); break;
+        case OP_BINARY_SHL:     length += fprintf(out, " << "); break;
+        case OP_BINARY_SHR:     length += fprintf(out, " >> "); break;
+
+        case OP_BINARY_LT:          length += fprintf(out, " < "); break;
+        case OP_BINARY_GT:          length += fprintf(out, " > "); break;
+        case OP_BINARY_LE:          length += fprintf(out, " <= "); break;
+        case OP_BINARY_GE:          length += fprintf(out, " >= "); break;
+        case OP_BINARY_EQUAL:       length += fprintf(out, " == "); break;
+        case OP_BINARY_NOT_EQUAL:   length += fprintf(out, " != "); break;
+
+        case OP_BINARY_LOGIC_AND:   length += fprintf(out, "&&"); break;
+        case OP_BINARY_LOGIC_OR:    length += fprintf(out, "||"); break;
+
+        case OP_BINARY_VECTOR_ACCESS: length += fprintf(out, "["); break;
+        case OP_BINARY_DOT:           length += fprintf(out, "."); break;
+        default: length += fprintf(out, "<invalid binary expr>"); break;
+    }
+    length += ast_print_expression(expr->expr_binary.right, flags);
+    if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS) {
+        length += fprintf(out, "]");
+    }
+
+    return length;
+}
+
+s32
+ast_print_expr_proc_call(Light_Ast* expr, u32 flags) {
+    assert(expr->kind == AST_EXPRESSION_PROCEDURE_CALL);
+    FILE* out = ast_file_from_flags(flags);
+    s32 length = 0;
+
+    length += ast_print_expression(expr->expr_proc_call.caller_expr, flags);
+    length += fprintf(out, "(");
+    for(s32 i = 0; i < expr->expr_proc_call.arg_count; ++i) {
+        length += ast_print_expression(expr->expr_proc_call.args[i], flags);    
+    }
+    length += fprintf(out, ")");
+
+    return length;
+}
+
+s32
+ast_print_expr_unary(Light_Ast* expr, u32 flags) {
+    assert(expr->kind == AST_EXPRESSION_UNARY);
+    FILE* out = ast_file_from_flags(flags);
+    s32 length = 0;
+
+    switch(expr->expr_unary.op) {
+        case OP_UNARY_ADDRESSOF:     length += fprintf(out, "&"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
+        case OP_UNARY_BITWISE_NOT:   length += fprintf(out, "~"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
+        case OP_UNARY_DEREFERENCE:   length += fprintf(out, "*"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
+        case OP_UNARY_LOGIC_NOT:     length += fprintf(out, "!"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
+        case OP_UNARY_MINUS:         length += fprintf(out, "-"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
+        case OP_UNARY_PLUS:          length += fprintf(out, "+"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
+        case OP_UNARY_CAST: {
+            length += fprintf(out, "[");
+            length += ast_print_type(expr->expr_unary.type_to_cast, flags);
+            length += fprintf(out, "]");
+        }break;
+        default: length += fprintf(out, "<invalid unary expr>"); break;
+    }
+
+    return length;
+}
+
+s32
+ast_print_expression(Light_Ast* expr, u32 flags) {
+    FILE* out = ast_file_from_flags(flags);
+    s32 length = 0;
+
+    length += fprintf(out, "(");
+
+    switch(expr->kind) {
+        case AST_EXPRESSION_BINARY:
+            length += ast_print_expr_binary(expr, flags);
+            break;
+        case AST_EXPRESSION_UNARY:
+            length += ast_print_expr_unary(expr, flags);
+            break;
+        case AST_EXPRESSION_DIRECTIVE:
+            break;
+        case AST_EXPRESSION_LITERAL:
+            length += ast_print_expr_literal(expr, flags);
+            break;
+        case AST_EXPRESSION_PROCEDURE_CALL:
+            length += ast_print_expr_proc_call(expr, flags);
+            break;
+        case AST_EXPRESSION_VARIABLE:
+            length += fprintf(out, "%.*s", TOKEN_STR(expr->expr_variable.name));
+            break;
+        default: length += fprintf(out, "<invalid expression>"); break;
+    }
+
+    length += fprintf(out, ")");
+
+    return length;
 }
 
 s32
@@ -427,7 +631,7 @@ ast_print_node(Light_Ast* node, u32 flags) {
                 length += ast_print_type(node->decl_constant.type_info, flags);
             }
             length += fprintf(out, ":");
-            length += ast_print_expression(node->decl_constant.value);
+            length += ast_print_expression(node->decl_constant.value, flags);
         }break;
         case AST_DECL_TYPEDEF:{
             length += fprintf(out, "%.*s -> ", TOKEN_STR(node->decl_typedef.name));
@@ -440,7 +644,7 @@ ast_print_node(Light_Ast* node, u32 flags) {
             }
             if(node->decl_variable.assignment) {
                 length += fprintf(out, " = ");
-                length += ast_print_expression(node->decl_variable.assignment);
+                length += ast_print_expression(node->decl_variable.assignment, flags);
             }
         }break;
         case AST_DECL_PROCEDURE:{
@@ -455,6 +659,71 @@ ast_print_node(Light_Ast* node, u32 flags) {
             } else {
                 length += fprintf(out, ";");
             }
+        }break;
+        case AST_COMMAND_ASSIGNMENT:{
+            length += ast_print_expression(node->comm_assignment.lvalue, flags);
+            length += fprintf(out, " = ");
+            length += ast_print_expression(node->comm_assignment.rvalue, flags);
+        }break;
+        case AST_COMMAND_BLOCK:{
+            length += fprintf(out, "{\n");
+            for(s32 i = 0; i < node->comm_block.command_count; ++i) {
+                length += ast_print_node(node->comm_block.commands[i], flags);
+                length += fprintf(out, "\n");
+            }
+            length += fprintf(out, "}");
+        }break;
+        case AST_COMMAND_BREAK:{
+            length += fprintf(out, "break");
+            if(node->comm_break.level) {
+                length += fprintf(out, " ");
+                length += ast_print_expression(node->comm_break.level, flags);
+            }
+            length += fprintf(out, ";");
+        }break;
+        case AST_COMMAND_CONTINUE:{
+            length += fprintf(out, "continue");
+            if(node->comm_continue.level) {
+                length += fprintf(out, " ");
+                length += ast_print_expression(node->comm_continue.level, flags);
+            }
+            length += fprintf(out, ";");
+        }break;
+        case AST_COMMAND_FOR:{
+            length += fprintf(out, "for ");
+            for(s32 i = 0; i < array_length(node->comm_for.prologue); ++i) {
+                if(i != 0) length += fprintf(out, ", ");
+                length += ast_print_node(node->comm_for.prologue[i], flags);
+            }
+            length += fprintf(out, ";");
+            length += ast_print_expression(node->comm_for.condition, flags);
+            length += fprintf(out, ";");
+            for(s32 i = 0; i < array_length(node->comm_for.epilogue); ++i) {
+                if(i != 0) length += fprintf(out, ", ");
+                length += ast_print_node(node->comm_for.epilogue[i], flags);
+            }
+        }break;
+        case AST_COMMAND_IF:{
+            length += fprintf(out, "if ");
+            length += ast_print_expression(node->comm_if.condition, flags);
+            length += ast_print_node(node->comm_if.body_true, flags);
+            if(node->comm_if.body_false) {
+                length += fprintf(out, " else ");
+                length += ast_print_node(node->comm_if.body_false, flags);
+            }
+        }break;
+        case AST_COMMAND_RETURN:{
+            length += fprintf(out, "return");
+            if(node->comm_return.expression) {
+                length += fprintf(out, " ");
+                length += ast_print_expression(node->comm_return.expression, flags);
+            }
+            length += fprintf(out, ";");
+        }break;
+        case AST_COMMAND_WHILE:{
+            length += fprintf(out, "while ");
+            length += ast_print_expression(node->comm_while.condition, flags);
+            length += ast_print_node(node->comm_while.body, flags);
         }break;
         default: length += fprintf(out, "<invalid node>"); break;
     }
@@ -546,5 +815,6 @@ ast_print(Light_Ast** ast, u32 flags) {
     for(u64 i = 0; i < array_length(ast); ++i) {
         length += ast_print_node(ast[i], flags);
     }
+    fprintf(out, "\n");
     return length;
 }

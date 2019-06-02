@@ -71,6 +71,7 @@ token_number(u8* at, s32 line, s32 column) {
         } else {
             r.type = TOKEN_LITERAL_DEC_INT;
         }
+        r.flags |= TOKEN_FLAG_LITERAL;
     }
 
     r.length = at - r.data;
@@ -279,6 +280,7 @@ token_next(Light_Lexer* lexer) {
 
         case '\'': {
             r.type = TOKEN_LITERAL_CHAR;
+            r.flags |= TOKEN_FLAG_LITERAL;
             at++;
             if (*at == '\'') {
                 at++;
@@ -343,6 +345,7 @@ token_next(Light_Lexer* lexer) {
 		// Token string
         case '`': {
             r.type = TOKEN_LITERAL_STRING;
+            r.flags |= TOKEN_FLAG_LITERAL;
             at++;	// skip "
             for (; *at && *at != '`'; ++at) {
                 if(*at == '\\' && at[1] == '`') {
@@ -354,6 +357,7 @@ token_next(Light_Lexer* lexer) {
         } break;
 		case '"': {
 			r.type = TOKEN_LITERAL_STRING;
+            r.flags |= TOKEN_FLAG_LITERAL;
 			at++;	// skip "
 
 			for (; *at && *at != '"'; ++at) {
@@ -414,6 +418,7 @@ token_next(Light_Lexer* lexer) {
 						++at;
 					}
 					r.type = TOKEN_LITERAL_HEX_INT;
+                    r.flags |= TOKEN_FLAG_LITERAL;
                 } else if(*at == '0' && at[1] == 'b') {
                     // binary
                     at += 2;
@@ -421,11 +426,13 @@ token_next(Light_Lexer* lexer) {
                         ++at;
                     }
                     r.type = TOKEN_LITERAL_BIN_INT;
+                    r.flags |= TOKEN_FLAG_LITERAL;
 				} else {
 					r = token_number(at, lexer->line, lexer->column);
                     break;
 				}
                 r.flags |= TOKEN_FLAG_INTEGER_LITERAL;
+                r.flags |= TOKEN_FLAG_LITERAL;
 			} else if (is_letter(*at) || *at == '_') {
                 // identifier
 				for (; is_letter(*at) || is_number(*at) || *at == '_'; ++at);

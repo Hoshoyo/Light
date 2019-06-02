@@ -108,6 +108,7 @@ typedef enum {
     TOKEN_FLAG_BINARY_OPERATOR     = (1 << 3),
     TOKEN_FLAG_UNARY_OPERATOR      = (1 << 4),
 	TOKEN_FLAG_INTEGER_LITERAL     = (1 << 5),
+	TOKEN_FLAG_LITERAL             = (1 << 6),
 } Light_Token_Flag;
 
 typedef struct {

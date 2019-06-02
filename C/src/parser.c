@@ -41,6 +41,9 @@ parser_require_and_eat(Light_Parser* parser, Light_Token_Type type) {
     return PARSER_OK;
 }
 
+
+
+
 static Light_Ast*
 parse_comm_block(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Lexer* lexer = parser->lexer;
@@ -430,7 +433,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 
     Light_Ast* result = ast_new_decl_procedure(scope, name, body, return_type, args_scope, (Light_Ast_Decl_Variable**)arguments, args_count, 0);
 
-    if(body) {
+    if(body && body->comm_block.block_scope) {
         body->comm_block.block_scope->creator_node = result;
     }
 
@@ -439,6 +442,8 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 
 static Light_Ast*
 parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, Light_Scope* scope, u32* error) {
+    //assert((name && type) || (!name && !type));
+
     Light_Lexer* lexer = parser->lexer;
     if(!name) {
         name = lexer_next(lexer);
@@ -448,7 +453,7 @@ parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, L
         }
     }
 
-    if(!type) {
+    if(!type && !name) {
         *error |= parser_require_and_eat(parser, ':');
         ReturnIfError();
         
@@ -568,12 +573,15 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
                 }
             } else {
                 // type for a variable or constant declaration
-                Light_Type* type = parse_type(parser, scope, error);
-                if(*error & PARSER_ERROR_FATAL) break;
+                Light_Type* type = 0;
+                if(lexer_peek(lexer)->type != '=') {
+                    type = parse_type(parser, scope, error);
+                    ReturnIfError();
+                }
+
                 Light_Token* n = lexer_peek(lexer);
                 switch(n->type) {
                     case '=':
-                        lexer_next(lexer);
                         result = parse_decl_variable(parser, name, type, scope, error);
                         break;
                     case ':':
@@ -599,10 +607,408 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
     return result;
 }
 
+static Light_Operator_Binary
+token_to_binary_op(Light_Token* token) {
+    switch(token->type) {
+        case '+':                   return OP_BINARY_PLUS; break;
+        case '-':                   return OP_BINARY_MINUS; break;
+        case '*':                   return OP_BINARY_MULT; break;
+        case '/':                   return OP_BINARY_DIV; break;
+        case '%':                  return OP_BINARY_MOD; break;
+        case '&':                   return OP_BINARY_AND; break;
+        case '|':                   return OP_BINARY_OR; break;
+        case '^':                   return OP_BINARY_XOR; break;
+        case TOKEN_BITSHIFT_LEFT:   return OP_BINARY_SHL; break;
+        case TOKEN_BITSHIFT_RIGHT:  return OP_BINARY_SHR; break;
+        case '<':                   return OP_BINARY_LT; break;
+        case '>':                   return OP_BINARY_GT; break;
+        case TOKEN_LESS_EQUAL:      return OP_BINARY_LE; break;
+        case TOKEN_GREATER_EQUAL:   return OP_BINARY_GE; break;
+        case TOKEN_EQUAL_EQUAL:     return OP_BINARY_EQUAL; break;
+        case TOKEN_NOT_EQUAL:       return OP_BINARY_NOT_EQUAL; break;
+        case TOKEN_LOGIC_AND:       return OP_BINARY_LOGIC_AND; break;
+        case TOKEN_LOGIC_OR:        return OP_BINARY_LOGIC_OR; break;
+        case '.':                   return OP_BINARY_DOT; break;
+        case '[':                   return OP_BINARY_VECTOR_ACCESS; break;
+        default: return OP_BINARY_UNKNOWN; break;
+    }
+}
+
+static Light_Operator_Unary
+token_to_unary_op(Light_Token* token) {
+    switch(token->type) {
+        case '+': return OP_UNARY_PLUS;
+        case '-': return OP_UNARY_MINUS;
+        case '*': return OP_UNARY_DEREFERENCE;
+        case '&': return OP_UNARY_ADDRESSOF;
+        case '~': return OP_UNARY_BITWISE_NOT;
+        case '[': return OP_UNARY_CAST;
+        case '!': return OP_UNARY_LOGIC_NOT;
+        default: return OP_UNARY_UNKNOWN;
+    }
+}
+
+Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* error) {
+    Light_Lexer* lexer = parser->lexer;
+	Light_Token* first = lexer_next(lexer);
+
+    Light_Ast* result = 0;
+
+    switch (first->type) {
+        case TOKEN_LITERAL_DEC_INT:
+        case TOKEN_LITERAL_DEC_UINT:
+        case TOKEN_LITERAL_HEX_INT:
+        case TOKEN_LITERAL_BIN_INT:
+        case TOKEN_LITERAL_BOOL_FALSE:
+        case TOKEN_LITERAL_BOOL_TRUE:
+        case TOKEN_LITERAL_FLOAT:
+        case TOKEN_LITERAL_CHAR:
+        case TOKEN_KEYWORD_NULL:
+            result = ast_new_expr_literal_primitive(scope, first);
+            break;
+        case TOKEN_LITERAL_STRING:
+            // TODO(psv):
+            break;
+        default: {
+            *error |= parser_error_fatal(parser, first, "expected literal expression but got '%.*s'\n", TOKEN_STR(first));
+        }break;
+    }
+
+	return result;
+}
+
+Light_Ast* 
+parse_expr_literal_struct(Light_Parser* parser, Light_Scope* scope, Light_Token* struct_token, u32* error) {
+	*error |= parser_require_and_eat(parser, '{');
+    ReturnIfError();
+
+    Light_Ast* result = 0;
+	
+	Light_Ast** exprs = array_new(Light_Ast*);
+	if(lexer_peek(parser->lexer)->type != '}'){
+		while(true) {
+			Light_Ast* expr = parse_expression(parser, scope, error);
+            ReturnIfError();
+
+			array_push(exprs, expr);
+
+			if(lexer_peek(parser->lexer)->type != ','){
+				break;
+			} else {
+				lexer_next(parser->lexer);
+			}
+		}
+        result = ast_new_expr_literal_struct(scope, struct_token, exprs);
+	}
+	*error |= parser_require_and_eat(parser, '{');
+    ReturnIfError();
+
+	return result;
+}
+
+Light_Ast* 
+parse_expr_literal_array(Light_Parser* parser, Light_Scope* scope, u32* error) {
+    Light_Token* array_token = lexer_next(parser->lexer);
+    if(array_token->type != TOKEN_KEYWORD_ARRAY) {
+        *error |= parser_error_fatal(parser, array_token, "expected array keyword, but got '%.*s'", TOKEN_STR(array_token));
+        return 0;
+    }
+    
+    *error |= parser_require_and_eat(parser, '{');
+    ReturnIfError();
+
+    Light_Ast* result = 0;
+
+	if(lexer_peek(parser->lexer)->type != '}') {
+		Light_Ast** exprs = array_new(Light_Ast*);
+		while(true) {
+			Light_Ast* expr = parse_expression(parser, scope, error);
+			array_push(exprs, expr);
+
+			if(lexer_peek(parser->lexer)->type != ','){
+				break;
+			} else {
+				lexer_next(parser->lexer);
+			}
+		}
+	    result = ast_new_expr_literal_array(scope, array_token, exprs);
+	}
+
+	*error |= parser_require_and_eat(parser, '}');
+    ReturnIfError();
+
+	return result;
+}
+
+Light_Ast* 
+parse_expression_precedence10(Light_Parser* parser, Light_Scope* scope, u32* error) {
+	Light_Token* t = lexer_peek(parser->lexer);
+	if (t->flags & TOKEN_FLAG_LITERAL || t->type == TOKEN_KEYWORD_NULL) {
+		// literal
+		return parse_expr_literal(parser, scope, error);
+	} else if(t->type == TOKEN_KEYWORD_ARRAY) {
+		// array literal
+		return parse_expr_literal_array(parser, scope, error);
+	} else if (t->type == TOKEN_IDENTIFIER) {
+		// variable
+		lexer_next(parser->lexer);
+		if (lexer_peek(parser->lexer)->type == ':') {
+			lexer_next(parser->lexer);
+			return parse_expr_literal_struct(parser, scope, t, error);
+		} else {
+			return ast_new_expr_variable(scope, t);
+		}
+	} else if(t->type == '#') {
+        // TODO(psv):
+        assert(0);
+		//return parse_directive_expression(parser, scope, error);
+	} else if(t->type == '(') {
+		// ( expr )
+		lexer_next(parser->lexer);
+		Light_Ast* expr = parse_expression(parser, scope, error);
+		*error |= parser_require_and_eat(parser, ')');
+        ReturnIfError();
+		return expr;
+	} else {
+        *error |= parser_error_fatal(parser, t, "expected expression but got '%.*s'\n", TOKEN_STR(t));
+	}
+	return 0;
+}
+
+
+Light_Ast* parse_expression_precedence9(Light_Parser* parser, Light_Scope* scope, u32* error) {
+	Light_Token* op = 0;
+	Light_Ast* expr = parse_expression_precedence10(parser, scope, error);
+    ReturnIfError();
+	while(true) {
+		op = lexer_peek(parser->lexer);
+		if(op->type == '['){
+			lexer_next(parser->lexer);
+			Light_Ast* r = parse_expression(parser, scope, error);
+			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
+            ReturnIfError();
+			*error |= parser_require_and_eat(parser, ']');
+            ReturnIfError();
+		} else if(op->type == '(') {
+			// procedure call
+			Light_Ast**  arguments = 0;
+			s32          args_count = 0;
+			
+			*error |= parser_require_and_eat(parser, '(');
+            ReturnIfError();
+			if (lexer_peek(parser->lexer)->type != ')') {
+				arguments = array_new(Light_Ast*);
+				for (;;) {
+					if (args_count != 0) {
+                        *error |= parser_require_and_eat(parser, ',');
+                        ReturnIfError();
+                    }
+					Light_Ast* argument = parse_expression(parser, scope, error);
+					array_push(arguments, argument);
+					++args_count;
+					if (lexer_peek(parser->lexer)->type != ',')
+						break;
+				}
+			}
+			*error |= parser_require_and_eat(parser, ')');
+            ReturnIfError();
+
+			return ast_new_expr_proc_call(scope, expr, arguments, args_count);
+		} else {
+			break;
+		}
+	}
+	return expr;
+}
+
+Light_Ast* parse_expression_left_dot(Light_Parser* parser, Light_Scope* scope, u32* error){
+	Light_Token* op = 0;
+	Light_Ast* expr = parse_expression_precedence10(parser, scope, error);
+    ReturnIfError();
+	while(true) {
+		op = lexer_peek(parser->lexer);
+		if(op->type == '['){
+			lexer_next(parser->lexer);
+			Light_Ast* r = parse_expression(parser, scope, error);
+            ReturnIfError();
+			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
+			*error |= parser_require_and_eat(parser, ']');
+            ReturnIfError();
+		} else if(op->type == '(') {
+			// procedure call
+			Light_Ast**  arguments = 0;
+			s32          args_count = 0;
+			
+			*error |= parser_require_and_eat(parser, '(');
+            ReturnIfError();
+
+			if (lexer_peek(parser->lexer)->type != ')') {
+				arguments = array_new(Light_Ast*);
+				for (;;) {
+					if (args_count != 0) {
+						*error |= parser_require_and_eat(parser, ',');
+                        ReturnIfError();
+                    }
+					Light_Ast* argument = parse_expression(parser, scope, error);
+					array_push(arguments, argument);
+					++args_count;
+					if (lexer_peek(parser->lexer)->type != ',')
+						break;
+				}
+			}
+			*error |= parser_require_and_eat(parser, ')');
+            ReturnIfError();
+
+			return ast_new_expr_proc_call(scope, expr, arguments, args_count);
+		} else {
+			break;
+		}
+	}
+	return expr;
+}
+
+Light_Ast* parse_expression_precedence8(Light_Parser* parser, Light_Scope* scope, u32* error) {
+	Light_Token* op = 0;
+	Light_Ast* expr = parse_expression_left_dot(parser, scope, error);
+    ReturnIfError();
+	while(true) {
+		op = lexer_peek(parser->lexer);
+		if(op->type == '.'){
+			lexer_next(parser->lexer); // eat '.'
+			Light_Ast* r = parse_expression_precedence10(parser, scope, error);
+            ReturnIfError();
+			expr = ast_new_expr_binary(scope, expr, r, op, OP_BINARY_DOT);
+			while(true) {
+				op = lexer_peek(parser->lexer);
+				if(op->type == '['){
+					lexer_next(parser->lexer);
+					Light_Ast* r = parse_expression(parser, scope, error);
+                    ReturnIfError();
+					expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
+					*error |= parser_require_and_eat(parser, ']');
+                    ReturnIfError();
+				} else {
+					break;
+				}
+			}
+		} else {
+			break;
+		}
+	}
+	return expr;
+}
+Light_Ast* parse_expression_precedence7(Light_Parser* parser, Light_Scope* scope, u32* error) {
+	return parse_expression_precedence8(parser, scope, error);
+}
+
+Light_Ast* parse_expression_precedence6(Light_Parser* parser, Light_Scope* scope, u32* error) {
+	Light_Token_Type next = lexer_peek(parser->lexer)->type;
+	if (next == '~' || next == '!' || next == '&' || next == '*' || next == '-' || next == '+') {
+		Light_Token* op = lexer_next(parser->lexer);
+		Light_Ast* operand = parse_expression_precedence6(parser, scope, error);
+        ReturnIfError();
+		return ast_new_expr_unary(scope, operand, op, token_to_unary_op(op));
+	} else if (next == '[') {
+		// parse cast
+		Light_Token* cast = lexer_next(parser->lexer); // eat '['
+		Light_Type* ttc = parse_type(parser, scope, error);
+        ReturnIfError();
+		*error |= parser_require_and_eat(parser, ']');
+        ReturnIfError();
+
+		Light_Ast* operand = parse_expression_precedence6(parser, scope, error);
+        ReturnIfError();
+		Light_Ast* result = ast_new_expr_unary(scope, operand, cast, OP_UNARY_CAST);
+        result->expr_unary.type_to_cast = ttc;
+	}
+	return parse_expression_precedence7(parser, scope, error);
+}
+
+Light_Ast* parse_expression_precedence5(Light_Parser* parser, Light_Scope* scope, u32* error) {
+	Light_Token* op = 0;
+	Light_Ast* expr = parse_expression_precedence6(parser, scope, error);
+    ReturnIfError();
+	while(true) {
+		op = lexer_peek(parser->lexer);
+		if(op->type == '*' || op->type == '/' || op->type == '%'){
+			lexer_next(parser->lexer);
+			Light_Ast* r = parse_expression_precedence6(parser, scope, error);
+            ReturnIfError();
+			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
+		} else {
+			break;
+		}
+	}
+	return expr;
+}
+
+Light_Ast* parse_expression_precedence4(Light_Parser* parser, Light_Scope* scope, u32* error) {
+	Light_Token* op = 0;
+	Light_Ast* expr = parse_expression_precedence5(parser, scope, error);
+    ReturnIfError();
+	while(true) {
+		op = lexer_peek(parser->lexer);
+		if(op->type == '+' || op->type == '-'){
+			lexer_next(parser->lexer);
+			Light_Ast* r = parse_expression_precedence5(parser, scope, error);
+            ReturnIfError();
+			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
+		} else {
+			break;
+		}
+	}
+	return expr;
+}
+
+Light_Ast* parse_expression_precedence3(Light_Parser* parser, Light_Scope* scope, u32* error) {
+	Light_Token* op = 0;
+	Light_Ast* expr = parse_expression_precedence4(parser, scope, error);
+    ReturnIfError();
+	while(true) {
+		op = lexer_peek(parser->lexer);
+		if(op->type == '^' || op->type == '|' || op->type == '&' || op->type == TOKEN_BITSHIFT_LEFT || op->type == TOKEN_BITSHIFT_RIGHT){
+			lexer_next(parser->lexer);
+			Light_Ast* r = parse_expression_precedence4(parser, scope, error);
+            ReturnIfError();
+			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
+		} else {
+			break;
+		}
+	}
+	return expr;
+}
+
+Light_Ast* parse_expression_precedence2(Light_Parser* parser, Light_Scope* scope, u32* error) {
+	Light_Ast* expr = parse_expression_precedence3(parser, scope, error);
+    ReturnIfError();
+	Light_Token_Type next = lexer_peek(parser->lexer)->type;
+	if (next == TOKEN_EQUAL_EQUAL || next == TOKEN_GREATER_EQUAL || next == TOKEN_NOT_EQUAL ||
+		next == TOKEN_LESS_EQUAL || next == '<' || next == '>') 
+	{
+		Light_Token* op = lexer_next(parser->lexer);
+		Light_Ast* right = parse_expression_precedence2(parser, scope, error);
+        ReturnIfError();
+		return ast_new_expr_binary(scope, expr, right, op, token_to_binary_op(op));
+	}
+	return expr;
+}
+
+Light_Ast* parse_expression_precedence1(Light_Parser* parser, Light_Scope* scope, u32* error) {
+	Light_Ast* expr = parse_expression_precedence2(parser, scope, error);
+    ReturnIfError();
+	Light_Token_Type next = lexer_peek(parser->lexer)->type;
+	if (next == TOKEN_LOGIC_OR || next == TOKEN_LOGIC_AND) {
+		Light_Token* op = lexer_next(parser->lexer);
+		Light_Ast* right = parse_expression_precedence1(parser, scope, error);
+        ReturnIfError();
+		return ast_new_expr_binary(scope, expr, right, op, token_to_binary_op(op));
+	}
+	return expr;
+}
+
 Light_Ast* 
 parse_expression(Light_Parser* parser, Light_Scope* scope, u32* error) {
-    // TODO(psv):
-    return 0;
+    return parse_expression_precedence1(parser, scope, error);
 }
 
 static Light_Type*

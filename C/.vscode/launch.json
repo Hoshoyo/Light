@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/light",
-            "args": [],
+            "args": ["test/foo.li"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

@@ -510,8 +510,12 @@ Light_Ast* ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_
 
 // Expressions
 Light_Ast* ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token);
+Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* token, Light_Ast** struct_exprs);
+Light_Ast* ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs);
 Light_Ast* ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op);
 Light_Ast* ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op);
+Light_Ast* ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count);
+Light_Ast* ast_new_expr_variable(Light_Scope* scope, Light_Token* name);
 
 // Utils
 bool literal_primitive_evaluate(Light_Ast* p);
@@ -528,4 +532,5 @@ typedef enum {
 
 s32 ast_print_node(Light_Ast* node, u32 flags);
 s32 ast_print_type(Light_Type* type, u32 flags);
+s32 ast_print_expression(Light_Ast* expr, u32 flags);
 s32 ast_print(Light_Ast** ast, u32 flags);
