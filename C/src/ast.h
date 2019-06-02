@@ -126,6 +126,7 @@ typedef struct Light_Scope_t {
 // -------------- ----- ----------------
 
 typedef enum {
+	STORAGE_CLASS_REGISTER = 0,
     STORAGE_CLASS_STACK,
     STORAGE_CLASS_DATA_SEGMENT,
 } Light_Storage_Class;
@@ -208,7 +209,6 @@ typedef struct {
 typedef struct {
 	struct Light_Ast_t** commands;
 	struct Light_Ast_t** defer_stack;
-	struct Light_Ast_t*  creator_node;
 	Light_Scope*         block_scope;
 	int32_t              command_count;
 } Light_Ast_Comm_Block;
@@ -234,19 +234,21 @@ typedef struct {
 	struct Light_Ast_t*  body;			// Must be a command
 	struct Light_Ast_t** prologue;		// Array of commands
 	struct Light_Ast_t** epilogue;		// Array of commands
+	Light_Scope*         for_scope;
 } Light_Ast_Comm_For;
 
 typedef struct {
 	struct Light_Ast_t*   level;	    // Must be an int literal [0, MAX_INT]
 	Light_Token*          token_break;
 } Light_Ast_Comm_Break;
-struct Ast_Comm_Continue {
-	Light_Token* token_continue;
-};
-struct Ast_Comm_Return {
+typedef struct {
+	struct Light_Ast_t*   level;
+	Light_Token*          token_continue;
+} Light_Ast_Comm_Continue;
+typedef struct {
 	struct Light_Ast_t* expression;		// Must be an expression
 	Light_Token*        token_return;
-};
+} Light_Ast_Comm_Return;
 
 // Declarations
 typedef enum {
@@ -349,6 +351,8 @@ typedef struct Light_Ast_t {
 		Light_Ast_Comm_Assignment comm_assignment;
 		Light_Ast_Comm_Block      comm_block;
 		Light_Ast_Comm_Break      comm_break;
+		Light_Ast_Comm_Continue   comm_continue;
+		Light_Ast_Comm_Return     comm_return;
 		Light_Ast_Comm_For        comm_for;
 		Light_Ast_Comm_If         comm_if;
 		Light_Ast_Comm_While      comm_while;
@@ -488,11 +492,29 @@ typedef struct Light_Type_t{
 Light_Scope* light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags);
 
 // Ast
-Light_Ast* ast_new_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name);
+// Declarations
+Light_Ast* ast_new_decl_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name);
 Light_Ast* ast_new_decl_variable(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, Light_Storage_Class storage, u32 flags);
 Light_Ast* ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, u32 flags);
 Light_Ast* ast_new_decl_procedure(Light_Scope* scope, Light_Token* name, Light_Ast* body, Light_Type* return_type, Light_Scope* args_scope, Light_Ast_Decl_Variable** args, s32 args_count, u32 flags);
 
+// Commands
+Light_Ast* ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, Light_Scope* block_scope);
+Light_Ast* ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false);
+Light_Ast* ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body);
+Light_Ast* ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* condition, Light_Ast* body, Light_Ast** prologue, Light_Ast** epilogue);
+Light_Ast* ast_new_comm_break(Light_Scope* scope, Light_Token* break_keyword, Light_Ast* level);
+Light_Ast* ast_new_comm_continue(Light_Scope* scope, Light_Token* continue_keyword, Light_Ast* level);
+Light_Ast* ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_token);
+Light_Ast* ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue);
+
+// Expressions
+Light_Ast* ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token);
+Light_Ast* ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op);
+Light_Ast* ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op);
+
+// Utils
+bool literal_primitive_evaluate(Light_Ast* p);
 
 // -------------- --------- ----------------
 // --------------   Print   ----------------

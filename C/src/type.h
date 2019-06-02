@@ -7,11 +7,14 @@ void        type_tables_initialize();
 Light_Type* type_internalize(Light_Type* type);
 Light_Type* type_alias_by_name(Light_Token* name);
 Light_Type* type_primitive_from_token(Light_Token_Type token);
+Light_Type* type_from_token(Light_Token* t);
 Light_Type* type_primitive_get(Light_Type_Primitive t);
 
 u64         type_hash(Light_Type* type);
 
 // Create
+
+// type_new_pointer returns an internalized pointer type if the argument type is internalized
 Light_Type* type_new_pointer(Light_Type* pointer_to);
 Light_Type* type_new_alias(Light_Token* name, Light_Type* alias_to);
 Light_Type* type_new_array(Light_Ast* dimension, Light_Type* type);

@@ -294,6 +294,13 @@ type_primitive_from_token(Light_Token_Type token) {
     return 0;
 }
 
+// Could be a WEAK type
+Light_Type* 
+type_from_token(Light_Token* t) {
+    // TODO(psv): implement
+    return 0;
+}
+
 Light_Type* 
 type_alias_by_name(Light_Token* name) {
     Light_Type t = {0};

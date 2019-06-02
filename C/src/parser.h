@@ -25,7 +25,7 @@ Light_Type* parse_type(Light_Parser* parser, Light_Scope* scope, u32* error);
 Light_Ast* parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error);
 
 // Command
-Light_Ast* parse_command(Light_Parser* parser, Light_Scope* scope, u32* error);
+Light_Ast* parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require_semicolon);
 
 // Expression
 Light_Ast* parse_expression(Light_Parser* parser, Light_Scope* scope, u32* error);
