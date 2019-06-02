@@ -115,7 +115,7 @@ type_new_function(Light_Type** arguments_types, Light_Type* return_type, s32 arg
 }
 
 Light_Type* 
-type_new_enum(Light_Token** fields_names, Light_Ast** fields_values, s32 fields_count, Light_Type* type_hint) {
+type_new_enum(Light_Token** fields_names, Light_Ast** fields_values, s32 fields_count, Light_Type* type_hint, Light_Scope* scope) {
     Light_Type* result = type_alloc();
 
     result->kind = TYPE_KIND_ENUM;
@@ -125,6 +125,7 @@ type_new_enum(Light_Token** fields_names, Light_Ast** fields_values, s32 fields_
     result->enumerator.fields_values = fields_values;
     result->enumerator.fields_names = fields_names;
     result->enumerator.type_hint = type_hint;
+    result->enumerator.enum_scope = scope;
 
     if(type_hint) {
         if(type_hint->flags & TYPE_FLAG_WEAK) {
@@ -135,6 +136,38 @@ type_new_enum(Light_Token** fields_names, Light_Ast** fields_values, s32 fields_
         }
     }
     
+    return result;
+}
+
+Light_Type*
+type_new_struct(Light_Ast** fields, s32 fields_count, Light_Scope* struct_scope) {
+    Light_Type* result = type_alloc();
+
+    result->kind = TYPE_KIND_STRUCT;
+    result->size_bits = 0;
+    result->flags = 0;
+
+    result->struct_info.fields = fields;
+    result->struct_info.fields_count = fields_count;
+    result->struct_info.flags = 0;
+    result->struct_info.struct_scope = struct_scope;
+
+    return result;
+}
+
+Light_Type* 
+type_new_union(Light_Ast** fields, s32 fields_count, Light_Scope* union_scope) {
+    Light_Type* result = type_alloc();
+
+    result->kind = TYPE_KIND_UNION;
+    result->size_bits = 0;
+    result->flags = 0;
+
+    result->union_info.fields = fields;
+    result->union_info.fields_count = fields_count;
+    result->union_info.flags = 0;
+    result->union_info.union_scope = union_scope;
+
     return result;
 }
 
@@ -156,15 +189,17 @@ type_hash(Light_Type* type) {
             hash = struct_hash;
             if(type->struct_info.fields_count > 0) {
                 for(s32 i = 0; i < type->struct_info.fields_count; ++i) {
-                    hash = fnv_1_hash_combine(hash, type_hash(type->struct_info.fields_types[i]));
+                    Light_Ast* field_node = type->struct_info.fields[i];
+                    hash = fnv_1_hash_combine(hash, type_hash(field_node->decl_variable.type));
                 }
             }
             break;
 		case TYPE_KIND_UNION:
             hash = union_hash;
-            if(type->struct_info.fields_count > 0) {
-                for(s32 i = 0; i < type->struct_info.fields_count; ++i) {
-                    hash = fnv_1_hash_combine(hash, type_hash(type->struct_info.fields_types[i]));
+            if(type->union_info.fields_count > 0) {
+                for(s32 i = 0; i < type->union_info.fields_count; ++i) {
+                    Light_Ast* field_node = type->union_info.fields[i];
+                    hash = fnv_1_hash_combine(hash, type_hash(field_node->decl_variable.type));
                 }
             }
 			break;

@@ -8,9 +8,6 @@ typedef enum {
 	// Declarations
 	AST_DECL_PROCEDURE,
 	AST_DECL_VARIABLE,
-	AST_DECL_STRUCT,
-	AST_DECL_ENUM,
-	AST_DECL_UNION,
 	AST_DECL_CONSTANT,
 	AST_DECL_TYPEDEF,
 
@@ -107,7 +104,10 @@ typedef enum {
 
 typedef struct Light_Scope_t {
 	struct Light_Scope_t* parent;
-	struct Light_Ast_t*   creator_node;
+	union {
+		struct Light_Ast_t*   creator_node;
+		struct Light_Type_t*  creator_type;
+	};
 
 	uint32_t          flags;
 	int32_t           id;
@@ -250,8 +250,9 @@ struct Ast_Comm_Return {
 
 // Declarations
 typedef enum {
-    DECL_VARIABLE_FLAG_STRUCT_FIELD = (1 << 0),
-    DECL_VARIABLE_FLAG_EXPORTED     = (1 << 1),
+    DECL_VARIABLE_FLAG_EXPORTED     = (1 << 0),
+    DECL_VARIABLE_FLAG_STRUCT_FIELD = (1 << 1),
+	DECL_VARIABLE_FLAG_UNION_FIELD  = (1 << 2),
 } Light_Decl_Variable_Flags;
 
 typedef struct {
@@ -267,34 +268,6 @@ typedef struct {
 } Light_Ast_Decl_Variable;
 
 typedef enum {
-    DECL_STRUCT_FLAG_PACKED = (1 << 0),
-} Light_Decl_Struct_Flags;
-
-typedef struct {
-	Light_Token*          name;
-	struct Light_Ast_t**  fields;
-	struct Light_Type_t*  type_info;
-	Light_Scope*          struct_scope;
-
-	uint32_t flags;
-	int32_t  fields_count;
-	int32_t  alignment;
-	int32_t  size_bytes;
-} Light_Ast_Decl_Struct;
-
-typedef struct {
-	Light_Token*          name;
-	struct Light_Ast_t**  fields;
-	struct Light_Type_t*  type_info;
-	Light_Scope*          union_scope;
-
-	uint32_t flags;
-	int32_t  fields_count;
-	int32_t  alignment;
-	int32_t  size_bytes;
-} Light_Ast_Decl_Union;
-
-typedef enum {
     DECL_PROC_FLAG_FOREIGN = (1 << 0),
     DECL_PROC_FLAG_MAIN    = (1 << 1),
 } Light_Decl_Procedure_Flags;
@@ -302,7 +275,7 @@ typedef enum {
 typedef struct {
 	Light_Token*              name;
 	Light_Ast_Decl_Variable** arguments;       // Must be Light_Decl_Variable
-	struct Light_Ast*         body;			   // Must be a Light_Command_Block
+	struct Light_Ast_t*       body;			   // Must be a Light_Command_Block
 	struct Light_Type_t*      return_type;     // Type of the procedure return
 	struct Light_Type_t*      proc_type;       // Type of the procedure
 	Light_Scope*              arguments_scope;
@@ -315,21 +288,11 @@ typedef struct {
 
 typedef struct {
 	Light_Token*         name;
-	struct Light_Ast_t*  value_literal;
+	struct Light_Ast_t*  value;
 	struct Light_Type_t* type_info;
 
 	uint32_t flags;
 } Light_Ast_Decl_Constant;
-
-typedef struct {
-	Light_Token*          name;
-	Light_Ast_Decl_Constant** fields;
-	struct Light_Type*    type_hint;
-	Light_Scope*          enum_scope;
-
-	uint32_t flags;
-	int32_t  fields_count;
-} Light_Ast_Decl_Enum;
 
 typedef struct {
 	Light_Token*       name;
@@ -379,9 +342,6 @@ typedef struct Light_Ast_t {
 		// Declarations
         Light_Ast_Decl_Procedure decl_proc;
         Light_Ast_Decl_Variable  decl_variable;
-		Light_Ast_Decl_Struct    decl_struct;
-		Light_Ast_Decl_Union     decl_union;
-		Light_Ast_Decl_Enum      decl_enum;
 		Light_Ast_Decl_Constant  decl_constant;
 		Light_Ast_Decl_Typedef   decl_typedef;
 
@@ -450,25 +410,27 @@ typedef struct {
 	};
 } Light_Type_Array;
 
+typedef enum {
+    LIGHT_STRUCT_FLAG_PACKED = (1 << 0),
+} Light_Struct_Flags;
+
 typedef struct {
-	struct Light_Type_t** fields_types;
-    struct {
-        char**       fields_names;
-        int32_t*     fields_names_length;
-    };
-	int64_t*     offset_bits;
-	int32_t      fields_count;
-	int32_t      alignment_bytes;
+	Light_Ast**   fields;
+	Light_Scope*  struct_scope;
+	int64_t*      offset_bits;
+	uint32_t      flags;
+	int32_t       size_bits;
+	int32_t       fields_count;
+	int32_t       alignment_bytes;
 } Light_Type_Struct;
 
 typedef struct {
-	struct Light_Type_t** fields_types;
-    struct {
-        char**       fields_names;
-        int32_t*     fields_names_length;
-    };
-	int32_t      fields_count;
-	int32_t      alignment_bytes;
+	Light_Ast**   fields;
+	Light_Scope*  union_scope;
+	uint32_t      flags;
+	int32_t       size_bits;
+	int32_t       fields_count;
+	int32_t       alignment_bytes;
 } Light_Type_Union;
 
 typedef struct {
@@ -482,10 +444,12 @@ typedef struct {
 } Light_Type_Function;
 
 typedef struct {
-	Light_Token**        fields_names;
-	Light_Ast**          fields_values;
-	s32                  field_count;
-	struct Light_Type_t* type_hint;
+	struct Light_Type_t*  type_hint;
+	Light_Scope*          enum_scope;
+	Light_Token**         fields_names;
+	Light_Ast**           fields_values;
+	s32                   field_count;
+	uint32_t              flags;
 } Light_Type_Enum;
 
 typedef struct {
@@ -524,7 +488,22 @@ typedef struct Light_Type_t{
 Light_Scope* light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags);
 
 // Ast
-Light_Ast* ast_new_typedef(Light_Scope* scope, struct Light_Type_t* type, Light_Token* name);
+Light_Ast* ast_new_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name);
+Light_Ast* ast_new_decl_variable(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, Light_Storage_Class storage, u32 flags);
+Light_Ast* ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, u32 flags);
+Light_Ast* ast_new_decl_procedure(Light_Scope* scope, Light_Token* name, Light_Ast* body, Light_Type* return_type, Light_Scope* args_scope, Light_Ast_Decl_Variable** args, s32 args_count, u32 flags);
 
-s32 ast_print_node(Light_Ast* node);
-s32 ast_print_type(Light_Type* type);
+
+// -------------- --------- ----------------
+// --------------   Print   ----------------
+// -------------- --------- ----------------
+
+typedef enum {
+	LIGHT_AST_PRINT_STDOUT = (1 << 0),
+	LIGHT_AST_PRINT_STDERR = (1 << 1),
+	LIGHT_AST_PRINT_BUFFER = (1 << 2),
+} Light_Ast_Print_Flags;
+
+s32 ast_print_node(Light_Ast* node, u32 flags);
+s32 ast_print_type(Light_Type* type, u32 flags);
+s32 ast_print(Light_Ast** ast, u32 flags);

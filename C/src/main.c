@@ -48,13 +48,11 @@ int main(int argc, char** argv) {
 
     u32 parser_error = 0;
     Light_Parser parser = {0};
-    parser.lexer = &lexer;
-    //parse_top_level(&parser, &lexer, 0, &parser_error);
 
-    
-    Light_Type* type = parse_type(&parser, 0, &parser_error);
-    ast_print_type(type);
+    Light_Scope global_scope = {0};
+    Light_Ast** ast = parse_top_level(&parser, &lexer, &global_scope, &parser_error);
 
-    printf("\n");
+    ast_print(ast, LIGHT_AST_PRINT_STDOUT);
+
     return 0;
 }
