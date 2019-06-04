@@ -4,7 +4,6 @@
 
 String_Table global_identifiers_table = {0};
 String_Table global_imports_table = {0};
-Symbol_Table global_symbol_table = {0};
 Type_Table   global_type_table = {0};
 string*      global_imports_queue = 0;
 

@@ -114,7 +114,7 @@ typedef struct Light_Scope_t {
 	int32_t           level;
 	int32_t           decl_count;
 
-	//Symbol_Table  symb_table;
+	struct Symbol_Table_t*      symb_table;
 
     // Necessary data for code generation
 	int32_t           stack_allocation_offset;
@@ -325,16 +325,18 @@ typedef struct {
 } Light_Ast_Directive_Import;
 
 typedef enum {
-    AST_FLAG_EXPRESSION  = (1 << 0),
-    AST_FLAG_COMMAND     = (1 << 1),
-    AST_FLAG_DECLARATION = (1 << 2),
-	AST_FLAG_DIRECTIVE   = (1 << 3),
+    AST_FLAG_EXPRESSION   = (1 << 0),
+    AST_FLAG_COMMAND      = (1 << 1),
+    AST_FLAG_DECLARATION  = (1 << 2),
+	AST_FLAG_DIRECTIVE    = (1 << 3),
+	AST_FLAG_INFER_QUEUED = (1 << 4),
 } Light_Ast_Flags;
 
 typedef struct Light_Ast_t {
     Light_Ast_Type kind;
 
     int32_t  id;
+	int32_t  infer_queue_index;
     uint32_t flags;
 
     struct Light_Type_t* type;
@@ -419,7 +421,7 @@ typedef enum {
 } Light_Struct_Flags;
 
 typedef struct {
-	Light_Ast**   fields;
+	Light_Ast**   fields;			// Must be AST_DECL_VARIABLE
 	Light_Scope*  struct_scope;
 	int64_t*      offset_bits;
 	uint32_t      flags;
@@ -528,6 +530,7 @@ typedef enum {
 	LIGHT_AST_PRINT_STDOUT = (1 << 0),
 	LIGHT_AST_PRINT_STDERR = (1 << 1),
 	LIGHT_AST_PRINT_BUFFER = (1 << 2),
+	LIGHT_AST_PRINT_EXPR_TYPES = (1 << 3),
 } Light_Ast_Print_Flags;
 
 s32 ast_print_node(Light_Ast* node, u32 flags);

@@ -469,6 +469,14 @@ ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_tok
 
 
 // Print
+const char* ColorReset   = "\x1B[0m";
+const char* ColorRed     = "\x1B[31m";
+const char* ColorGreen   = "\x1B[32m";
+const char* ColorYellow  = "\x1B[33m";
+const char* ColorBlue    = "\x1B[34m";
+const char* ColorMagenta = "\x1B[35m";
+const char* ColorCyan    = "\x1B[36m";
+const char* ColorWhite   = "\x1B[37m";
 #define TOKEN_STR(T) (T)->length, (T)->data
 
 static FILE* ast_file_from_flags(u32 flags) {
@@ -610,6 +618,11 @@ ast_print_expression(Light_Ast* expr, u32 flags) {
     s32 length = 0;
 
     //length += fprintf(out, "(");
+    if(flags & LIGHT_AST_PRINT_EXPR_TYPES) {
+        length += fprintf(out, "<");
+        length += ast_print_type(expr->type, flags);
+        length += fprintf(out, ">");
+    }
 
     switch(expr->kind) {
         case AST_EXPRESSION_BINARY:
@@ -752,10 +765,24 @@ ast_print_node(Light_Ast* node, u32 flags) {
     return length;
 }
 
+
 s32 
 ast_print_type(Light_Type* type, u32 flags) {
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
+
+    if(!type) {
+        return 0;
+    }
+
+    const char* color = 0;
+    if(type->flags & TYPE_FLAG_INTERNALIZED) {
+        fprintf(out, "%s", ColorGreen);
+        color = ColorGreen;
+    } else {
+        fprintf(out, "%s", ColorRed);
+        color = ColorRed;
+    }
 
     if(!type) return 0;
     switch(type->kind) {
@@ -793,7 +820,7 @@ ast_print_type(Light_Type* type, u32 flags) {
                 if(i != 0) length += fprintf(out, ", ");
                 length += ast_print_type(type->function.arguments_type[i], flags);
             }
-            length += fprintf(out, ") -> ");
+            length += fprintf(out, "%s) -> ", color);
             length += ast_print_type(type->function.return_type, flags);
         } break;
         case TYPE_KIND_STRUCT:{
@@ -801,32 +828,34 @@ ast_print_type(Light_Type* type, u32 flags) {
             for(s32 i = 0; i < type->struct_info.fields_count; ++i) {
                 Light_Ast* field = type->struct_info.fields[i];
                 length += ast_print_node(field, flags);
-                length += fprintf(out, "; ");
+                length += fprintf(out, "%s; ", color);
             }
-            length += fprintf(out, "}");
+            length += fprintf(out, "%s}", color);
         } break;
         case TYPE_KIND_UNION: {
             length += fprintf(out, "union { ");
             for(s32 i = 0; i < type->union_info.fields_count; ++i) {
                 Light_Ast* field = type->union_info.fields[i];
                 length += ast_print_node(field, flags);
-                length += fprintf(out, "; ");
+                length += fprintf(out, "%s; ", color);
             }
-            length += fprintf(out, "}");
+            length += fprintf(out, "%s}", color);
         } break;
         case TYPE_KIND_ENUM: {
             length += fprintf(out, "enum ");
             length += ast_print_type(type->enumerator.type_hint, flags);
             length += fprintf(out, "{ ");
             for(s32 i = 0; i < type->enumerator.field_count; ++i) {
-                if(i != 0) length += fprintf(out, ", ");
+                if(i != 0) length += fprintf(out, "%s, ", color);
                 length += fprintf(out, "%.*s", type->enumerator.fields_names[i]->length, type->enumerator.fields_names[i]->data);
             }
-            length += fprintf(out, " }");
+            length += fprintf(out, "%s }", color);
         } break;
         case TYPE_KIND_NONE:
         default: length += fprintf(out, "<unknown type>"); break;
     }
+
+    fprintf(out, "%s", ColorReset);
 }
 
 s32
@@ -835,7 +864,16 @@ ast_print(Light_Ast** ast, u32 flags) {
     s32 length = 0;
     for(u64 i = 0; i < array_length(ast); ++i) {
         length += ast_print_node(ast[i], flags);
+        switch(ast[i]->kind) {
+            case AST_DECL_CONSTANT:     length += fprintf(out, ";"); break;
+            case AST_DECL_VARIABLE:     length += fprintf(out, ";"); break;
+            case AST_DECL_PROCEDURE:
+            case AST_DECL_TYPEDEF:
+            break;
+            default: break;
+        }
+        length += fprintf(out, "\n");
     }
-    fprintf(out, "\n");
+    length += fprintf(out, "\n");
     return length;
 }

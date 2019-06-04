@@ -15,6 +15,25 @@ type_alloc() {
     return arena_alloc(global_type_arena, sizeof(Light_Type));
 }
 
+bool type_primitive_sint(Light_Type* t) {
+    return (t->kind >= TYPE_PRIMITIVE_S8 && t->kind <= TYPE_PRIMITIVE_S64);
+}
+bool type_primitive_uint(Light_Type* t) {
+    return (t->kind >= TYPE_PRIMITIVE_U8 && t->kind <= TYPE_PRIMITIVE_U64);
+}
+bool type_primitive_int(Light_Type* t) {
+    return (t->kind >= TYPE_PRIMITIVE_S8 && t->kind <= TYPE_PRIMITIVE_U64);
+}
+bool type_primitive_float(Light_Type* t) {
+    return (t->kind == TYPE_PRIMITIVE_R32 || t->kind == TYPE_PRIMITIVE_R64);
+}
+bool type_primitive_numeric(Light_Type* t) {
+    return (type_primitive_int(t) || type_primitive_float(t));
+}
+bool type_primitive_bool(Light_Type* t) {
+    return t == type_primitive_get(TYPE_PRIMITIVE_BOOL);
+}
+
 static Light_Type*
 type_new_primitive(Light_Type_Primitive p) {
     Light_Type* result = type_alloc();
@@ -264,8 +283,10 @@ Light_Type*
 type_internalize(Light_Type* type) {
     s32 index = 0;
     type_table_add(&global_type_table, type, &index);
+    // Works even if the type already exist in the table.
     Light_Type* internalized = type_table_get(&global_type_table, index);
     internalized->flags |= TYPE_FLAG_INTERNALIZED;
+    internalized->flags &= ~(TYPE_FLAG_WEAK);
     return internalized;
 }
 
@@ -292,6 +313,24 @@ type_primitive_from_token(Light_Token_Type token) {
         default: assert(0); break;
     }
     return 0;
+}
+
+Light_Type* 
+type_weak_primitive_from_literal(Light_Literal_Type literal) {
+    Light_Type* type = type_alloc();
+    type->kind = TYPE_KIND_PRIMITIVE;
+    type->flags = TYPE_FLAG_WEAK;
+    
+    switch(literal) {
+        case LITERAL_CHAR:          type->primitive = TYPE_PRIMITIVE_U32; break;
+        case LITERAL_FLOAT:         type->primitive = TYPE_PRIMITIVE_R32; break;
+        case LITERAL_DEC_SINT:      type->primitive = TYPE_PRIMITIVE_S32; break;
+        case LITERAL_BIN_INT:       type->primitive = TYPE_PRIMITIVE_U32; break;
+        case LITERAL_HEX_INT:       type->primitive = TYPE_PRIMITIVE_U32; break;
+        case LITERAL_DEC_UINT:      type->primitive = TYPE_PRIMITIVE_S32; break;
+        default: assert(0); break;
+    }
+    return type;
 }
 
 // Could be a WEAK type

@@ -118,6 +118,7 @@ typedef struct {
     u8*              data;
     s32              length;
     u32              flags;
+	char*            filepath;
 } Light_Token;
 
 typedef enum {
@@ -137,6 +138,20 @@ typedef struct {
     String_Table  keyword_table;
     bool          keyword_table_initialized;
 } Light_Lexer;
+
+typedef enum {
+	LIGHT_SPECIAL_IDENT_MAIN,
+	LIGHT_SPECIAL_IDENT_FOREIGN,
+	LIGHT_SPECIAL_IDENT_ASSERT,
+	LIGHT_SPECIAL_IDENT_STRING,
+	LIGHT_SPECIAL_IDENT_IMPORT,
+	LIGHT_SPECIAL_IDENT_SIZEOF,
+	LIGHT_SPECIAL_IDENT_TYPEOF,
+	LIGHT_SPECIAL_IDENT_END,
+	LIGHT_SPECIAL_IDENT_RUN,
+
+	LIGHT_SPECIAL_IDENT_COUNT,
+} Light_Special_Identifiers;
 
 Light_Token* lexer_file(Light_Lexer* lexer, const char* filename, u32 flags);
 Light_Token* lexer_cstr(Light_Lexer* lexer, char* str, s32 length, u32 flags);

@@ -1,7 +1,7 @@
-main :: () -> s32 {
-    //a := 1 + 2 + a.b[2].c;
-    //b := ~a.b;
-    //a := a.b[2].c;
-    //c := ~b[2];
-    _ := foo();
-}
+//foo -> struct { b: bar; c : tar; }
+
+//bar -> struct { a : s32; }
+
+//tar -> struct { b : bar; }
+//tar -> struct { b : s32; }
+tar -> struct { b : s32 = 0; }

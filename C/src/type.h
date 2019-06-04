@@ -7,8 +7,15 @@ void        type_tables_initialize();
 Light_Type* type_internalize(Light_Type* type);
 Light_Type* type_alias_by_name(Light_Token* name);
 Light_Type* type_primitive_from_token(Light_Token_Type token);
+Light_Type* type_weak_primitive_from_literal(Light_Literal_Type literal);
 Light_Type* type_from_token(Light_Token* t);
 Light_Type* type_primitive_get(Light_Type_Primitive t);
+bool        type_primitive_sint(Light_Type* t);
+bool        type_primitive_uint(Light_Type* t);
+bool        type_primitive_int(Light_Type* t);
+bool        type_primitive_float(Light_Type* t);
+bool        type_primitive_numeric(Light_Type* t);
+bool        type_primitive_bool(Light_Type* t);
 
 u64         type_hash(Light_Type* type);
 

@@ -16,7 +16,7 @@ parser_error_location(Light_Parser* parser, Light_Token* t) {
     if(!t) {
         return fprintf(stderr, "%s: ", parser->lexer->filepath);
     } else {
-        return fprintf(stderr, "%s:%d:%d: ", parser->lexer->filepath, t->line, t->column);
+        return fprintf(stderr, "%s:%d:%d: ", parser->lexer->filepath, t->line + 1, t->column + 1);
     }
 }
 
@@ -441,6 +441,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 
 static Light_Ast*
 parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, Light_Scope* scope, u32* error) {
+    Light_Token* name_in = name;
     Light_Lexer* lexer = parser->lexer;
     if(!name) {
         name = lexer_next(lexer);
@@ -450,7 +451,7 @@ parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, L
         }
     }
 
-    if(!type && !name) {
+    if(!type && !name_in) {
         *error |= parser_require_and_eat(parser, ':');
         ReturnIfError();
         
@@ -472,6 +473,7 @@ parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, L
 
 static Light_Ast*
 parse_decl_constant(Light_Parser* parser, Light_Token* name, Light_Type* type, Light_Scope* scope, u32* error) {
+    Light_Token* name_in = name;
     Light_Lexer* lexer = parser->lexer;
     if(!name) {
         name = lexer_next(lexer);
@@ -481,7 +483,7 @@ parse_decl_constant(Light_Parser* parser, Light_Token* name, Light_Type* type, L
         }
     }
 
-    if(!type) {
+    if(!type && !name_in) {
         *error |= parser_require_and_eat(parser, ':');
         ReturnIfError();
         
@@ -567,6 +569,7 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
                     result = parse_decl_procedure(parser, name, scope, error);
                 } else {
                     // constant declaration
+                    lexer_rewind(lexer, 1);
                     result = parse_decl_constant(parser, name, 0, scope, error);
                 }
             } else {
@@ -579,6 +582,7 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
 
                 Light_Token* n = lexer_peek(lexer);
                 switch(n->type) {
+                    case ';':
                     case '=':
                         result = parse_decl_variable(parser, name, type, scope, error);
                         break;

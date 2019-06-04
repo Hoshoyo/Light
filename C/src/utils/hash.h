@@ -6,7 +6,7 @@ typedef struct { \
     TYPE data; \
 } UNAME##_Table_Entry; \
 \
-typedef struct { \
+typedef struct UNAME##_Table_t { \
     int                  entries_count; \
 	int                  entries_capacity; \
 	int                  hash_collision_count; \

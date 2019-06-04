@@ -493,7 +493,7 @@ Type_Error type_propagate(Type_Instance* strong, Ast* expr) {
 	if(!expr->type_return) {
 		// @TODO see what to do here
 		// @IMPORTANT
-		// This type can be null?
+		// Can this type be null?
 		return error_code;
 	}
 	if (expr->type_return->flags & TYPE_FLAG_STRONG)

@@ -4,6 +4,7 @@
 #include "parser.h"
 #include "utils/os.h"
 #include "global_tables.h"
+#include "top_typecheck.h"
 #include <light_array.h>
 
 int main(int argc, char** argv) {
@@ -15,6 +16,7 @@ int main(int argc, char** argv) {
     }
 
     Light_Lexer lexer = {0};
+    //Light_Token* tokens = lexer_file(&lexer, argv[1], LIGHT_LEXER_PRINT_TOKENS);
     Light_Token* tokens = lexer_file(&lexer, argv[1], 0);
 
     u32 parser_error = 0;
@@ -26,7 +28,13 @@ int main(int argc, char** argv) {
     if(parser_error & PARSER_ERROR_FATAL)
         return 1;
 
-    ast_print(ast, LIGHT_AST_PRINT_STDOUT);
+    
+    Light_Type_Check_Error type_error = top_typecheck(ast, &global_scope);
+    if(type_error & TYPE_ERROR) {
+        return 1;
+    }
+
+    ast_print(ast, LIGHT_AST_PRINT_STDOUT|LIGHT_AST_PRINT_EXPR_TYPES);
 
     return 0;
 }

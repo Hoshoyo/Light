@@ -6,11 +6,33 @@
 #include <string.h>
 #include <light_array.h>
 
+string light_special_idents_table[LIGHT_SPECIAL_IDENT_COUNT] = {0};
+
 static void
 initialize_global_identifiers_table() {
     if(global_identifiers_table.entries_capacity == 0) {
         string_table_new(&global_identifiers_table, 1024 * 1024);
     }
+
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_MAIN]    = MAKE_STR_LEN("main", sizeof("main") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_FOREIGN] = MAKE_STR_LEN("foreign", sizeof("foreign") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_ASSERT]  = MAKE_STR_LEN("assert", sizeof("assert") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_STRING]  = MAKE_STR_LEN("string", sizeof("") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_IMPORT]  = MAKE_STR_LEN("import", sizeof("import") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_SIZEOF]  = MAKE_STR_LEN("sizeof", sizeof("sizeof") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF]  = MAKE_STR_LEN("typeof", sizeof("typeof") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_END]     = MAKE_STR_LEN("end", sizeof("end") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_RUN]     = MAKE_STR_LEN("run", sizeof("run") - 1);
+
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_MAIN], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_FOREIGN], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_ASSERT], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_STRING], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_IMPORT], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_SIZEOF], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_END], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_RUN], 0);
 }
 
 static bool
@@ -58,6 +80,8 @@ token_number(u8* at, s32 line, s32 column) {
             }
             while(is_number(*at)) ++at;
         }
+        r.type = TOKEN_LITERAL_FLOAT;
+        r.flags |= TOKEN_FLAG_LITERAL;
     } else {
         bool uns = false;
         s32 long_count = 0;
@@ -466,6 +490,7 @@ token_next(Light_Lexer* lexer) {
 		} break;
 	}
 
+    r.filepath = lexer->filepath;
 	lexer->stream += r.length;
 	lexer->column += r.length;
 	return r;
@@ -523,6 +548,8 @@ lexer_eat_whitespace(Light_Lexer* lexer) {
 					lexer->index++;
 				}
                 lexer->line++;
+                if(lexer->index == '\n')
+                    lexer->index++;
                 lexer->column = 0;
             } else if(c == '/' && lexer->stream[lexer->index + 1] == '*') {
                 // multi line comment
