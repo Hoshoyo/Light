@@ -201,15 +201,18 @@ type_hash(Light_Type* type) {
 	if(!type) return 0;
 	switch (type->kind) {
 		case TYPE_KIND_PRIMITIVE:
-			hash = type_primitive_hash(type->primitive); break;
+			hash = type_primitive_hash(type->primitive); 
+            break;
 		case TYPE_KIND_POINTER:
-			hash = fnv_1_hash_combine(type_hash(type->pointer_to), pointer_hash); break;
+			hash = fnv_1_hash_combine(type_hash(type->pointer_to), pointer_hash); 
+            break;
 		case TYPE_KIND_STRUCT:
             hash = struct_hash;
             if(type->struct_info.fields_count > 0) {
                 for(s32 i = 0; i < type->struct_info.fields_count; ++i) {
                     Light_Ast* field_node = type->struct_info.fields[i];
-                    hash = fnv_1_hash_combine(hash, type_hash(field_node->decl_variable.type));
+                    u64 rhash = type_hash(field_node->decl_variable.type);
+                    hash = fnv_1_hash_combine(hash, rhash);
                 }
             }
             break;

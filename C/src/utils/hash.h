@@ -20,7 +20,7 @@ int LNAME##_table_entry_exist(UNAME##_Table* table, TYPE v, int* out_index, unsi
 int LNAME##_table_del(UNAME##_Table* table, TYPE v); \
 TYPE LNAME##_table_get(UNAME##_Table* table, int index);
 
-#define GENERATE_HASH_TABLE_IMPLEMENTATION(UNAME, LNAME, TYPE, HASHFUNC, ALLOCATOR, FREE) \
+#define GENERATE_HASH_TABLE_IMPLEMENTATION(UNAME, LNAME, TYPE, HASHFUNC, ALLOCATOR, FREE, EQUALITY) \
 void LNAME##_table_new(UNAME##_Table* table, int capacity) { \
     table->entries = (UNAME##_Table_Entry*)ALLOCATOR(capacity * sizeof(UNAME##_Table_Entry)); \
     table->entries_capacity = capacity; \
@@ -41,7 +41,7 @@ int LNAME##_table_add(UNAME##_Table* table, TYPE v, int* out_index) { \
 	int index = (int)(hash % table->entries_capacity); \
 \
 	while (table->entries[index].flags & (1 << 0)) { \
-		if (table->entries[index].hash == hash) { \
+		if (table->entries[index].hash == hash && (EQUALITY(table->entries[index].data, v))) { \
             if(out_index) *out_index = index; \
 			return 0; \
 		} \
@@ -63,7 +63,7 @@ int LNAME##_table_entry_exist(UNAME##_Table* table, TYPE v, int* out_index, unsi
 	int index = (int)(hash % table->entries_capacity); \
 \
 	while (table->entries[index].flags & (1 << 0)) { \
-		if (table->entries[index].hash == hash) { \
+		if (table->entries[index].hash == hash && (EQUALITY(table->entries[index].data, v))) { \
             if(out_index) { \
                 *out_index = index; \
             } \

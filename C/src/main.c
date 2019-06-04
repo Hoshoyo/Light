@@ -33,8 +33,8 @@ int main(int argc, char** argv) {
     if(type_error & TYPE_ERROR) {
         return 1;
     }
-
     ast_print(ast, LIGHT_AST_PRINT_STDOUT|LIGHT_AST_PRINT_EXPR_TYPES);
+
     type_table_print();
 
     return 0;

@@ -2,6 +2,10 @@
 //bar : s32;
 //car := *&foo;
 
+foo -> struct {
+    a : struct {b : s32; };
+}
+
 //foo -> struct { b: bar; c : tar; }
 //bar -> struct { a : s32; }
 //tar -> struct { b : bar; }
