@@ -862,6 +862,9 @@ s32
 ast_print(Light_Ast** ast, u32 flags) {
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
+
+    if(!ast) return length;
+
     for(u64 i = 0; i < array_length(ast); ++i) {
         length += ast_print_node(ast[i], flags);
         switch(ast[i]->kind) {

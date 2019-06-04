@@ -350,7 +350,7 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 			} else {
 				command = parse_comm_assignment(parser, scope, error);
 			}
-            if(require_semicolon) {
+            if(require_semicolon && command->kind != AST_DECL_PROCEDURE && command->kind != AST_DECL_TYPEDEF) {
                 *error |= parser_require_and_eat(parser, ';');
                 ReturnIfError();
             }

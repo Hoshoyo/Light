@@ -9,7 +9,8 @@
 
 #define TOKEN_STR(T) (T)->length, (T)->data
 
-void typecheck_information_pass(Light_Ast* node, u32 flags, u32* error);
+void typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* error);
+void typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error);
 
 static bool
 typecheck_push_to_infer_queue(Light_Ast* node) {
@@ -78,6 +79,8 @@ Light_Type_Check_Error
 top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
     Light_Type_Check_Error error = TYPE_OK;
 
+    if(!top_level) return error;
+
     global_scope->symb_table = light_alloc(sizeof(Symbol_Table));
     symbol_table_new((Symbol_Table*)global_scope->symb_table, (global_scope->decl_count + 4) * 8);
 
@@ -106,7 +109,7 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
     // All symbols are loaded, perform normal typecheck
     for(u64 i = 0; i < array_length(top_level); ++i) {
         Light_Ast* node = top_level[i];
-        typecheck_information_pass(node, 0, &error);
+        typecheck_information_pass_decl(node, 0, &error);
     }
     if(error & TYPE_ERROR)
         return error;
@@ -117,7 +120,7 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
     while(starting_length > 0) {
         for(u64 i = 0; i < array_length(global_infer_queue); ++i) {
             Light_Ast* node = global_infer_queue[i];
-            typecheck_information_pass(node, 0, &error);
+            typecheck_information_pass_decl(node, 0, &error);
         }
 
         if(error & TYPE_ERROR)
@@ -136,17 +139,24 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
 static Light_Ast*
 type_decl_from_alias(Light_Scope* scope, Light_Type* alias, u32* error) {
     Light_Symbol s = {0};
-    while(scope){
-        s.token =  alias->alias.name;
+    s.token =  alias->alias.name;
 
+    while(scope){
+
+        if(!scope->symb_table) {
+            scope = scope->parent;
+            continue;
+        }
+        
         s32 index = 0;
         if(symbol_table_entry_exist((Symbol_Table*)scope->symb_table, s, &index, 0)) {
             s = symbol_table_get((Symbol_Table*)scope->symb_table, index);
-        } else {
-            *error |= TYPE_ERROR;
+            break;
         }
         scope = scope->parent;
     }
+    if(!s.decl)
+        *error |= TYPE_ERROR;
     return s.decl;
 }
 
@@ -255,7 +265,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
 }
 
 void
-typecheck_information_pass(Light_Ast* node, u32 flags, u32* error) {
+typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* error) {
     Light_Scope* scope = node->scope_at;
 
     switch(node->kind) {
@@ -343,6 +353,10 @@ typecheck_information_pass(Light_Ast* node, u32 flags, u32* error) {
         case AST_DECL_PROCEDURE: {
             node->decl_proc.proc_type = typecheck_resolve_type(scope, node->decl_proc.proc_type, flags, error);
             if(*error & TYPE_ERROR) return;
+            if(node->decl_proc.body) {
+                typecheck_information_pass_command(node->decl_proc.body, flags, error);
+                if(*error & TYPE_ERROR) return;
+            }
             if(!(node->decl_proc.proc_type->flags & TYPE_FLAG_INTERNALIZED)) {
                 typecheck_push_to_infer_queue(node);
             } else {
@@ -360,6 +374,29 @@ typecheck_information_pass(Light_Ast* node, u32 flags, u32* error) {
                 typecheck_push_to_infer_queue(node);
             }
         } break;
-        default: break;
+        default: typecheck_information_pass_command(node, flags, error); break;
     }
+}
+
+void
+typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
+    Light_Scope* scope = node->scope_at;
+
+    switch(node->kind) {
+        case AST_COMMAND_BLOCK: {
+            for(s32 i = 0; i < node->comm_block.command_count; ++i) {
+                typecheck_information_pass_decl(node->comm_block.commands[i], flags, error);
+            }
+        } break;
+        case AST_COMMAND_ASSIGNMENT:
+        case AST_COMMAND_BREAK:
+        case AST_COMMAND_CONTINUE:
+        case AST_COMMAND_FOR:
+        case AST_COMMAND_IF:
+        case AST_COMMAND_RETURN:
+        case AST_COMMAND_WHILE:
+            break;
+        default: assert(0); break;
+    }
+
 }

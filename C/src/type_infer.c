@@ -18,6 +18,13 @@ type_infer_error_location(Light_Token* t) {
     return 0;
 }
 
+static s32
+type_infer_error_undeclared_identifier(Light_Token* t) {
+    s32 length = 0;
+    length += type_infer_error_location(t);
+    fprintf(stderr, "Type Error: undeclared identifier '%.*s'\n", TOKEN_STR(t));
+}
+
 Light_Type_Check_Error
 type_infer_type_mismatch_error(Light_Token* location, Light_Type* left, Light_Type* right) {
     type_infer_error_location(location);
@@ -32,15 +39,18 @@ type_infer_type_mismatch_error(Light_Token* location, Light_Type* left, Light_Ty
 static Light_Ast*
 decl_from_name(Light_Scope* scope, Light_Token* name) {
     Light_Symbol s = {0};
+    s.token = name;
 
     while(scope) {
-        s.token = name;
+
+        if(!scope->symb_table){
+            scope = scope->parent;
+            continue;
+        }
 
         s32 index = 0;
         if(symbol_table_entry_exist((Symbol_Table*)scope->symb_table, s, &index, 0)) {
             s = symbol_table_get((Symbol_Table*)scope->symb_table, index);
-        } else {
-            return 0;
         }
         scope = scope->parent;
     }
@@ -234,6 +244,8 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
     assert(expr->kind == AST_EXPRESSION_VARIABLE);
     Light_Ast* decl = decl_from_name(expr->scope_at, expr->expr_variable.name);
     if(!decl) {
+        type_infer_error_undeclared_identifier(expr->expr_variable.name);
+        *error |= TYPE_ERROR;
         return 0;
     }
 

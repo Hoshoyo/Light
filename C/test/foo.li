@@ -1,10 +1,24 @@
+foo -> struct {
+    b : s32;
+}
+v : foo;
+a := v.b;
+
+
 //foo : struct {a : s32; };
 //bar : s32;
 //car := *&foo;
 
-foo -> struct {
-    a : struct {b : s32; };
+/*
+main :: () -> s32 {
+    foo :: () -> bar {
+
+    }
+    return 0;
 }
+
+bar -> struct { a : s32; }
+*/
 
 //foo -> struct { b: bar; c : tar; }
 //bar -> struct { a : s32; }

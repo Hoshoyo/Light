@@ -6,8 +6,7 @@ u64 symbol_hash(Light_Symbol s) {
 }
 
 int symbol_equal(Light_Symbol s1, Light_Symbol s2) {
-    // TODO(psv):
-    return 0;
+    return s1.token->data == s2.token->data;
 }
 
 GENERATE_HASH_TABLE_IMPLEMENTATION(Symbol, symbol, Light_Symbol, symbol_hash, light_alloc, light_free, symbol_equal)
