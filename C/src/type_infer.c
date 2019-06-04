@@ -32,13 +32,17 @@ type_infer_type_mismatch_error(Light_Token* location, Light_Type* left, Light_Ty
 static Light_Ast*
 decl_from_name(Light_Scope* scope, Light_Token* name) {
     Light_Symbol s = {0};
-    s.token = name;
 
-    s32 index = 0;
-    if(symbol_table_entry_exist((Symbol_Table*)scope->symb_table, s, &index, 0)) {
-        s = symbol_table_get((Symbol_Table*)scope->symb_table, index);
-    } else {
-        return 0;
+    while(scope) {
+        s.token = name;
+
+        s32 index = 0;
+        if(symbol_table_entry_exist((Symbol_Table*)scope->symb_table, s, &index, 0)) {
+            s = symbol_table_get((Symbol_Table*)scope->symb_table, index);
+        } else {
+            return 0;
+        }
+        scope = scope->parent;
     }
     return s.decl;
 }

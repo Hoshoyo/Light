@@ -111,6 +111,8 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
     if(error & TYPE_ERROR)
         return error;
 
+    // Try to resolve everything in the infer table while
+    // the table is shrinking
     u64 starting_length = array_length(global_infer_queue);
     while(starting_length > 0) {
         for(u64 i = 0; i < array_length(global_infer_queue); ++i) {
@@ -134,13 +136,16 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
 static Light_Ast*
 type_decl_from_alias(Light_Scope* scope, Light_Type* alias, u32* error) {
     Light_Symbol s = {0};
-    s.token =  alias->alias.name;
+    while(scope){
+        s.token =  alias->alias.name;
 
-    s32 index = 0;
-    if(symbol_table_entry_exist((Symbol_Table*)scope->symb_table, s, &index, 0)) {
-        s = symbol_table_get((Symbol_Table*)scope->symb_table, index);
-    } else {
-        *error |= TYPE_ERROR;
+        s32 index = 0;
+        if(symbol_table_entry_exist((Symbol_Table*)scope->symb_table, s, &index, 0)) {
+            s = symbol_table_get((Symbol_Table*)scope->symb_table, index);
+        } else {
+            *error |= TYPE_ERROR;
+        }
+        scope = scope->parent;
     }
     return s.decl;
 }
@@ -256,8 +261,12 @@ typecheck_information_pass(Light_Ast* node, u32 flags, u32* error) {
     switch(node->kind) {
         case AST_DECL_CONSTANT:{
             // Infer the type of expression
-            type_infer_expression(node->decl_constant.value, error);
+            Light_Type* inferred = type_infer_expression(node->decl_constant.value, error);
             if(*error & TYPE_ERROR) return;
+             if(!inferred) {
+                typecheck_push_to_infer_queue(node);
+                return;
+            }
 
             if(node->decl_constant.type_info && !(node->decl_constant.type_info->flags & TYPE_FLAG_INTERNALIZED)) {
                 node->decl_constant.type_info = typecheck_resolve_type(scope, node->decl_constant.type_info, flags, error);
@@ -292,9 +301,14 @@ typecheck_information_pass(Light_Ast* node, u32 flags, u32* error) {
         } break;
         case AST_DECL_VARIABLE: {
             // Infer the type of expression
-            if(node->decl_variable.assignment)
-                type_infer_expression(node->decl_variable.assignment, error);
-            if(*error & TYPE_ERROR) return;
+            if(node->decl_variable.assignment){
+                Light_Type* inferred = type_infer_expression(node->decl_variable.assignment, error);
+                if(*error & TYPE_ERROR) return;
+                if(!inferred) {
+                    typecheck_push_to_infer_queue(node);
+                    return;
+                }
+            }
             
             if(node->decl_variable.type && !(node->decl_variable.type->flags & TYPE_FLAG_INTERNALIZED)) {
                 node->decl_variable.type = typecheck_resolve_type(scope, node->decl_variable.type, flags, error);

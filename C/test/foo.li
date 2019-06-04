@@ -1,14 +1,9 @@
 //foo : struct {a : s32; };
 //bar : s32;
 //car := *&foo;
-foo :: (a : s32) -> bar {
-
-}
-
-bar -> struct  { a : ^s32; }
 
 //foo -> struct { b: bar; c : tar; }
 //bar -> struct { a : s32; }
 //tar -> struct { b : bar; }
 //tar -> struct { b : s32; }
-//tar -> struct { b : s32 = 0; }
+//tar -> struct { b : s32 = 0; 
