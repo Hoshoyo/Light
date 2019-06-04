@@ -1,3 +1,4 @@
+#define HASH_TABLE_OCCUPIED (1 << 0)
 
 #define GENERATE_HASH_TABLE(UNAME, LNAME, TYPE) \
 typedef struct { \

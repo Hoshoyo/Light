@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 void        type_tables_initialize();
+void        type_table_print();
 Light_Type* type_internalize(Light_Type* type);
 Light_Type* type_alias_by_name(Light_Token* name);
 Light_Type* type_primitive_from_token(Light_Token_Type token);

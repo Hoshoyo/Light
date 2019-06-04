@@ -353,3 +353,16 @@ type_alias_by_name(Light_Token* name) {
     }
     return 0;
 }
+
+#include <stdio.h>
+void
+type_table_print() {
+    FILE* out = stdout;
+    for(int i = 0; i < global_type_table.entries_capacity; ++i) {
+        Type_Table_Entry* entry = &global_type_table.entries[i];
+        if(entry->flags & HASH_TABLE_OCCUPIED){
+            ast_print_type(entry->data, LIGHT_AST_PRINT_STDOUT);
+            fprintf(out, "\n");
+        }
+    }
+}

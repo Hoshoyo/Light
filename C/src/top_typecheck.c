@@ -193,6 +193,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
             for(s32 i = 0; i < type->union_info.fields_count; ++i) {
                 Light_Ast* field = type->union_info.fields[i];
                 Light_Type* field_type = typecheck_resolve_type(scope, field->decl_variable.type, flags, error);
+                field->decl_variable.type = field_type;
                 if(field_type && !(field_type->flags & TYPE_FLAG_INTERNALIZED)) {
                     all_fields_internalized = false;
                 }
@@ -210,7 +211,8 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                     all_fields_internalized = false;
                 }
             }
-            if(all_fields_internalized) {
+            type->function.return_type = typecheck_resolve_type(scope, type->function.return_type, flags, error);
+            if(all_fields_internalized && type->function.return_type->flags & TYPE_FLAG_INTERNALIZED) {
                 type = type_internalize(type);
             }
         } break;
@@ -227,6 +229,12 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 Light_Ast* decl = type_decl_from_alias(scope, type, error);
                 if(*error & TYPE_ERROR) {
                     typecheck_error_undeclared_identifier(type->alias.name);
+                    return type;
+                }
+                if(decl->kind != AST_DECL_TYPEDEF) {
+                    *error |= TYPE_ERROR;
+                    typecheck_error_location(type->alias.name);
+                    fprintf(stderr, "Type Error: invalid type name '%.*s'\n", TOKEN_STR(type->alias.name));
                     return type;
                 }
                 type->alias.alias_to = decl->decl_typedef.type_referenced;
@@ -249,9 +257,11 @@ typecheck_information_pass(Light_Ast* node, u32 flags, u32* error) {
         case AST_DECL_CONSTANT:{
             // Infer the type of expression
             type_infer_expression(node->decl_constant.value, error);
+            if(*error & TYPE_ERROR) return;
 
             if(node->decl_constant.type_info && !(node->decl_constant.type_info->flags & TYPE_FLAG_INTERNALIZED)) {
                 node->decl_constant.type_info = typecheck_resolve_type(scope, node->decl_constant.type_info, flags, error);
+                if(*error & TYPE_ERROR) return;
                 if(TYPE_STRONG(node->decl_constant.type_info)) {
                     type_infer_propagate(node->decl_constant.type_info, node->decl_constant.value, error);
                 }
@@ -259,6 +269,7 @@ typecheck_information_pass(Light_Ast* node, u32 flags, u32* error) {
 
             // Infer to default type when type declaration is null
             Light_Type* type = type_infer_propagate(node->decl_constant.type_info, node->decl_constant.value, error);
+            if(*error & TYPE_ERROR) return;
 
             if(!node->decl_constant.type_info) {
                 // Constant type must be inferred
@@ -283,9 +294,11 @@ typecheck_information_pass(Light_Ast* node, u32 flags, u32* error) {
             // Infer the type of expression
             if(node->decl_variable.assignment)
                 type_infer_expression(node->decl_variable.assignment, error);
+            if(*error & TYPE_ERROR) return;
             
             if(node->decl_variable.type && !(node->decl_variable.type->flags & TYPE_FLAG_INTERNALIZED)) {
                 node->decl_variable.type = typecheck_resolve_type(scope, node->decl_variable.type, flags, error);
+                if(*error & TYPE_ERROR) return;
                 if(TYPE_STRONG(node->decl_variable.type) && node->decl_variable.assignment) {
                     type_infer_propagate(node->decl_variable.type, node->decl_variable.assignment, error);
                 } 
@@ -294,6 +307,7 @@ typecheck_information_pass(Light_Ast* node, u32 flags, u32* error) {
             if(node->decl_variable.assignment) {
                 // Infer to default type when type declaration is null
                 Light_Type* type = type_infer_propagate(node->decl_variable.type, node->decl_variable.assignment, error);
+                if(*error & TYPE_ERROR) return;
                 
                 if(!node->decl_variable.type) {
                     node->decl_variable.type = type;
@@ -313,7 +327,13 @@ typecheck_information_pass(Light_Ast* node, u32 flags, u32* error) {
             }
         } break;
         case AST_DECL_PROCEDURE: {
-
+            node->decl_proc.proc_type = typecheck_resolve_type(scope, node->decl_proc.proc_type, flags, error);
+            if(*error & TYPE_ERROR) return;
+            if(!(node->decl_proc.proc_type->flags & TYPE_FLAG_INTERNALIZED)) {
+                typecheck_push_to_infer_queue(node);
+            } else {
+                typecheck_remove_from_infer_queue(node);
+            }
         } break;
         case AST_DECL_TYPEDEF: {
             node->decl_typedef.type_referenced = typecheck_resolve_type(scope, node->decl_typedef.type_referenced, flags, error);

@@ -388,9 +388,12 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     Light_Scope* args_scope = light_scope_new(0, scope, SCOPE_PROCEDURE_ARGUMENTS);
     Light_Ast**  arguments = 0;
     s32 args_count = 0;
+    Light_Type** args_types = 0;
+    bool all_args_internalized = true;
 
     if(lexer_peek(lexer)->type != ')') {
         arguments = array_new(Light_Ast*);
+        args_types = array_new(Light_Type*);
         for (;;) {
 			if (args_count != 0) {
                 *error |= parser_require_and_eat(parser, ',');
@@ -401,8 +404,17 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 				*error |= parser_error_fatal(parser, name, "expected argument #%d declaration identifier but got '%.*s'\n", args_count + 1, TOKEN_STR(name));
                 return 0;
 			}
-			Light_Ast* arg = parse_decl_variable(parser, name, 0, args_scope, error);
+            *error |= parser_require_and_eat(parser, ':');
+            ReturnIfError();
+
+            Light_Type* arg_type = parse_type(parser, scope, error);
+            ReturnIfError();
+
+			Light_Ast* arg = parse_decl_variable(parser, name, arg_type, args_scope, error);
 			array_push(arguments, arg);
+            array_push(args_types, arg_type);
+            if(!(arg_type->flags & TYPE_FLAG_INTERNALIZED))
+                all_args_internalized = false;
 
             args_scope->decl_count++;
 			++args_count;
@@ -424,6 +436,8 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
         ReturnIfError();
 	}
 
+    Light_Type* proc_type = type_new_function(args_types, return_type, args_count, all_args_internalized);
+
     Light_Ast* body = 0;
 
     // TODO(psv): foreign declaration and forward declaration
@@ -431,6 +445,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     ReturnIfError();
 
     Light_Ast* result = ast_new_decl_procedure(scope, name, body, return_type, args_scope, (Light_Ast_Decl_Variable**)arguments, args_count, 0);
+    result->decl_proc.proc_type = proc_type;
 
     if(body && body->comm_block.block_scope) {
         body->comm_block.block_scope->creator_node = result;
