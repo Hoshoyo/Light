@@ -527,6 +527,8 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                     *error |= type_infer_type_mismatch_error(expr->expr_binary.token_op, left, right);
                     fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
                 } else {
+                    type_infer_propagate(0, expr->expr_binary.left, error);
+                    type_infer_propagate(0, expr->expr_binary.right, error);
                     return type_primitive_get(TYPE_PRIMITIVE_BOOL);
                 }
             } else {
@@ -559,6 +561,8 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                     *error |= type_infer_type_mismatch_error(expr->expr_binary.token_op, left, right);
                     fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
                 } else {
+                    type_infer_propagate(0, expr->expr_binary.left, error);
+                    type_infer_propagate(0, expr->expr_binary.right, error);
                     return type_primitive_get(TYPE_PRIMITIVE_BOOL);
                 }
             } else {

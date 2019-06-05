@@ -403,7 +403,9 @@ ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Li
 
 
 Light_Ast* 
-ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* condition, Light_Ast* body, Light_Ast** prologue, Light_Ast** epilogue) {
+ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* condition, Light_Ast* body, 
+    Light_Ast** prologue, Light_Ast** epilogue, Light_Token* for_token) 
+{
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_FOR;
@@ -417,6 +419,7 @@ ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* conditio
     result->comm_for.epilogue = epilogue;
     result->comm_for.prologue = prologue;
     result->comm_for.for_scope = for_scope;
+    result->comm_for.for_token = for_token;
 
     return result;
 }
@@ -729,16 +732,21 @@ ast_print_node(Light_Ast* node, u32 flags) {
         }break;
         case AST_COMMAND_FOR:{
             length += fprintf(out, "for ");
-            for(s32 i = 0; i < array_length(node->comm_for.prologue); ++i) {
-                if(i != 0) length += fprintf(out, ", ");
-                length += ast_print_node(node->comm_for.prologue[i], flags);
+            if(node->comm_for.prologue){
+                for(s32 i = 0; i < array_length(node->comm_for.prologue); ++i) {
+                    if(i != 0) length += fprintf(out, ", ");
+                    length += ast_print_node(node->comm_for.prologue[i], flags);
+                }
             }
             length += fprintf(out, ";");
-            length += ast_print_expression(node->comm_for.condition, flags);
+            if(node->comm_for.condition)
+                length += ast_print_expression(node->comm_for.condition, flags);
             length += fprintf(out, ";");
-            for(s32 i = 0; i < array_length(node->comm_for.epilogue); ++i) {
-                if(i != 0) length += fprintf(out, ", ");
-                length += ast_print_node(node->comm_for.epilogue[i], flags);
+            if(node->comm_for.epilogue) {
+                for(s32 i = 0; i < array_length(node->comm_for.epilogue); ++i) {
+                    if(i != 0) length += fprintf(out, ", ");
+                    length += ast_print_node(node->comm_for.epilogue[i], flags);
+                }
             }
         }break;
         case AST_COMMAND_IF:{

@@ -239,6 +239,7 @@ typedef struct {
 	struct Light_Ast_t** prologue;		// Array of commands
 	struct Light_Ast_t** epilogue;		// Array of commands
 	Light_Scope*         for_scope;
+	Light_Token*         for_token;
 } Light_Ast_Comm_For;
 
 typedef struct {
@@ -508,7 +509,7 @@ Light_Ast* ast_new_decl_procedure(Light_Scope* scope, Light_Token* name, Light_A
 Light_Ast* ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, Light_Scope* block_scope);
 Light_Ast* ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false, Light_Token* if_token);
 Light_Ast* ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Light_Token* while_token);
-Light_Ast* ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* condition, Light_Ast* body, Light_Ast** prologue, Light_Ast** epilogue);
+Light_Ast* ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* condition, Light_Ast* body, Light_Ast** prologue, Light_Ast** epilogue, Light_Token* for_token);
 Light_Ast* ast_new_comm_break(Light_Scope* scope, Light_Token* break_keyword, Light_Ast* level);
 Light_Ast* ast_new_comm_continue(Light_Scope* scope, Light_Token* continue_keyword, Light_Ast* level);
 Light_Ast* ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_token);

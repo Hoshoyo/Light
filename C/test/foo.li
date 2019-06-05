@@ -1,11 +1,10 @@
 main :: () -> s32 {
-    if foo {
-        
-    }
+    //foo = bar;
     return 0;
 }
 
-foo :: true;
+//foo := 1;
+//bar := 2;
 
 
 //foo : struct {a : s32; };

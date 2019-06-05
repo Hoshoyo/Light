@@ -462,13 +462,6 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             // TODO(psv):
         } break;
         case AST_COMMAND_RETURN: {
-            Light_Type* type = type_infer_expression(node->comm_return.expression, error);
-            if(*error & TYPE_ERROR) return;
-            if(!type) {
-                typecheck_push_to_infer_queue(node);
-                return;
-            }
-
             Light_Ast* decl_proc = typecheck_decl_proc_from_scope(node->scope_at);
             if(!decl_proc) {
                 typecheck_error_location(node->comm_return.token_return);
@@ -485,21 +478,33 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
                 return;
             }
 
-            node->comm_return.expression->type = type_infer_propagate(decl_proc->decl_proc.proc_type->function.return_type, 
-                node->comm_return.expression, error);
-            if(*error & TYPE_ERROR) return;
-            if(TYPE_WEAK(node->comm_return.expression)) {
-                typecheck_push_to_infer_queue(node);
-                return;
+            Light_Type* expr_type = 0;
+            if(node->comm_return.expression) {
+                Light_Type* type = type_infer_expression(node->comm_return.expression, error);
+                if(*error & TYPE_ERROR) return;
+                if(!type) {
+                    typecheck_push_to_infer_queue(node);
+                    return;
+                }
+                node->comm_return.expression->type = type_infer_propagate(decl_proc->decl_proc.proc_type->function.return_type, 
+                    node->comm_return.expression, error);
+                if(*error & TYPE_ERROR) return;
+                if(TYPE_WEAK(node->comm_return.expression)) {
+                    typecheck_push_to_infer_queue(node);
+                    return;
+                }
+                expr_type = node->comm_return.expression->type;
+            } else {
+                expr_type = type_primitive_get(TYPE_PRIMITIVE_VOID);
             }
 
             // Type check
-            if(node->comm_return.expression->type != decl_proc->decl_proc.proc_type->function.return_type) {
+            if(expr_type != decl_proc->decl_proc.proc_type->function.return_type) {
                 typecheck_error_location(node->comm_return.token_return);
                 fprintf(stderr, "Type Error: procedure '%.*s' requires return type '", TOKEN_STR(decl_proc->decl_proc.name));
                 ast_print_type(decl_proc->decl_proc.proc_type->function.return_type, LIGHT_AST_PRINT_STDERR);
                 fprintf(stderr, "', but got '");
-                ast_print_type(node->comm_return.expression->type, LIGHT_AST_PRINT_STDERR);
+                ast_print_type(expr_type, LIGHT_AST_PRINT_STDERR);
                 fprintf(stderr, "'\n");
                 *error |= TYPE_ERROR;
                 return;
@@ -508,7 +513,48 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             typecheck_remove_from_infer_queue(node);
         } break;
         case AST_COMMAND_FOR: {
+            Light_Scope* for_scope = node->comm_for.for_scope;
+            if(for_scope) {
+                if(for_scope->decl_count > 0) {
+                    for_scope->symb_table = light_alloc(sizeof(Symbol_Table));
+                    symbol_table_new(for_scope->symb_table, (for_scope->decl_count + 4) * 8);
+                }
+            }
 
+            if(node->comm_for.prologue){
+                for(u64 i = 0; i < array_length(node->comm_for.prologue); ++i) {
+                    typecheck_information_pass_decl(node->comm_for.prologue[i], flags, error);
+                }
+            }
+            if(node->comm_for.epilogue) {
+                for(u64 i = 0; i < array_length(node->comm_for.epilogue); ++i) {
+                    typecheck_information_pass_decl(node->comm_for.epilogue[i], flags, error);
+                }
+            }
+            typecheck_information_pass_decl(node->comm_for.body, flags, error);
+            if(*error & TYPE_ERROR) return;
+
+            // Conditional check, must be boolean
+            // When condition doesnt exist, assume true
+            if(node->comm_for.condition) {
+                Light_Type* type = type_infer_expression(node->comm_for.condition, error);
+                if(*error & TYPE_ERROR) return;
+                if(!type) {
+                    typecheck_push_to_infer_queue(node);
+                    return;
+                }
+
+                if(type != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
+                    typecheck_error_location(node->comm_for.for_token);
+                    fprintf(stderr, "Type Error: for command requires boolean type condition, but got '");
+                    ast_print_type(type, LIGHT_AST_PRINT_STDERR);
+                    fprintf(stderr, "'\n");
+                    *error |= TYPE_ERROR;
+                    return;
+                }
+            }
+
+            typecheck_remove_from_infer_queue(node);
         } break;
         case AST_COMMAND_IF: {
             // Check if true path

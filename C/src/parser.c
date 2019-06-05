@@ -153,6 +153,7 @@ parse_comm_for(Light_Parser* parser, Light_Scope* scope, u32* error) {
 
     *error |= parser_require_and_eat(parser, TOKEN_KEYWORD_FOR);
     ReturnIfError();
+    Light_Token* for_token = lexer_peek_n(lexer, -1);
 
     Light_Ast** prologue = 0;
     Light_Ast** epilogue = 0;
@@ -191,7 +192,7 @@ parse_comm_for(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Ast* body = parse_command(parser, for_scope, error, true);
     ReturnIfError();
 
-    Light_Ast* result = ast_new_comm_for(scope, for_scope, condition, body, prologue, epilogue);
+    Light_Ast* result = ast_new_comm_for(scope, for_scope, condition, body, prologue, epilogue, for_token);
     for_scope->creator_node = result;
 
     return result;
