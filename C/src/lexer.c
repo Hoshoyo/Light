@@ -469,6 +469,8 @@ token_next(Light_Lexer* lexer) {
                     string kw = string_table_get(&lexer->keyword_table, kw_index);
                     r.type = kw.value;
                     r.flags |= TOKEN_FLAG_KEYWORD;
+                    if(kw.value == TOKEN_LITERAL_BOOL_TRUE || kw.value == TOKEN_LITERAL_BOOL_FALSE)
+                        r.flags |= TOKEN_FLAG_LITERAL;
                 } else {
                     // internalize the identifier
                     s32 identifier_index = 0;

@@ -88,6 +88,7 @@ parse_comm_if(Light_Parser* parser, Light_Scope* scope, u32* error) {
 
     *error |= parser_require_and_eat(parser, TOKEN_KEYWORD_IF);
     ReturnIfError();
+    Light_Token* if_token = lexer_peek_n(lexer, -1);
 
 	Light_Ast* condition = parse_expression(parser, scope, error);
     ReturnIfError();
@@ -104,13 +105,14 @@ parse_comm_if(Light_Parser* parser, Light_Scope* scope, u32* error) {
         command_false = parse_command(parser, scope, error, true);
         ReturnIfError();
 	}
-	return ast_new_comm_if(scope, condition, command_true, command_false);
+	return ast_new_comm_if(scope, condition, command_true, command_false, if_token);
 }
 
 static Light_Ast*
 parse_comm_while(Light_Parser* parser, Light_Scope* scope, u32* error) {
     *error |= parser_require_and_eat(parser, TOKEN_KEYWORD_WHILE);
     ReturnIfError();
+    Light_Token* while_token = lexer_peek_n(parser->lexer, -1);
 
 	Light_Ast* condition = parse_expression(parser, scope, error);
     ReturnIfError();
@@ -122,7 +124,7 @@ parse_comm_while(Light_Parser* parser, Light_Scope* scope, u32* error) {
 		if (body->comm_block.block_scope)
 			body->comm_block.block_scope->flags |= SCOPE_LOOP;
 	}
-	return ast_new_comm_while(scope, condition, body);
+	return ast_new_comm_while(scope, condition, body, while_token);
 }
 
 static Light_Ast** 
@@ -257,15 +259,6 @@ parse_comm_assignment(Light_Parser* parser, Light_Scope* scope, u32* error) {
 
     Light_Ast* lvalue = parse_expression(parser, scope, error);
     ReturnIfError();
-    Light_Ast* dereferenced_lvalue = 0;
-
-    if(lvalue->kind == AST_EXPRESSION_VARIABLE) {
-        // We must dereference automatically, so as to an expression like:
-        // a = ...  will be transformed into *a = ...
-        dereferenced_lvalue = ast_new_expr_unary(scope, lvalue, 0, OP_UNARY_DEREFERENCE);
-    } else {
-        dereferenced_lvalue = lvalue;
-    }
 
     Light_Operator_Binary binop = OP_BINARY_UNKNOWN;
     Light_Token* op = lexer_next(lexer);
@@ -296,7 +289,7 @@ parse_comm_assignment(Light_Parser* parser, Light_Scope* scope, u32* error) {
         rvalue = ast_new_expr_binary(scope, lvalue, rvalue, op, binop);
     }
 
-    return ast_new_comm_assignment(scope, lvalue, rvalue);
+    return ast_new_comm_assignment(scope, lvalue, rvalue, op);
 }
 
 Light_Ast*
@@ -346,7 +339,7 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 			} else if (t == '(') {
 				// Syntatic sugar void proc call
 				Light_Ast* pcall = parse_expression(parser, scope, error);
-                command = ast_new_comm_assignment(scope, 0, pcall);
+                command = ast_new_comm_assignment(scope, 0, pcall, next);
 			} else {
 				command = parse_comm_assignment(parser, scope, error);
 			}
@@ -441,14 +434,16 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     Light_Ast* body = 0;
 
     // TODO(psv): foreign declaration and forward declaration
-    body = parse_comm_block(parser, scope, error);
+    body = parse_comm_block(parser, args_scope, error);
     ReturnIfError();
 
     Light_Ast* result = ast_new_decl_procedure(scope, name, body, return_type, args_scope, (Light_Ast_Decl_Variable**)arguments, args_count, 0);
     result->decl_proc.proc_type = proc_type;
+    args_scope->creator_node = result;
 
     if(body && body->comm_block.block_scope) {
         body->comm_block.block_scope->creator_node = result;
+        body->comm_block.block_scope->flags |= SCOPE_PROCEDURE_BODY;
     }
 
     return result;
@@ -830,7 +825,7 @@ Light_Ast* parse_expression_precedence9(Light_Parser* parser, Light_Scope* scope
 			*error |= parser_require_and_eat(parser, ')');
             ReturnIfError();
 
-			return ast_new_expr_proc_call(scope, expr, arguments, args_count);
+			return ast_new_expr_proc_call(scope, expr, arguments, args_count, op);
 		} else {
 			break;
 		}

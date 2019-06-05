@@ -303,6 +303,7 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
     assert(expr->kind == AST_EXPRESSION_UNARY);
     
     Light_Type* operand_type = type_infer_expression(expr->expr_unary.operand, error);
+    if(*error & TYPE_ERROR) return 0;
 
     switch(expr->expr_unary.op) {
         case OP_UNARY_ADDRESSOF: {
@@ -314,10 +315,15 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
         } break;
         case OP_UNARY_CAST:{
             expr->type = expr->expr_unary.type_to_cast;
+            type_infer_propagate(0, expr->expr_unary.operand, error);
         } break;
         case OP_UNARY_DEREFERENCE:{
             if(operand_type->kind == TYPE_KIND_POINTER) {
                 expr->type = operand_type->pointer_to;
+            } else {
+                type_infer_error_location(expr->expr_unary.token_op);
+                fprintf(stderr, "Type Error: cannot derreference a non pointer type\n");
+                *error |= TYPE_ERROR;
             }
         } break;
         case OP_UNARY_LOGIC_NOT:{
@@ -397,6 +403,24 @@ type_infer_expr_binary_pointer_arithmetic(Light_Ast* expr, Light_Type* inferred_
         } break;
         default: assert(0); break;
     }
+}
+
+static Light_Type* 
+type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
+    assert(expr->kind == AST_EXPRESSION_PROCEDURE_CALL);
+    Light_Type* caller_type = type_infer_expression(expr->expr_proc_call.caller_expr, error);
+    if(*error & TYPE_ERROR) return 0;
+
+    if(caller_type->kind != TYPE_KIND_FUNCTION) {
+        type_infer_error_location(expr->expr_proc_call.token);
+        fprintf(stderr, "Type Error: expected procedure type, but got '");
+        ast_print_type(caller_type, LIGHT_AST_PRINT_STDERR);
+        fprintf(stderr, "'\n");
+        *error |= TYPE_ERROR;
+        return expr->type;
+    }
+    
+    return caller_type->function.return_type;
 }
 
 static Light_Type* 
@@ -594,7 +618,7 @@ type_infer_expression(Light_Ast* expr, u32* error) {
             type = type_infer_expr_binary(expr, error);
             break;
         case AST_EXPRESSION_PROCEDURE_CALL:
-            assert(0);
+            type = type_infer_expr_proc_call(expr, error);
             break;
         case AST_EXPRESSION_UNARY:
             type = type_infer_expr_unary(expr, error);
@@ -610,9 +634,5 @@ type_infer_expression(Light_Ast* expr, u32* error) {
     }
 
     expr->type = type;
-    if(!type) {
-        // TODO(psv): infer queue
-    }
-
     return type;
 }

@@ -51,7 +51,7 @@ ast_new_expr_variable(Light_Scope* scope, Light_Token* name) {
 }
 
 Light_Ast* 
-ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count) {
+ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count, Light_Token* op) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_PROCEDURE_CALL;
@@ -63,6 +63,7 @@ ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** argume
     result->expr_proc_call.arg_count = args_count;
     result->expr_proc_call.args = arguments;
     result->expr_proc_call.caller_expr = caller;
+    result->expr_proc_call.token = op;
 
     return result;
 }
@@ -331,7 +332,7 @@ ast_new_decl_procedure(
 }
 
 Light_Ast* 
-ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue) {
+ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue, Light_Token* op_token) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_ASSIGNMENT;
@@ -342,6 +343,7 @@ ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue
 
     result->comm_assignment.lvalue = lvalue;
     result->comm_assignment.rvalue = rvalue;
+    result->comm_assignment.op_token = op_token;
 
     return result;
 }
@@ -365,7 +367,7 @@ ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, 
 }
 
 Light_Ast* 
-ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false) {
+ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false, Light_Token* if_token) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_IF;
@@ -377,12 +379,13 @@ ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Li
     result->comm_if.condition = condition;
     result->comm_if.body_true = if_true;
     result->comm_if.body_false = if_false;
+    result->comm_if.if_token = if_token;
 
     return result;
 }
 
 Light_Ast* 
-ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body) {
+ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Light_Token* while_token) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_WHILE;
@@ -393,6 +396,7 @@ ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body) {
 
     result->comm_while.condition = condition;
     result->comm_while.body = body;
+    result->comm_while.while_token = while_token;
 
     return result;
 }

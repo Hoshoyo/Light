@@ -16,16 +16,20 @@ type_alloc() {
 }
 
 bool type_primitive_sint(Light_Type* t) {
-    return (t->kind >= TYPE_PRIMITIVE_S8 && t->kind <= TYPE_PRIMITIVE_S64);
+    return (t->kind == TYPE_KIND_PRIMITIVE) &&
+        (t->primitive >= TYPE_PRIMITIVE_S8 && t->primitive <= TYPE_PRIMITIVE_S64);
 }
 bool type_primitive_uint(Light_Type* t) {
-    return (t->kind >= TYPE_PRIMITIVE_U8 && t->kind <= TYPE_PRIMITIVE_U64);
+    return (t->kind == TYPE_KIND_PRIMITIVE) &&
+        (t->primitive >= TYPE_PRIMITIVE_U8 && t->primitive <= TYPE_PRIMITIVE_U64);
 }
 bool type_primitive_int(Light_Type* t) {
-    return (t->kind >= TYPE_PRIMITIVE_S8 && t->kind <= TYPE_PRIMITIVE_U64);
+    return (t->kind == TYPE_KIND_PRIMITIVE) &&
+        (t->primitive >= TYPE_PRIMITIVE_S8 && t->primitive <= TYPE_PRIMITIVE_U64);
 }
 bool type_primitive_float(Light_Type* t) {
-    return (t->kind == TYPE_PRIMITIVE_R32 || t->kind == TYPE_PRIMITIVE_R64);
+    return (t->kind == TYPE_KIND_PRIMITIVE) &&
+        (t->primitive == TYPE_PRIMITIVE_R32 || t->primitive == TYPE_PRIMITIVE_R64);
 }
 bool type_primitive_numeric(Light_Type* t) {
     return (type_primitive_int(t) || type_primitive_float(t));

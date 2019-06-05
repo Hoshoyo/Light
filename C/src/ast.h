@@ -187,6 +187,7 @@ typedef struct {
 	struct Light_Ast_t*      caller_expr;
 	struct Light_Ast_t**     args;
 	int32_t                  arg_count;
+	Light_Token*             token;
 } Light_Ast_Expr_Proc_Call;
 
 typedef enum {
@@ -216,17 +217,20 @@ typedef struct {
 typedef struct {
 	struct Light_Ast_t* lvalue;	// Must be an expression
 	struct Light_Ast_t* rvalue;	// Must be an expression
+	Light_Token*        op_token;
 } Light_Ast_Comm_Assignment;
 
 typedef struct {
 	struct Light_Ast_t* condition;	// Must be a (boolean) expression
 	struct Light_Ast_t* body_true;	// Must be a command
 	struct Light_Ast_t* body_false;	// Must be a command
+	Light_Token*        if_token;
 } Light_Ast_Comm_If;
 
 typedef struct {
 	struct Light_Ast_t* condition;		// Must be a (boolean) expression
 	struct Light_Ast_t* body;			// Must be a command
+	Light_Token*        while_token;
 } Light_Ast_Comm_While;
 
 typedef struct {
@@ -502,13 +506,13 @@ Light_Ast* ast_new_decl_procedure(Light_Scope* scope, Light_Token* name, Light_A
 
 // Commands
 Light_Ast* ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, Light_Scope* block_scope);
-Light_Ast* ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false);
-Light_Ast* ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body);
+Light_Ast* ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false, Light_Token* if_token);
+Light_Ast* ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Light_Token* while_token);
 Light_Ast* ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* condition, Light_Ast* body, Light_Ast** prologue, Light_Ast** epilogue);
 Light_Ast* ast_new_comm_break(Light_Scope* scope, Light_Token* break_keyword, Light_Ast* level);
 Light_Ast* ast_new_comm_continue(Light_Scope* scope, Light_Token* continue_keyword, Light_Ast* level);
 Light_Ast* ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_token);
-Light_Ast* ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue);
+Light_Ast* ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue, Light_Token* op_token);
 
 // Expressions
 Light_Ast* ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token);
@@ -516,7 +520,7 @@ Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* token, L
 Light_Ast* ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs);
 Light_Ast* ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op);
 Light_Ast* ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op);
-Light_Ast* ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count);
+Light_Ast* ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count, Light_Token* op);
 Light_Ast* ast_new_expr_variable(Light_Scope* scope, Light_Token* name);
 
 // Utils

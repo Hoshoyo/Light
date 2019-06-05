@@ -1,8 +1,11 @@
-foo -> struct {
-    b : s32;
+main :: () -> s32 {
+    if foo {
+        
+    }
+    return 0;
 }
-v : foo;
-a := v.b;
+
+foo :: true;
 
 
 //foo : struct {a : s32; };
