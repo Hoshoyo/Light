@@ -490,7 +490,7 @@ ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_tok
 
 
 
-
+#define fprintf(F, ...) fprintf(F, __VA_ARGS__); fflush(F)
 // Print
 const char* ColorReset   = "\x1B[0m";
 const char* ColorRed     = "\x1B[31m";
@@ -627,6 +627,7 @@ ast_print_expr_unary(Light_Ast* expr, u32 flags) {
             length += fprintf(out, "[");
             length += ast_print_type(expr->expr_unary.type_to_cast, flags);
             length += fprintf(out, "]");
+            length += ast_print_expression(expr->expr_unary.operand, flags);
         }break;
         default: length += fprintf(out, "<invalid unary expr>"); break;
     }

@@ -193,6 +193,13 @@ type_infer_propagate_binary(Light_Type* type, Light_Ast* expr, u32* error) {
 }
 
 static Light_Type* 
+type_infer_propagate_dot(Light_Type* type, Light_Ast* expr, u32* error) {
+    assert(expr->kind == AST_EXPRESSION_DOT);
+    expr->type = type_infer_propagate(type, expr->expr_dot.left, error);
+    return expr->type;
+}
+
+static Light_Type* 
 type_infer_propagate_unary(Light_Type* type, Light_Ast* expr, u32* error) {
     switch(expr->expr_unary.op) {
         case OP_UNARY_ADDRESSOF:
@@ -231,6 +238,8 @@ type_infer_propagate(Light_Type* type, Light_Ast* expr, u32* error) {
             return type_infer_propagate_binary(type, expr, error);
         case AST_EXPRESSION_UNARY:
             return type_infer_propagate_unary(type, expr, error);
+        case AST_EXPRESSION_DOT:
+            return type_infer_propagate_dot(type, expr, error);
         case AST_EXPRESSION_PROCEDURE_CALL:
             // passthrough
         case AST_EXPRESSION_VARIABLE:
@@ -457,6 +466,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
             if(!(type_primitive_numeric(left) && type_primitive_numeric(right))) {
                 type_infer_error_location(expr->expr_binary.token_op);
                 fprintf(stderr, "Type Error: binary operator '%.*s' requires numeric types\n", TOKEN_STR(expr->expr_binary.token_op));
+                *error |= TYPE_ERROR;
                 return 0;
             }
             break;
@@ -469,6 +479,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
             if(!(type_primitive_int(left) && type_primitive_int(right))) {
                 type_infer_error_location(expr->expr_binary.token_op);
                 fprintf(stderr, "Type Error: binary operator '%.*s' requires integer types\n", TOKEN_STR(expr->expr_binary.token_op));
+                *error |= TYPE_ERROR;
                 return 0;
             }
         }break;

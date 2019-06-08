@@ -895,6 +895,7 @@ Light_Ast* parse_expression_precedence6(Light_Parser* parser, Light_Scope* scope
         ReturnIfError();
 		Light_Ast* result = ast_new_expr_unary(scope, operand, cast, OP_UNARY_CAST);
         result->expr_unary.type_to_cast = ttc;
+        return result;
 	}
 	return parse_expression_precedence7(parser, scope, error);
 }
