@@ -8,6 +8,13 @@
 
 #define TOKEN_STR(T) (T)->length, (T)->data
 
+static Light_Type*
+type_alias_root(Light_Type* type) {
+    while(type && type->kind == TYPE_KIND_ALIAS)
+        type = type->alias.alias_to;
+    return type;
+}
+
 static s32
 type_infer_error_location(Light_Token* t) {
     if(!t) {
@@ -259,13 +266,15 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
             return decl->decl_variable.type;
         } break;
         case AST_DECL_TYPEDEF:{
-            // TODO(psv): support alias of an alias
-            if(decl->decl_typedef.type_referenced->kind == TYPE_KIND_ENUM && expr->flags & AST_FLAG_ALLOW_BASE_ENUM) {
+            Light_Type* type = decl->decl_typedef.type_referenced;
+            type = type_alias_root(type);
+            if(type && type->kind == TYPE_KIND_ENUM && expr->flags & AST_FLAG_ALLOW_BASE_ENUM) {
                 return decl->decl_typedef.type_referenced;
             }
+            if(!type) return 0;
             // Error, referencing a typename instead of a declaration
             type_infer_error_location(expr->expr_variable.name);
-            fprintf(stderr, "Type Error: referencing the typename '%.*s' as an rvalue variable\n", TOKEN_STR(expr->expr_variable.name));
+            fprintf(stderr, "Type Error: referencing the typename '%.*s' as an rvalue\n", TOKEN_STR(expr->expr_variable.name));
             *error |= TYPE_ERROR;
         } break;
         default: assert(0); break;
@@ -670,6 +679,8 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
         left = left->pointer_to;
     }
 
+    left = type_alias_root(left);
+
     switch(left->kind) {
         case TYPE_KIND_STRUCT:{
             Light_Ast* decl = find_struct_field_decl(left->struct_info.struct_scope, expr->expr_dot.identifier);
@@ -709,7 +720,8 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
             return 0;
         } break;
         case TYPE_KIND_ALIAS:{
-            // TODO(psv): alias
+            // We should never get here, since the type should already be 'de-aliased' when
+            // inferring from the left side.
             assert(0);
         } break;
         case TYPE_KIND_FUNCTION: {

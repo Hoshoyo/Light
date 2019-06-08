@@ -1,12 +1,19 @@
+vec2 -> struct {
+    a : s32;
+}
+
 main :: () -> s32 {
-    v : struct {
-        a : s32;
-        b : r32;
-        c : struct {
-            b : foo;
-        };
-    };
-    a := foo.Hello;
+    //v : struct {
+    //    a : s32;
+    //    b : r32;
+    //    c : struct {
+    //        b : foo;
+    //    };
+    //};
+    b : vec2;
+    c := b.a;
     return 0;
 }
-foo ->  enum {Hello, World}
+//foo ->  enum {Hello, World}
+//foozle -> foo;
+//bar -> foozle;

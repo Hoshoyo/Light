@@ -205,10 +205,6 @@ typecheck_resolve_type_symbol_tables(Light_Type* type, u32 flags, u32* error) {
                 *error |= decl_check_redefinition(scope, type->enumerator.fields_values[i], type->enumerator.fields_names[i]);
             }
         } break;
-        case TYPE_KIND_ALIAS: {
-            // TODO(psv):
-            assert(0);
-        } break;
         default: assert(0); break;
     }
     return type;

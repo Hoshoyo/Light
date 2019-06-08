@@ -56,8 +56,14 @@ type_equal(Light_Type* t1, Light_Type* t2) {
             if(t1->enumerator.type_hint && t2->enumerator.type_hint) {
                 return type_equal(t1->enumerator.type_hint, t2->enumerator.type_hint);
             } else {
-                assert(0);
-                // TODO(psv):
+                if(t1->enumerator.field_count != t2->enumerator.field_count)
+                    return 0;
+                // TODO(psv): consider enum values
+                for(s32 i = 0; i < t1->enumerator.field_count; ++i) {
+                    if(t1->enumerator.fields_names[i]->data != t2->enumerator.fields_names[i]->data)
+                        return 0;
+                }
+                return 1;
             }
         } break;
         case TYPE_KIND_ALIAS: {
