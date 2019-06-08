@@ -260,7 +260,7 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
         } break;
         case AST_DECL_TYPEDEF:{
             // TODO(psv): support alias of an alias
-            if(decl->decl_typedef.type_referenced->kind == TYPE_KIND_ENUM) {
+            if(decl->decl_typedef.type_referenced->kind == TYPE_KIND_ENUM && expr->flags & AST_FLAG_ALLOW_BASE_ENUM) {
                 return decl->decl_typedef.type_referenced;
             }
             // Error, referencing a typename instead of a declaration
@@ -651,15 +651,20 @@ find_enum_field_decl(Light_Scope* scope, Light_Token* ident, u32* error) {
     return 0;
 }
 
+
 Light_Type* 
 type_infer_expr_dot(Light_Ast* expr, u32* error) {
     assert(expr->kind == AST_EXPRESSION_DOT);
 
     Light_Type* type = 0;
 
+    if(expr->expr_dot.left->kind == AST_EXPRESSION_VARIABLE) {
+        expr->expr_dot.left->flags |= AST_FLAG_ALLOW_BASE_ENUM;
+    }
     Light_Type* left = type_infer_expression(expr->expr_dot.left, error);
+
     if(*error & TYPE_ERROR) return 0;
-    if(!left) return 0;
+    if(!left || !(left->flags & TYPE_FLAG_INTERNALIZED)) return 0;
 
     if(left->kind == TYPE_KIND_POINTER) {
         left = left->pointer_to;

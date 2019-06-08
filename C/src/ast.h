@@ -340,6 +340,7 @@ typedef enum {
     AST_FLAG_DECLARATION  = (1 << 2),
 	AST_FLAG_DIRECTIVE    = (1 << 3),
 	AST_FLAG_INFER_QUEUED = (1 << 4),
+	AST_FLAG_ALLOW_BASE_ENUM = (1 << 5), // This flags allows type inference to not error out if a variable with enum type is seen
 } Light_Ast_Flags;
 
 typedef struct Light_Ast_t {

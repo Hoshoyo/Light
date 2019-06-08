@@ -2,10 +2,11 @@ main :: () -> s32 {
     v : struct {
         a : s32;
         b : r32;
+        c : struct {
+            b : foo;
+        };
     };
-    e : foo;
-    a := v.a;
-    b := e;
+    a := foo.Hello;
     return 0;
 }
 foo ->  enum {Hello, World}
