@@ -7,6 +7,7 @@ static u64 struct_hash = 0;
 static u64 union_hash = 0;
 static u64 proc_hash = 0;
 static u64 pointer_hash = 0;
+static u64 enum_hash = 0;
 
 static Light_Type* primitive_type_table[TYPE_PRIMITIVE_COUNT] = {0};
 
@@ -244,6 +245,18 @@ type_hash(Light_Type* type) {
         case TYPE_KIND_ALIAS:
             hash = fnv_1_hash(type->alias.name->data, type->alias.name->length);
             break;
+        case TYPE_KIND_ENUM: 
+            hash = enum_hash;
+            // TODO(psv): type hint
+            //type_hash(type->enumerator.type_hint);
+            if(type->enumerator.field_count > 0) {
+                for(s32 i = 0; i < type->enumerator.field_count; ++i) {
+                    // TODO(psv): field value be part of the hash
+                    Light_Token* field_name = type->enumerator.fields_names[i];
+                    hash = fnv_1_hash_from_start(hash, field_name->data, field_name->length);
+                }
+            }
+            break;
 		default:
 			assert(0);
 	}
@@ -257,6 +270,7 @@ type_tables_initialize() {
     struct_hash = fnv_1_hash("struct", sizeof("struct") - 1);
     union_hash = fnv_1_hash("union", sizeof("union") - 1);
     proc_hash = fnv_1_hash("proc", sizeof("proc") - 1);
+    enum_hash = fnv_1_hash("enum", sizeof("enum") - 1);
 
     primitive_table_hash[TYPE_PRIMITIVE_VOID] = fnv_1_hash("void", sizeof("void") - 1);
     primitive_table_hash[TYPE_PRIMITIVE_S8]   = fnv_1_hash("s8", sizeof("s8") - 1);

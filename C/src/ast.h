@@ -27,6 +27,7 @@ typedef enum {
 	AST_EXPRESSION_LITERAL,
 	AST_EXPRESSION_VARIABLE,
 	AST_EXPRESSION_PROCEDURE_CALL,
+	AST_EXPRESSION_DOT,
 	AST_EXPRESSION_DIRECTIVE,
 } Light_Ast_Type;
 
@@ -84,7 +85,6 @@ typedef enum {
 	OP_BINARY_LOGIC_AND,	// &&
 	OP_BINARY_LOGIC_OR,		// ||
 
-	OP_BINARY_DOT,			 // .
 	OP_BINARY_VECTOR_ACCESS, // []
 } Light_Operator_Binary;
 
@@ -132,6 +132,11 @@ typedef enum {
 } Light_Storage_Class;
 
 // Expressions
+typedef struct {
+	struct Light_Ast_t* left;
+	Light_Token*        identifier;
+} Light_Ast_Expr_Dot;
+
 typedef struct {
 	struct Light_Ast_t*   left;
 	struct Light_Ast_t*   right;
@@ -371,6 +376,7 @@ typedef struct Light_Ast_t {
 		Light_Ast_Expr_Variable   expr_variable;
 		Light_Ast_Expr_Proc_Call  expr_proc_call;
 		Light_Ast_Expr_Directive  expr_directive;
+		Light_Ast_Expr_Dot        expr_dot;
 
 		// Directives
 		Light_Ast_Directive_Foreign   directive_foreign;
@@ -521,6 +527,7 @@ Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* token, L
 Light_Ast* ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs);
 Light_Ast* ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op);
 Light_Ast* ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op);
+Light_Ast* ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier);
 Light_Ast* ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count, Light_Token* op);
 Light_Ast* ast_new_expr_variable(Light_Scope* scope, Light_Token* name);
 

@@ -172,6 +172,48 @@ type_decl_from_alias(Light_Scope* scope, Light_Type* alias, u32* error) {
     return s.decl;
 }
 
+static Light_Type*
+typecheck_resolve_type_symbol_tables(Light_Type* type, u32 flags, u32* error) {
+    switch(type->kind) {
+        case TYPE_KIND_STRUCT:{
+            Light_Scope* scope = type->struct_info.struct_scope;
+            if(!scope->symb_table) {
+                scope->symb_table = light_alloc(sizeof(Symbol_Table));
+                symbol_table_new(scope->symb_table, (scope->decl_count + 4) * 8);
+            }
+            for(s32 i = 0; i < type->struct_info.fields_count; ++i) {
+                *error |= decl_check_redefinition(scope, type->struct_info.fields[i], type->struct_info.fields[i]->decl_variable.name);
+            }
+        } break;
+        case TYPE_KIND_UNION:{
+            Light_Scope* scope = type->union_info.union_scope;
+            if(!scope->symb_table) {
+                scope->symb_table = light_alloc(sizeof(Symbol_Table));
+                symbol_table_new(scope->symb_table, (scope->decl_count + 4) * 8);
+            }
+            for(s32 i = 0; i < type->union_info.fields_count; ++i) {
+                *error |= decl_check_redefinition(scope, type->union_info.fields[i], type->union_info.fields[i]->decl_variable.name);
+            }
+        } break;
+        case TYPE_KIND_ENUM:{
+            Light_Scope* scope = type->enumerator.enum_scope;
+            if(!scope->symb_table) {
+                scope->symb_table = light_alloc(sizeof(Symbol_Table));
+                symbol_table_new(scope->symb_table, (scope->decl_count + 4) * 8);
+            }
+            for(s32 i = 0; i < type->enumerator.field_count; ++i) {
+                *error |= decl_check_redefinition(scope, type->enumerator.fields_values[i], type->enumerator.fields_names[i]);
+            }
+        } break;
+        case TYPE_KIND_ALIAS: {
+            // TODO(psv):
+            assert(0);
+        } break;
+        default: assert(0); break;
+    }
+    return type;
+}
+
 // This function tries to internalize a type if possible
 //
 // Returns TYPE_ERROR in 'error' if undeclared type name is found.
@@ -212,6 +254,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
 
             if(all_fields_internalized) {
                 type = type_internalize(type);
+                type = typecheck_resolve_type_symbol_tables(type, flags, error);
             }
         } break;
         case TYPE_KIND_UNION: {
@@ -228,6 +271,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
 
             if(all_fields_internalized) {
                 type = type_internalize(type);
+                type = typecheck_resolve_type_symbol_tables(type, flags, error);
             }
         } break;
         case TYPE_KIND_FUNCTION: {
@@ -248,7 +292,13 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 type->enumerator.type_hint = typecheck_resolve_type(scope, type->enumerator.type_hint, flags, error);
                 if(type->enumerator.type_hint && type->enumerator.type_hint->flags & TYPE_FLAG_INTERNALIZED) {
                     type = type_internalize(type);
+                    type = typecheck_resolve_type_symbol_tables(type, flags, error);
                 }
+            } else {
+                type->size_bits = 32;
+                type->flags |= TYPE_FLAG_SIZE_RESOLVED;
+                type = type_internalize(type);
+                type = typecheck_resolve_type_symbol_tables(type, flags, error);
             }
         } break;
         case TYPE_KIND_ALIAS: {
@@ -282,7 +332,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* error) {
 
     switch(node->kind) {
         case AST_DECL_CONSTANT:{
-            if(scope->level > 0) {
+            if(scope->level > 0 && !(node->flags & AST_FLAG_INFER_QUEUED)) {
                 *error |= decl_check_redefinition(scope, node, node->decl_constant.name);
                 if(*error & TYPE_ERROR) return;
             }
@@ -327,7 +377,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* error) {
 
         } break;
         case AST_DECL_VARIABLE: {
-            if(scope->level > 0) {
+            if(scope->level > 0 && !(node->flags & AST_FLAG_INFER_QUEUED)) {
                 *error |= decl_check_redefinition(scope, node, node->decl_variable.name);
                 if(*error & TYPE_ERROR) return;
             }
@@ -373,7 +423,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* error) {
             }
         } break;
         case AST_DECL_PROCEDURE: {
-            if(scope->level > 0) {
+            if(scope->level > 0 && !(node->flags & AST_FLAG_INFER_QUEUED)) {
                 *error |= decl_check_redefinition(scope, node, node->decl_proc.name);
                 if(*error & TYPE_ERROR) return;
             }
@@ -391,7 +441,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* error) {
             }
         } break;
         case AST_DECL_TYPEDEF: {
-            if(scope->level > 0) {
+            if(scope->level > 0 && !(node->flags & AST_FLAG_INFER_QUEUED)) {
                 *error |= decl_check_redefinition(scope, node, node->decl_typedef.name);
                 if(*error & TYPE_ERROR) return;
             }
@@ -515,7 +565,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
         case AST_COMMAND_FOR: {
             Light_Scope* for_scope = node->comm_for.for_scope;
             if(for_scope) {
-                if(for_scope->decl_count > 0) {
+                if(!for_scope->symb_table && for_scope->decl_count > 0) {
                     for_scope->symb_table = light_alloc(sizeof(Symbol_Table));
                     symbol_table_new(for_scope->symb_table, (for_scope->decl_count + 4) * 8);
                 }

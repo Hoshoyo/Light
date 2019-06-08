@@ -35,6 +35,22 @@ light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags) {
 }
 
 Light_Ast* 
+ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_DOT;
+    result->scope_at = scope;
+    result->type = 0;
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+
+    result->expr_dot.left = left;
+    result->expr_dot.identifier = identifier;
+
+    return result;
+}
+
+Light_Ast* 
 ast_new_expr_variable(Light_Scope* scope, Light_Token* name) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
@@ -568,7 +584,6 @@ ast_print_expr_binary(Light_Ast* expr, u32 flags) {
         case OP_BINARY_LOGIC_OR:    length += fprintf(out, "||"); break;
 
         case OP_BINARY_VECTOR_ACCESS: length += fprintf(out, "["); break;
-        case OP_BINARY_DOT:           length += fprintf(out, "."); break;
         default: length += fprintf(out, "<invalid binary expr>"); break;
     }
     length += ast_print_expression(expr->expr_binary.right, flags);
@@ -649,6 +664,10 @@ ast_print_expression(Light_Ast* expr, u32 flags) {
         case AST_EXPRESSION_VARIABLE:
             length += fprintf(out, "%.*s", TOKEN_STR(expr->expr_variable.name));
             break;
+        case AST_EXPRESSION_DOT:
+            length += ast_print_expression(expr->expr_dot.left, flags);
+            length += fprintf(out, ".%.*s", TOKEN_STR(expr->expr_dot.identifier));
+            break;
         default: length += fprintf(out, "<invalid expression>"); break;
     }
 
@@ -674,6 +693,10 @@ ast_print_node(Light_Ast* node, u32 flags) {
         case AST_DECL_TYPEDEF:{
             length += fprintf(out, "%.*s -> ", TOKEN_STR(node->decl_typedef.name));
             length += ast_print_type(node->decl_typedef.type_referenced, flags);
+            Light_Type* type = node->decl_typedef.type_referenced;
+            if(type && type->kind != TYPE_KIND_ENUM && type->kind != TYPE_KIND_STRUCT && type->kind != TYPE_KIND_UNION) {
+                length += fprintf(out, ";");
+            }
         }break;
         case AST_DECL_VARIABLE:{
             length += fprintf(out, "%.*s :", TOKEN_STR(node->decl_variable.name));

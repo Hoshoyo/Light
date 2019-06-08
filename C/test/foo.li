@@ -1,29 +1,11 @@
 main :: () -> s32 {
-    //foo = bar;
+    v : struct {
+        a : s32;
+        b : r32;
+    };
+    e : foo;
+    a := v.a;
+    b := e;
     return 0;
 }
-
-//foo := 1;
-//bar := 2;
-
-
-//foo : struct {a : s32; };
-//bar : s32;
-//car := *&foo;
-
-/*
-main :: () -> s32 {
-    foo :: () -> bar {
-
-    }
-    return 0;
-}
-
-bar -> struct { a : s32; }
-*/
-
-//foo -> struct { b: bar; c : tar; }
-//bar -> struct { a : s32; }
-//tar -> struct { b : bar; }
-//tar -> struct { b : s32; }
-//tar -> struct { b : s32 = 0; 
+foo ->  enum {Hello, World}

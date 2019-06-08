@@ -176,7 +176,6 @@ type_infer_propagate_binary(Light_Type* type, Light_Ast* expr, u32* error) {
             expr->type = type_primitive_get(TYPE_PRIMITIVE_BOOL);
         } break;
 
-        case OP_BINARY_DOT:
         case OP_BINARY_VECTOR_ACCESS:
             assert(0);
             break;
@@ -260,6 +259,10 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
             return decl->decl_variable.type;
         } break;
         case AST_DECL_TYPEDEF:{
+            // TODO(psv): support alias of an alias
+            if(decl->decl_typedef.type_referenced->kind == TYPE_KIND_ENUM) {
+                return decl->decl_typedef.type_referenced;
+            }
             // Error, referencing a typename instead of a declaration
             type_infer_error_location(expr->expr_variable.name);
             fprintf(stderr, "Type Error: referencing the typename '%.*s' as an rvalue variable\n", TOKEN_STR(expr->expr_variable.name));
@@ -598,15 +601,135 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
             }
         } break;
 
-        case OP_BINARY_DOT:{
-            // TODO(psv):
-            assert(0);
-        } break;
-
         default: assert(0); break;
     }
 
     return 0;
+}
+
+static Light_Ast*
+find_struct_field_decl(Light_Scope* scope, Light_Token* ident) {
+    Light_Symbol symb = {0};
+    symb.token = ident;
+    Symbol_Table* symbol_table = (Symbol_Table*)scope->symb_table;
+    if(symbol_table) {
+        int index = 0;
+        if(symbol_table_entry_exist(symbol_table, symb, &index, 0)) {
+            return symbol_table_get(symbol_table, index).decl;
+        }
+    }
+    return 0;
+}
+static Light_Ast*
+find_union_field_decl(Light_Scope* scope, Light_Token* ident) {
+    Light_Symbol symb = {0};
+    symb.token = ident;
+    Symbol_Table* symbol_table = (Symbol_Table*)scope->symb_table;
+    if(symbol_table) {
+        int index = 0;
+        if(symbol_table_entry_exist(symbol_table, symb, &index, 0)) {
+            return symbol_table_get(symbol_table, index).decl;
+        }
+    }
+    return 0;
+}
+
+static Light_Ast*
+find_enum_field_decl(Light_Scope* scope, Light_Token* ident, u32* error) {
+    Light_Symbol symb = {0};
+    symb.token = ident;
+    Symbol_Table* symbol_table = (Symbol_Table*)scope->symb_table;
+
+    if(symbol_table) {
+        int index = 0;
+        if(symbol_table_entry_exist(symbol_table, symb, &index, 0)) {
+            return symbol_table_get(symbol_table, index).decl;
+        }
+    }
+    // undeclared
+    *error |= TYPE_ERROR;
+    return 0;
+}
+
+Light_Type* 
+type_infer_expr_dot(Light_Ast* expr, u32* error) {
+    assert(expr->kind == AST_EXPRESSION_DOT);
+
+    Light_Type* type = 0;
+
+    Light_Type* left = type_infer_expression(expr->expr_dot.left, error);
+    if(*error & TYPE_ERROR) return 0;
+    if(!left) return 0;
+
+    if(left->kind == TYPE_KIND_POINTER) {
+        left = left->pointer_to;
+    }
+
+    switch(left->kind) {
+        case TYPE_KIND_STRUCT:{
+            Light_Ast* decl = find_struct_field_decl(left->struct_info.struct_scope, expr->expr_dot.identifier);
+            if(!decl) {
+                type_infer_error_location(expr->expr_dot.identifier);
+                fprintf(stderr, "Type Error: Undeclared struct field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
+                *error |= TYPE_ERROR;
+                return 0;
+            }
+            type = decl->decl_variable.type; 
+        } break;
+        case TYPE_KIND_UNION:{
+            Light_Ast* decl = find_union_field_decl(left->union_info.union_scope, expr->expr_dot.identifier);
+            if(!decl) {
+                type_infer_error_location(expr->expr_dot.identifier);
+                fprintf(stderr, "Type Error: Undeclared union field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
+                *error |= TYPE_ERROR;
+                return 0;
+            }
+            type = decl->decl_variable.type;
+        } break;
+        case TYPE_KIND_ENUM:{
+            Light_Ast* decl = find_enum_field_decl(left->enumerator.enum_scope, expr->expr_dot.identifier, error);
+            if(*error & TYPE_ERROR) {
+                type_infer_error_location(expr->expr_dot.identifier);
+                fprintf(stderr, "Type Error: Undeclared enum field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
+                *error |= TYPE_ERROR;
+                return 0;
+            }
+            type = left;
+        } break;
+        case TYPE_KIND_POINTER: {
+            // Already dereferenced once, if it is still a pointer, error out
+            type_infer_error_location(expr->expr_dot.identifier);
+            fprintf(stderr, "Type Error: Operator '.' cannot dereference lvalue twice\n");
+            *error |= TYPE_ERROR;
+            return 0;
+        } break;
+        case TYPE_KIND_ALIAS:{
+            // TODO(psv): alias
+            assert(0);
+        } break;
+        case TYPE_KIND_FUNCTION: {
+            type_infer_error_location(expr->expr_dot.identifier);
+            fprintf(stderr, "Type Error: Operator '.' is not defined for functional types\n");
+            *error |= TYPE_ERROR;
+            return 0;
+        } break;
+        case TYPE_KIND_PRIMITIVE:{
+            type_infer_error_location(expr->expr_dot.identifier);
+            fprintf(stderr, "Type Error: Operator '.' is not defined for primitive types\n");
+            *error |= TYPE_ERROR;
+            return 0;
+        } break;
+        case TYPE_KIND_ARRAY: {
+            type_infer_error_location(expr->expr_dot.identifier);
+            fprintf(stderr, "Type Error: Operator '.' is not defined for array types\n");
+            *error |= TYPE_ERROR;
+            return 0;
+        } break;
+        // Maybe implement namespaces in the future
+        default: assert(0); break;
+    }
+
+    return type;
 }
 
 Light_Type* 
@@ -630,6 +753,10 @@ type_infer_expression(Light_Ast* expr, u32* error) {
         case AST_EXPRESSION_VARIABLE:
             type = type_infer_expr_variable(expr, error);
             break;
+        case AST_EXPRESSION_DOT:
+            type = type_infer_expr_dot(expr, error);
+            break;
+
         case AST_EXPRESSION_DIRECTIVE:
             // TODO(psv):
             assert(0);

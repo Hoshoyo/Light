@@ -539,7 +539,7 @@ parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_sc
             case TOKEN_IDENTIFIER:{
                 Light_Ast* decl = parse_declaration(parser, global_scope, error);
                 if(*error & PARSER_ERROR_FATAL) break;
-                if(decl->kind == AST_DECL_CONSTANT || decl->kind == AST_DECL_VARIABLE){
+                if(decl->kind == AST_DECL_CONSTANT || decl->kind == AST_DECL_VARIABLE) {
                     *error |= parser_require_and_eat(parser, ';');
                 }
                 if(decl) {
@@ -610,7 +610,12 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
         case TOKEN_ARROW:{
             // typedef
             Light_Type* type = parse_type(parser, scope, error);
+            ReturnIfError();
             result = ast_new_decl_typedef(scope, type, name);
+            if(type && type->kind != TYPE_KIND_ENUM && type->kind != TYPE_KIND_STRUCT && type->kind != TYPE_KIND_UNION) {
+                *error |= parser_require_and_eat(parser, ';');
+            }
+            type = type_new_alias(name, type);
         } break;
         default: {
             *error |= parser_error_fatal(parser, next, "invalid token '%.*s' after declaration name\n", TOKEN_STR(next));
@@ -627,7 +632,7 @@ token_to_binary_op(Light_Token* token) {
         case '-':                   return OP_BINARY_MINUS; break;
         case '*':                   return OP_BINARY_MULT; break;
         case '/':                   return OP_BINARY_DIV; break;
-        case '%':                  return OP_BINARY_MOD; break;
+        case '%':                   return OP_BINARY_MOD; break;
         case '&':                   return OP_BINARY_AND; break;
         case '|':                   return OP_BINARY_OR; break;
         case '^':                   return OP_BINARY_XOR; break;
@@ -641,7 +646,6 @@ token_to_binary_op(Light_Token* token) {
         case TOKEN_NOT_EQUAL:       return OP_BINARY_NOT_EQUAL; break;
         case TOKEN_LOGIC_AND:       return OP_BINARY_LOGIC_AND; break;
         case TOKEN_LOGIC_OR:        return OP_BINARY_LOGIC_OR; break;
-        case '.':                   return OP_BINARY_DOT; break;
         case '[':                   return OP_BINARY_VECTOR_ACCESS; break;
         default: return OP_BINARY_UNKNOWN; break;
     }
@@ -847,8 +851,7 @@ Light_Ast* parse_expression_precedence8(Light_Parser* parser, Light_Scope* scope
                 *error |= parser_error_fatal(parser, ident, "expected identifier after '.' operator, but got '%.*s'\n", TOKEN_STR(ident));
                 return 0;
             }
-			Light_Ast* right = ast_new_expr_variable(scope, ident);
-			expr = ast_new_expr_binary(scope, expr, right, op, token_to_binary_op(op));
+            expr = ast_new_expr_dot(scope, expr, ident);
 
             while(true) {
 				op = lexer_peek(parser->lexer);
@@ -1073,6 +1076,7 @@ parse_type_enum(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Token** fields_names = array_new(Light_Token*);
     Light_Ast**   fields_values = array_new(Light_Ast*);
     Light_Scope*  enum_scope = light_scope_new(0, scope, SCOPE_ENUM);
+
     for(s32 i = 0; ; ++i) {
         if(i != 0) {
             *error |= parser_require_and_eat(parser, ',');
