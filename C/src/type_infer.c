@@ -29,7 +29,8 @@ static s32
 type_infer_error_undeclared_identifier(Light_Token* t) {
     s32 length = 0;
     length += type_infer_error_location(t);
-    fprintf(stderr, "Type Error: undeclared identifier '%.*s'\n", TOKEN_STR(t));
+    length += fprintf(stderr, "Type Error: undeclared identifier '%.*s'\n", TOKEN_STR(t));
+    return length;
 }
 
 Light_Type_Check_Error
@@ -305,7 +306,7 @@ type_infer_expr_literal(Light_Ast* expr, u32* error) {
             return type_weak_primitive_from_literal(expr->expr_literal.type);
         } break;
         case LITERAL_POINTER:{
-            return type_new_pointer(TYPE_PRIMITIVE_VOID);
+            return type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
         } break;
         case LITERAL_ARRAY: {
             // TODO(psv):
@@ -317,6 +318,7 @@ type_infer_expr_literal(Light_Ast* expr, u32* error) {
         } break;
         default: assert(0); break;
     }
+    return 0;
 }
 
 static Light_Type*
@@ -402,6 +404,7 @@ types_compatible(Light_Type* left, Light_Type* right) {
             break;
         default: assert(0); break;
     }
+    return 0;
 }
 
 static Light_Type*
@@ -431,6 +434,7 @@ type_infer_expr_binary_pointer_arithmetic(Light_Ast* expr, Light_Type* inferred_
         } break;
         default: assert(0); break;
     }
+    return 0;
 }
 
 static Light_Type* 

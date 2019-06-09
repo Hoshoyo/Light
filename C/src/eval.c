@@ -132,6 +132,7 @@ eval_expr_is_constant(Light_Ast* expr, u32 flags, u32* error) {
         } break;
         default: assert(0); break;
 	}
+	return false;
 }
 
 s64

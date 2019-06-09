@@ -49,7 +49,8 @@ static s32
 typecheck_error_undeclared_identifier(Light_Token* t) {
     s32 length = 0;
     length += typecheck_error_location(t);
-    fprintf(stderr, "Type Error: undeclared identifier '%.*s'\n", TOKEN_STR(t));
+    length += fprintf(stderr, "Type Error: undeclared identifier '%.*s'\n", TOKEN_STR(t));
+    return length;
 }
 
 static Light_Ast* 
@@ -137,7 +138,7 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
     // All symbols are loaded, perform normal typecheck
     for(u64 i = 0; i < array_length(top_level); ++i) {
         Light_Ast* node = top_level[i];
-        typecheck_information_pass_decl(node, 0, &error);
+        typecheck_information_pass_decl(node, 0, (u32*)&error);
     }
     if(error & TYPE_ERROR)
         return error;
@@ -148,7 +149,7 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
     while(starting_length > 0) {
         for(u64 i = 0; i < array_length(global_infer_queue); ++i) {
             Light_Ast* node = global_infer_queue[i];
-            typecheck_information_pass_decl(node, 0, &error);
+            typecheck_information_pass_decl(node, 0, (u32*)&error);
         }
 
         if(error & TYPE_ERROR)
