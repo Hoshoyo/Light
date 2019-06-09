@@ -1,3 +1,7 @@
 main :: () -> s32 {
-    a : [!3]s32;
+    a : [[s32]foo.FOO]s32;
+}
+
+foo -> enum {
+    FOO :: 1
 }

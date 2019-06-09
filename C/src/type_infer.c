@@ -325,6 +325,7 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
     
     Light_Type* operand_type = type_infer_expression(expr->expr_unary.operand, error);
     if(*error & TYPE_ERROR) return 0;
+    if(!operand_type) return 0;
 
     switch(expr->expr_unary.op) {
         case OP_UNARY_ADDRESSOF: {

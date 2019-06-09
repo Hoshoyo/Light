@@ -135,9 +135,7 @@ eval_expr_is_constant(Light_Ast* expr, u32 flags, u32* error) {
 }
 
 s64
-eval_expr_constant_int(Light_Ast* expr, u32* error) {
-    assert(type_primitive_int(expr->type));
-	
+eval_expr_constant_int(Light_Ast* expr, u32* error) {	
     switch(expr->kind) {
         case AST_EXPRESSION_LITERAL:{
 			eval_literal_primitive(expr);
@@ -205,7 +203,11 @@ eval_expr_constant_int(Light_Ast* expr, u32* error) {
 			Light_Type* type = type_alias_root(expr->type);
 			Light_Ast* decl = find_enum_field_decl(type->enumerator.enum_scope, expr->expr_dot.identifier, error);
 			if(*error & TYPE_ERROR) return 0;
-			// TODO(psv): enum value 
+			if(decl) {
+				s64 value = eval_expr_constant_int(decl, error);
+				return value;
+			}
+			// TODO(psv): enum value
 			assert(0);
 		} break;
         case AST_EXPRESSION_UNARY: {
@@ -230,15 +232,15 @@ eval_expr_constant_int(Light_Ast* expr, u32* error) {
 					s64 opval = eval_expr_constant_int(expr->expr_unary.operand, error);
 					return ~opval;
 				} break;
-				case OP_UNARY_CAST:
-					// TODO(psv):
-					assert(0);
-					break;
+				case OP_UNARY_CAST:{
+					assert(type_primitive_int(expr->expr_unary.type_to_cast));
+					return eval_expr_constant_int(expr->expr_unary.operand, error);
+				} break;
 				default: assert(0); break;
 			}
 		} break;
         case AST_EXPRESSION_VARIABLE: {
-			
+
 		} break;
         case AST_EXPRESSION_DIRECTIVE:
             // TODO(psv):

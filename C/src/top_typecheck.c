@@ -348,6 +348,14 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                     type = typecheck_resolve_type_symbol_tables(type, flags, error);
                 }
             } else {
+                bool all_fields_internalized = true;
+                for(s32 i = 0; i < type->enumerator.field_count; ++i) {
+                    Light_Ast* field_value = type->enumerator.fields_values[i];
+                    Light_Type* field_type = type_infer_expression(field_value, error);
+                    if(!field_type) {
+                        all_fields_internalized = false;
+                    }
+                }
                 type->size_bits = 32;
                 type->flags |= TYPE_FLAG_SIZE_RESOLVED;
                 type = type_internalize(type);
