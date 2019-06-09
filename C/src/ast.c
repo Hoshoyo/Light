@@ -2,6 +2,7 @@
 #include "type.h"
 #include "utils/utils.h"
 #include "utils/allocator.h"
+#include "eval.h"
 #include <stdio.h>
 #include <assert.h>
 #include <light_array.h>
@@ -215,58 +216,13 @@ ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token) {
         switch(result->type->kind) {
             case TYPE_KIND_POINTER: break; // value is 0
             case TYPE_KIND_PRIMITIVE:{
-                literal_primitive_evaluate(result);
+                eval_literal_primitive(result);
             }break;
             default: assert(0); break;
         }
     }    
 
     return result;
-}
-
-bool 
-literal_primitive_evaluate(Light_Ast* p) {
-    assert(p->type->kind == TYPE_KIND_PRIMITIVE);
-    switch(p->type->kind) {
-        case TYPE_PRIMITIVE_BOOL:
-            p->expr_literal.value_bool = (p->expr_literal.token->type == TOKEN_LITERAL_BOOL_TRUE);
-            break;
-
-        case TYPE_PRIMITIVE_R32:
-            p->expr_literal.value_r32 = str_to_r32(p->expr_literal.token->data, p->expr_literal.token->length);
-            break;
-        case TYPE_PRIMITIVE_R64:
-            p->expr_literal.value_r64 = str_to_r64(p->expr_literal.token->data, p->expr_literal.token->length);
-            break;
-
-        case TYPE_PRIMITIVE_S8:
-            p->expr_literal.value_s8 = (s8)str_to_s64(p->expr_literal.token->data, p->expr_literal.token->length);
-            break;
-        case TYPE_PRIMITIVE_S16:
-            p->expr_literal.value_s16 = (s16)str_to_s64(p->expr_literal.token->data, p->expr_literal.token->length);
-            break;
-        case TYPE_PRIMITIVE_S32:
-            p->expr_literal.value_s32 = (s32)str_to_s64(p->expr_literal.token->data, p->expr_literal.token->length);
-            break;
-        case TYPE_PRIMITIVE_S64:
-            p->expr_literal.value_s64 = str_to_s64(p->expr_literal.token->data, p->expr_literal.token->length);
-            break;
-        case TYPE_PRIMITIVE_U8:
-            p->expr_literal.value_u8 = (u8)str_to_u64(p->expr_literal.token->data, p->expr_literal.token->length);
-            break;
-        case TYPE_PRIMITIVE_U16:
-            p->expr_literal.value_u16 = (u16)str_to_u64(p->expr_literal.token->data, p->expr_literal.token->length);
-            break;
-        case TYPE_PRIMITIVE_U32:
-            p->expr_literal.value_u32 = (u32)str_to_u64(p->expr_literal.token->data, p->expr_literal.token->length);
-            break;
-        case TYPE_PRIMITIVE_U64:
-            p->expr_literal.value_u64 = str_to_u64(p->expr_literal.token->data, p->expr_literal.token->length);
-            break;
-        case TYPE_PRIMITIVE_VOID: break;
-        default: assert(0); break;
-    }
-    return true;
 }
 
 Light_Ast* 
@@ -490,7 +446,6 @@ ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_tok
 
 
 
-#define fprintf(F, ...) fprintf(F, __VA_ARGS__); fflush(F)
 // Print
 const char* ColorReset   = "\x1B[0m";
 const char* ColorRed     = "\x1B[31m";
@@ -500,6 +455,18 @@ const char* ColorBlue    = "\x1B[34m";
 const char* ColorMagenta = "\x1B[35m";
 const char* ColorCyan    = "\x1B[36m";
 const char* ColorWhite   = "\x1B[37m";
+
+static s32
+print_indent_level(FILE* out, s32 level) {
+    s32 length = 0;
+    // TODO(psv): more efficient
+    for(s32 i = 0; i < level; ++i) {
+        length += fprintf(out, "   ");
+    }
+
+    return length;
+}
+#define fprintf(F, ...) fprintf(F, __VA_ARGS__); fflush(F)
 #define TOKEN_STR(T) (T)->length, (T)->data
 
 static FILE* ast_file_from_flags(u32 flags) {
@@ -514,7 +481,7 @@ static FILE* ast_file_from_flags(u32 flags) {
 }
 
 s32
-ast_print_expr_literal(Light_Ast* expr, u32 flags) {
+ast_print_expr_literal(Light_Ast* expr, u32 flags, s32 indent_level) {
     assert(expr->kind == AST_EXPRESSION_LITERAL);
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
@@ -536,7 +503,7 @@ ast_print_expr_literal(Light_Ast* expr, u32 flags) {
                 if(i != 0) {
                     length += fprintf(out, ", ");
                 }
-                length += ast_print_expression(expr->expr_literal.array_exprs[i], flags);
+                length += ast_print_expression(expr->expr_literal.array_exprs[i], flags, indent_level);
             }
             length += fprintf(out, "}");
         }break;
@@ -546,7 +513,7 @@ ast_print_expr_literal(Light_Ast* expr, u32 flags) {
                 if(i != 0) {
                     length += fprintf(out, ", ");
                 }
-                length += ast_print_expression(expr->expr_literal.struct_exprs[i], flags);
+                length += ast_print_expression(expr->expr_literal.struct_exprs[i], flags, indent_level);
             }
             length += fprintf(out, "}");
         }break;
@@ -555,12 +522,12 @@ ast_print_expr_literal(Light_Ast* expr, u32 flags) {
 }
 
 s32
-ast_print_expr_binary(Light_Ast* expr, u32 flags) {
+ast_print_expr_binary(Light_Ast* expr, u32 flags, s32 indent_level) {
     assert(expr->kind == AST_EXPRESSION_BINARY);
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
 
-    length += ast_print_expression(expr->expr_binary.left, flags);
+    length += ast_print_expression(expr->expr_binary.left, flags, indent_level);
     switch(expr->expr_binary.op) {
         case OP_BINARY_PLUS:    length += fprintf(out, " + "); break;
         case OP_BINARY_MINUS:   length += fprintf(out, " - "); break;
@@ -586,7 +553,7 @@ ast_print_expr_binary(Light_Ast* expr, u32 flags) {
         case OP_BINARY_VECTOR_ACCESS: length += fprintf(out, "["); break;
         default: length += fprintf(out, "<invalid binary expr>"); break;
     }
-    length += ast_print_expression(expr->expr_binary.right, flags);
+    length += ast_print_expression(expr->expr_binary.right, flags, indent_level);
     if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS) {
         length += fprintf(out, "]");
     }
@@ -595,15 +562,15 @@ ast_print_expr_binary(Light_Ast* expr, u32 flags) {
 }
 
 s32
-ast_print_expr_proc_call(Light_Ast* expr, u32 flags) {
+ast_print_expr_proc_call(Light_Ast* expr, u32 flags, s32 indent_level) {
     assert(expr->kind == AST_EXPRESSION_PROCEDURE_CALL);
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
 
-    length += ast_print_expression(expr->expr_proc_call.caller_expr, flags);
+    length += ast_print_expression(expr->expr_proc_call.caller_expr, flags, indent_level);
     length += fprintf(out, "(");
     for(s32 i = 0; i < expr->expr_proc_call.arg_count; ++i) {
-        length += ast_print_expression(expr->expr_proc_call.args[i], flags);    
+        length += ast_print_expression(expr->expr_proc_call.args[i], flags, indent_level);
     }
     length += fprintf(out, ")");
 
@@ -611,23 +578,23 @@ ast_print_expr_proc_call(Light_Ast* expr, u32 flags) {
 }
 
 s32
-ast_print_expr_unary(Light_Ast* expr, u32 flags) {
+ast_print_expr_unary(Light_Ast* expr, u32 flags, s32 indent_level) {
     assert(expr->kind == AST_EXPRESSION_UNARY);
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
 
     switch(expr->expr_unary.op) {
-        case OP_UNARY_ADDRESSOF:     length += fprintf(out, "&"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
-        case OP_UNARY_BITWISE_NOT:   length += fprintf(out, "~"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
-        case OP_UNARY_DEREFERENCE:   length += fprintf(out, "*"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
-        case OP_UNARY_LOGIC_NOT:     length += fprintf(out, "!"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
-        case OP_UNARY_MINUS:         length += fprintf(out, "-"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
-        case OP_UNARY_PLUS:          length += fprintf(out, "+"); length += ast_print_expression(expr->expr_unary.operand, flags); break;
+        case OP_UNARY_ADDRESSOF:     length += fprintf(out, "&"); length += ast_print_expression(expr->expr_unary.operand, flags, indent_level); break;
+        case OP_UNARY_BITWISE_NOT:   length += fprintf(out, "~"); length += ast_print_expression(expr->expr_unary.operand, flags, indent_level); break;
+        case OP_UNARY_DEREFERENCE:   length += fprintf(out, "*"); length += ast_print_expression(expr->expr_unary.operand, flags, indent_level); break;
+        case OP_UNARY_LOGIC_NOT:     length += fprintf(out, "!"); length += ast_print_expression(expr->expr_unary.operand, flags, indent_level); break;
+        case OP_UNARY_MINUS:         length += fprintf(out, "-"); length += ast_print_expression(expr->expr_unary.operand, flags, indent_level); break;
+        case OP_UNARY_PLUS:          length += fprintf(out, "+"); length += ast_print_expression(expr->expr_unary.operand, flags, indent_level); break;
         case OP_UNARY_CAST: {
             length += fprintf(out, "[");
-            length += ast_print_type(expr->expr_unary.type_to_cast, flags);
+            length += ast_print_type(expr->expr_unary.type_to_cast, flags, indent_level);
             length += fprintf(out, "]");
-            length += ast_print_expression(expr->expr_unary.operand, flags);
+            length += ast_print_expression(expr->expr_unary.operand, flags, indent_level);
         }break;
         default: length += fprintf(out, "<invalid unary expr>"); break;
     }
@@ -636,37 +603,37 @@ ast_print_expr_unary(Light_Ast* expr, u32 flags) {
 }
 
 s32
-ast_print_expression(Light_Ast* expr, u32 flags) {
+ast_print_expression(Light_Ast* expr, u32 flags, s32 indent_level) {
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
 
     //length += fprintf(out, "(");
     if(flags & LIGHT_AST_PRINT_EXPR_TYPES) {
         length += fprintf(out, "<");
-        length += ast_print_type(expr->type, flags);
+        length += ast_print_type(expr->type, flags, indent_level);
         length += fprintf(out, ">");
     }
 
     switch(expr->kind) {
         case AST_EXPRESSION_BINARY:
-            length += ast_print_expr_binary(expr, flags);
+            length += ast_print_expr_binary(expr, flags, indent_level);
             break;
         case AST_EXPRESSION_UNARY:
-            length += ast_print_expr_unary(expr, flags);
+            length += ast_print_expr_unary(expr, flags, indent_level);
             break;
         case AST_EXPRESSION_DIRECTIVE:
             break;
         case AST_EXPRESSION_LITERAL:
-            length += ast_print_expr_literal(expr, flags);
+            length += ast_print_expr_literal(expr, flags, indent_level);
             break;
         case AST_EXPRESSION_PROCEDURE_CALL:
-            length += ast_print_expr_proc_call(expr, flags);
+            length += ast_print_expr_proc_call(expr, flags, indent_level);
             break;
         case AST_EXPRESSION_VARIABLE:
             length += fprintf(out, "%.*s", TOKEN_STR(expr->expr_variable.name));
             break;
         case AST_EXPRESSION_DOT:
-            length += ast_print_expression(expr->expr_dot.left, flags);
+            length += ast_print_expression(expr->expr_dot.left, flags, indent_level);
             length += fprintf(out, ".%.*s", TOKEN_STR(expr->expr_dot.identifier));
             break;
         default: length += fprintf(out, "<invalid expression>"); break;
@@ -678,7 +645,7 @@ ast_print_expression(Light_Ast* expr, u32 flags) {
 }
 
 s32
-ast_print_node(Light_Ast* node, u32 flags) {
+ast_print_node(Light_Ast* node, u32 flags, s32 indent_level) {
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
 
@@ -686,14 +653,14 @@ ast_print_node(Light_Ast* node, u32 flags) {
         case AST_DECL_CONSTANT: {
             length += fprintf(out, "%.*s :", TOKEN_STR(node->decl_constant.name));
             if(node->decl_constant.type_info) {
-                length += ast_print_type(node->decl_constant.type_info, flags);
+                length += ast_print_type(node->decl_constant.type_info, flags, indent_level);
             }
             length += fprintf(out, ":");
-            length += ast_print_expression(node->decl_constant.value, flags);
+            length += ast_print_expression(node->decl_constant.value, flags, indent_level);
         }break;
         case AST_DECL_TYPEDEF:{
             length += fprintf(out, "%.*s -> ", TOKEN_STR(node->decl_typedef.name));
-            length += ast_print_type(node->decl_typedef.type_referenced, flags);
+            length += ast_print_type(node->decl_typedef.type_referenced, flags, indent_level);
             Light_Type* type = node->decl_typedef.type_referenced;
             if(type && type->kind != TYPE_KIND_ENUM && type->kind != TYPE_KIND_STRUCT && type->kind != TYPE_KIND_UNION) {
                 length += fprintf(out, ";");
@@ -702,47 +669,49 @@ ast_print_node(Light_Ast* node, u32 flags) {
         case AST_DECL_VARIABLE:{
             length += fprintf(out, "%.*s :", TOKEN_STR(node->decl_variable.name));
             if(node->decl_variable.type) {
-                length += ast_print_type(node->decl_variable.type, flags);
+                length += ast_print_type(node->decl_variable.type, flags, indent_level);
             }
             if(node->decl_variable.assignment) {
                 length += fprintf(out, " = ");
-                length += ast_print_expression(node->decl_variable.assignment, flags);
+                length += ast_print_expression(node->decl_variable.assignment, flags, indent_level);
             }
         }break;
         case AST_DECL_PROCEDURE:{
             length += fprintf(out, "%.*s :: (", TOKEN_STR(node->decl_proc.name));
             for(s32 i = 0; i < node->decl_proc.argument_count; ++i) {
-                length += ast_print_node((Light_Ast*)node->decl_proc.arguments[i], flags);
+                length += ast_print_node((Light_Ast*)node->decl_proc.arguments[i], flags, indent_level);
             }
             length += fprintf(out, ") -> ");
-            length += ast_print_type(node->decl_proc.return_type, flags);
+            length += ast_print_type(node->decl_proc.return_type, flags, indent_level);
             if(node->decl_proc.body) {
-                length += ast_print_node(node->decl_proc.body, flags);
+                length += ast_print_node(node->decl_proc.body, flags, indent_level);
             } else {
                 length += fprintf(out, ";");
             }
         }break;
         case AST_COMMAND_ASSIGNMENT:{
             if(node->comm_assignment.lvalue) {
-                length += ast_print_expression(node->comm_assignment.lvalue, flags);
+                length += ast_print_expression(node->comm_assignment.lvalue, flags, indent_level);
                 length += fprintf(out, " = ");
             }
-            length += ast_print_expression(node->comm_assignment.rvalue, flags);
+            length += ast_print_expression(node->comm_assignment.rvalue, flags, indent_level);
             length += fprintf(out, ";");
         }break;
         case AST_COMMAND_BLOCK:{
             length += fprintf(out, "{\n");
             for(s32 i = 0; i < node->comm_block.command_count; ++i) {
-                length += ast_print_node(node->comm_block.commands[i], flags);
+                print_indent_level(out, indent_level + 1);
+                length += ast_print_node(node->comm_block.commands[i], flags, indent_level + 1);
                 length += fprintf(out, "\n");
             }
+            print_indent_level(out, indent_level);
             length += fprintf(out, "}");
         }break;
         case AST_COMMAND_BREAK:{
             length += fprintf(out, "break");
             if(node->comm_break.level) {
                 length += fprintf(out, " ");
-                length += ast_print_expression(node->comm_break.level, flags);
+                length += ast_print_expression(node->comm_break.level, flags, indent_level);
             }
             length += fprintf(out, ";");
         }break;
@@ -750,7 +719,7 @@ ast_print_node(Light_Ast* node, u32 flags) {
             length += fprintf(out, "continue");
             if(node->comm_continue.level) {
                 length += fprintf(out, " ");
-                length += ast_print_expression(node->comm_continue.level, flags);
+                length += ast_print_expression(node->comm_continue.level, flags, indent_level);
             }
             length += fprintf(out, ";");
         }break;
@@ -759,41 +728,42 @@ ast_print_node(Light_Ast* node, u32 flags) {
             if(node->comm_for.prologue){
                 for(s32 i = 0; i < array_length(node->comm_for.prologue); ++i) {
                     if(i != 0) length += fprintf(out, ", ");
-                    length += ast_print_node(node->comm_for.prologue[i], flags);
+                    length += ast_print_node(node->comm_for.prologue[i], flags, indent_level);
                 }
             }
             length += fprintf(out, ";");
             if(node->comm_for.condition)
-                length += ast_print_expression(node->comm_for.condition, flags);
+                length += ast_print_expression(node->comm_for.condition, flags, indent_level);
             length += fprintf(out, ";");
             if(node->comm_for.epilogue) {
                 for(s32 i = 0; i < array_length(node->comm_for.epilogue); ++i) {
                     if(i != 0) length += fprintf(out, ", ");
-                    length += ast_print_node(node->comm_for.epilogue[i], flags);
+                    length += ast_print_node(node->comm_for.epilogue[i], flags, indent_level);
                 }
             }
+            length += ast_print_node(node->comm_for.body, flags, indent_level);
         }break;
         case AST_COMMAND_IF:{
             length += fprintf(out, "if ");
-            length += ast_print_expression(node->comm_if.condition, flags);
-            length += ast_print_node(node->comm_if.body_true, flags);
+            length += ast_print_expression(node->comm_if.condition, flags, indent_level);
+            length += ast_print_node(node->comm_if.body_true, flags, indent_level);
             if(node->comm_if.body_false) {
                 length += fprintf(out, " else ");
-                length += ast_print_node(node->comm_if.body_false, flags);
+                length += ast_print_node(node->comm_if.body_false, flags, indent_level);
             }
         }break;
         case AST_COMMAND_RETURN:{
             length += fprintf(out, "return");
             if(node->comm_return.expression) {
                 length += fprintf(out, " ");
-                length += ast_print_expression(node->comm_return.expression, flags);
+                length += ast_print_expression(node->comm_return.expression, flags, indent_level);
             }
             length += fprintf(out, ";");
         }break;
         case AST_COMMAND_WHILE:{
             length += fprintf(out, "while ");
-            length += ast_print_expression(node->comm_while.condition, flags);
-            length += ast_print_node(node->comm_while.body, flags);
+            length += ast_print_expression(node->comm_while.condition, flags, indent_level);
+            length += ast_print_node(node->comm_while.body, flags, indent_level);
         }break;
         default: length += fprintf(out, "<invalid node>"); break;
     }
@@ -803,7 +773,7 @@ ast_print_node(Light_Ast* node, u32 flags) {
 
 
 s32 
-ast_print_type(Light_Type* type, u32 flags) {
+ast_print_type(Light_Type* type, u32 flags, s32 indent_level) {
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
 
@@ -841,45 +811,45 @@ ast_print_type(Light_Type* type, u32 flags) {
         } break;
         case TYPE_KIND_POINTER:{
             length += fprintf(out, "^");
-            length += ast_print_type(type->pointer_to, flags);
+            length += ast_print_type(type->pointer_to, flags, indent_level);
         } break;
         case TYPE_KIND_ALIAS:{
             length += fprintf(out, "%.*s", type->alias.name->length, type->alias.name->data);
         } break;
         case TYPE_KIND_ARRAY:{
             length += fprintf(out, "[%lu]", type->array_info.dimension);
-            length += ast_print_type(type->array_info.array_of, flags);
+            length += ast_print_type(type->array_info.array_of, flags, indent_level);
         } break;
         case TYPE_KIND_FUNCTION:{
             length += fprintf(out, "(");
             for(s32 i = 0; i < type->function.arguments_count; ++i) {
                 if(i != 0) length += fprintf(out, ", ");
-                length += ast_print_type(type->function.arguments_type[i], flags);
+                length += ast_print_type(type->function.arguments_type[i], flags, indent_level);
             }
             length += fprintf(out, "%s) -> ", color);
-            length += ast_print_type(type->function.return_type, flags);
+            length += ast_print_type(type->function.return_type, flags, indent_level);
         } break;
         case TYPE_KIND_STRUCT:{
             length += fprintf(out, "struct { ");
             for(s32 i = 0; i < type->struct_info.fields_count; ++i) {
                 Light_Ast* field = type->struct_info.fields[i];
-                length += ast_print_node(field, flags);
+                length += ast_print_node(field, flags, indent_level);
                 length += fprintf(out, "%s; ", color);
             }
-            length += fprintf(out, "%s}", color);
+            length += fprintf(out, "%s }", color);
         } break;
         case TYPE_KIND_UNION: {
             length += fprintf(out, "union { ");
             for(s32 i = 0; i < type->union_info.fields_count; ++i) {
                 Light_Ast* field = type->union_info.fields[i];
-                length += ast_print_node(field, flags);
+                length += ast_print_node(field, flags, indent_level);
                 length += fprintf(out, "%s; ", color);
             }
-            length += fprintf(out, "%s}", color);
+            length += fprintf(out, "%s }", color);
         } break;
         case TYPE_KIND_ENUM: {
             length += fprintf(out, "enum ");
-            length += ast_print_type(type->enumerator.type_hint, flags);
+            length += ast_print_type(type->enumerator.type_hint, flags, indent_level);
             length += fprintf(out, "{ ");
             for(s32 i = 0; i < type->enumerator.field_count; ++i) {
                 if(i != 0) length += fprintf(out, "%s, ", color);
@@ -895,14 +865,14 @@ ast_print_type(Light_Type* type, u32 flags) {
 }
 
 s32
-ast_print(Light_Ast** ast, u32 flags) {
+ast_print(Light_Ast** ast, u32 flags, s32 indent_level) {
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
 
     if(!ast) return length;
 
     for(u64 i = 0; i < array_length(ast); ++i) {
-        length += ast_print_node(ast[i], flags);
+        length += ast_print_node(ast[i], flags, indent_level);
         switch(ast[i]->kind) {
             case AST_DECL_CONSTANT:     length += fprintf(out, ";"); break;
             case AST_DECL_VARIABLE:     length += fprintf(out, ";"); break;

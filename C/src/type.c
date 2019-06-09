@@ -105,7 +105,7 @@ type_new_alias(Light_Token* name, Light_Type* alias_to) {
 }
 
 Light_Type* 
-type_new_array(Light_Ast* dimension, Light_Type* type) {
+type_new_array(Light_Ast* dimension, Light_Type* type, Light_Token* token_array) {
     Light_Type* result = type_alloc();
 
     result->kind = TYPE_KIND_ARRAY;
@@ -115,6 +115,7 @@ type_new_array(Light_Ast* dimension, Light_Type* type) {
     
     result->array_info.array_of = type;
     result->array_info.const_expr = dimension;
+    result->array_info.token_array = token_array;
 
     return result;
 }
@@ -382,7 +383,7 @@ type_table_print() {
     for(int i = 0; i < global_type_table.entries_capacity; ++i) {
         Type_Table_Entry* entry = &global_type_table.entries[i];
         if(entry->flags & HASH_TABLE_OCCUPIED){
-            ast_print_type(entry->data, LIGHT_AST_PRINT_STDOUT);
+            ast_print_type(entry->data, LIGHT_AST_PRINT_STDOUT, 0);
             fprintf(out, "\n");
         }
     }

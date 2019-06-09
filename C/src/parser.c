@@ -25,7 +25,7 @@ parser_error_fatal(Light_Parser* parser, Light_Token* loc, const char* fmt, ...)
     va_list args;
 	va_start(args, fmt);
     parser_error_location(parser, loc);
-	fprintf(stderr, "Syntax error: ");
+	fprintf(stderr, "Syntax Error: ");
 	vfprintf(stderr, fmt, args);
 	va_end(args);
 
@@ -211,8 +211,10 @@ parse_comm_break(Light_Parser* parser, Light_Scope* scope, u32* error) {
         case TOKEN_LITERAL_DEC_INT:
         case TOKEN_LITERAL_BIN_INT:
         case TOKEN_LITERAL_HEX_INT:
+            lexer_next(parser->lexer); // integer
             lit = ast_new_expr_literal_primitive(scope, next);
             break;
+        case ';': break;
         default:
             *error |= parser_error_fatal(parser, next, "break expects either a positive integer literal or no argument, given '%.*s' instead\n", TOKEN_STR(next));
             return 0;
@@ -233,8 +235,10 @@ parse_comm_continue(Light_Parser* parser, Light_Scope* scope, u32* error) {
         case TOKEN_LITERAL_DEC_INT:
         case TOKEN_LITERAL_BIN_INT:
         case TOKEN_LITERAL_HEX_INT:
+            lexer_next(parser->lexer); // eat integer
             lit = ast_new_expr_literal_primitive(scope, next);
             break;
+        case ';': break;
         default:
             *error |= parser_error_fatal(parser, next, "break expects either a positive integer literal or no argument, given '%.*s' instead\n", TOKEN_STR(next));
             return 0;
@@ -314,6 +318,7 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 			break;
 		case TOKEN_KEYWORD_BREAK:
 			command = parse_comm_break(parser, scope, error);
+            ReturnIfError();
             if(require_semicolon) {
                 *error |= parser_require_and_eat(parser, ';');
                 ReturnIfError();
@@ -321,6 +326,7 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 			break;
 		case TOKEN_KEYWORD_CONTINUE:
 			command = parse_comm_continue(parser, scope, error);
+            ReturnIfError();
             if(require_semicolon) {
                 *error |= parser_require_and_eat(parser, ';');
                 ReturnIfError();
@@ -328,6 +334,7 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 			break;
 		case TOKEN_KEYWORD_RETURN:
 			command = parse_comm_return(parser, scope, error);
+            ReturnIfError();
             if(require_semicolon) {
                 *error |= parser_require_and_eat(parser, ';');
                 ReturnIfError();
@@ -344,6 +351,7 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 			} else {
 				command = parse_comm_assignment(parser, scope, error);
 			}
+            ReturnIfError();
             if(require_semicolon && command->kind != AST_DECL_PROCEDURE && command->kind != AST_DECL_TYPEDEF) {
                 *error |= parser_require_and_eat(parser, ';');
                 ReturnIfError();
@@ -351,6 +359,7 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 		}break;
 		default: {
 			command = parse_comm_assignment(parser, scope, error);
+            ReturnIfError();
             if(require_semicolon) {
                 *error |= parser_require_and_eat(parser, ';');
                 ReturnIfError();
@@ -999,6 +1008,8 @@ parse_type_array(Light_Parser* parser, Light_Scope* scope, u32* error) {
     *error |= parser_require_and_eat(parser, '[');
     ReturnIfError();
 
+    Light_Token* token_array = lexer_peek_n(parser->lexer, -1);
+
     Light_Ast* dimension = parse_expression(parser, scope, error);
     ReturnIfError();
 
@@ -1008,7 +1019,7 @@ parse_type_array(Light_Parser* parser, Light_Scope* scope, u32* error) {
 	Light_Type* array_type = parse_type(parser, scope, error);
     ReturnIfError();
 
-	return type_new_array(dimension, array_type);
+	return type_new_array(dimension, array_type, token_array);
 }
 static Light_Type*
 parse_type_procedure(Light_Parser* parser, Light_Scope* scope, u32* error) {

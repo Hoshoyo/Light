@@ -249,10 +249,14 @@ typedef struct {
 
 typedef struct {
 	struct Light_Ast_t*   level;	    // Must be an int literal [0, MAX_INT]
+	s64                   level_value;
+	bool                  level_evaluated;
 	Light_Token*          token_break;
 } Light_Ast_Comm_Break;
 typedef struct {
 	struct Light_Ast_t*   level;
+	s64                   level_value;
+	bool                  level_evaluated;
 	Light_Token*          token_continue;
 } Light_Ast_Comm_Continue;
 typedef struct {
@@ -421,8 +425,9 @@ typedef enum {
 
 typedef struct {
     struct Light_Type_t* array_of;
-	bool        dimension_evaluated;
-	uint64_t    dimension;
+	bool                 dimension_evaluated;
+	uint64_t             dimension;
+	Light_Token*         token_array;
 	union {
 		struct Light_Ast_t*   const_expr;
 	};
@@ -546,7 +551,7 @@ typedef enum {
 	LIGHT_AST_PRINT_EXPR_TYPES = (1 << 3),
 } Light_Ast_Print_Flags;
 
-s32 ast_print_node(Light_Ast* node, u32 flags);
-s32 ast_print_type(Light_Type* type, u32 flags);
-s32 ast_print_expression(Light_Ast* expr, u32 flags);
-s32 ast_print(Light_Ast** ast, u32 flags);
+s32 ast_print_node(Light_Ast* node, u32 flags, s32 indent_level);
+s32 ast_print_type(Light_Type* type, u32 flags, s32 indent_level);
+s32 ast_print_expression(Light_Ast* expr, u32 flags, s32 indent_level);
+s32 ast_print(Light_Ast** ast, u32 flags, s32 indent_level);

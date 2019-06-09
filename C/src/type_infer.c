@@ -8,7 +8,7 @@
 
 #define TOKEN_STR(T) (T)->length, (T)->data
 
-static Light_Type*
+Light_Type*
 type_alias_root(Light_Type* type) {
     while(type && type->kind == TYPE_KIND_ALIAS)
         type = type->alias.alias_to;
@@ -36,15 +36,15 @@ Light_Type_Check_Error
 type_infer_type_mismatch_error(Light_Token* location, Light_Type* left, Light_Type* right) {
     type_infer_error_location(location);
     fprintf(stderr, "Type Error: type mismatch '");
-    ast_print_type(left, LIGHT_AST_PRINT_STDERR);
+    ast_print_type(left, LIGHT_AST_PRINT_STDERR, 0);
     fprintf(stderr, "' vs '");
-    ast_print_type(right, LIGHT_AST_PRINT_STDERR);
+    ast_print_type(right, LIGHT_AST_PRINT_STDERR, 0);
     fprintf(stderr, "' ");
     return TYPE_ERROR;
 }
 
-static Light_Ast*
-decl_from_name(Light_Scope* scope, Light_Token* name) {
+Light_Ast*
+type_infer_decl_from_name(Light_Scope* scope, Light_Token* name) {
     Light_Symbol s = {0};
     s.token = name;
 
@@ -257,7 +257,7 @@ type_infer_propagate(Light_Type* type, Light_Ast* expr, u32* error) {
 static Light_Type*
 type_infer_expr_variable(Light_Ast* expr, u32* error) {
     assert(expr->kind == AST_EXPRESSION_VARIABLE);
-    Light_Ast* decl = decl_from_name(expr->scope_at, expr->expr_variable.name);
+    Light_Ast* decl = type_infer_decl_from_name(expr->scope_at, expr->expr_variable.name);
     if(!decl) {
         type_infer_error_undeclared_identifier(expr->expr_variable.name);
         *error |= TYPE_ERROR;
@@ -329,7 +329,14 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
     switch(expr->expr_unary.op) {
         case OP_UNARY_ADDRESSOF: {
             if(operand_type) {
-                expr->type = type_new_pointer(operand_type);
+                if(TYPE_WEAK(operand_type)) {
+                    type_infer_error_location(expr->expr_unary.token_op);
+                    fprintf(stderr, "Type Error: Operand of unary 'address of' must be an addressable value\n");
+                    *error |= TYPE_ERROR;
+                    expr->type = 0;
+                } else {
+                    expr->type = type_new_pointer(operand_type);
+                }
             } else {
                 expr->type = 0;
             }
@@ -435,7 +442,7 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
     if(caller_type->kind != TYPE_KIND_FUNCTION) {
         type_infer_error_location(expr->expr_proc_call.token);
         fprintf(stderr, "Type Error: expected procedure type, but got '");
-        ast_print_type(caller_type, LIGHT_AST_PRINT_STDERR);
+        ast_print_type(caller_type, LIGHT_AST_PRINT_STDERR, 0);
         fprintf(stderr, "'\n");
         *error |= TYPE_ERROR;
         return expr->type;
@@ -615,7 +622,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
             } else {
                 type_infer_error_location(expr->expr_binary.token_op);
                 fprintf(stderr, "Type Error: vector accessing operator requires integer indices, but got '");
-                ast_print_type(right, LIGHT_AST_PRINT_STDERR);
+                ast_print_type(right, LIGHT_AST_PRINT_STDERR, 0);
                 fprintf(stderr, "'\n");
                 *error |= TYPE_ERROR;
             }
@@ -654,7 +661,7 @@ find_union_field_decl(Light_Scope* scope, Light_Token* ident) {
     return 0;
 }
 
-static Light_Ast*
+Light_Ast*
 find_enum_field_decl(Light_Scope* scope, Light_Token* ident, u32* error) {
     Light_Symbol symb = {0};
     symb.token = ident;
