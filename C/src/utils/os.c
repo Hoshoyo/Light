@@ -4,7 +4,7 @@
 #include <string.h>
 
 #if defined(__linux__)
-
+#include <time.h>
 const char* 
 light_real_path(const char* path, uint64_t* size) {
 	// this function uses malloc, should free after

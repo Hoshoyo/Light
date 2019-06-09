@@ -147,7 +147,7 @@ light_vm_push_r64_to_datasegment(Light_VM_State* state, r64 f) {
     return light_vm_push_data_segment(state, data);
 }
 
-s64
+int64_t
 light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instruction_Info to) {
     switch(((Light_VM_Instruction*)from.absolute_address)->imm_size_bytes) {
         case 1: *(u8*)(from.absolute_address +  1) = (u8)((u8*)to.absolute_address - (u8*)from.absolute_address); break;
