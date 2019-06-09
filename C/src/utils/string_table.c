@@ -2,7 +2,7 @@
 #include "allocator.h"
 
 u64 string_hash(string s) {
-	return fnv_1_hash(s.data, s.length);
+	return fnv_1_hash((const u8*)s.data, s.length);
 }
 
 int string_equal(string s1, string s2) {

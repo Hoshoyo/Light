@@ -84,7 +84,6 @@ token_number(u8* at, s32 line, s32 column) {
         r.flags |= TOKEN_FLAG_LITERAL;
     } else {
         bool uns = false;
-        s32 long_count = 0;
         // u U suffix
         if(*at == 'u' || *at == 'U') {
             ++at;
@@ -465,7 +464,7 @@ token_next(Light_Lexer* lexer) {
                 r.length = at - r.data;
 
                 s32 kw_index = 0;
-                if(string_table_entry_exist(&lexer->keyword_table, MAKE_STR_LEN(r.data, r.length), &kw_index, 0)) {
+                if(string_table_entry_exist(&lexer->keyword_table, MAKE_STR_LEN((char*)r.data, r.length), &kw_index, 0)) {
                     string kw = string_table_get(&lexer->keyword_table, kw_index);
                     r.type = kw.value;
                     r.flags |= TOKEN_FLAG_KEYWORD;
@@ -474,11 +473,11 @@ token_next(Light_Lexer* lexer) {
                 } else {
                     // internalize the identifier
                     s32 identifier_index = 0;
-                    if(string_table_entry_exist(&global_identifiers_table, MAKE_STR_LEN(r.data, r.length), &identifier_index, 0)) {
+                    if(string_table_entry_exist(&global_identifiers_table, MAKE_STR_LEN((char*)r.data, r.length), &identifier_index, 0)) {
                         string v = string_table_get(&global_identifiers_table, identifier_index);
-                        r.data = v.data;
+                        r.data = (u8*)v.data;
                     } else {
-                        string_table_add(&global_identifiers_table, MAKE_STR_LEN(r.data, r.length), 0);
+                        string_table_add(&global_identifiers_table, MAKE_STR_LEN((char*)r.data, r.length), 0);
                     }
                 }
 
@@ -642,7 +641,7 @@ lexer_cstr(Light_Lexer* lexer, char* str, s32 length, u32 flags) {
     initialize_global_identifiers_table();
     lexer_internalize_keywords(lexer);
 
-    lexer->stream = str;
+    lexer->stream = (u8*)str;
     lexer->stream_size_bytes = (size_t)length;
 
 	Light_Token* tokens = array_new(Light_Token);

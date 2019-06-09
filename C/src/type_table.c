@@ -7,6 +7,7 @@ int
 type_equal(Light_Type* t1, Light_Type* t2) {
     if(t1->kind != t2->kind) return 0;
     switch(t1->kind)  {
+        case TYPE_KIND_NONE: assert(0); break;
         case TYPE_KIND_PRIMITIVE:
             return (t1->primitive == t2->primitive);
         case TYPE_KIND_POINTER:

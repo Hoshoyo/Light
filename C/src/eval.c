@@ -92,6 +92,7 @@ eval_expr_is_constant(Light_Ast* expr, u32 flags, u32* error) {
 				case OP_UNARY_PLUS:{
 					return eval_expr_is_constant(expr->expr_unary.operand, flags, error);
 				}break;
+				default: assert(0); break;
 			}
 		}break;
 		case AST_EXPRESSION_VARIABLE:{
@@ -255,41 +256,41 @@ eval_expr_constant_int(Light_Ast* expr, u32* error) {
 bool 
 eval_literal_primitive(Light_Ast* p) {
     assert(p->type->kind == TYPE_KIND_PRIMITIVE);
-    switch(p->type->kind) {
+    switch(p->type->primitive) {
         case TYPE_PRIMITIVE_BOOL:
             p->expr_literal.value_bool = (p->expr_literal.token->type == TOKEN_LITERAL_BOOL_TRUE);
             break;
 
         case TYPE_PRIMITIVE_R32:
-            p->expr_literal.value_r32 = str_to_r32(p->expr_literal.token->data, p->expr_literal.token->length);
+            p->expr_literal.value_r32 = str_to_r32((char*)p->expr_literal.token->data, p->expr_literal.token->length);
             break;
         case TYPE_PRIMITIVE_R64:
-            p->expr_literal.value_r64 = str_to_r64(p->expr_literal.token->data, p->expr_literal.token->length);
+            p->expr_literal.value_r64 = str_to_r64((char*)p->expr_literal.token->data, p->expr_literal.token->length);
             break;
 
         case TYPE_PRIMITIVE_S8:
-            p->expr_literal.value_s8 = (s8)str_to_s64(p->expr_literal.token->data, p->expr_literal.token->length);
+            p->expr_literal.value_s8 = (s8)str_to_s64((char*)p->expr_literal.token->data, p->expr_literal.token->length);
             break;
         case TYPE_PRIMITIVE_S16:
-            p->expr_literal.value_s16 = (s16)str_to_s64(p->expr_literal.token->data, p->expr_literal.token->length);
+            p->expr_literal.value_s16 = (s16)str_to_s64((char*)p->expr_literal.token->data, p->expr_literal.token->length);
             break;
         case TYPE_PRIMITIVE_S32:
-            p->expr_literal.value_s32 = (s32)str_to_s64(p->expr_literal.token->data, p->expr_literal.token->length);
+            p->expr_literal.value_s32 = (s32)str_to_s64((char*)p->expr_literal.token->data, p->expr_literal.token->length);
             break;
         case TYPE_PRIMITIVE_S64:
-            p->expr_literal.value_s64 = str_to_s64(p->expr_literal.token->data, p->expr_literal.token->length);
+            p->expr_literal.value_s64 = str_to_s64((char*)p->expr_literal.token->data, p->expr_literal.token->length);
             break;
         case TYPE_PRIMITIVE_U8:
-            p->expr_literal.value_u8 = (u8)str_to_u64(p->expr_literal.token->data, p->expr_literal.token->length);
+            p->expr_literal.value_u8 = (u8)str_to_u64((char*)p->expr_literal.token->data, p->expr_literal.token->length);
             break;
         case TYPE_PRIMITIVE_U16:
-            p->expr_literal.value_u16 = (u16)str_to_u64(p->expr_literal.token->data, p->expr_literal.token->length);
+            p->expr_literal.value_u16 = (u16)str_to_u64((char*)p->expr_literal.token->data, p->expr_literal.token->length);
             break;
         case TYPE_PRIMITIVE_U32:
-            p->expr_literal.value_u32 = (u32)str_to_u64(p->expr_literal.token->data, p->expr_literal.token->length);
+            p->expr_literal.value_u32 = (u32)str_to_u64((char*)p->expr_literal.token->data, p->expr_literal.token->length);
             break;
         case TYPE_PRIMITIVE_U64:
-            p->expr_literal.value_u64 = str_to_u64(p->expr_literal.token->data, p->expr_literal.token->length);
+            p->expr_literal.value_u64 = str_to_u64((char*)p->expr_literal.token->data, p->expr_literal.token->length);
             break;
         case TYPE_PRIMITIVE_VOID: break;
         default: assert(0); break;

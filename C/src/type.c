@@ -267,24 +267,24 @@ type_hash(Light_Type* type) {
 void
 type_tables_initialize() {
     // Initialize hashes
-    pointer_hash = fnv_1_hash("pointer", sizeof("pointer") - 1);
-    struct_hash = fnv_1_hash("struct", sizeof("struct") - 1);
-    union_hash = fnv_1_hash("union", sizeof("union") - 1);
-    proc_hash = fnv_1_hash("proc", sizeof("proc") - 1);
-    enum_hash = fnv_1_hash("enum", sizeof("enum") - 1);
+    pointer_hash = fnv_1_hash((const u8*)"pointer", sizeof("pointer") - 1);
+    struct_hash = fnv_1_hash((const u8*)"struct", sizeof("struct") - 1);
+    union_hash = fnv_1_hash((const u8*)"union", sizeof("union") - 1);
+    proc_hash = fnv_1_hash((const u8*)"proc", sizeof("proc") - 1);
+    enum_hash = fnv_1_hash((const u8*)"enum", sizeof("enum") - 1);
 
-    primitive_table_hash[TYPE_PRIMITIVE_VOID] = fnv_1_hash("void", sizeof("void") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_S8]   = fnv_1_hash("s8", sizeof("s8") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_S16]  = fnv_1_hash("s16", sizeof("s16") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_S32]  = fnv_1_hash("s32", sizeof("s32") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_S64]  = fnv_1_hash("s64", sizeof("s64") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_U8]   = fnv_1_hash("u8", sizeof("u8") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_U16]  = fnv_1_hash("u16", sizeof("u16") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_U32]  = fnv_1_hash("u32", sizeof("u32") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_U64]  = fnv_1_hash("u64", sizeof("u64") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_R32]  = fnv_1_hash("r32", sizeof("r32") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_R64]  = fnv_1_hash("r64", sizeof("r64") - 1);
-    primitive_table_hash[TYPE_PRIMITIVE_BOOL] = fnv_1_hash("bool", sizeof("bool") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_VOID] = fnv_1_hash((const u8*)"void", sizeof("void") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_S8]   = fnv_1_hash((const u8*)"s8", sizeof("s8") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_S16]  = fnv_1_hash((const u8*)"s16", sizeof("s16") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_S32]  = fnv_1_hash((const u8*)"s32", sizeof("s32") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_S64]  = fnv_1_hash((const u8*)"s64", sizeof("s64") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_U8]   = fnv_1_hash((const u8*)"u8", sizeof("u8") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_U16]  = fnv_1_hash((const u8*)"u16", sizeof("u16") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_U32]  = fnv_1_hash((const u8*)"u32", sizeof("u32") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_U64]  = fnv_1_hash((const u8*)"u64", sizeof("u64") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_R32]  = fnv_1_hash((const u8*)"r32", sizeof("r32") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_R64]  = fnv_1_hash((const u8*)"r64", sizeof("r64") - 1);
+    primitive_table_hash[TYPE_PRIMITIVE_BOOL] = fnv_1_hash((const u8*)"bool", sizeof("bool") - 1);
 
     // Initialize primitive types
     primitive_type_table[TYPE_PRIMITIVE_R32]   = type_new_primitive(TYPE_PRIMITIVE_R32);

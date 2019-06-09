@@ -17,11 +17,9 @@ light_real_path(const char* path, uint64_t* size) {
 	return result;
 }
 
-double os_time_us()
-{
-	clockid_t clockid;
+double os_time_us() {
 	struct timespec t_spec;
-	int start = clock_gettime(CLOCK_MONOTONIC_RAW, &t_spec);
+	clock_gettime(CLOCK_MONOTONIC_RAW, &t_spec);
 	u64 res = t_spec.tv_nsec + 1000000000 * t_spec.tv_sec;
 	return (double)res / 1000.0;
 }

@@ -727,7 +727,7 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
         } break;
         case TYPE_KIND_ENUM:{
             Light_Ast* decl = find_enum_field_decl(left->enumerator.enum_scope, expr->expr_dot.identifier, error);
-            if(*error & TYPE_ERROR) {
+            if(!decl) {
                 type_infer_error_location(expr->expr_dot.identifier);
                 fprintf(stderr, "Type Error: Undeclared enum field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
                 *error |= TYPE_ERROR;
