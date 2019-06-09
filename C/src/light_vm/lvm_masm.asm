@@ -1,55 +1,57 @@
-global cmp_flags_8
-global cmp_flags_16
-global cmp_flags_32
-global cmp_flags_64
 
-global lvm_ext_call
+.data
+.code
 
-section .text
-
-cmp_flags_8:
-    cmp dil, sil
+cmp_flags_8 proc
+    cmp cl, dl
     lahf
     ret
+cmp_flags_8 endp
 
-cmp_flags_16:
-    cmp di, si
+cmp_flags_16 proc
+    cmp cx, dx
     lahf
     ret
+cmp_flags_16 endp
 
-cmp_flags_32:
-    cmp edi, esi
+cmp_flags_32 proc
+    cmp ecx, edx
     lahf
     ret
+cmp_flags_32 endp
 
-cmp_flags_64:
-    cmp rdi, rsi
+cmp_flags_64 proc
+    cmp rcx, rdx
     lahf
     ret
+cmp_flags_64 endp
 
-; preserve rbx, rsp, rbp, r12, r13, r14, and r15
+; preserve rbx, rsp, rbp, rdi, rsi, r12, r13, r14, and r15
+; preserve xmm6 - xmm7
 ; u64 lvm_ext_call(void* stack, void* proc, u64* float_return)
 ; stack pointer in RDI
 ; sfunction ptr in RSI
-lvm_ext_call:
+lvm_ext_call proc
 
     ; prologue
     push rbp
     mov rbp, rsp
 
     ; preserve registers
-    sub rsp, 48
-    mov [rsp], rdx
-    mov [rsp + 8], r15
-    mov [rsp + 16], r14
-    mov [rsp + 24], r13
-    mov [rsp + 32], r12
-    mov [rsp + 40], rbx
+    sub rsp, 64
+    mov [rsp], r8
+    mov [rsp + 8], rdi
+    mov [rsp + 16], rsi
+    mov [rsp + 24], r15
+    mov [rsp + 32], r14
+    mov [rsp + 40], r13
+    mov [rsp + 48], r12
+    mov [rsp + 56], rbx
 
-    mov r10, rsi        ; r10 = funcptr
+    mov r10, rdx        ; r10 = funcptr
 
-    mov rax, rdi        ; rax = struct*
-    mov rbx, rdi
+    mov rax, rcx        ; rax = struct*
+    mov rbx, rcx
     add rbx, 2056       ; rbx = float_values*
 
     mov r13, rax
@@ -61,121 +63,85 @@ lvm_ext_call:
     mov r12d, [rax + 4] ; float_arg_count
     add rax, 8
 
-    ; Put all register integers
+arg0:
+    ; Put first 4 arguments to registers
     cmp r11d, 0
-    je no_more_int_reg_args
-
-    mov rdi, [rax]
-    add rax, 8
-    dec r11d
-    inc r13
-
-    cmp r11d, 0
-    je no_more_int_reg_args
-
-    mov rsi, [rax]
-    add rax, 8
-    dec r11d
-    inc r13
-
-    cmp r11d, 0
-    je no_more_int_reg_args
-    
-    mov rdx, [rax]
-    add rax, 8
-    dec r11d
-    inc r13
-
-    cmp r11d, 0
-    je no_more_int_reg_args
+    je arg0_float
+    cmp byte ptr[r13], 0
+    jne arg0_float
 
     mov rcx, [rax]
     add rax, 8
     dec r11d
     inc r13
+    jmp arg1
+arg0_float:
+    ; assume that if we got here arg0 is float
+    cmp r12d, 0
+    je arg1
+    movdqa xmm0, xmmword ptr[rbx]
+    add rbx, 8
+    dec r12d
+    inc r14
 
+arg1:
     cmp r11d, 0
-    je no_more_int_reg_args
+    je arg1_float
+    cmp byte ptr[r13], 1
+    jne arg1_float
+
+    mov rdx, [rax]
+    add rax, 8
+    dec r11d
+    inc r13
+    jmp arg2
+arg1_float:
+    cmp r12d, 0
+    je arg2
+    movdqa xmm1, xmmword ptr[rbx]
+    add rbx, 8
+    dec r12d
+    inc r14
+
+arg2:
+    cmp r11d, 0
+    je arg2_float
+    cmp byte ptr[r13], 2
+    jne arg2_float
 
     mov r8, [rax]
     add rax, 8
     dec r11d
     inc r13
+    jmp arg3
+arg2_float:
+    cmp r12d, 0
+    je arg3
+    movdqa xmm2, xmmword ptr[rbx]
+    add rbx, 8
+    dec r12d
+    inc r14
 
+arg3:
     cmp r11d, 0
-    je no_more_int_reg_args
+    je arg3_float
+    cmp byte ptr[r13], 3
+    jne arg3_float
 
     mov r9, [rax]
     add rax, 8
     dec r11d
     inc r13
-
-no_more_int_reg_args:
+    jmp end_reg_args
+arg3_float:
     cmp r12d, 0
-    je no_more_float_reg_args
-
-    movq xmm0, [rbx]
+    je end_reg_args
+    movdqa xmm2, xmmword ptr[rbx]
     add rbx, 8
     dec r12d
     inc r14
 
-    cmp r12d, 0
-    je no_more_float_reg_args
-
-    movq xmm1, [rbx]
-    add rbx, 8
-    dec r12d
-    inc r14
-
-    cmp r12d, 0
-    je no_more_float_reg_args
-
-    movq xmm2, [rbx]
-    add rbx, 8
-    dec r12d
-    inc r14
-
-    cmp r12d, 0
-    je no_more_float_reg_args
-
-    movq xmm3, [rbx]
-    add rbx, 8
-    dec r12d
-    inc r14
-
-    cmp r12d, 0
-    je no_more_float_reg_args
-
-    movq xmm4, [rbx]
-    add rbx, 8
-    dec r12d
-    inc r14
-
-    cmp r12d, 0
-    je no_more_float_reg_args
-
-    movq xmm5, [rbx]
-    add rbx, 8
-    dec r12d
-    inc r14
-
-    cmp r12d, 0
-    je no_more_float_reg_args
-
-    movq xmm6, [rbx]
-    add rbx, 8
-    dec r12d
-    inc r14
-
-    cmp r12d, 0
-    je no_more_float_reg_args
-
-    movq xmm7, [rbx]
-    add rbx, 8
-    dec r12d
-    inc r14
-
-no_more_float_reg_args:
+end_reg_args:
     ; rax = current int_value*
     ; rbx = current float_value*
     ; r11d = current int arg count
@@ -234,20 +200,26 @@ push_float:
     jmp pushing_args_to_stack
 
 no_more_args:
+    sub rsp, 32 ; 32 bytes of shadow space
     call r10
+    add rsp, 32
 
     ; restore registers saved
-    mov rdx, [rsp]
-    mov r15, [rsp + 8]
-    mov r14, [rsp + 16]
-    mov r13, [rsp + 24]
-    mov r12, [rsp + 32]
-    mov rbx, [rsp + 40]
+    mov r8, [rsp]
+    mov rsi, [rsp + 8]
+    mov rdi, [rsp + 16]
+    mov r15, [rsp + 24]
+    mov r14, [rsp + 32]
+    mov r13, [rsp + 40]
+    mov r12, [rsp + 48]
+    mov rbx, [rsp + 56]
 
-    movq [rdx], xmm0
+    movdqa xmmword ptr[r8], xmm0
 
     ; epilogue
     mov	rsp, rbp
 	pop	rbp
 
 	ret
+lvm_ext_call endp
+end

@@ -8,6 +8,8 @@
 #include <light_array.h>
 
 int main(int argc, char** argv) {
+    double start = os_time_us();
+
     light_set_global_tables(argv[0]);
 
     if(argc < 2) {
@@ -36,6 +38,9 @@ int main(int argc, char** argv) {
     ast_print(ast, LIGHT_AST_PRINT_STDOUT|LIGHT_AST_PRINT_EXPR_TYPES, 0);
 
     //type_table_print();
+
+    double end = os_time_us();
+    printf("Time elapsed: %fms\n", (end - start) / 1000.0);
 
     return 0;
 }

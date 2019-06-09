@@ -519,6 +519,7 @@ ast_print_expr_literal(Light_Ast* expr, u32 flags, s32 indent_level) {
         }break;
         default: length += fprintf(out, "<invalid literal>"); break;
     }
+    return length;
 }
 
 s32
@@ -817,7 +818,7 @@ ast_print_type(Light_Type* type, u32 flags, s32 indent_level) {
             length += fprintf(out, "%.*s", type->alias.name->length, type->alias.name->data);
         } break;
         case TYPE_KIND_ARRAY:{
-            length += fprintf(out, "[%lu]", type->array_info.dimension);
+            length += fprintf(out, "[%llu]", type->array_info.dimension);
             length += ast_print_type(type->array_info.array_of, flags, indent_level);
         } break;
         case TYPE_KIND_FUNCTION:{
@@ -862,6 +863,7 @@ ast_print_type(Light_Type* type, u32 flags, s32 indent_level) {
     }
 
     fprintf(out, "%s", ColorReset);
+    return length;
 }
 
 s32

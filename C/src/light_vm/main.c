@@ -8,6 +8,8 @@
 #if defined(__linux__)
 #include <dlfcn.h>
 #include <unistd.h>
+#elif defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
 #endif
 
 void example1(Light_VM_State* state) {
@@ -105,7 +107,6 @@ void example5(Light_VM_State* state) {
     light_vm_patch_immediate_distance(branch, start);
 
     light_vm_execute(state, entry.absolute_address, 0);
-    light_vm_debug_dump_code(stdout, state);
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
     assert(state->registers[R1] == 120);
 }
@@ -126,13 +127,14 @@ void example6(Light_VM_State* state) {
     light_vm_push(state, "expushi r1");
     light_vm_push(state, "expushi r0");
     light_vm_push(state, "expushf fr0");
-    light_vm_push_fmt(state, "mov r2, %p", (void*)addproc);
+    light_vm_push_fmt(state, "mov r2, 0x%llx", (void*)addproc);
     light_vm_push(state, "extcall r2");
     light_vm_push(state, "expop");
     light_vm_push(state, "hlt");
 
     // Should print 2 5 11.100000
-    light_vm_execute(state, entry.absolute_address, 0);
+	light_vm_debug_dump_code(stdout, state);
+    light_vm_execute(state, entry.absolute_address, 1);
     assert(state->f32registers[FR0] == 1.544f);
 }
 
@@ -155,6 +157,27 @@ void example7(Light_VM_State* state) {
 
     // Should print Hello World!\n
     light_vm_execute(state, entry.absolute_address, 0);
+}
+#elif defined(_WIN32) || defined(_WIN64)
+void example7(Light_VM_State* state) {
+    char str[] = "Hello World!\n";
+    void* addr = light_vm_push_bytes_data_segment(state, (u8*)str, sizeof(str) - 1);
+    Light_VM_Instruction_Info entry = 
+    light_vm_push(state, "mov r0, 0");
+    light_vm_push_fmt(state, "mov r1, 0x%llx", addr);
+    light_vm_push_fmt(state, "mov r2, 0x%llx", addr);
+    light_vm_push(state, "mov r3, 0");
+    light_vm_push(state, "expushi r0");
+    light_vm_push(state, "expushi r1");
+    light_vm_push(state, "expushi r2");
+    light_vm_push(state, "expushi r3");
+    light_vm_push_fmt(state, "mov r4, 0x%llx", MessageBoxA);
+    light_vm_push(state, "extcall r4");
+    light_vm_push(state, "expop");
+    light_vm_push(state, "hlt");
+
+    // Should print Hello World!\n
+    light_vm_execute(state, entry.absolute_address, 1);
 }
 #endif
 
@@ -215,12 +238,13 @@ void example10(Light_VM_State* state) {
 
     *(void**)(((Light_VM_Instruction*)entry_info.absolute_address) + 1) = func_add;
 
-    light_vm_execute(state, 0, 0);
+    light_vm_execute(state, entry_info.absolute_address, 0);
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
 }
 
 void example11(Light_VM_State* state) {
     // put garbage in r1 and r2
+	Light_VM_Instruction_Info entry =
     light_vm_push(state, "mov r1, 0xff");
     light_vm_push(state, "mov r2, 0xff");
 
@@ -230,7 +254,8 @@ void example11(Light_VM_State* state) {
     light_vm_push(state, "movne r2");
 
     light_vm_push(state, "hlt");
-    light_vm_execute(state, 0, 0);
+
+    light_vm_execute(state, entry.absolute_address, 0);
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL);
     assert(state->registers[R1] == 0 && state->registers[R2] == 1);
 }
@@ -238,17 +263,18 @@ void example11(Light_VM_State* state) {
 int main() {
     Light_VM_State* state = light_vm_init();
 
-    //example1(state);
-    //example2(state);
-    //example3(state);
-    //example4(state);
+    example1(state);
+    example2(state);
+    example3(state);
+    example4(state);
     example5(state);
-    //example6(state);
-    //example7(state);
-    //example8(state);
-    //example9(state);
-    //example10(state);
-    //example11(state);
+    example6(state);
+    example7(state);
+    example8(state);
+    example9(state);
+    example10(state);
+    example11(state);
+    light_vm_debug_dump_registers(stdout, state, LVM_PRINT_FLAGS_REGISTER|LVM_PRINT_DECIMAL);
 
     //Light_VM_Instruction_Info from = {0};
     //from.absolute_address = state->code.block - 0x02;

@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include "lightvm.h"
 #include <assert.h>
 #include <stdarg.h>
@@ -555,7 +556,7 @@ light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...) {
 
 void*
 light_vm_push_data_segment(Light_VM_State* vm_state, Light_VM_Data data) {
-    void* ptr = (vm_state->data.block +vm_state->data_offset);
+    void* ptr = ((u8*)vm_state->data.block +vm_state->data_offset);
 
     switch(data.byte_size) {
         case 1: *(u8*)ptr = data.unsigned_byte; break;
@@ -572,7 +573,7 @@ light_vm_push_data_segment(Light_VM_State* vm_state, Light_VM_Data data) {
 
 void*
 light_vm_push_bytes_data_segment(Light_VM_State* vm_state, u8* bytes, s32 byte_count) {
-    void* ptr = (vm_state->data.block + vm_state->data_offset);
+    void* ptr = ((u8*)vm_state->data.block + vm_state->data_offset);
     memcpy(ptr, bytes, byte_count);
     vm_state->data_offset += byte_count;
     return ptr;

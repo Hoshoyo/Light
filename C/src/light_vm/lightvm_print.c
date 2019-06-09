@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include "lightvm.h"
 #include "ast.h"
 #include <assert.h>
@@ -466,7 +467,7 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm) 
     fprintf(out, "\n");
 }
 
-
+#if defined(__linux__)
 void 
 light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
     if(flags & LVM_PRINT_DECIMAL) {
@@ -502,12 +503,49 @@ light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
         fprintf(out, "\n");
     }
 }
+#elif defined(_WIN32) || defined(_WIN64)
+void 
+light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
+    if(flags & LVM_PRINT_DECIMAL) {
+        fprintf(out, "R0: %lld \t R1: %lld\n", state->registers[R0], state->registers[R1]);
+        fprintf(out, "R2: %lld \t R3: %lld\n", state->registers[R2], state->registers[R3]);
+        fprintf(out, "R4: %lld \t R5: %lld\n", state->registers[R4], state->registers[R5]);
+        fprintf(out, "R6: %lld \t R7: %lld\n", state->registers[R6], state->registers[R7]);
+        fprintf(out, "\n");
+        fprintf(out, "RSP: %lld \t RBP: %lld\n", state->registers[RSP], state->registers[RBP]);
+        fprintf(out, "RIP: %lld \t RDP: %lld\n", state->registers[RIP], state->registers[RDP]);
+    } else {
+        fprintf(out, "R0: 0x%llx \t R1: 0x%llx\n", state->registers[R0], state->registers[R1]);
+        fprintf(out, "R2: 0x%llx \t R3: 0x%llx\n", state->registers[R2], state->registers[R3]);
+        fprintf(out, "R4: 0x%llx \t R5: 0x%llx\n", state->registers[R4], state->registers[R5]);
+        fprintf(out, "R6: 0x%llx \t R7: 0x%llx\n", state->registers[R6], state->registers[R7]);
+        fprintf(out, "\n");
+        fprintf(out, "RSP: 0x%llx \t RBP: 0x%llx\n", state->registers[RSP], state->registers[RBP]);
+        fprintf(out, "RIP: 0x%llx \t RDP: 0x%llx\n", state->registers[RIP], state->registers[RDP]);
+    }
+    if(flags & LVM_PRINT_FLOATING_POINT_REGISTERS) {
+        fprintf(out, "\n");
+        fprintf(out, "FR0: %f \t FR1: %f\n", state->f32registers[FR0], state->f32registers[FR1]);
+        fprintf(out, "FR2: %f \t FR3: %f\n", state->f32registers[FR2], state->f32registers[FR3]);
+        fprintf(out, "FR4: %f \t FR5: %f\n", state->f64registers[FR4], state->f64registers[FR5]);
+        fprintf(out, "FR6: %f \t FR7: %f\n", state->f64registers[FR6], state->f64registers[FR7]);
+    }
+    if(flags & LVM_PRINT_FLAGS_REGISTER) {
+        fprintf(out, "\n");
+        fprintf(out, "Carry: %d ",   state->rflags.carry);
+        fprintf(out, "Zero: %d ",    state->rflags.zerof);
+        fprintf(out, "Sign: %d ",    state->rflags.sign);
+        fprintf(out, "Overflow: %d", state->rflags.overflow);
+        fprintf(out, "\n");
+    }
+}
+#endif
 
 void
 light_vm_debug_dump_code(FILE* out, Light_VM_State* state) {
     for(u64 i = 0 ;;) {
         u64 imm = 0;
-        Light_VM_Instruction inst = *(Light_VM_Instruction*)(state->code.block + i);
+        Light_VM_Instruction inst = *(Light_VM_Instruction*)((u8*)state->code.block + i);
         i += sizeof(Light_VM_Instruction);
 
         if(inst.type == LVM_NOP) break;
@@ -515,16 +553,16 @@ light_vm_debug_dump_code(FILE* out, Light_VM_State* state) {
         switch(inst.imm_size_bytes) {
             case 0: break;
             case 1: 
-                imm = *(u8*)(state->code.block + i);
+                imm = *(u8*)((u8*)state->code.block + i);
                 break;
             case 2:
-                imm = *(u16*)(state->code.block + i);
+                imm = *(u16*)((u8*)state->code.block + i);
                 break;
             case 4:
-                imm = *(u32*)(state->code.block + i);
+                imm = *(u32*)((u8*)state->code.block + i);
                 break;
             case 8:
-                imm = *(u64*)(state->code.block + i);
+                imm = *(u64*)((u8*)state->code.block + i);
                 break;
             default: break;
         }
