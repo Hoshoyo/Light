@@ -1,6 +1,7 @@
 #include "parser.h"
 #include "global_tables.h"
 #include "utils/os.h"
+#include "utils/allocator.h"
 #include <light_array.h>
 #include <stdarg.h>
 #include <assert.h>
@@ -692,9 +693,38 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
         case TOKEN_KEYWORD_NULL:
             result = ast_new_expr_literal_primitive(scope, first);
             break;
-        case TOKEN_LITERAL_STRING:
-            // TODO(psv):
-            break;
+        case TOKEN_LITERAL_STRING: {
+            // Convert string literal to struct string
+            // string -> struct { u64 length, u64 capacity, u8* data }
+            // Create a token for the string
+            Light_Token* string_token = light_alloc(sizeof(Light_Token));
+            string_token->line = first->line;
+            string_token->column = first->column;
+            string_token->filepath = first->filepath;
+            string_token->flags = first->flags;
+            string_token->type = TOKEN_IDENTIFIER;
+            string_token->data = (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_STRING].data;
+            string_token->length = light_special_idents_table[LIGHT_SPECIAL_IDENT_STRING].length;
+
+            Light_Ast* arr = ast_new_expr_literal_array(scope, first, 0);
+            arr->expr_literal_array.raw_data = true;
+            arr->expr_literal_array.array_strong_type = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_U8));
+            arr->expr_literal_array.data = first->data;
+            arr->expr_literal_array.data_length_bytes = (u64)first->length;
+
+            result = ast_new_expr_literal_struct(scope, string_token, first, 0);
+            result->expr_literal_struct.struct_exprs = array_new(Light_Ast*);
+
+            // length
+            array_push(result->expr_literal_struct.struct_exprs, ast_new_expr_literal_primitive_u64(scope, 0));
+            // capacity
+            array_push(result->expr_literal_struct.struct_exprs, ast_new_expr_literal_primitive_u64(scope, 0));
+            // data
+            array_push(result->expr_literal_struct.struct_exprs, arr);
+
+            // @Syntactic Sugar
+            // final result is equivalent to struct string { 0, 0, array "data" }
+        } break;
         default: {
             *error |= parser_error_fatal(parser, first, "expected literal expression but got '%.*s'\n", TOKEN_STR(first));
         }break;
@@ -704,19 +734,42 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
 }
 
 Light_Ast* 
-parse_expr_literal_struct(Light_Parser* parser, Light_Scope* scope, Light_Token* struct_token, u32* error) {
+parse_expr_literal_struct(Light_Parser* parser, Light_Scope* scope, u32* error) {
+    *error |= parser_require_and_eat(parser, TOKEN_KEYWORD_STRUCT);
+    ReturnIfError();
+    Light_Token* struct_token = lexer_peek_n(parser->lexer, -1);
+
+    Light_Token* name = 0;
+    if(lexer_peek(parser->lexer)->type == TOKEN_IDENTIFIER) {
+        name = lexer_next(parser->lexer);
+    }
+
 	*error |= parser_require_and_eat(parser, '{');
     ReturnIfError();
 
     Light_Ast* result = 0;
+    bool named = false;
+    if(!name) named = true;
 	
-	Light_Ast** exprs = array_new(Light_Ast*);
+    // Check if it is named
+    if(lexer_peek(parser->lexer)->type == TOKEN_IDENTIFIER && lexer_peek_n(parser->lexer, 1)->type == ':')
+        named = true;
+
+	Light_Ast** exprs_or_decls = array_new(Light_Ast*);
 	if(lexer_peek(parser->lexer)->type != '}'){
 		while(true) {
-			Light_Ast* expr = parse_expression(parser, scope, error);
-            ReturnIfError();
+            if(named) {
+                // Require full declaration
+                Light_Ast* decl = parse_decl_variable(parser, 0, 0, scope, error);
+                ReturnIfError();
 
-			array_push(exprs, expr);
+                array_push(exprs_or_decls, decl);
+            } else {
+                Light_Ast* expr = parse_expression(parser, scope, error);
+                ReturnIfError();
+
+                array_push(exprs_or_decls, expr);
+            }
 
 			if(lexer_peek(parser->lexer)->type != ','){
 				break;
@@ -724,9 +777,9 @@ parse_expr_literal_struct(Light_Parser* parser, Light_Scope* scope, Light_Token*
 				lexer_next(parser->lexer);
 			}
 		}
-        result = ast_new_expr_literal_struct(scope, struct_token, exprs);
+        result = ast_new_expr_literal_struct(scope, name, struct_token, exprs_or_decls, named);
 	}
-	*error |= parser_require_and_eat(parser, '{');
+	*error |= parser_require_and_eat(parser, '}');
     ReturnIfError();
 
 	return result;
@@ -775,15 +828,12 @@ parse_expression_precedence10(Light_Parser* parser, Light_Scope* scope, u32* err
 	} else if(t->type == TOKEN_KEYWORD_ARRAY) {
 		// array literal
 		return parse_expr_literal_array(parser, scope, error);
+    } else if(t->type == TOKEN_KEYWORD_STRUCT) {
+        // struct literal
+        return parse_expr_literal_struct(parser, scope, error);
 	} else if (t->type == TOKEN_IDENTIFIER) {
 		// variable
-		lexer_next(parser->lexer);
-		if (lexer_peek(parser->lexer)->type == ':') {
-			lexer_next(parser->lexer);
-			return parse_expr_literal_struct(parser, scope, t, error);
-		} else {
-			return ast_new_expr_variable(scope, t);
-		}
+        return ast_new_expr_variable(scope, t);
 	} else if(t->type == '#') {
         // TODO(psv):
         assert(0);

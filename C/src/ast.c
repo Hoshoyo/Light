@@ -147,39 +147,57 @@ ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light
 }
 
 Light_Ast* 
-ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs) {
+ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
-    result->kind = AST_EXPRESSION_LITERAL;
+    result->kind = AST_EXPRESSION_LITERAL_STRUCT;
     result->scope_at = scope;
-    result->type = type_from_token(token);
+    result->type = 0;
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
 
-    result->expr_literal.token = token;
-    result->expr_literal.type = LITERAL_ARRAY;
-    result->expr_literal.array_exprs = array_exprs;
-    result->expr_literal.array_strong_type = 0;
-    result->expr_literal.storage_class = STORAGE_CLASS_STACK;
+    result->expr_literal_struct.named = named;
+    result->expr_literal_struct.struct_exprs = struct_exprs;
+    result->expr_literal_struct.token_struct = token;
+    result->expr_literal_struct.name = name;
+    result->expr_literal_struct.storage_class = STORAGE_CLASS_STACK;
     
     return result;
 }
 
-Light_Ast* 
-ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* token, Light_Ast** struct_exprs) {
+Light_Ast*
+ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
-    result->kind = AST_EXPRESSION_LITERAL;
+    result->kind = AST_EXPRESSION_LITERAL_ARRAY;
     result->scope_at = scope;
-    result->type = type_from_token(token);
+    result->type = 0;
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
 
-    result->expr_literal.type = LITERAL_STRUCT;
-    result->expr_literal.token = token;
-    result->expr_literal.struct_exprs = struct_exprs;
-    result->expr_literal.storage_class = STORAGE_CLASS_STACK;
-    
+    result->expr_literal_array.token_array = token;
+    result->expr_literal_array.array_exprs = array_exprs;
+    result->expr_literal_array.array_strong_type = 0;
+    result->expr_literal_array.storage_class = STORAGE_CLASS_STACK;
+    result->expr_literal_array.raw_data = false;
+
+    return result;
+}
+
+Light_Ast*
+ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
+    result->scope_at = scope;
+    result->type = type_primitive_get(TYPE_PRIMITIVE_U64);
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+
+    result->expr_literal_primitive.flags = 0;
+    result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
+    result->expr_literal_primitive.token = 0;
+
     return result;
 }
 
@@ -187,15 +205,15 @@ Light_Ast*
 ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
-    result->kind = AST_EXPRESSION_LITERAL;
+    result->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
     result->scope_at = scope;
     result->type = type_from_token(token);
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
 
-    result->expr_literal.flags = 0;
-    result->expr_literal.storage_class = STORAGE_CLASS_REGISTER;
-    result->expr_literal.token = token;
+    result->expr_literal_primitive.flags = 0;
+    result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
+    result->expr_literal_primitive.token = token;
 
     Light_Literal_Type type = 0;
     switch(token->type) {
@@ -210,7 +228,7 @@ ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token) {
         case TOKEN_KEYWORD_NULL:        type = LITERAL_POINTER; break;
         default: type = 0; break;
     }
-    result->expr_literal.type = type;
+    result->expr_literal_primitive.type = type;
 
     if(result->type) {
         switch(result->type->kind) {
@@ -466,7 +484,7 @@ print_indent_level(FILE* out, s32 level) {
 
     return length;
 }
-#define fprintf(F, ...) fprintf(F, __VA_ARGS__); fflush(F)
+//#define fprintf(F, ...) fprintf(F, __VA_ARGS__); fflush(F)
 #define TOKEN_STR(T) (T)->length, (T)->data
 
 static FILE* ast_file_from_flags(u32 flags) {
@@ -481,12 +499,48 @@ static FILE* ast_file_from_flags(u32 flags) {
 }
 
 s32
-ast_print_expr_literal(Light_Ast* expr, u32 flags, s32 indent_level) {
-    assert(expr->kind == AST_EXPRESSION_LITERAL);
+ast_print_expr_literal_array(Light_Ast* expr, u32 flags, s32 indent_level) {
+    assert(expr->kind == AST_EXPRESSION_LITERAL_ARRAY);
+    FILE* out = ast_file_from_flags(flags);
+    s32 length = 0;
+    if(expr->expr_literal_array.raw_data) {
+        length += fprintf(out, "%.*s", (s32)expr->expr_literal_array.data_length_bytes, expr->expr_literal_array.data);
+    } else {
+        length += fprintf(out, "array {");
+        for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
+            if(i != 0) {
+                length += fprintf(out, ", ");
+            }
+            length += ast_print_expression(expr->expr_literal_array.array_exprs[i], flags, indent_level);
+        }
+        length += fprintf(out, "}");
+    }
+    return length;
+}
+
+s32
+ast_print_expr_literal_struct(Light_Ast* expr, u32 flags, s32 indent_level) {
+    assert(expr->kind == AST_EXPRESSION_LITERAL_STRUCT);
+    FILE* out = ast_file_from_flags(flags);
+    s32 length = 0;
+    length += fprintf(out, "struct {");
+    for(u64 i = 0; i < array_length(expr->expr_literal_struct.struct_exprs); ++i) {
+        if(i != 0) {
+            length += fprintf(out, ", ");
+        }
+        length += ast_print_expression(expr->expr_literal_struct.struct_exprs[i], flags, indent_level);
+    }
+    length += fprintf(out, "}");
+    return length;
+}
+
+s32
+ast_print_expr_literal_primitive(Light_Ast* expr, u32 flags, s32 indent_level) {
+    assert(expr->kind == AST_EXPRESSION_LITERAL_PRIMITIVE);
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
 
-    switch(expr->expr_literal.type) {
+    switch(expr->expr_literal_primitive.type) {
         case LITERAL_BIN_INT:
         case LITERAL_DEC_SINT:
         case LITERAL_DEC_UINT:
@@ -494,29 +548,9 @@ ast_print_expr_literal(Light_Ast* expr, u32 flags, s32 indent_level) {
         case LITERAL_BOOL:
         case LITERAL_CHAR:
         case LITERAL_FLOAT:{
-            length += fprintf(out, "%.*s", TOKEN_STR(expr->expr_literal.token));
+            length += fprintf(out, "%.*s", TOKEN_STR(expr->expr_literal_primitive.token));
         }break;
         case LITERAL_POINTER: length += fprintf(out, "null"); break;
-        case LITERAL_ARRAY:{
-            length += fprintf(out, "array {");
-            for(u64 i = 0; i < array_length(expr->expr_literal.struct_exprs); ++i) {
-                if(i != 0) {
-                    length += fprintf(out, ", ");
-                }
-                length += ast_print_expression(expr->expr_literal.array_exprs[i], flags, indent_level);
-            }
-            length += fprintf(out, "}");
-        }break;
-        case LITERAL_STRUCT:{
-            length += fprintf(out, "struct {");
-            for(u64 i = 0; i < array_length(expr->expr_literal.struct_exprs); ++i) {
-                if(i != 0) {
-                    length += fprintf(out, ", ");
-                }
-                length += ast_print_expression(expr->expr_literal.struct_exprs[i], flags, indent_level);
-            }
-            length += fprintf(out, "}");
-        }break;
         default: length += fprintf(out, "<invalid literal>"); break;
     }
     return length;
@@ -624,8 +658,14 @@ ast_print_expression(Light_Ast* expr, u32 flags, s32 indent_level) {
             break;
         case AST_EXPRESSION_DIRECTIVE:
             break;
-        case AST_EXPRESSION_LITERAL:
-            length += ast_print_expr_literal(expr, flags, indent_level);
+        case AST_EXPRESSION_LITERAL_PRIMITIVE:
+            length += ast_print_expr_literal_primitive(expr, flags, indent_level);
+            break;
+        case AST_EXPRESSION_LITERAL_ARRAY:
+            length += ast_print_expr_literal_array(expr, flags, indent_level);
+            break;
+        case AST_EXPRESSION_LITERAL_STRUCT:
+            length += ast_print_expr_literal_struct(expr, flags, indent_level);
             break;
         case AST_EXPRESSION_PROCEDURE_CALL:
             length += ast_print_expr_proc_call(expr, flags, indent_level);

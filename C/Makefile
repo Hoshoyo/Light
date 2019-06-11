@@ -2,7 +2,7 @@ CC=gcc
 BINDIR=./bin
 LINKFLAGS=-ldl $(BINDIR)/lightvm.a
 LIGHTVMDIR=../src/light_vm
-DISABLE_WARNINGS=-Wno-unused-function -Wno-unused-variable
+DISABLE_WARNINGS=-Wno-unused-variable
 
 all: lightvm
 	$(CC) -Iinclude -Wall $(DISABLE_WARNINGS) -g -m64 ./src/*.c ./src/utils/*.c -o $(BINDIR)/light $(LINKFLAGS)

@@ -27,7 +27,7 @@ typedef enum {
 	TOKEN_SYMBOL_INTERROGATION   = '?', // 63
 	TOKEN_SYMBOL_AT              = '@', // 64
 	TOKEN_SYMBOL_OPEN_BRACE      = '{', // 91
-	TOKEN_SYMBOL_CLOSE_BRACE     = '}', // 93
+	TOKEN_SYMBOL_CLOSE_BRACE     = '}', // 93 ' // stop being confused @vscode
 	TOKEN_SYMBOL_CARAT           = '^', // 94
 	TOKEN_SYMBOL_BACK_TICK       = '`', // 96
 	TOKEN_SYMBOL_OPEN_BRACKET    = '[', // 123
@@ -162,3 +162,5 @@ void         lexer_rewind(Light_Lexer* lexer, s32 count);
 void         lexer_free(Light_Lexer* lexer);
 
 const char*  token_type_to_str(Light_Token_Type token_type);
+
+extern string light_special_idents_table[LIGHT_SPECIAL_IDENT_COUNT];

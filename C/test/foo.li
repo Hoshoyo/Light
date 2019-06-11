@@ -1,3 +1,4 @@
 main :: () -> s32 {
-    a : [3]s32;
+    a := "hello";
+    return 0;
 }

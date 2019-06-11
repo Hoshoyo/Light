@@ -24,7 +24,9 @@ typedef enum {
 	// Expressions
 	AST_EXPRESSION_BINARY,
 	AST_EXPRESSION_UNARY,
-	AST_EXPRESSION_LITERAL,
+	AST_EXPRESSION_LITERAL_PRIMITIVE,
+	AST_EXPRESSION_LITERAL_ARRAY,
+	AST_EXPRESSION_LITERAL_STRUCT,
 	AST_EXPRESSION_VARIABLE,
 	AST_EXPRESSION_PROCEDURE_CALL,
 	AST_EXPRESSION_DOT,
@@ -33,8 +35,6 @@ typedef enum {
 
 typedef enum {
 	LITERAL_UNKNOWN = 0,
-
-    // Register size
 	LITERAL_DEC_SINT,
 	LITERAL_DEC_UINT,
 	LITERAL_HEX_INT,
@@ -43,10 +43,6 @@ typedef enum {
 	LITERAL_BOOL,
 	LITERAL_CHAR,
 	LITERAL_POINTER,
-
-    // Composite
-	LITERAL_STRUCT,
-	LITERAL_ARRAY,
 } Light_Literal_Type;
 
 typedef enum {
@@ -169,14 +165,29 @@ typedef struct {
 		float    value_r32;
 		double   value_r64;
 		bool     value_bool;
-
-		struct Light_Ast_t** struct_exprs;
-		struct {
-			struct Light_Ast_t** array_exprs;
-			struct Light_Type_t* array_strong_type;
-		};
 	};
-} Light_Ast_Expr_Literal;
+} Light_Ast_Expr_Literal_Primitive;
+
+typedef struct  {
+	Light_Token*         token_array;
+	struct Light_Ast_t** array_exprs;
+	struct Light_Type_t* array_strong_type;
+	u8*                  data;
+	uint64_t             data_length_bytes;
+	bool                 raw_data;
+	Light_Storage_Class  storage_class;
+} Light_Ast_Expr_Literal_Array;
+
+typedef struct {
+	Light_Token*         name;
+	Light_Token*         token_struct;
+	bool                 named;
+	union {
+		struct Light_Ast_t** struct_exprs;
+		struct Light_Ast_t** struct_decls;
+	};
+	Light_Storage_Class  storage_class;
+} Light_Ast_Expr_Literal_Struct;
 
 typedef struct {
 	Light_Token*        name;
@@ -375,13 +386,15 @@ typedef struct Light_Ast_t {
 		Light_Ast_Comm_While      comm_while;
 
 		// Expressions
-		Light_Ast_Expr_Binary     expr_binary;
-		Light_Ast_Expr_Unary      expr_unary;
-		Light_Ast_Expr_Literal    expr_literal;
-		Light_Ast_Expr_Variable   expr_variable;
-		Light_Ast_Expr_Proc_Call  expr_proc_call;
-		Light_Ast_Expr_Directive  expr_directive;
-		Light_Ast_Expr_Dot        expr_dot;
+		Light_Ast_Expr_Binary            expr_binary;
+		Light_Ast_Expr_Unary             expr_unary;
+		Light_Ast_Expr_Literal_Primitive expr_literal_primitive;
+		Light_Ast_Expr_Literal_Array     expr_literal_array;
+		Light_Ast_Expr_Literal_Struct    expr_literal_struct;
+		Light_Ast_Expr_Variable          expr_variable;
+		Light_Ast_Expr_Proc_Call         expr_proc_call;
+		Light_Ast_Expr_Directive         expr_directive;
+		Light_Ast_Expr_Dot               expr_dot;
 
 		// Directives
 		Light_Ast_Directive_Foreign   directive_foreign;
@@ -529,8 +542,9 @@ Light_Ast* ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_
 
 // Expressions
 Light_Ast* ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token);
-Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* token, Light_Ast** struct_exprs);
+Light_Ast* ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val);
 Light_Ast* ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs);
+Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named);
 Light_Ast* ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op);
 Light_Ast* ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op);
 Light_Ast* ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier);

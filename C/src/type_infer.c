@@ -4,6 +4,7 @@
 #include "ast.h"
 #include <stdio.h>
 #include <assert.h>
+#include <stdarg.h>
 #include <light_array.h>
 
 #define TOKEN_STR(T) (T)->length, (T)->data
@@ -23,6 +24,19 @@ type_infer_error_location(Light_Token* t) {
         return fprintf(stderr, "%s:%d:%d: ", t->filepath, t->line + 1, t->column + 1);
     }
     return 0;
+}
+
+static s32
+type_infer_error(u32* error, Light_Token* location, const char* fmt, ...) {
+    s32 length = 0;
+    va_list args;
+    va_start(args, fmt);
+    length += type_infer_error_location(location);
+    length += fprintf(stderr, "Type Error: ");
+    length += vfprintf(stderr, fmt, args);
+    va_end(args);
+    if(error) *error |= TYPE_ERROR;
+    return length;
 }
 
 static s32
@@ -65,15 +79,49 @@ type_infer_decl_from_name(Light_Scope* scope, Light_Token* name) {
     return s.decl;
 }
 
-static
-Light_Type* 
-type_infer_propagate_literal(Light_Type* type, Light_Ast* expr, u32* error) {
+static Light_Type*
+type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error) {
     if(type) {
         assert(TYPE_STRONG(type));
     }
     assert(expr->type);
 
-    switch(expr->expr_literal.type) {
+    if(expr->expr_literal_array.raw_data) {
+        // TODO(psv): Implement
+        assert(0);
+    }
+    for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
+        if(type) {
+            type = type->array_info.array_of;
+        }
+        type_infer_propagate(type, expr->expr_literal_array.array_exprs[i], error);
+    }
+    return expr->type;
+}
+
+static Light_Type*
+type_infer_propagate_literal_struct(Light_Type* type, Light_Ast* expr, u32* error) {
+    if(type) {
+        assert(TYPE_STRONG(type));
+    }
+    assert(expr->type);
+    for(u64 i = 0; i < array_length(expr->expr_literal_struct.struct_exprs); ++i) {
+        if(type) {
+            type = type->struct_info.fields[i]->decl_variable.type;
+        }
+        type_infer_propagate(type, expr->expr_literal_struct.struct_exprs[i], error);
+    }
+    return expr->type;
+}
+
+static Light_Type* 
+type_infer_propagate_literal_primitive(Light_Type* type, Light_Ast* expr, u32* error) {
+    if(type) {
+        assert(TYPE_STRONG(type));
+    }
+    assert(expr->type);
+
+    switch(expr->expr_literal_primitive.type) {
         case LITERAL_BIN_INT:
         case LITERAL_DEC_SINT:
         case LITERAL_DEC_UINT:
@@ -109,22 +157,6 @@ type_infer_propagate_literal(Light_Type* type, Light_Ast* expr, u32* error) {
             }
             if(type->kind == TYPE_KIND_POINTER){
                 expr->type = type;
-            }
-        } break;
-        case LITERAL_STRUCT: {
-            for(u64 i = 0; i < array_length(expr->expr_literal.struct_exprs); ++i) {
-                if(type) {
-                    type = type->struct_info.fields[i]->decl_variable.type;
-                }
-                type_infer_propagate(type, expr->expr_literal.struct_exprs[i], error);
-            }
-        } break;
-        case LITERAL_ARRAY:{
-            for(u64 i = 0; i < array_length(expr->expr_literal.array_exprs); ++i) {
-                if(type) {
-                    type = type->array_info.array_of;
-                }
-                type_infer_propagate(type, expr->expr_literal.array_exprs[i], error);
             }
         } break;
         default: assert(0); break;
@@ -233,8 +265,12 @@ type_infer_propagate(Light_Type* type, Light_Ast* expr, u32* error) {
     }
 
     switch(expr->kind) {
-        case AST_EXPRESSION_LITERAL:
-            return type_infer_propagate_literal(type, expr, error);
+        case AST_EXPRESSION_LITERAL_ARRAY:
+            return type_infer_propagate_literal_array(type, expr, error);
+        case AST_EXPRESSION_LITERAL_STRUCT:
+            return type_infer_propagate_literal_struct(type, expr, error);
+        case AST_EXPRESSION_LITERAL_PRIMITIVE:
+            return type_infer_propagate_literal_primitive(type, expr, error);
         case AST_EXPRESSION_BINARY:
             return type_infer_propagate_binary(type, expr, error);
         case AST_EXPRESSION_UNARY:
@@ -283,9 +319,7 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
             }
             if(!type) return 0;
             // Error, referencing a typename instead of a declaration
-            type_infer_error_location(expr->expr_variable.name);
-            fprintf(stderr, "Type Error: referencing the typename '%.*s' as an rvalue\n", TOKEN_STR(expr->expr_variable.name));
-            *error |= TYPE_ERROR;
+            type_infer_error(error, expr->expr_variable.name, "referencing the typename '%.*s' as an rvalue\n", TOKEN_STR(expr->expr_variable.name));
         } break;
         default: assert(0); break;
     }
@@ -293,8 +327,81 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
 }
 
 static Light_Type*
-type_infer_expr_literal(Light_Ast* expr, u32* error) {
-    switch(expr->expr_literal.type) {
+type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
+    assert(expr->kind == AST_EXPRESSION_LITERAL_STRUCT);
+    Light_Type* type = 0;
+
+    if(expr->expr_literal_struct.name) {
+        // If the struct has a name, typecheck against the type
+        Light_Ast* decl = type_infer_decl_from_name(expr->scope_at, expr->expr_literal_struct.name);
+        if(decl->kind != AST_DECL_TYPEDEF) {
+            type_infer_error(error, expr->expr_literal_struct.name, "'%.*s' is not a struct typename\n", TOKEN_STR(expr->expr_literal_struct.name));
+            return 0;
+        }
+        // Get the struct type instead of the alias
+        Light_Type* struct_type = type_alias_root(decl->decl_typedef.type_referenced);
+        if(struct_type->kind != TYPE_KIND_STRUCT) {
+            type_infer_error(error, expr->expr_literal_struct.name, "'%.*s' is not a struct typename\n", TOKEN_STR(expr->expr_literal_struct.name));
+            return 0;
+        }
+        // Require to be internalized to proceed with the type inference.
+        if(!(struct_type->flags & TYPE_FLAG_INTERNALIZED)) {
+            return expr->type;
+        }
+
+        // Verify if the struct literal is named, meaning is declared with field names
+        // i.e. struct string {length: 0, capacity: 0, data: "foo" }
+        bool named = expr->expr_literal_struct.named;
+        s32 decl_field_count = struct_type->struct_info.fields_count;
+        if (named) {
+            s32 lit_field_count = (s32)array_length(expr->expr_literal_struct.struct_decls);
+            if(decl_field_count != lit_field_count) {
+                type_infer_error(error, expr->expr_literal_struct.name, 
+                    "incompatible field count for struct literal, declaration requires %d, but got %d\n",
+                    decl_field_count, lit_field_count);
+                return 0;
+            }
+        } else {
+            s32 lit_field_count = (s32)array_length(expr->expr_literal_struct.struct_exprs);
+            if(decl_field_count != lit_field_count) {
+                type_infer_error(error, expr->expr_literal_struct.name, 
+                    "incompatible field count for struct literal, declaration requires %d, but got %d\n",
+                    decl_field_count, lit_field_count);
+                return 0;
+            }
+        }
+
+        // Type is already inferred, only need to check
+        for(s32 i = 0; i < struct_type->struct_info.fields_count; ++i) {
+            if(named) {
+                if(struct_type->struct_info.fields[i]->decl_variable.name->data != 
+                    expr->expr_literal_struct.struct_decls[i]->decl_variable.name->data) 
+                {
+                    
+                }
+            }
+            //type_infer_expr_literal_struct(expr->expr_literal_struct.struct_exprs)
+        }
+    } else {
+        // Create a new structure type
+        if(expr->expr_literal_struct.struct_exprs) {
+            // TODO(psv): named fields struct literal
+        } else {
+            // TODO(psv): empty struct
+        }
+    }
+
+}
+
+static Light_Type*
+type_infer_expr_literal_array(Light_Ast* expr, u32* error) {
+    assert(expr->kind == AST_EXPRESSION_LITERAL_ARRAY);
+    return 0;
+}
+
+static Light_Type*
+type_infer_expr_literal_primitive(Light_Ast* expr, u32* error) {
+    switch(expr->expr_literal_primitive.type) {
         case LITERAL_BOOL:
             return type_primitive_get(TYPE_PRIMITIVE_BOOL);
         case LITERAL_CHAR:
@@ -303,18 +410,10 @@ type_infer_expr_literal(Light_Ast* expr, u32* error) {
         case LITERAL_BIN_INT:
         case LITERAL_HEX_INT:
         case LITERAL_DEC_UINT: {
-            return type_weak_primitive_from_literal(expr->expr_literal.type);
+            return type_weak_primitive_from_literal(expr->expr_literal_primitive.type);
         } break;
         case LITERAL_POINTER:{
             return type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
-        } break;
-        case LITERAL_ARRAY: {
-            // TODO(psv):
-            assert(0);
-        } break;
-        case LITERAL_STRUCT: {
-            // TODO(psv):
-            assert(0);
         } break;
         default: assert(0); break;
     }
@@ -778,8 +877,14 @@ type_infer_expression(Light_Ast* expr, u32* error) {
 
     Light_Type* type = 0;
     switch(expr->kind) {
-        case AST_EXPRESSION_LITERAL:
-            type = type_infer_expr_literal(expr, error);
+        case AST_EXPRESSION_LITERAL_ARRAY:
+            type = type_infer_expr_literal_array(expr, error);
+            break;
+        case AST_EXPRESSION_LITERAL_STRUCT:
+            type = type_infer_expr_literal_struct(expr, error);
+            break;
+        case AST_EXPRESSION_LITERAL_PRIMITIVE:
+            type = type_infer_expr_literal_primitive(expr, error);
             break;
         case AST_EXPRESSION_BINARY:
             type = type_infer_expr_binary(expr, error);
