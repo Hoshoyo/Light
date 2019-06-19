@@ -390,7 +390,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
             // TODO(psv): empty struct
         }
     }
-
+    return 0;
 }
 
 static Light_Type*

@@ -18,8 +18,10 @@ int main(int argc, char** argv) {
     }
 
     Light_Lexer lexer = {0};
-    //Light_Token* tokens = lexer_file(&lexer, argv[1], LIGHT_LEXER_PRINT_TOKENS);
-    Light_Token* tokens = lexer_file(&lexer, argv[1], 0);
+    Light_Token* tokens = lexer_file(&lexer, argv[1], LIGHT_LEXER_PRINT_TOKENS);
+    //Light_Token* tokens = lexer_file(&lexer, argv[1], 0);
+
+    return 0;
 
     u32 parser_error = 0;
     Light_Parser parser = {0};

@@ -501,26 +501,26 @@ token_next(Light_Lexer* lexer) {
 static void
 token_print(Light_Token t) {
     /* FOREGROUND */
-    const char* RST  = "\x1B[0m";
-    const char* KRED = "\x1B[31m";
-    const char* KGRN = "\x1B[32m";
-    const char* KYEL = "\x1B[33m";
-    const char* KBLU = "\x1B[34m";
-    const char* KMAG = "\x1B[35m";
-    const char* KCYN = "\x1B[36m";
-    const char* KWHT = "\x1B[37m";
+    const char* RST  = "";//"\x1B[0m";
+    const char* KRED = "";//"\x1B[31m";
+    const char* KGRN = "";//"\x1B[32m";
+    const char* KYEL = "";//"\x1B[33m";
+    const char* KBLU = "";//"\x1B[34m";
+    const char* KMAG = "";//"\x1B[35m";
+    const char* KCYN = "";//"\x1B[36m";
+    const char* KWHT = "";//"\x1B[37m";
 
     if(t.flags & TOKEN_FLAG_KEYWORD) {
         if(t.flags & TOKEN_FLAG_TYPE_KEYWORD) {
-            printf("%s%d:%d: %.*s%s\n", KBLU, t.line, t.column, t.length, t.data, RST);
+            printf("%s%d:%d: %.*s%s\n", KBLU, t.line + 1, t.column, t.length, t.data, RST);
         } else {
-            printf("%s%d:%d: %.*s%s\n", KGRN, t.line, t.column, t.length, t.data, RST);
+            printf("%s%d:%d: %.*s%s\n", KGRN, t.line + 1, t.column, t.length, t.data, RST);
         }
     } else {
         if(t.type == TOKEN_IDENTIFIER) {
-            printf("%s%d:%d: %.*s%s\n", KBLU, t.line, t.column, t.length, t.data, RST);
+            printf("%s%d:%d: %.*s%s\n", KBLU, t.line + 1, t.column, t.length, t.data, RST);
         } else {
-            printf("%d:%d: %.*s\n", t.line, t.column, t.length, t.data);
+            printf("%d:%d: %.*s\n", t.line + 1, t.column, t.length, t.data);
         }
     }
 }
@@ -549,8 +549,7 @@ lexer_eat_whitespace(Light_Lexer* lexer) {
 					lexer->index++;
 				}
                 lexer->line++;
-                if(lexer->index == '\n')
-                    lexer->index++;
+                lexer->index++;
                 lexer->column = 0;
             } else if(c == '/' && lexer->stream[lexer->index + 1] == '*') {
                 // multi line comment

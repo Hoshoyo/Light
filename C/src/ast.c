@@ -700,7 +700,7 @@ ast_print_node(Light_Ast* node, u32 flags, s32 indent_level) {
             length += ast_print_expression(node->decl_constant.value, flags, indent_level);
         }break;
         case AST_DECL_TYPEDEF:{
-            length += fprintf(out, "%.*s -> ", TOKEN_STR(node->decl_typedef.name));
+            length += fprintf(out, "%.*s ", TOKEN_STR(node->decl_typedef.name));
             length += ast_print_type(node->decl_typedef.type_referenced, flags, indent_level);
             Light_Type* type = node->decl_typedef.type_referenced;
             if(type && type->kind != TYPE_KIND_ENUM && type->kind != TYPE_KIND_STRUCT && type->kind != TYPE_KIND_UNION) {
@@ -718,8 +718,9 @@ ast_print_node(Light_Ast* node, u32 flags, s32 indent_level) {
             }
         }break;
         case AST_DECL_PROCEDURE:{
-            length += fprintf(out, "%.*s :: (", TOKEN_STR(node->decl_proc.name));
+            length += fprintf(out, "%.*s : (", TOKEN_STR(node->decl_proc.name));
             for(s32 i = 0; i < node->decl_proc.argument_count; ++i) {
+                if(i != 0) length += fprintf(out, ", ");
                 length += ast_print_node((Light_Ast*)node->decl_proc.arguments[i], flags, indent_level);
             }
             length += fprintf(out, ") -> ");

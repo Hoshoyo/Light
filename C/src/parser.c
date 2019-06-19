@@ -492,38 +492,6 @@ parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, L
     return ast_new_decl_variable(scope, name, type, expr, STORAGE_CLASS_STACK, 0);
 }
 
-static Light_Ast*
-parse_decl_constant(Light_Parser* parser, Light_Token* name, Light_Type* type, Light_Scope* scope, u32* error) {
-    Light_Token* name_in = name;
-    Light_Lexer* lexer = parser->lexer;
-    if(!name) {
-        name = lexer_next(lexer);
-        if(name->type != TOKEN_IDENTIFIER) {
-            *error |= parser_error_fatal(parser, name, "expected identifier name in constant declaration, but got '%.*s'\n", TOKEN_STR(name));
-            ReturnIfError();
-        }
-    }
-
-    if(!type && !name_in) {
-        *error |= parser_require_and_eat(parser, ':');
-        ReturnIfError();
-        
-        if(lexer_peek(lexer)->type != ':') {
-            type = parse_type(parser, scope, error);
-            ReturnIfError();
-        }
-    }
-
-    Light_Ast* expr = 0;
-    if(lexer_peek(lexer)->type == ':') {
-        lexer_next(lexer); // eat ':'
-        expr = parse_expression(parser, scope, error);
-        ReturnIfError();
-    }
-
-    return ast_new_decl_constant(scope, name, type, expr, 0);
-}
-
 Light_Ast** 
 parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, u32* error) {
     // Check empty file
@@ -549,9 +517,6 @@ parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_sc
             case TOKEN_IDENTIFIER:{
                 Light_Ast* decl = parse_declaration(parser, global_scope, error);
                 if(*error & PARSER_ERROR_FATAL) break;
-                if(decl->kind == AST_DECL_CONSTANT || decl->kind == AST_DECL_VARIABLE) {
-                    *error |= parser_require_and_eat(parser, ';');
-                }
                 if(decl) {
                     array_push(parser->top_level, decl);
                 }
@@ -578,58 +543,59 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
         return 0;
     }
 
-    Light_Token* next = lexer_next(lexer);
+    Light_Token* next = lexer_peek(lexer);
 
-    switch(next->type) {
-        case ':':{
-            if(lexer_peek(lexer)->type == ':') {
-                // constant declaration
+    if(next->type == ':') {
+        // Might be a constant or variable declaration
+        // Procedure declaration is tecnically a constant
+        lexer_next(lexer);
+
+        Light_Type* decl_type = 0;
+        Light_Token* n = lexer_peek(lexer);
+        if(n->type != ':' && n->type != '=') {
+            if(n->type == '(') {
+                // procedure declaration
+                result = parse_decl_procedure(parser, name, scope, error);
+                return result;
+            }
+            decl_type = parse_type(parser, scope, error);
+        }
+
+        n = lexer_peek(lexer);
+
+        switch(n->type) {
+            case ';': {
+                lexer_next(lexer); // eat ';'
+                // variable declaration without expression assignment
+                result = ast_new_decl_variable(scope, name, decl_type, 0, STORAGE_CLASS_STACK, 0);
+            } break;
+            case ':':
                 lexer_next(lexer); // eat ':'
-                if(lexer_peek(lexer)->type == '(') {
-                    // procedure declaration
-                    result = parse_decl_procedure(parser, name, scope, error);
-                } else {
-                    // constant declaration
-                    lexer_rewind(lexer, 1);
-                    result = parse_decl_constant(parser, name, 0, scope, error);
-                }
-            } else {
-                // type for a variable or constant declaration
-                Light_Type* type = 0;
-                if(lexer_peek(lexer)->type != '=') {
-                    type = parse_type(parser, scope, error);
-                    ReturnIfError();
-                }
-
-                Light_Token* n = lexer_peek(lexer);
-                switch(n->type) {
-                    case ';':
-                    case '=':
-                        result = parse_decl_variable(parser, name, type, scope, error);
-                        break;
-                    case ':':
-                        lexer_next(lexer);
-                        result = parse_decl_constant(parser, name, type, scope, error);
-                        break;
-                    default:{
-                        *error |= parser_error_fatal(parser, next, "invalid token '%.*s' in declaration\n", TOKEN_STR(n));
-                    } break;
-                }
-            }
-        } break;
-        case TOKEN_ARROW:{
-            // typedef
-            Light_Type* type = parse_type(parser, scope, error);
-            ReturnIfError();
-            result = ast_new_decl_typedef(scope, type, name);
-            if(type && type->kind != TYPE_KIND_ENUM && type->kind != TYPE_KIND_STRUCT && type->kind != TYPE_KIND_UNION) {
+            default: { // : is optional
+                // inferred constant declaration or procedure call
+                Light_Ast* expr = parse_expression(parser, scope, error);
+                ReturnIfError();
                 *error |= parser_require_and_eat(parser, ';');
-            }
-            type = type_new_alias(name, type);
-        } break;
-        default: {
-            *error |= parser_error_fatal(parser, next, "invalid token '%.*s' after declaration name\n", TOKEN_STR(next));
-        }break;
+                ReturnIfError();
+                result = ast_new_decl_constant(scope, name, decl_type, expr, 0);
+            }break;
+            case '=': {
+                lexer_next(lexer); // eat '='
+                // inferred variable declaration
+                Light_Ast* expr = parse_expression(parser, scope, error);
+                ReturnIfError();
+                result = ast_new_decl_variable(scope, name, decl_type, expr, STORAGE_CLASS_STACK, 0);
+            }break;
+        }
+    } else {
+        // typedef
+        Light_Type* type = parse_type(parser, scope, error);
+        ReturnIfError();
+        result = ast_new_decl_typedef(scope, type, name);
+        if(type && type->kind != TYPE_KIND_ENUM && type->kind != TYPE_KIND_STRUCT && type->kind != TYPE_KIND_UNION) {
+            *error |= parser_require_and_eat(parser, ';');
+        }
+        type = type_new_alias(name, type);
     }
 
     return result;
@@ -712,7 +678,7 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
             arr->expr_literal_array.data = first->data;
             arr->expr_literal_array.data_length_bytes = (u64)first->length;
 
-            result = ast_new_expr_literal_struct(scope, string_token, first, 0);
+            result = ast_new_expr_literal_struct(scope, string_token, first, 0, false);
             result->expr_literal_struct.struct_exprs = array_new(Light_Ast*);
 
             // length
@@ -833,6 +799,7 @@ parse_expression_precedence10(Light_Parser* parser, Light_Scope* scope, u32* err
         return parse_expr_literal_struct(parser, scope, error);
 	} else if (t->type == TOKEN_IDENTIFIER) {
 		// variable
+        lexer_next(parser->lexer); // eat identifier
         return ast_new_expr_variable(scope, t);
 	} else if(t->type == '#') {
         // TODO(psv):
@@ -1139,35 +1106,37 @@ parse_type_enum(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Ast**   fields_values = array_new(Light_Ast*);
     Light_Scope*  enum_scope = light_scope_new(0, scope, SCOPE_ENUM);
 
-    for(s32 i = 0; ; ++i) {
-        if(i != 0) {
-            *error |= parser_require_and_eat(parser, ',');
-            ReturnIfError();
+    if(lexer_peek(parser->lexer)->type != '}') {
+        for(s32 i = 0; ; ++i) {
+            if(i != 0) {
+                *error |= parser_require_and_eat(parser, ',');
+                ReturnIfError();
+            }
+            Light_Token* name = lexer_next(parser->lexer);
+            if(name->type != TOKEN_IDENTIFIER) {
+                *error |= parser_error_fatal(parser, name, "expected identifier in enum field declaration, but got '%.*s'\n", TOKEN_STR(name));
+                return 0;
+            }
+
+            array_push(fields_names, name);
+
+            if(lexer_peek(parser->lexer)->type == ':') {
+                lexer_next(parser->lexer); // skip ':'
+                *error |= parser_require_and_eat(parser, ':');
+                ReturnIfError();
+
+                Light_Ast* val = parse_expression(parser, enum_scope, error);
+                ReturnIfError();
+
+                array_push(fields_values, val);
+            } else {
+                array_push(fields_values, 0);
+            }
+
+            enum_scope->decl_count++;
+
+            if(lexer_peek(parser->lexer)->type != ',') break;
         }
-        Light_Token* name = lexer_next(parser->lexer);
-        if(name->type != TOKEN_IDENTIFIER) {
-            *error |= parser_error_fatal(parser, name, "expected identifier in enum field declaration, but got '%.*s'\n", TOKEN_STR(name));
-            return 0;
-        }
-
-        array_push(fields_names, name);
-
-        if(lexer_peek(parser->lexer)->type == ':') {
-            lexer_next(parser->lexer); // skip ':'
-            *error |= parser_require_and_eat(parser, ':');
-            ReturnIfError();
-
-            Light_Ast* val = parse_expression(parser, enum_scope, error);
-            ReturnIfError();
-
-            array_push(fields_values, val);
-        } else {
-            array_push(fields_values, 0);
-        }
-
-        enum_scope->decl_count++;
-
-        if(lexer_peek(parser->lexer)->type != ',') break;
     }
 
     *error |= parser_require_and_eat(parser, '}');
@@ -1193,20 +1162,22 @@ parse_type_struct(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Scope* struct_scope = light_scope_new(0, scope, SCOPE_STRUCTURE);
 
     s32 field_count = 0;
-    for(;;) {
-        Light_Ast* field = parse_decl_variable(parser, 0, 0, struct_scope, error);
-        ReturnIfError();
-        field->decl_variable.flags |= DECL_VARIABLE_FLAG_STRUCT_FIELD;
-        field->decl_variable.field_index = field_count;
-        array_push(fields, field);
+    if(lexer_peek(parser->lexer)->type != '}') {
+        for(;;) {
+            Light_Ast* field = parse_decl_variable(parser, 0, 0, struct_scope, error);
+            ReturnIfError();
+            field->decl_variable.flags |= DECL_VARIABLE_FLAG_STRUCT_FIELD;
+            field->decl_variable.field_index = field_count;
+            array_push(fields, field);
 
-        *error |= parser_require_and_eat(parser, ';');
-        ReturnIfError();
+            *error |= parser_require_and_eat(parser, ';');
+            ReturnIfError();
 
-        struct_scope->decl_count++;
+            struct_scope->decl_count++;
 
-        ++field_count;
-        if(lexer_peek(parser->lexer)->type == '}') break;
+            ++field_count;
+            if(lexer_peek(parser->lexer)->type == '}') break;
+        }
     }
 
     *error |= parser_require_and_eat(parser, '}');
@@ -1229,20 +1200,22 @@ parse_type_union(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Scope* union_scope = light_scope_new(0, scope, SCOPE_UNION);
 
     s32 field_count = 0;
-    for(;;) {
-        Light_Ast* field = parse_decl_variable(parser, 0, 0, union_scope, error);
-        ReturnIfError();
-        field->decl_variable.flags |= DECL_VARIABLE_FLAG_UNION_FIELD;
-        field->decl_variable.field_index = field_count;
-        array_push(fields, field);
+    if(lexer_peek(parser->lexer)->type != '}') {
+        for(;;) {
+            Light_Ast* field = parse_decl_variable(parser, 0, 0, union_scope, error);
+            ReturnIfError();
+            field->decl_variable.flags |= DECL_VARIABLE_FLAG_UNION_FIELD;
+            field->decl_variable.field_index = field_count;
+            array_push(fields, field);
 
-        *error |= parser_require_and_eat(parser, ';');
-        ReturnIfError();
+            *error |= parser_require_and_eat(parser, ';');
+            ReturnIfError();
 
-        union_scope->decl_count++;
+            union_scope->decl_count++;
 
-        ++field_count;
-        if(lexer_peek(parser->lexer)->type == '}') break;
+            ++field_count;
+            if(lexer_peek(parser->lexer)->type == '}') break;
+        }
     }
 
     *error |= parser_require_and_eat(parser, '}');

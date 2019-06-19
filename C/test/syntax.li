@@ -1,0 +1,18 @@
+// Constant declaration
+identifier : type : expr;
+identifier : type expr;
+identifier :: expr;
+
+// Constant
+foo  :: 3;
+foo  : [3]s32: {1,2,3};
+foo  : ^s32;
+foo  : bar car
+main : () -> s32 {}
+
+// Typedefs
+foo vec2;
+foo struct {}
+foo enum {}
+foo [32]s32;
+foo (s32)->void;
