@@ -1,30 +1,35 @@
 before struct {
     x :s32;
-    y :s32;
+    y :after;
+    //t :after;
 }
 
 main : () -> s32 {
-    v1 := struct{ a :s32 = 4, b :s32 = 3};  // normal decl
-    v2 := struct{ a := 4,     b :s32 = 3};  // infer only one field
-    v4 := struct{ a := 4,     b := 3};      // infer both
+    // v1 := struct{ a :s32 = 4, b :s32 = 3};  // normal decl
+    // v2 := struct{ a := 4,     b :s32 = 3};  // infer only one field
+    // v4 := struct{ a := 4,     b := 3};      // infer both
     
-    v5 : struct{ a:s32; b:s32; } = struct{ a :s32 = 4, b :s32 = 3}; // infer and check
-    v6 : struct{ a:s32; b:s32; } = struct{ a :s32 = 4, b :u32 = 3}; // infer and check error
-    v7 : struct{ a:s32; b:s32; } = struct{ 4, 3 }; // check not named
-    v8 : struct{ a:s32; b:s32; } = struct{ 4, 3 }; // check error not named
+    // v5 : struct{ a:s32; b:s32; } = struct{ a :s32 = 4, b :s32 = 3}; // infer and check
+    // v6 : struct{ a:s32; b:s32; } = struct{ a :s32 = 4, b :u32 = 3}; // infer and check error
 
-    v9 : struct{ a:s32; } = struct{ 4.0 }; // infer and check
-    va : struct{ a:s32; } = struct{ b : s32 = 4 }; // name wrong
+    // v9 : struct{ a:s32; } = struct{ a :s32 = 4.0 }; // infer and check
+    // va : struct{ a:s32; } = struct{ b : s32 = 4 }; // name wrong
 
-    vb1 : before = struct{ 3, 4 }; // check before ok
-    vb2 : before = struct{ 3, 3.4 }; // check before error
-    vc1 : after = struct{ 27, 1.75 }; // check after ok
-    vc2 : after = struct{ 27, 3 }; // check after error
+     vb1 : before = struct before{ 3, 4 }; // check before ok
+    // vb2 : before = struct before{ 3, 3.4 }; // check before error
+    // vc1 : after = struct after{ 27, 1.75 }; // check after ok
+    // vc2 : after = struct after{ 27, 3 }; // check after error
+
+    // vd1 := struct before{ 3, 4 }; // check before ok
+    // vd2 := struct before{ 3, 3.4 }; // check before error
+    // ve1 := struct after{ 27, 1.75 }; // check after ok
+    // ve2 := struct after{ 27, 3 }; // check after error
 
     return 0;
 }
 
-after struct {
-    age    :s32;
-    height :r32;
-}
+//after struct {
+//    age    :s32;
+//    height :r32;
+//}
+after s32;

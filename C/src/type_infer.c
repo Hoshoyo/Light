@@ -54,7 +54,7 @@ type_infer_type_mismatch_error(Light_Token* location, Light_Type* left, Light_Ty
     ast_print_type(left, LIGHT_AST_PRINT_STDERR, 0);
     fprintf(stderr, "' vs '");
     ast_print_type(right, LIGHT_AST_PRINT_STDERR, 0);
-    fprintf(stderr, "' ");
+    fprintf(stderr, "'");
     return TYPE_ERROR;
 }
 
@@ -260,7 +260,7 @@ Light_Type*
 type_infer_propagate(Light_Type* type, Light_Ast* expr, u32* error) {
     assert(expr->flags & AST_FLAG_EXPRESSION);
 
-    if(expr->type && TYPE_STRONG(expr->type)) {
+    if(expr->type && TYPE_STRONG(expr->type) && expr->type->flags & TYPE_FLAG_INTERNALIZED) {
         return expr->type;
     }
 
@@ -329,7 +329,6 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
 static Light_Type*
 type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
     assert(expr->kind == AST_EXPRESSION_LITERAL_STRUCT);
-    Light_Type* type = 0;
 
     if(expr->expr_literal_struct.name) {
         // If the struct has a name, typecheck against the type
@@ -356,7 +355,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
         if (named) {
             s32 lit_field_count = (s32)array_length(expr->expr_literal_struct.struct_decls);
             if(decl_field_count != lit_field_count) {
-                type_infer_error(error, expr->expr_literal_struct.name, 
+                type_infer_error(error, expr->expr_literal_struct.token_struct, 
                     "incompatible field count for struct literal, declaration requires %d, but got %d\n",
                     decl_field_count, lit_field_count);
                 return 0;
@@ -364,7 +363,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
         } else {
             s32 lit_field_count = (s32)array_length(expr->expr_literal_struct.struct_exprs);
             if(decl_field_count != lit_field_count) {
-                type_infer_error(error, expr->expr_literal_struct.name, 
+                type_infer_error(error, expr->expr_literal_struct.token_struct,
                     "incompatible field count for struct literal, declaration requires %d, but got %d\n",
                     decl_field_count, lit_field_count);
                 return 0;
@@ -374,14 +373,28 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
         // Type is already inferred, only need to check
         for(s32 i = 0; i < struct_type->struct_info.fields_count; ++i) {
             if(named) {
-                if(struct_type->struct_info.fields[i]->decl_variable.name->data != 
-                    expr->expr_literal_struct.struct_decls[i]->decl_variable.name->data) 
+                Light_Ast* field = expr->expr_literal_struct.struct_decls[i];
+                if(field->decl_variable.name->data != field->decl_variable.name->data) 
                 {
-                    
+                    // TODO(psv): orderless fields
+                    // Fields names are incompatible
+                }
+            } else {
+                Light_Ast* field = expr->expr_literal_struct.struct_exprs[i];
+                Light_Type* expr_type = type_infer_expression(field, error);
+                Light_Type* field_type = struct_type->struct_info.fields[i]->decl_variable.type;
+                expr_type = type_infer_propagate(field_type, field, error);
+                if(expr_type != field_type) {
+                    type_infer_error(error, expr->expr_literal_struct.token_struct,
+                        "type mismatch in field #%d of struct literal.\n  '", i + 1);
+                    ast_print_type(expr_type, LIGHT_AST_PRINT_STDERR, 0);
+                    fprintf(stderr, "' vs '");
+                    ast_print_type(field_type, LIGHT_AST_PRINT_STDERR, 0);
+                    fprintf(stderr, "'\n");
                 }
             }
-            //type_infer_expr_literal_struct(expr->expr_literal_struct.struct_exprs)
         }
+        expr->type = decl->decl_typedef.type_referenced;
     } else {
         // Create a new structure type
         if(expr->expr_literal_struct.struct_exprs) {
@@ -390,7 +403,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
             // TODO(psv): empty struct
         }
     }
-    return 0;
+    return expr->type;
 }
 
 static Light_Type*

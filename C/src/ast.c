@@ -528,7 +528,11 @@ ast_print_expr_literal_struct(Light_Ast* expr, u32 flags, s32 indent_level) {
         if(i != 0) {
             length += fprintf(out, ", ");
         }
-        length += ast_print_expression(expr->expr_literal_struct.struct_exprs[i], flags, indent_level);
+        if(expr->expr_literal_struct.named) {
+            length += ast_print_node(expr->expr_literal_struct.struct_exprs[i], flags, indent_level);
+        } else {
+            length += ast_print_expression(expr->expr_literal_struct.struct_exprs[i], flags, indent_level);
+        }
     }
     length += fprintf(out, "}");
     return length;
@@ -711,9 +715,10 @@ ast_print_node(Light_Ast* node, u32 flags, s32 indent_level) {
             length += fprintf(out, "%.*s :", TOKEN_STR(node->decl_variable.name));
             if(node->decl_variable.type) {
                 length += ast_print_type(node->decl_variable.type, flags, indent_level);
+                length += fprintf(out, " ");
             }
             if(node->decl_variable.assignment) {
-                length += fprintf(out, " = ");
+                length += fprintf(out, "= ");
                 length += ast_print_expression(node->decl_variable.assignment, flags, indent_level);
             }
         }break;

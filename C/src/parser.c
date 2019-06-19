@@ -591,11 +591,11 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
         // typedef
         Light_Type* type = parse_type(parser, scope, error);
         ReturnIfError();
-        result = ast_new_decl_typedef(scope, type, name);
         if(type && type->kind != TYPE_KIND_ENUM && type->kind != TYPE_KIND_STRUCT && type->kind != TYPE_KIND_UNION) {
             *error |= parser_require_and_eat(parser, ';');
         }
         type = type_new_alias(name, type);
+        result = ast_new_decl_typedef(scope, type, name);
     }
 
     return result;
