@@ -280,30 +280,42 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
 
             for(s32 i = 0; i < type->struct_info.fields_count; ++i) {
                 Light_Ast* field = type->struct_info.fields[i];
+
+                // When there is an assignment
+                if(field->decl_variable.assignment) {
+                    // Propagate the internalized type to the assignment expression
+                    field->decl_variable.assignment->type = 
+                        type_infer_expression(field->decl_variable.assignment, error);
+                    if(!field->decl_variable.type) {
+                        // Infer variable type from expression
+                        field->decl_variable.assignment->type = 
+                            type_infer_propagate(0, field->decl_variable.assignment, error);
+                        if(*error & TYPE_ERROR || !field->decl_variable.assignment->type) {
+                            all_fields_internalized = false;
+                            // do not attemp to continue inferring the type of this field
+                            continue;
+                        }
+                        field->decl_variable.type = field->decl_variable.assignment->type;
+                    }
+                }
+
                 Light_Type* field_type = typecheck_resolve_type(scope, field->decl_variable.type, flags, error);
                 field->decl_variable.type = field_type;
                 if(field_type && !(field_type->flags & TYPE_FLAG_INTERNALIZED)) {
                     all_fields_internalized = false;
                 } else {
                     if(field->decl_variable.assignment) {
-                        // Propagate the internalized type to the assignment expression
                         field->decl_variable.assignment->type = 
-                            type_infer_expression(field->decl_variable.assignment, error);
-                        if(!field->decl_variable.assignment){
+                            type_infer_propagate(field_type, field->decl_variable.assignment, error);
+                        if(!type_check_equality(field_type, field->decl_variable.assignment->type)) {
+                            // Type does not match the assignment
+                            type_error(error, field->decl_variable.name, 
+                                "type mismatch in struct field declaration. '");
+                            ast_print_type(field->decl_variable.assignment->type, LIGHT_AST_PRINT_STDERR, 0);
+                            fprintf(stderr, "' vs '");
+                            ast_print_type(field_type, LIGHT_AST_PRINT_STDERR, 0);
+                            fprintf(stderr, "'\n");
                             all_fields_internalized = false;
-                        } else {
-                            field->decl_variable.assignment->type = 
-                                type_infer_propagate(field_type, field->decl_variable.assignment, error);
-                            if(!type_check_equality(field_type, field->decl_variable.assignment->type)) {
-                                // Type does not match the assignment
-                                type_error(error, field->decl_variable.name, 
-                                    "type mismatch in struct field declaration. '");
-                                ast_print_type(field->decl_variable.assignment->type, LIGHT_AST_PRINT_STDERR, 0);
-                                fprintf(stderr, "' vs '");
-                                ast_print_type(field_type, LIGHT_AST_PRINT_STDERR, 0);
-                                fprintf(stderr, "'\n");
-                                all_fields_internalized = false;
-                            }
                         }
                     }
                 }
@@ -334,8 +346,10 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
             type->flags |= TYPE_FLAG_SIZE_RESOLVED;
 
             if(all_fields_internalized) {
-                type = type_internalize(type);
+                // It is important that we check redefinitions before we internalize
+                // since we don't want to check it again and get a redefinition error.
                 type = typecheck_resolve_type_symbol_tables(type, flags, error);
+                type = type_internalize(type);
             }
         } break;
         case TYPE_KIND_UNION: {

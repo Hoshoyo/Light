@@ -293,6 +293,10 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
     if(expr->expr_literal_struct.name) {
         // If the struct has a name, typecheck against the type
         Light_Ast* decl = type_infer_decl_from_name(expr->scope_at, expr->expr_literal_struct.name);
+        if(!decl) {
+            type_error_undeclared_identifier(error, expr->expr_literal_struct.name);
+            return 0;
+        }
         if(decl->kind != AST_DECL_TYPEDEF) {
             type_error(error, expr->expr_literal_struct.name, "'%.*s' is not a struct typename\n", TOKEN_STR(expr->expr_literal_struct.name));
             return 0;

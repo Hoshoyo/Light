@@ -264,7 +264,9 @@ type_hash(Light_Type* type) {
                 for(s32 i = 0; i < type->struct_info.fields_count; ++i) {
                     Light_Ast* field_node = type->struct_info.fields[i];
                     u64 rhash = type_hash(field_node->decl_variable.type);
-                    hash = fnv_1_hash_combine(hash, rhash);
+                    u64 nhash = fnv_1_hash_from_start(rhash, 
+                        field_node->decl_variable.name->data, field_node->decl_variable.name->length);
+                    hash = fnv_1_hash_combine(hash, nhash);
                 }
             }
             break;
@@ -273,7 +275,11 @@ type_hash(Light_Type* type) {
             if(type->union_info.fields_count > 0) {
                 for(s32 i = 0; i < type->union_info.fields_count; ++i) {
                     Light_Ast* field_node = type->union_info.fields[i];
-                    hash = fnv_1_hash_combine(hash, type_hash(field_node->decl_variable.type));
+                    u64 rhash = type_hash(field_node->decl_variable.type);
+                    u64 nhash = fnv_1_hash_from_start(rhash, 
+                        field_node->decl_variable.name->data, field_node->decl_variable.name->length);
+                    hash = fnv_1_hash_combine(hash, nhash);
+                    
                 }
             }
 			break;

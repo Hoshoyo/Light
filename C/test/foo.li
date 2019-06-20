@@ -1,22 +1,22 @@
 //after s32;
 
-//before struct {
-//    x :s32;
-//    y :after;
-//    //t :after;
-//}
+before struct {
+    x :s32;
+    y :after;
+    //t :after;
+}
 
 main : () -> s32 {
     v0 := struct {a : s32 = 1, b : foo = 2.0};
-    // v1 := struct{ a :s32 = 4, b :s32 = 3};  // normal decl
-    // v2 := struct{ a := 4,     b :s32 = 3};  // infer only one field
-    // v4 := struct{ a := 4,     b := 3};      // infer both
+    v1 := struct{ a :s32 = 4, b :s32 = 3};  // normal decl
+    v2 := struct{ a := 4,     b :s32 = 3};  // infer only one field
+    v4 := struct{ a := 4,     b := 3};      // infer both
     
-    // v5 : struct{ a:s32; b:s32; } = struct{ a :s32 = 4, b :s32 = 3}; // infer and check
-    // v6 : struct{ a:s32; b:s32; } = struct{ a :s32 = 4, b :u32 = 3}; // infer and check error
+    v5 : struct{ a:s32; b:s32; } = struct{ a :s32 = 4, b :s32 = 3}; // infer and check
+    //v6 : struct{ a:s32; b:s32; } = struct{ a :s32 = 4, b :u32 = 3}; // infer and check error
 
-    // v9 : struct{ a:s32; } = struct{ a :s32 = 4.0 }; // infer and check
-    // va : struct{ a:s32; } = struct{ b : s32 = 4 }; // name wrong
+    //v9 : struct{ a:s32; } = struct{ a :s32 = 4.0 }; // infer and check
+    //va : struct{ a:s32; } = struct{ b : s32 = 4 }; // name wrong
 
     // vb1 : before = struct before{ 3, 4 }; // check before ok
     // vb2 : before = struct before{ 3, 3.4 }; // check before error
@@ -35,6 +35,6 @@ main : () -> s32 {
 //    age    :s32;
 //    height :r32;
 //}
-//after s32;
+after s32;
 
 foo r32;
