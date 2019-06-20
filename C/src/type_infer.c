@@ -127,7 +127,7 @@ type_infer_propagate_binary(Light_Type* type, Light_Ast* expr, u32* error) {
             Light_Type* left = type_infer_propagate(type, expr->expr_binary.left, error);
             Light_Type* right = type_infer_propagate(type, expr->expr_binary.right, error);
             
-            if(left == right) {
+            if(type_check_equality(left, right)) {
                 expr->type = left;
             }
         } break;
@@ -142,7 +142,7 @@ type_infer_propagate_binary(Light_Type* type, Light_Ast* expr, u32* error) {
             Light_Type* right = type_infer_propagate(type, expr->expr_binary.right, error);
             assert(type_primitive_int(left) && type_primitive_int(right));
 
-            if(left == right) {
+            if(type_check_equality(left, right)) {
                 expr->type = left;
             }
         } break;
@@ -153,7 +153,7 @@ type_infer_propagate_binary(Light_Type* type, Light_Ast* expr, u32* error) {
         case OP_BINARY_GE:
         case OP_BINARY_EQUAL:
         case OP_BINARY_NOT_EQUAL: {
-            assert(type == type_primitive_get(TYPE_PRIMITIVE_BOOL));
+            assert(type_check_equality(type, type_primitive_get(TYPE_PRIMITIVE_BOOL)));
             Light_Type* left = type_infer_propagate(type, expr->expr_binary.left, error);
             Light_Type* right = type_infer_propagate(type, expr->expr_binary.right, error);
             assert(type_primitive_numeric(left) && type_primitive_numeric(right));
@@ -163,8 +163,8 @@ type_infer_propagate_binary(Light_Type* type, Light_Ast* expr, u32* error) {
 
         case OP_BINARY_LOGIC_AND:
         case OP_BINARY_LOGIC_OR: {
-            assert(expr->expr_binary.left->type == type_primitive_get(TYPE_PRIMITIVE_BOOL));
-            assert(expr->expr_binary.right->type == type_primitive_get(TYPE_PRIMITIVE_BOOL));
+            assert(type_check_equality(expr->expr_binary.left->type, type_primitive_get(TYPE_PRIMITIVE_BOOL)));
+            assert(type_check_equality(expr->expr_binary.right->type, type_primitive_get(TYPE_PRIMITIVE_BOOL)));
             expr->type = type_primitive_get(TYPE_PRIMITIVE_BOOL);
         } break;
 
@@ -254,13 +254,13 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
 
     switch(decl->kind) {
         case AST_DECL_CONSTANT:{
-            return decl->decl_constant.type_info;
+            return type_alias_root(decl->decl_constant.type_info);
         } break;
         case AST_DECL_PROCEDURE:{
             return decl->decl_proc.proc_type;
         } break;
         case AST_DECL_VARIABLE:{
-            return decl->decl_variable.type;
+            return type_alias_root(decl->decl_variable.type);
         } break;
         case AST_DECL_TYPEDEF:{
             Light_Type* type = decl->decl_typedef.type_referenced;
@@ -335,7 +335,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
                 Light_Type* expr_type = type_infer_expression(field, error);
                 Light_Type* field_type = struct_type->struct_info.fields[i]->decl_variable.type;
                 expr_type = type_infer_propagate(field_type, field, error);
-                if(expr_type != field_type) {
+                if(!type_check_equality(expr_type, field_type)) {
                     type_error(error, expr->expr_literal_struct.token_struct,
                         "type mismatch in field #%d of struct literal.\n  '", i + 1);
                     ast_print_type(expr_type, LIGHT_AST_PRINT_STDERR, 0);
@@ -481,7 +481,7 @@ type_infer_expr_binary_pointer_arithmetic(Light_Ast* expr, Light_Type* inferred_
         } break;
         case OP_BINARY_MINUS: {
             if(type_primitive_int(inferred_right) || inferred_right->kind == TYPE_KIND_POINTER) {
-                if(inferred_left != inferred_right) {
+                if(!type_check_equality(inferred_left, inferred_right)) {
                     type_error_mismatch(error, expr->expr_binary.token_op, inferred_left, inferred_right);
                 } else {
                     expr->type = inferred_left;
@@ -588,7 +588,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                     right = res;
                 }
             }
-            if(left != right) {
+            if(!type_check_equality(left, right)) {
                 type_error_mismatch(error, expr->expr_binary.token_op, left, right);
                 fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
             } else {
@@ -620,7 +620,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                         right = res;
                     }
                 }
-                if(left != right) {
+                if(type_check_equality(left, right)) {
                     type_error_mismatch(error, expr->expr_binary.token_op, left, right);
                     fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
                 } else {
@@ -654,7 +654,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                         right = res;
                     }
                 }
-                if(left != right) {
+                if(type_check_equality(left, right)) {
                     type_error_mismatch(error, expr->expr_binary.token_op, left, right);
                     fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
                 } else {

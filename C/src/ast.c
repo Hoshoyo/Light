@@ -715,10 +715,9 @@ ast_print_node(Light_Ast* node, u32 flags, s32 indent_level) {
             length += fprintf(out, "%.*s :", TOKEN_STR(node->decl_variable.name));
             if(node->decl_variable.type) {
                 length += ast_print_type(node->decl_variable.type, flags, indent_level);
-                length += fprintf(out, " ");
             }
             if(node->decl_variable.assignment) {
-                length += fprintf(out, "= ");
+                length += fprintf(out, " = ");
                 length += ast_print_expression(node->decl_variable.assignment, flags, indent_level);
             }
         }break;
@@ -749,6 +748,14 @@ ast_print_node(Light_Ast* node, u32 flags, s32 indent_level) {
             for(s32 i = 0; i < node->comm_block.command_count; ++i) {
                 print_indent_level(out, indent_level + 1);
                 length += ast_print_node(node->comm_block.commands[i], flags, indent_level + 1);
+                switch(node->comm_block.commands[i]->kind) {
+                    case AST_COMMAND_ASSIGNMENT:
+                    case AST_DECL_CONSTANT:
+                    case AST_DECL_VARIABLE:
+                        length += fprintf(out, ";");
+                    break;
+                    default: break;
+                }
                 length += fprintf(out, "\n");
             }
             print_indent_level(out, indent_level);

@@ -20,6 +20,7 @@ bool        type_primitive_numeric(Light_Type* t);
 bool        type_primitive_bool(Light_Type* t);
 
 u64         type_hash(Light_Type* type);
+bool        type_check_equality(Light_Type* t1, Light_Type* t2);
 
 // Create
 

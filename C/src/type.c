@@ -11,6 +11,11 @@ static u64 enum_hash = 0;
 
 static Light_Type* primitive_type_table[TYPE_PRIMITIVE_COUNT] = {0};
 
+static Light_Type*
+type_alloc() {
+    return arena_alloc(global_type_arena, sizeof(Light_Type));
+}
+
 Light_Type*
 type_alias_root(Light_Type* type) {
     while(type && type->kind == TYPE_KIND_ALIAS)
@@ -18,9 +23,24 @@ type_alias_root(Light_Type* type) {
     return type;
 }
 
-static Light_Type*
-type_alloc() {
-    return arena_alloc(global_type_arena, sizeof(Light_Type));
+bool
+type_check_equality(Light_Type* t1, Light_Type* t2) {
+    assert(t1->flags & TYPE_FLAG_INTERNALIZED && t2->flags & TYPE_FLAG_INTERNALIZED);
+
+    Light_Type* t1root = t1;
+    Light_Type* t2root = t2;
+    if(t1->kind == TYPE_KIND_ALIAS) {
+        t1root = type_alias_root(t1);
+    }
+    if(t2->kind == TYPE_KIND_ALIAS) {
+        t2root = type_alias_root(t2);
+    }
+
+    if(t1root->kind == TYPE_KIND_PRIMITIVE && t2root->kind == TYPE_KIND_PRIMITIVE) {
+        return t1root == t2root;
+    }
+
+    return t1 == t2;
 }
 
 bool type_primitive_sint(Light_Type* t) {

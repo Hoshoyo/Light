@@ -574,7 +574,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             }
 
             // Type check
-            if(inferred_left != inferred_right) {
+            if(!type_check_equality(inferred_left, inferred_right)) {
                 type_error_mismatch(error, node->comm_assignment.op_token, inferred_left, inferred_right);
                 fprintf(stderr, "in assignment command\n");
                 return;
@@ -706,7 +706,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             }
 
             // Type check
-            if(expr_type != decl_proc->decl_proc.proc_type->function.return_type) {
+            if(!type_check_equality(expr_type, decl_proc->decl_proc.proc_type->function.return_type)) {
                 type_error(error, node->comm_return.token_return, 
                     "procedure '%.*s' requires return type '", TOKEN_STR(decl_proc->decl_proc.name));
                 ast_print_type(decl_proc->decl_proc.proc_type->function.return_type, LIGHT_AST_PRINT_STDERR, 0);
@@ -750,7 +750,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
                     return;
                 }
 
-                if(type != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
+                if(!type_check_equality(type, type_primitive_get(TYPE_PRIMITIVE_BOOL))) {
                     type_error(error, node->comm_for.for_token, 
                         "Type Error: for command requires boolean type condition, but got '");
                     ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);
@@ -778,7 +778,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
                 return;
             }
 
-            if(type != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
+            if(!type_check_equality(type, type_primitive_get(TYPE_PRIMITIVE_BOOL))) {
                 type_error(error, node->comm_if.if_token, 
                     "Type Error: if command requires boolean type condition, but got '");
                 ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);
@@ -801,7 +801,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
                 return;
             }
 
-            if(type != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
+            if(!type_check_equality(type, type_primitive_get(TYPE_PRIMITIVE_BOOL))) {
                 type_error(error, node->comm_if.if_token, 
                     "Type Error: while command requires boolean type condition, but got '");
                 ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);

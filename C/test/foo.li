@@ -1,3 +1,5 @@
+after s32;
+
 before struct {
     x :s32;
     y :after;
@@ -6,7 +8,7 @@ before struct {
 
 main : () -> s32 {
     a : after;
-    b := a + 3;
+    b : s32;
     // v1 := struct{ a :s32 = 4, b :s32 = 3};  // normal decl
     // v2 := struct{ a := 4,     b :s32 = 3};  // infer only one field
     // v4 := struct{ a := 4,     b := 3};      // infer both
@@ -34,4 +36,4 @@ main : () -> s32 {
 //    age    :s32;
 //    height :r32;
 //}
-after s32;
+//after s32;
