@@ -3,6 +3,10 @@
 #include "ast.h"
 #include <stdint.h>
 
+extern Light_Type* global_type_empty_struct;
+extern Light_Type* global_type_empty_union;
+extern Light_Type* global_type_empty_enum;
+
 void        type_tables_initialize();
 void        type_table_print();
 Light_Type* type_internalize(Light_Type* type);

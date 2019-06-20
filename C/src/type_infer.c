@@ -3,6 +3,7 @@
 #include "top_typecheck.h"
 #include "ast.h"
 #include "error.h"
+#include "utils/allocator.h"
 #include <stdio.h>
 #include <assert.h>
 #include <stdarg.h>
@@ -61,7 +62,15 @@ type_infer_propagate_literal_struct(Light_Type* type, Light_Ast* expr, u32* erro
         if(type) {
             type = type->struct_info.fields[i]->decl_variable.type;
         }
-        type_infer_propagate(type, expr->expr_literal_struct.struct_exprs[i], error);
+        if(expr->expr_literal_struct.named) {
+            // If named, we have declarations instead of expressions,
+            Light_Ast* assignment = expr->expr_literal_struct.struct_decls[i]->decl_variable.assignment;
+            assert(assignment);
+            type_infer_propagate(type, assignment, error);
+        } else {
+            // Otherwise we have normal expressions
+            type_infer_propagate(type, expr->expr_literal_struct.struct_exprs[i], error);
+        }
     }
     return expr->type;
 }
@@ -349,9 +358,17 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
     } else {
         // Create a new structure type
         if(expr->expr_literal_struct.struct_exprs) {
-            // TODO(psv): named fields struct literal
+            // named fields struct literal
+            Light_Scope* struct_scope = expr->expr_literal_struct.struct_scope;
+ 
+            Light_Type* struct_type = type_new_struct(expr->expr_literal_struct.struct_decls, 
+                array_length(expr->expr_literal_struct.struct_decls), struct_scope);
+            struct_type = typecheck_resolve_type(struct_scope, struct_type, 0, error);
+            if(struct_type && struct_type->flags & TYPE_FLAG_INTERNALIZED) {
+                expr->type = struct_type;
+            }
         } else {
-            // TODO(psv): empty struct
+            expr->type = global_type_empty_struct;
         }
     }
     return expr->type;

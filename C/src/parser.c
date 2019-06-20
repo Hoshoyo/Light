@@ -11,7 +11,7 @@
 #define TOKEN_STR(T) (T)->length, (T)->data
 
 // Forward declarations
-static Light_Ast* parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, Light_Scope* scope, u32* error);
+static Light_Ast* parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, Light_Scope* scope, u32* error, bool require_expr);
 
 static s32
 parser_error_location(Light_Parser* parser, Light_Token* t) {
@@ -407,7 +407,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
             Light_Type* arg_type = parse_type(parser, scope, error);
             ReturnIfError();
 
-			Light_Ast* arg = parse_decl_variable(parser, name, arg_type, args_scope, error);
+			Light_Ast* arg = parse_decl_variable(parser, name, arg_type, args_scope, error, false);
 			array_push(arguments, arg);
             array_push(args_types, arg_type);
             if(!(arg_type->flags & TYPE_FLAG_INTERNALIZED))
@@ -454,7 +454,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 }
 
 static Light_Ast*
-parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, Light_Scope* scope, u32* error) {
+parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, Light_Scope* scope, u32* error, bool require_expr) {
     Light_Token* name_in = name;
     Light_Lexer* lexer = parser->lexer;
     if(!name) {
@@ -679,7 +679,7 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
             arr->expr_literal_array.data = first->data;
             arr->expr_literal_array.data_length_bytes = (u64)first->length;
 
-            result = ast_new_expr_literal_struct(scope, string_token, first, 0, false);
+            result = ast_new_expr_literal_struct(scope, string_token, first, 0, false, 0);
             result->expr_literal_struct.struct_exprs = array_new(Light_Ast*);
 
             // length
@@ -718,17 +718,33 @@ parse_expr_literal_struct(Light_Parser* parser, Light_Scope* scope, u32* error) 
     bool named = false;
     if(!name) named = true;
 	
+    Light_Scope* struct_scope = 0;
     // Check if it is named
-    if(lexer_peek(parser->lexer)->type == TOKEN_IDENTIFIER && lexer_peek_n(parser->lexer, 1)->type == ':')
+    if(lexer_peek(parser->lexer)->type == TOKEN_IDENTIFIER && lexer_peek_n(parser->lexer, 1)->type == ':') {
         named = true;
+        struct_scope = light_scope_new(0, scope, SCOPE_STRUCTURE);
+    }
 
 	Light_Ast** exprs_or_decls = array_new(Light_Ast*);
 	if(lexer_peek(parser->lexer)->type != '}'){
+        u32 named_error = PARSER_OK;
 		while(true) {
             if(named) {
                 // Require full declaration
-                Light_Ast* decl = parse_decl_variable(parser, 0, 0, scope, error);
+                Light_Ast* decl = parse_decl_variable(parser, 0, 0, struct_scope, error, true);
                 ReturnIfError();
+                if(!decl->decl_variable.assignment) {
+                    // Do not allow named struct literal to have no assignment
+                    named_error |= parser_error_fatal(parser, lexer_peek(parser->lexer), 
+                        "expected assignment expression at struct literal declaration\n");
+
+                    // We can keep going to maybe report more errors
+                } else {
+                    // Expression scope is the expression scope, not the struct,
+                    // since we are parsing a struct literal.
+                    decl->decl_variable.assignment->scope_at = scope;
+                }
+                struct_scope->decl_count++;
 
                 array_push(exprs_or_decls, decl);
             } else {
@@ -744,10 +760,16 @@ parse_expr_literal_struct(Light_Parser* parser, Light_Scope* scope, u32* error) 
 				lexer_next(parser->lexer);
 			}
 		}
-        result = ast_new_expr_literal_struct(scope, name, struct_token, exprs_or_decls, named);
+        *error |= named_error;
+        ReturnIfError();
+        
+        result = ast_new_expr_literal_struct(scope, name, struct_token, exprs_or_decls, named, struct_scope);
 	}
+
 	*error |= parser_require_and_eat(parser, '}');
     ReturnIfError();
+
+    if(!result) result = ast_new_expr_literal_struct(scope, name, struct_token, 0, false, 0);
 
 	return result;
 }
@@ -1165,7 +1187,7 @@ parse_type_struct(Light_Parser* parser, Light_Scope* scope, u32* error) {
     s32 field_count = 0;
     if(lexer_peek(parser->lexer)->type != '}') {
         for(;;) {
-            Light_Ast* field = parse_decl_variable(parser, 0, 0, struct_scope, error);
+            Light_Ast* field = parse_decl_variable(parser, 0, 0, struct_scope, error, false);
             ReturnIfError();
             field->decl_variable.flags |= DECL_VARIABLE_FLAG_STRUCT_FIELD;
             field->decl_variable.field_index = field_count;
@@ -1203,7 +1225,7 @@ parse_type_union(Light_Parser* parser, Light_Scope* scope, u32* error) {
     s32 field_count = 0;
     if(lexer_peek(parser->lexer)->type != '}') {
         for(;;) {
-            Light_Ast* field = parse_decl_variable(parser, 0, 0, union_scope, error);
+            Light_Ast* field = parse_decl_variable(parser, 0, 0, union_scope, error, false);
             ReturnIfError();
             field->decl_variable.flags |= DECL_VARIABLE_FLAG_UNION_FIELD;
             field->decl_variable.field_index = field_count;

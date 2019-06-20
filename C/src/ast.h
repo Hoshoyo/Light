@@ -181,6 +181,7 @@ typedef struct  {
 typedef struct {
 	Light_Token*         name;
 	Light_Token*         token_struct;
+	Light_Scope*         struct_scope;		// Only relevant in nameless structs
 	bool                 named;
 	union {
 		struct Light_Ast_t** struct_exprs;
@@ -544,7 +545,7 @@ Light_Ast* ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_
 Light_Ast* ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token);
 Light_Ast* ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val);
 Light_Ast* ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs);
-Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named);
+Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named, Light_Scope* struct_scope);
 Light_Ast* ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op);
 Light_Ast* ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op);
 Light_Ast* ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier);

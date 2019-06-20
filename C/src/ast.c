@@ -147,7 +147,7 @@ ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light
 }
 
 Light_Ast* 
-ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named) {
+ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named, Light_Scope* struct_scope) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_LITERAL_STRUCT;
@@ -161,6 +161,7 @@ ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* 
     result->expr_literal_struct.token_struct = token;
     result->expr_literal_struct.name = name;
     result->expr_literal_struct.storage_class = STORAGE_CLASS_STACK;
+    result->expr_literal_struct.struct_scope = struct_scope;
     
     return result;
 }

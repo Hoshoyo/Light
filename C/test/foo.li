@@ -1,14 +1,13 @@
-after s32;
+//after s32;
 
-before struct {
-    x :s32;
-    y :after;
-    //t :after;
-}
+//before struct {
+//    x :s32;
+//    y :after;
+//    //t :after;
+//}
 
 main : () -> s32 {
-    a : after;
-    b : s32;
+    v0 := struct {a : s32 = 1, b : foo = 2.0};
     // v1 := struct{ a :s32 = 4, b :s32 = 3};  // normal decl
     // v2 := struct{ a := 4,     b :s32 = 3};  // infer only one field
     // v4 := struct{ a := 4,     b := 3};      // infer both
@@ -37,3 +36,5 @@ main : () -> s32 {
 //    height :r32;
 //}
 //after s32;
+
+foo r32;

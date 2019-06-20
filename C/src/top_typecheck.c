@@ -63,7 +63,7 @@ typecheck_loop_base_scope(Light_Scope* scope) {
     return 0;
 }
 
-static Light_Type_Error
+Light_Type_Error
 decl_check_redefinition(Light_Scope* scope, Light_Ast* node, Light_Token* token) {
     Light_Symbol s = {0};
     s.token = token;
@@ -216,7 +216,7 @@ typecheck_resolve_type_symbol_tables(Light_Type* type, u32 flags, u32* error) {
 // Returns the type internalized in case the function internalizes it.
 //
 // Strenghten type if not already (removes weak type flag)
-static Light_Type*
+Light_Type*
 typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* error) {
     if(type->flags & TYPE_FLAG_INTERNALIZED) return type;
 
@@ -284,6 +284,28 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 field->decl_variable.type = field_type;
                 if(field_type && !(field_type->flags & TYPE_FLAG_INTERNALIZED)) {
                     all_fields_internalized = false;
+                } else {
+                    if(field->decl_variable.assignment) {
+                        // Propagate the internalized type to the assignment expression
+                        field->decl_variable.assignment->type = 
+                            type_infer_expression(field->decl_variable.assignment, error);
+                        if(!field->decl_variable.assignment){
+                            all_fields_internalized = false;
+                        } else {
+                            field->decl_variable.assignment->type = 
+                                type_infer_propagate(field_type, field->decl_variable.assignment, error);
+                            if(!type_check_equality(field_type, field->decl_variable.assignment->type)) {
+                                // Type does not match the assignment
+                                type_error(error, field->decl_variable.name, 
+                                    "type mismatch in struct field declaration. '");
+                                ast_print_type(field->decl_variable.assignment->type, LIGHT_AST_PRINT_STDERR, 0);
+                                fprintf(stderr, "' vs '");
+                                ast_print_type(field_type, LIGHT_AST_PRINT_STDERR, 0);
+                                fprintf(stderr, "'\n");
+                                all_fields_internalized = false;
+                            }
+                        }
+                    }
                 }
             }
 

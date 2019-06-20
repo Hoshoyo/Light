@@ -10,6 +10,9 @@ static u64 pointer_hash = 0;
 static u64 enum_hash = 0;
 
 static Light_Type* primitive_type_table[TYPE_PRIMITIVE_COUNT] = {0};
+Light_Type* global_type_empty_struct;
+Light_Type* global_type_empty_union;
+Light_Type* global_type_empty_enum;
 
 static Light_Type*
 type_alloc() {
@@ -25,7 +28,8 @@ type_alias_root(Light_Type* type) {
 
 bool
 type_check_equality(Light_Type* t1, Light_Type* t2) {
-    assert(t1->flags & TYPE_FLAG_INTERNALIZED && t2->flags & TYPE_FLAG_INTERNALIZED);
+    if(!(t1->flags & TYPE_FLAG_INTERNALIZED) || !(t2->flags & TYPE_FLAG_INTERNALIZED))
+        return false;
 
     Light_Type* t1root = t1;
     Light_Type* t2root = t2;
@@ -341,6 +345,10 @@ type_tables_initialize() {
     primitive_type_table[TYPE_PRIMITIVE_U64]   = type_new_primitive(TYPE_PRIMITIVE_U64);
     primitive_type_table[TYPE_PRIMITIVE_VOID]  = type_new_primitive(TYPE_PRIMITIVE_VOID);
     primitive_type_table[TYPE_PRIMITIVE_BOOL]  = type_new_primitive(TYPE_PRIMITIVE_BOOL);
+
+    global_type_empty_struct = type_internalize(type_new_struct(0, 0, 0));
+    global_type_empty_union = type_internalize(type_new_union(0, 0, 0));
+    global_type_empty_enum = type_internalize(type_new_enum(0, 0, 0, 0, 0));
 }
 
 Light_Type*
