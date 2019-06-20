@@ -11,24 +11,43 @@ static u64 enum_hash = 0;
 
 static Light_Type* primitive_type_table[TYPE_PRIMITIVE_COUNT] = {0};
 
+Light_Type*
+type_alias_root(Light_Type* type) {
+    while(type && type->kind == TYPE_KIND_ALIAS)
+        type = type->alias.alias_to;
+    return type;
+}
+
 static Light_Type*
 type_alloc() {
     return arena_alloc(global_type_arena, sizeof(Light_Type));
 }
 
 bool type_primitive_sint(Light_Type* t) {
+    if(t->kind == TYPE_KIND_ALIAS) {
+        t = type_alias_root(t);
+    }
     return (t->kind == TYPE_KIND_PRIMITIVE) &&
         (t->primitive >= TYPE_PRIMITIVE_S8 && t->primitive <= TYPE_PRIMITIVE_S64);
 }
 bool type_primitive_uint(Light_Type* t) {
+    if(t->kind == TYPE_KIND_ALIAS) {
+        t = type_alias_root(t);
+    }
     return (t->kind == TYPE_KIND_PRIMITIVE) &&
         (t->primitive >= TYPE_PRIMITIVE_U8 && t->primitive <= TYPE_PRIMITIVE_U64);
 }
 bool type_primitive_int(Light_Type* t) {
+    if(t->kind == TYPE_KIND_ALIAS) {
+        t = type_alias_root(t);
+    }
     return (t->kind == TYPE_KIND_PRIMITIVE) &&
         (t->primitive >= TYPE_PRIMITIVE_S8 && t->primitive <= TYPE_PRIMITIVE_U64);
 }
 bool type_primitive_float(Light_Type* t) {
+    if(t->kind == TYPE_KIND_ALIAS) {
+        t = type_alias_root(t);
+    }
     return (t->kind == TYPE_KIND_PRIMITIVE) &&
         (t->primitive == TYPE_PRIMITIVE_R32 || t->primitive == TYPE_PRIMITIVE_R64);
 }
@@ -36,6 +55,9 @@ bool type_primitive_numeric(Light_Type* t) {
     return (type_primitive_int(t) || type_primitive_float(t));
 }
 bool type_primitive_bool(Light_Type* t) {
+    if(t->kind == TYPE_KIND_ALIAS) {
+        t = type_alias_root(t);
+    }
     return t == type_primitive_get(TYPE_PRIMITIVE_BOOL);
 }
 

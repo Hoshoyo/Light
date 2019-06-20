@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
         return 1;
 
     
-    Light_Type_Check_Error type_error = top_typecheck(ast, &global_scope);
+    Light_Type_Error type_error = top_typecheck(ast, &global_scope);
     if(type_error & TYPE_ERROR) {
         return 1;
     }

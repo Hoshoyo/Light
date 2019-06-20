@@ -2,61 +2,13 @@
 #include "symbol_table.h"
 #include "top_typecheck.h"
 #include "ast.h"
+#include "error.h"
 #include <stdio.h>
 #include <assert.h>
 #include <stdarg.h>
 #include <light_array.h>
 
 #define TOKEN_STR(T) (T)->length, (T)->data
-
-Light_Type*
-type_alias_root(Light_Type* type) {
-    while(type && type->kind == TYPE_KIND_ALIAS)
-        type = type->alias.alias_to;
-    return type;
-}
-
-static s32
-type_infer_error_location(Light_Token* t) {
-    if(!t) {
-        return fprintf(stderr, "%s: ", t->filepath);
-    } else {
-        return fprintf(stderr, "%s:%d:%d: ", t->filepath, t->line + 1, t->column + 1);
-    }
-    return 0;
-}
-
-static s32
-type_infer_error(u32* error, Light_Token* location, const char* fmt, ...) {
-    s32 length = 0;
-    va_list args;
-    va_start(args, fmt);
-    length += type_infer_error_location(location);
-    length += fprintf(stderr, "Type Error: ");
-    length += vfprintf(stderr, fmt, args);
-    va_end(args);
-    if(error) *error |= TYPE_ERROR;
-    return length;
-}
-
-static s32
-type_infer_error_undeclared_identifier(Light_Token* t) {
-    s32 length = 0;
-    length += type_infer_error_location(t);
-    length += fprintf(stderr, "Type Error: undeclared identifier '%.*s'\n", TOKEN_STR(t));
-    return length;
-}
-
-Light_Type_Check_Error
-type_infer_type_mismatch_error(Light_Token* location, Light_Type* left, Light_Type* right) {
-    type_infer_error_location(location);
-    fprintf(stderr, "Type Error: type mismatch '");
-    ast_print_type(left, LIGHT_AST_PRINT_STDERR, 0);
-    fprintf(stderr, "' vs '");
-    ast_print_type(right, LIGHT_AST_PRINT_STDERR, 0);
-    fprintf(stderr, "'");
-    return TYPE_ERROR;
-}
 
 Light_Ast*
 type_infer_decl_from_name(Light_Scope* scope, Light_Token* name) {
@@ -296,8 +248,7 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
     assert(expr->kind == AST_EXPRESSION_VARIABLE);
     Light_Ast* decl = type_infer_decl_from_name(expr->scope_at, expr->expr_variable.name);
     if(!decl) {
-        type_infer_error_undeclared_identifier(expr->expr_variable.name);
-        *error |= TYPE_ERROR;
+        type_error_undeclared_identifier(error, expr->expr_variable.name);
         return 0;
     }
 
@@ -319,7 +270,7 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
             }
             if(!type) return 0;
             // Error, referencing a typename instead of a declaration
-            type_infer_error(error, expr->expr_variable.name, "referencing the typename '%.*s' as an rvalue\n", TOKEN_STR(expr->expr_variable.name));
+            type_error(error, expr->expr_variable.name, "referencing the typename '%.*s' as an rvalue\n", TOKEN_STR(expr->expr_variable.name));
         } break;
         default: assert(0); break;
     }
@@ -334,13 +285,13 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
         // If the struct has a name, typecheck against the type
         Light_Ast* decl = type_infer_decl_from_name(expr->scope_at, expr->expr_literal_struct.name);
         if(decl->kind != AST_DECL_TYPEDEF) {
-            type_infer_error(error, expr->expr_literal_struct.name, "'%.*s' is not a struct typename\n", TOKEN_STR(expr->expr_literal_struct.name));
+            type_error(error, expr->expr_literal_struct.name, "'%.*s' is not a struct typename\n", TOKEN_STR(expr->expr_literal_struct.name));
             return 0;
         }
         // Get the struct type instead of the alias
         Light_Type* struct_type = type_alias_root(decl->decl_typedef.type_referenced);
         if(struct_type->kind != TYPE_KIND_STRUCT) {
-            type_infer_error(error, expr->expr_literal_struct.name, "'%.*s' is not a struct typename\n", TOKEN_STR(expr->expr_literal_struct.name));
+            type_error(error, expr->expr_literal_struct.name, "'%.*s' is not a struct typename\n", TOKEN_STR(expr->expr_literal_struct.name));
             return 0;
         }
         // Require to be internalized to proceed with the type inference.
@@ -355,7 +306,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
         if (named) {
             s32 lit_field_count = (s32)array_length(expr->expr_literal_struct.struct_decls);
             if(decl_field_count != lit_field_count) {
-                type_infer_error(error, expr->expr_literal_struct.token_struct, 
+                type_error(error, expr->expr_literal_struct.token_struct, 
                     "incompatible field count for struct literal, declaration requires %d, but got %d\n",
                     decl_field_count, lit_field_count);
                 return 0;
@@ -363,7 +314,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
         } else {
             s32 lit_field_count = (s32)array_length(expr->expr_literal_struct.struct_exprs);
             if(decl_field_count != lit_field_count) {
-                type_infer_error(error, expr->expr_literal_struct.token_struct,
+                type_error(error, expr->expr_literal_struct.token_struct,
                     "incompatible field count for struct literal, declaration requires %d, but got %d\n",
                     decl_field_count, lit_field_count);
                 return 0;
@@ -385,7 +336,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
                 Light_Type* field_type = struct_type->struct_info.fields[i]->decl_variable.type;
                 expr_type = type_infer_propagate(field_type, field, error);
                 if(expr_type != field_type) {
-                    type_infer_error(error, expr->expr_literal_struct.token_struct,
+                    type_error(error, expr->expr_literal_struct.token_struct,
                         "type mismatch in field #%d of struct literal.\n  '", i + 1);
                     ast_print_type(expr_type, LIGHT_AST_PRINT_STDERR, 0);
                     fprintf(stderr, "' vs '");
@@ -445,9 +396,8 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
         case OP_UNARY_ADDRESSOF: {
             if(operand_type) {
                 if(TYPE_WEAK(operand_type)) {
-                    type_infer_error_location(expr->expr_unary.token_op);
-                    fprintf(stderr, "Type Error: Operand of unary 'address of' must be an addressable value\n");
-                    *error |= TYPE_ERROR;
+                    type_error(error, expr->expr_unary.token_op, 
+                        "operand of unary 'address of' must be an addressable value\n");
                     expr->type = 0;
                 } else {
                     expr->type = type_new_pointer(operand_type);
@@ -464,9 +414,7 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
             if(operand_type->kind == TYPE_KIND_POINTER) {
                 expr->type = operand_type->pointer_to;
             } else {
-                type_infer_error_location(expr->expr_unary.token_op);
-                fprintf(stderr, "Type Error: cannot derreference a non pointer type\n");
-                *error |= TYPE_ERROR;
+                type_error(error, expr->expr_unary.token_op, "cannot derreference a non pointer type\n");
             }
         } break;
         case OP_UNARY_LOGIC_NOT:{
@@ -527,22 +475,20 @@ type_infer_expr_binary_pointer_arithmetic(Light_Ast* expr, Light_Type* inferred_
             if(type_primitive_int(inferred_right)) {
                 expr->type = type_infer_propagate(type_primitive_get(TYPE_PRIMITIVE_S64), expr->expr_binary.right, error);
             } else {
-                type_infer_error_location(expr->expr_binary.token_op);
-                fprintf(stderr, "Type Error: pointer type addition is only valid with an integer type\n");
-                *error |= TYPE_ERROR;
+                type_error(error, expr->expr_binary.token_op, 
+                    "pointer type addition is only valid with an integer type\n");
             }
         } break;
         case OP_BINARY_MINUS: {
             if(type_primitive_int(inferred_right) || inferred_right->kind == TYPE_KIND_POINTER) {
                 if(inferred_left != inferred_right) {
-                    *error |= type_infer_type_mismatch_error(expr->expr_binary.token_op, inferred_left, inferred_right);
+                    type_error_mismatch(error, expr->expr_binary.token_op, inferred_left, inferred_right);
                 } else {
                     expr->type = inferred_left;
                 }
             } else {
-                type_infer_error_location(expr->expr_binary.token_op);
-                fprintf(stderr, "Type Error: pointer type difference is only defined for integer and pointer types\n");
-                *error |= TYPE_ERROR;
+                type_error(error, expr->expr_binary.token_op, 
+                    "pointer type difference is only defined for integer and pointer types\n");
             }
         } break;
         default: assert(0); break;
@@ -557,11 +503,9 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
     if(*error & TYPE_ERROR) return 0;
 
     if(caller_type->kind != TYPE_KIND_FUNCTION) {
-        type_infer_error_location(expr->expr_proc_call.token);
-        fprintf(stderr, "Type Error: expected procedure type, but got '");
+        type_error(error, expr->expr_proc_call.token, "expected procedure type, but got '");
         ast_print_type(caller_type, LIGHT_AST_PRINT_STDERR, 0);
         fprintf(stderr, "'\n");
-        *error |= TYPE_ERROR;
         return expr->type;
     }
     
@@ -577,6 +521,14 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
         // Could not infer type, put this node in type infer queue
         return 0;
     }
+    if(left->kind == TYPE_KIND_ALIAS && !type_alias_root(left)) {
+        // Could not infer type, put this node in type infer queue
+        return 0;
+    }
+    if(right->kind == TYPE_KIND_ALIAS && !type_alias_root(right)) {
+        // Could not infer type, put this node in type infer queue
+        return 0;
+    }
 
     switch(expr->expr_binary.op) {
         case OP_BINARY_PLUS:
@@ -588,9 +540,8 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
         case OP_BINARY_MULT:
         case OP_BINARY_DIV:
             if(!(type_primitive_numeric(left) && type_primitive_numeric(right))) {
-                type_infer_error_location(expr->expr_binary.token_op);
-                fprintf(stderr, "Type Error: binary operator '%.*s' requires numeric types\n", TOKEN_STR(expr->expr_binary.token_op));
-                *error |= TYPE_ERROR;
+                type_error(error, expr->expr_binary.token_op, 
+                    "binary operator '%.*s' requires numeric types\n", TOKEN_STR(expr->expr_binary.token_op));
                 return 0;
             }
             break;
@@ -601,9 +552,8 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
         case OP_BINARY_SHL:
         case OP_BINARY_SHR: {
             if(!(type_primitive_int(left) && type_primitive_int(right))) {
-                type_infer_error_location(expr->expr_binary.token_op);
-                fprintf(stderr, "Type Error: binary operator '%.*s' requires integer types\n", TOKEN_STR(expr->expr_binary.token_op));
-                *error |= TYPE_ERROR;
+                type_error(error, expr->expr_binary.token_op, 
+                    "binary operator '%.*s' requires integer types\n", TOKEN_STR(expr->expr_binary.token_op));
                 return 0;
             }
         }break;
@@ -639,7 +589,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                 }
             }
             if(left != right) {
-                *error |= type_infer_type_mismatch_error(expr->expr_binary.token_op, left, right);
+                type_error_mismatch(error, expr->expr_binary.token_op, left, right);
                 fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
             } else {
                 return left;
@@ -671,7 +621,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                     }
                 }
                 if(left != right) {
-                    *error |= type_infer_type_mismatch_error(expr->expr_binary.token_op, left, right);
+                    type_error_mismatch(error, expr->expr_binary.token_op, left, right);
                     fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
                 } else {
                     type_infer_propagate(0, expr->expr_binary.left, error);
@@ -679,8 +629,8 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                     return type_primitive_get(TYPE_PRIMITIVE_BOOL);
                 }
             } else {
-                type_infer_error_location(expr->expr_binary.token_op);
-                fprintf(stderr, "Type Error: comparison operator '%.*s' requires numeric types\n", TOKEN_STR(expr->expr_binary.token_op));
+                type_error(error, expr->expr_binary.token_op, 
+                    "comparison operator '%.*s' requires numeric types\n", TOKEN_STR(expr->expr_binary.token_op));
                 *error |= TYPE_ERROR;
             }
         } break;
@@ -705,7 +655,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                     }
                 }
                 if(left != right) {
-                    *error |= type_infer_type_mismatch_error(expr->expr_binary.token_op, left, right);
+                    type_error_mismatch(error, expr->expr_binary.token_op, left, right);
                     fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
                 } else {
                     type_infer_propagate(0, expr->expr_binary.left, error);
@@ -713,9 +663,8 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                     return type_primitive_get(TYPE_PRIMITIVE_BOOL);
                 }
             } else {
-                type_infer_error_location(expr->expr_binary.token_op);
-                fprintf(stderr, "Type Error: logic operator '%.*s' requires boolean types\n", TOKEN_STR(expr->expr_binary.token_op));
-                *error |= TYPE_ERROR;
+                type_error(error, expr->expr_binary.token_op, 
+                    "logic operator '%.*s' requires boolean types\n", TOKEN_STR(expr->expr_binary.token_op));
             }
         } break;
 
@@ -732,16 +681,13 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                 } else if(left->kind == TYPE_KIND_POINTER) {
                     return left->pointer_to;
                 } else {
-                    type_infer_error_location(expr->expr_binary.token_op);
-                    fprintf(stderr, "Type Error: cannot access non array/pointer type\n");
-                    *error |= TYPE_ERROR;
+                    type_error(error, expr->expr_binary.token_op, "Type Error: cannot access non array/pointer type\n");
                 }
             } else {
-                type_infer_error_location(expr->expr_binary.token_op);
-                fprintf(stderr, "Type Error: vector accessing operator requires integer indices, but got '");
+                type_error(error, expr->expr_binary.token_op, 
+                    "vector accessing operator requires integer indices, but got '");
                 ast_print_type(right, LIGHT_AST_PRINT_STDERR, 0);
                 fprintf(stderr, "'\n");
-                *error |= TYPE_ERROR;
             }
         } break;
 
@@ -820,9 +766,8 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
         case TYPE_KIND_STRUCT:{
             Light_Ast* decl = find_struct_field_decl(left->struct_info.struct_scope, expr->expr_dot.identifier);
             if(!decl) {
-                type_infer_error_location(expr->expr_dot.identifier);
-                fprintf(stderr, "Type Error: Undeclared struct field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
-                *error |= TYPE_ERROR;
+                type_error(error, expr->expr_dot.identifier, 
+                    "undeclared struct field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
                 return 0;
             }
             type = decl->decl_variable.type; 
@@ -830,9 +775,8 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
         case TYPE_KIND_UNION:{
             Light_Ast* decl = find_union_field_decl(left->union_info.union_scope, expr->expr_dot.identifier);
             if(!decl) {
-                type_infer_error_location(expr->expr_dot.identifier);
-                fprintf(stderr, "Type Error: Undeclared union field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
-                *error |= TYPE_ERROR;
+                type_error(error, expr->expr_dot.identifier, 
+                    "undeclared union field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
                 return 0;
             }
             type = decl->decl_variable.type;
@@ -840,18 +784,16 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
         case TYPE_KIND_ENUM:{
             Light_Ast* decl = find_enum_field_decl(left->enumerator.enum_scope, expr->expr_dot.identifier, error);
             if(!decl) {
-                type_infer_error_location(expr->expr_dot.identifier);
-                fprintf(stderr, "Type Error: Undeclared enum field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
-                *error |= TYPE_ERROR;
+                type_error(error, expr->expr_dot.identifier, 
+                    "undeclared enum field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
                 return 0;
             }
             type = left;
         } break;
         case TYPE_KIND_POINTER: {
             // Already dereferenced once, if it is still a pointer, error out
-            type_infer_error_location(expr->expr_dot.identifier);
-            fprintf(stderr, "Type Error: Operator '.' cannot dereference lvalue twice\n");
-            *error |= TYPE_ERROR;
+            type_error(error, expr->expr_dot.identifier, 
+                "operator '.' cannot dereference lvalue twice\n");
             return 0;
         } break;
         case TYPE_KIND_ALIAS:{
@@ -860,21 +802,18 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
             assert(0);
         } break;
         case TYPE_KIND_FUNCTION: {
-            type_infer_error_location(expr->expr_dot.identifier);
-            fprintf(stderr, "Type Error: Operator '.' is not defined for functional types\n");
-            *error |= TYPE_ERROR;
+            type_error(error, expr->expr_dot.identifier, 
+                "operator '.' is not defined for functional types\n");
             return 0;
         } break;
         case TYPE_KIND_PRIMITIVE:{
-            type_infer_error_location(expr->expr_dot.identifier);
-            fprintf(stderr, "Type Error: Operator '.' is not defined for primitive types\n");
-            *error |= TYPE_ERROR;
+            type_error(error, expr->expr_dot.identifier, 
+                "operator '.' is not defined for primitive types\n");
             return 0;
         } break;
         case TYPE_KIND_ARRAY: {
-            type_infer_error_location(expr->expr_dot.identifier);
-            fprintf(stderr, "Type Error: Operator '.' is not defined for array types\n");
-            *error |= TYPE_ERROR;
+            type_error(error, expr->expr_dot.identifier, 
+                "operator '.' is not defined for array types\n");
             return 0;
         } break;
         // Maybe implement namespaces in the future

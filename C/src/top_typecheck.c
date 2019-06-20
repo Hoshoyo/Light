@@ -5,6 +5,7 @@
 #include "utils/allocator.h"
 #include "global_tables.h"
 #include "eval.h"
+#include "error.h"
 #include <light_array.h>
 #include <assert.h>
 
@@ -35,24 +36,6 @@ typecheck_remove_from_infer_queue(Light_Ast* node) {
     return true;
 }
 
-static s32
-typecheck_error_location(Light_Token* t) {
-    if(!t) {
-        return fprintf(stderr, "%s: ", t->filepath);
-    } else {
-        return fprintf(stderr, "%s:%d:%d: ", t->filepath, t->line + 1, t->column + 1);
-    }
-    return 0;
-}
-
-static s32
-typecheck_error_undeclared_identifier(Light_Token* t) {
-    s32 length = 0;
-    length += typecheck_error_location(t);
-    length += fprintf(stderr, "Type Error: undeclared identifier '%.*s'\n", TOKEN_STR(t));
-    return length;
-}
-
 static Light_Ast* 
 typecheck_decl_proc_from_scope(Light_Scope* scope) {
     while(scope) {
@@ -80,7 +63,7 @@ typecheck_loop_base_scope(Light_Scope* scope) {
     return 0;
 }
 
-static Light_Type_Check_Error
+static Light_Type_Error
 decl_check_redefinition(Light_Scope* scope, Light_Ast* node, Light_Token* token) {
     Light_Symbol s = {0};
     s.token = token;
@@ -91,10 +74,10 @@ decl_check_redefinition(Light_Scope* scope, Light_Ast* node, Light_Token* token)
     s32 index = 0;
     if(symbol_table_entry_exist(symbol_table, s, &index, 0)) {
         Light_Symbol decl_symbol = symbol_table_get(symbol_table, index);
-        typecheck_error_location(token);
+        type_error_location(token);
         fprintf(stderr, "Type error: redeclaration of name '%.*s'\n", TOKEN_STR(token));
         fprintf(stderr, "  - previously declared at: ");
-        typecheck_error_location(decl_symbol.token);
+        type_error_location(decl_symbol.token);
         fprintf(stderr, "\n");
         return TYPE_ERROR;
     } else {
@@ -104,9 +87,9 @@ decl_check_redefinition(Light_Scope* scope, Light_Ast* node, Light_Token* token)
     return TYPE_OK;
 }
 
-Light_Type_Check_Error 
+Light_Type_Error 
 top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
-    Light_Type_Check_Error error = TYPE_OK;
+    Light_Type_Error error = TYPE_OK;
 
     if(!top_level) return error;
 
@@ -156,7 +139,7 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
             break;
 
         if(array_length(global_infer_queue) == starting_length) {
-            fprintf(stderr, "Type Error: circular dependencies\n");
+            type_error(&error, 0, "circular dependencies\n");
             break;
         }
         starting_length = array_length(global_infer_queue);
@@ -264,17 +247,15 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
 
             // Array dimension must be an integer
             if(!type_primitive_int(dim_type)) {
-                typecheck_error_location(type->array_info.token_array);
-                fprintf(stderr, "Type Error: Array dimension must be an integer type constant expression, given '");
+                type_error(error, type->array_info.token_array, "Type Error: Array dimension must be an integer type constant expression, given '");
                 ast_print_type(dim_type, LIGHT_AST_PRINT_STDERR, 0);
                 fprintf(stderr, "'\n");
-                *error |= TYPE_ERROR;
                 return type;
             }
 
             // Array dimension must be constant
             if(!eval_expr_is_constant(type->array_info.const_expr, EVAL_ERROR_REPORT, error)) {
-                fprintf(stderr, "  Could not resolve array type, dimension is not a constant integer\n");
+                fprintf(stderr, "  could not resolve array type, dimension is not a constant integer\n");
                 return type;
             }
 
@@ -282,8 +263,8 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
             s64 dimension_value = eval_expr_constant_int(type->array_info.const_expr, error);
             if(*error & TYPE_ERROR) return type;
             if(dimension_value < 0) {
-                typecheck_error_location(type->array_info.token_array);
-                fprintf(stderr, "Type Error: Array dimension cannot be negative, given '%lld'\n", dimension_value);
+                type_error(error, type->array_info.token_array, 
+                    "array dimension cannot be negative, given '%lld'\n", dimension_value);
                 *error |= TYPE_ERROR;
                 return type;
             }
@@ -391,13 +372,11 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
             if(!type->alias.alias_to) {
                 Light_Ast* decl = type_decl_from_alias(scope, type, error);
                 if(*error & TYPE_ERROR) {
-                    typecheck_error_undeclared_identifier(type->alias.name);
+                    type_error_undeclared_identifier(error, type->alias.name);
                     return type;
                 }
                 if(decl->kind != AST_DECL_TYPEDEF) {
-                    *error |= TYPE_ERROR;
-                    typecheck_error_location(type->alias.name);
-                    fprintf(stderr, "Type Error: invalid type name '%.*s'\n", TOKEN_STR(type->alias.name));
+                    type_error(error, type->alias.name, "invalid type name '%.*s'\n", TOKEN_STR(type->alias.name));
                     return type;
                 }
                 if(!(decl->decl_typedef.type_referenced->flags & TYPE_FLAG_INTERNALIZED)) {
@@ -453,7 +432,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             } else {
                 // Type check
                 if(node->decl_constant.type_info != type) {
-                    error |= type_infer_type_mismatch_error(node->decl_constant.name, node->decl_constant.type_info, type);
+                    type_error_mismatch(&error, node->decl_constant.name, node->decl_constant.type_info, type);
                     fprintf(stderr, " in '%.*s' constant declaration\n", TOKEN_STR(node->decl_constant.name));
                     *decl_error |= error;
                     return;
@@ -501,7 +480,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
                 } else {
                     // Type check
                     if(node->decl_variable.type != type) {
-                        error |= type_infer_type_mismatch_error(node->decl_variable.name, node->decl_variable.type, type);
+                        type_error_mismatch(&error, node->decl_variable.name, node->decl_variable.type, type);
                         fprintf(stderr, " in '%.*s' variable declaration\n", TOKEN_STR(node->decl_variable.name));
                         *decl_error |= error;
                         return;
@@ -596,7 +575,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
 
             // Type check
             if(inferred_left != inferred_right) {
-                *error |= type_infer_type_mismatch_error(node->comm_assignment.op_token, inferred_left, inferred_right);
+                type_error_mismatch(error, node->comm_assignment.op_token, inferred_left, inferred_right);
                 fprintf(stderr, "in assignment command\n");
                 return;
             }
@@ -606,9 +585,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
         case AST_COMMAND_BREAK:{
             if(!(node->scope_at->flags & SCOPE_LOOP)) {
                 // not inside a loop
-                typecheck_error_location(node->comm_break.token_break);
-                fprintf(stderr, "Type Error: break not inside a loop\n");
-                *error |= TYPE_ERROR;
+                type_error(error, node->comm_break.token_break, "break not inside a loop\n");
                 return;
             }
             Light_Scope* base_scope = typecheck_loop_base_scope(node->scope_at);
@@ -621,11 +598,9 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
                 if(*error & TYPE_ERROR) return;
 
                 if(!type_primitive_int(type)) {
-                    typecheck_error_location(node->comm_break.token_break);
-                    fprintf(stderr, "Type Error: break expression must be of integer type, but got '\n");
+                    type_error(error, node->comm_break.token_break, "break expression must be of integer type, but got '\n");
                     ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);
                     fprintf(stderr, "'\n");
-                    *error |= TYPE_ERROR;
                     return;
                 }
 
@@ -636,9 +611,8 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
                     node->comm_break.level_evaluated = true;
                     node->comm_break.level_value = value;
                     if(value > level_deep) {
-                        typecheck_error_location(node->comm_break.token_break);
-                        fprintf(stderr, "Type Error: break command is not inside an iterative loop nested '%lld' deep\n", value);
-                        *error |= TYPE_ERROR;
+                        type_error(error, node->comm_break.token_break, 
+                            "break command is not inside an iterative loop nested '%lld' deep\n", value);
                         return;
                     }
 
@@ -655,9 +629,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
         case AST_COMMAND_CONTINUE: {
             if(!(node->scope_at->flags & SCOPE_LOOP)) {
                 // not inside a loop
-                typecheck_error_location(node->comm_break.token_break);
-                fprintf(stderr, "Type Error: continue not inside a loop\n");
-                *error |= TYPE_ERROR;
+                type_error(error, node->comm_break.token_break, "continue not inside a loop\n");
                 return;
             }
             Light_Scope* base_scope = typecheck_loop_base_scope(node->scope_at);
@@ -670,11 +642,9 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
                 if(*error & TYPE_ERROR) return;
 
                 if(!type_primitive_int(type)) {
-                    typecheck_error_location(node->comm_continue.token_continue);
-                    fprintf(stderr, "Type Error: continue expression must be of integer type, but got '\n");
+                    type_error(error, node->comm_continue.token_continue, "continue expression must be of integer type, but got '\n");
                     ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);
                     fprintf(stderr, "'\n");
-                    *error |= TYPE_ERROR;
                     return;
                 }
 
@@ -685,9 +655,8 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
                     node->comm_continue.level_evaluated = true;
                     node->comm_continue.level_value = value;
                     if(value > level_deep) {
-                        typecheck_error_location(node->comm_continue.token_continue);
-                        fprintf(stderr, "Type Error: continue command is not inside an iterative loop nested '%lld' deep\n", value);
-                        *error |= TYPE_ERROR;
+                        type_error(error, node->comm_continue.token_continue, 
+                            "continue command is not inside an iterative loop nested '%lld' deep\n", value);
                         return;
                     }
 
@@ -704,9 +673,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
         case AST_COMMAND_RETURN: {
             Light_Ast* decl_proc = typecheck_decl_proc_from_scope(node->scope_at);
             if(!decl_proc) {
-                typecheck_error_location(node->comm_return.token_return);
-                fprintf(stderr, "Type error: return must be within a procedure but is not\n");
-                *error |= TYPE_ERROR;
+                type_error(error, node->comm_return.token_return, "return must be within a procedure but is not\n");
                 return;
             }
 
@@ -740,13 +707,12 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
 
             // Type check
             if(expr_type != decl_proc->decl_proc.proc_type->function.return_type) {
-                typecheck_error_location(node->comm_return.token_return);
-                fprintf(stderr, "Type Error: procedure '%.*s' requires return type '", TOKEN_STR(decl_proc->decl_proc.name));
+                type_error(error, node->comm_return.token_return, 
+                    "procedure '%.*s' requires return type '", TOKEN_STR(decl_proc->decl_proc.name));
                 ast_print_type(decl_proc->decl_proc.proc_type->function.return_type, LIGHT_AST_PRINT_STDERR, 0);
                 fprintf(stderr, "', but got '");
                 ast_print_type(expr_type, LIGHT_AST_PRINT_STDERR, 0);
                 fprintf(stderr, "'\n");
-                *error |= TYPE_ERROR;
                 return;
             }
 
@@ -785,11 +751,10 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
                 }
 
                 if(type != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
-                    typecheck_error_location(node->comm_for.for_token);
-                    fprintf(stderr, "Type Error: for command requires boolean type condition, but got '");
+                    type_error(error, node->comm_for.for_token, 
+                        "Type Error: for command requires boolean type condition, but got '");
                     ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);
                     fprintf(stderr, "'\n");
-                    *error |= TYPE_ERROR;
                     return;
                 }
             }
@@ -814,11 +779,10 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             }
 
             if(type != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
-                typecheck_error_location(node->comm_if.if_token);
-                fprintf(stderr, "Type Error: if command requires boolean type condition, but got '");
+                type_error(error, node->comm_if.if_token, 
+                    "Type Error: if command requires boolean type condition, but got '");
                 ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);
                 fprintf(stderr, "'\n");
-                *error |= TYPE_ERROR;
                 return;
             }
 
@@ -838,11 +802,10 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             }
 
             if(type != type_primitive_get(TYPE_PRIMITIVE_BOOL)) {
-                typecheck_error_location(node->comm_if.if_token);
-                fprintf(stderr, "Type Error: while command requires boolean type condition, but got '");
+                type_error(error, node->comm_if.if_token, 
+                    "Type Error: while command requires boolean type condition, but got '");
                 ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);
                 fprintf(stderr, "'\n");
-                *error |= TYPE_ERROR;
                 return;
             }
 

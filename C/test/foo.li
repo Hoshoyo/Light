@@ -5,6 +5,8 @@ before struct {
 }
 
 main : () -> s32 {
+    a : after;
+    b := a + 3;
     // v1 := struct{ a :s32 = 4, b :s32 = 3};  // normal decl
     // v2 := struct{ a := 4,     b :s32 = 3};  // infer only one field
     // v4 := struct{ a := 4,     b := 3};      // infer both
@@ -15,7 +17,7 @@ main : () -> s32 {
     // v9 : struct{ a:s32; } = struct{ a :s32 = 4.0 }; // infer and check
     // va : struct{ a:s32; } = struct{ b : s32 = 4 }; // name wrong
 
-     vb1 : before = struct before{ 3, 4 }; // check before ok
+    // vb1 : before = struct before{ 3, 4 }; // check before ok
     // vb2 : before = struct before{ 3, 3.4 }; // check before error
     // vc1 : after = struct after{ 27, 1.75 }; // check after ok
     // vc2 : after = struct after{ 27, 3 }; // check after error

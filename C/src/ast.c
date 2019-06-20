@@ -705,8 +705,8 @@ ast_print_node(Light_Ast* node, u32 flags, s32 indent_level) {
         }break;
         case AST_DECL_TYPEDEF:{
             length += fprintf(out, "%.*s ", TOKEN_STR(node->decl_typedef.name));
-            length += ast_print_type(node->decl_typedef.type_referenced, flags, indent_level);
-            Light_Type* type = node->decl_typedef.type_referenced;
+            Light_Type* type = node->decl_typedef.type_referenced->alias.alias_to;
+            length += ast_print_type(type, flags, indent_level);
             if(type && type->kind != TYPE_KIND_ENUM && type->kind != TYPE_KIND_STRUCT && type->kind != TYPE_KIND_UNION) {
                 length += fprintf(out, ";");
             }
@@ -827,7 +827,8 @@ ast_print_type(Light_Type* type, u32 flags, s32 indent_level) {
     if(!type) {
         return 0;
     }
-
+#define PRINT_TYPE_COLORS 1
+#if PRINT_TYPE_COLORS
     const char* color = 0;
     if(type->flags & TYPE_FLAG_INTERNALIZED) {
         fprintf(out, "%s", ColorGreen);
@@ -836,6 +837,9 @@ ast_print_type(Light_Type* type, u32 flags, s32 indent_level) {
         fprintf(out, "%s", ColorRed);
         color = ColorRed;
     }
+#else
+    const char* color = "";
+#endif
 
     if(!type) return 0;
     switch(type->kind) {
@@ -907,8 +911,9 @@ ast_print_type(Light_Type* type, u32 flags, s32 indent_level) {
         case TYPE_KIND_NONE:
         default: length += fprintf(out, "<unknown type>"); break;
     }
-
+#if PRINT_TYPE_COLORS
     fprintf(out, "%s", ColorReset);
+#endif
     return length;
 }
 

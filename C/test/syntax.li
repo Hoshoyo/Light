@@ -13,6 +13,13 @@ main : () -> s32 {}
 // Typedefs
 foo vec2;
 foo struct {}
+foo union {}
 foo enum {}
 foo [32]s32;
-foo (s32)->void;
+foo #type (s32)->void;
+foo ^foo;
+
+// Expressions
+// foo binop
+foo (args)
+foo .

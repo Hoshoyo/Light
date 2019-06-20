@@ -11,6 +11,7 @@ Light_Type* type_primitive_from_token(Light_Token_Type token);
 Light_Type* type_weak_primitive_from_literal(Light_Literal_Type literal);
 Light_Type* type_from_token(Light_Token* t);
 Light_Type* type_primitive_get(Light_Type_Primitive t);
+Light_Type* type_alias_root(Light_Type* type);
 bool        type_primitive_sint(Light_Type* t);
 bool        type_primitive_uint(Light_Type* t);
 bool        type_primitive_int(Light_Type* t);

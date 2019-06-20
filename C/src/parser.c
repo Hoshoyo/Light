@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "error.h"
 #include "global_tables.h"
 #include "utils/os.h"
 #include "utils/allocator.h"
@@ -41,9 +42,6 @@ parser_require_and_eat(Light_Parser* parser, Light_Token_Type type) {
     }
     return PARSER_OK;
 }
-
-
-
 
 static Light_Ast*
 parse_comm_block(Light_Parser* parser, Light_Scope* scope, u32* error) {
@@ -342,21 +340,16 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
             }
 			break;
 		case TOKEN_IDENTIFIER:{
-			Light_Token_Type t = lexer_peek_n(lexer, 1)->type;
-			if (t == ':') {
-				command = parse_declaration(parser, scope, error);
-			} else if (t == '(') {
+            Light_Token* t = lexer_peek_n(lexer, 1);
+			if (t->type == '.' || t->flags & TOKEN_FLAG_ASSIGNMENT_OPERATOR) {
+				command = parse_comm_assignment(parser, scope, error);
+			} else if (t->type == '(') {
 				// Syntatic sugar void proc call
 				Light_Ast* pcall = parse_expression(parser, scope, error);
                 command = ast_new_comm_assignment(scope, 0, pcall, next);
 			} else {
-				command = parse_comm_assignment(parser, scope, error);
+				command = parse_declaration(parser, scope, require_semicolon, error);
 			}
-            ReturnIfError();
-            if(require_semicolon && command->kind != AST_DECL_PROCEDURE && command->kind != AST_DECL_TYPEDEF) {
-                *error |= parser_require_and_eat(parser, ';');
-                ReturnIfError();
-            }
 		}break;
 		default: {
 			command = parse_comm_assignment(parser, scope, error);
@@ -515,7 +508,7 @@ parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_sc
                 assert(0);
             }break;
             case TOKEN_IDENTIFIER:{
-                Light_Ast* decl = parse_declaration(parser, global_scope, error);
+                Light_Ast* decl = parse_declaration(parser, global_scope, true, error);
                 if(*error & PARSER_ERROR_FATAL) break;
                 if(decl) {
                     array_push(parser->top_level, decl);
@@ -531,7 +524,7 @@ parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_sc
 }
 
 Light_Ast*
-parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
+parse_declaration(Light_Parser* parser, Light_Scope* scope, bool require_semicolon, u32* error) {
     Light_Ast* result = 0;
 
     Light_Lexer* lexer = parser->lexer;
@@ -572,11 +565,13 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
             case ':':
                 lexer_next(lexer); // eat ':'
             default: { // : is optional
-                // inferred constant declaration or procedure call
+                // inferred constant declaration
                 Light_Ast* expr = parse_expression(parser, scope, error);
                 ReturnIfError();
-                *error |= parser_require_and_eat(parser, ';');
-                ReturnIfError();
+                if(require_semicolon) {
+                    *error |= parser_require_and_eat(parser, ';');
+                    ReturnIfError();
+                }
                 result = ast_new_decl_constant(scope, name, decl_type, expr, 0);
             }break;
             case '=': {
@@ -584,6 +579,10 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
                 // inferred variable declaration
                 Light_Ast* expr = parse_expression(parser, scope, error);
                 ReturnIfError();
+                if(require_semicolon) {
+                    *error |= parser_require_and_eat(parser, ';');
+                    ReturnIfError();
+                }
                 result = ast_new_decl_variable(scope, name, decl_type, expr, STORAGE_CLASS_STACK, 0);
             }break;
         }
@@ -591,7 +590,9 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, u32* error) {
         // typedef
         Light_Type* type = parse_type(parser, scope, error);
         ReturnIfError();
-        if(type && type->kind != TYPE_KIND_ENUM && type->kind != TYPE_KIND_STRUCT && type->kind != TYPE_KIND_UNION) {
+        if(require_semicolon && type && 
+            type->kind != TYPE_KIND_ENUM && type->kind != TYPE_KIND_STRUCT && type->kind != TYPE_KIND_UNION) 
+        {
             *error |= parser_require_and_eat(parser, ';');
         }
         type = type_new_alias(name, type);
