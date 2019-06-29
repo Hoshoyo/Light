@@ -444,7 +444,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
 
                 // Check if the expressions are constant and evaluate them aswell as
                 // propagating their types, which could be any integer type
-                s64 previous_value = 0;
+                s64 previous_value = -1;
                 for(s32 i = 0; i < type->enumerator.field_count; ++i) {
                     Light_Ast* expr = type->enumerator.fields[i]->decl_constant.value;
                     Light_Token* field_name = type->enumerator.fields[i]->decl_constant.name;

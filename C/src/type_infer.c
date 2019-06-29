@@ -607,10 +607,11 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
             } else {
                 // weak weak
                 Light_Type* res = types_compatible(left, right);
-                if(res) {
-                    left = res;
-                    right = res;
+                if(!res) {
+                    type_error_mismatch(error, expr->expr_binary.token_op, left, right);
+                    fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
                 }
+                return res;
             }
             if(!type_check_equality(left, right)) {
                 type_error_mismatch(error, expr->expr_binary.token_op, left, right);
@@ -639,10 +640,11 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                 } else {
                     // weak weak
                     Light_Type* res = types_compatible(left, right);
-                    if(res) {
-                        left = res;
-                        right = res;
+                    if(!res) {
+                        type_error_mismatch(error, expr->expr_binary.token_op, left, right);
+                        fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
                     }
+                    return res;
                 }
                 if(type_check_equality(left, right)) {
                     type_error_mismatch(error, expr->expr_binary.token_op, left, right);
@@ -673,10 +675,10 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                 } else {
                     // weak weak
                     Light_Type* res = types_compatible(left, right);
-                    if(res) {
-                        left = res;
-                        right = res;
+                    if(!res) {
+                        type_error_mismatch(error, expr->expr_binary.token_op, left, right);
                     }
+                    return res;
                 }
                 if(type_check_equality(left, right)) {
                     type_error_mismatch(error, expr->expr_binary.token_op, left, right);

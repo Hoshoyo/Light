@@ -1133,6 +1133,10 @@ parse_type_enum(Light_Parser* parser, Light_Scope* scope, u32* error) {
             if(i != 0) {
                 *error |= parser_require_and_eat(parser, ',');
                 ReturnIfError();
+
+                // Optional comma at the end
+                if(lexer_peek(parser->lexer)->type == '}')
+                    break;
             }
             Light_Token* name = lexer_next(parser->lexer);
             if(name->type != TOKEN_IDENTIFIER) {

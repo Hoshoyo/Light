@@ -1,17 +1,5 @@
 main : () -> s32 {
-    a := Foo.BAR;
+    THREE :: 3 + 3;
+    a : [THREE]s32;
     return 0;
-}
-
-a :s32: 3;
-b :s16: 4;
-c :: 5;
-
-Foo enum { 
-    BAR,
-    TAR,
-    FOO,
-    DOO :: 5,
-    NIB,
-    SAB
 }

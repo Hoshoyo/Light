@@ -918,12 +918,13 @@ ast_print_type(Light_Type* type, u32 flags, s32 indent_level) {
                 if(i != 0) length += fprintf(out, "%s, ", color);
                 Light_Ast* field = type->enumerator.fields[i];
                 length += fprintf(out, "%.*s", field->decl_constant.name->length, field->decl_constant.name->data);
+                #if 0
                 if(field->decl_constant.value) {
                     length += fprintf(out, " :: ");
                     length += ast_print_expression(type->enumerator.fields[i]->decl_constant.value, flags, indent_level+1);
-                } else {
-                    length += fprintf(out, " :: %ld", type->enumerator.evaluated_values[i]);
                 }
+                #endif
+                length += fprintf(out, " :: %ld", type->enumerator.evaluated_values[i]);
             }
             length += fprintf(out, "%s }", color);
         } break;

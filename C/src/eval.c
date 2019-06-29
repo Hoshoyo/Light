@@ -2,6 +2,7 @@
 #include <assert.h>
 #include "top_typecheck.h"
 #include "type_infer.h"
+#include "error.h"
 #include "utils/utils.h"
 #include <stdio.h>
 #include <light_array.h>
@@ -243,10 +244,21 @@ eval_expr_constant_int(Light_Ast* expr, u32* error) {
 			}
 		} break;
         case AST_EXPRESSION_VARIABLE: {
-
+			// Must be a constant declaration
+			Light_Ast* decl = type_infer_decl_from_name(expr->scope_at, expr->expr_variable.name);
+			if(!decl) {
+				type_error_undeclared_identifier(error, expr->expr_variable.name);
+				return 0;
+			}
+			if(decl->kind != AST_DECL_CONSTANT) {
+				type_error(error, expr->expr_variable.name, 
+					"expression '%.*s' is not a constant\n", expr->expr_variable.name);
+				return 0;
+			}
+			return eval_expr_constant_int(decl->decl_constant.value, error);
 		} break;
         case AST_EXPRESSION_DIRECTIVE:
-            // TODO(psv):
+            // TODO(psv): Implement
             return 2;
             break;
         default: assert(0); break;
