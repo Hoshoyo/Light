@@ -85,6 +85,13 @@ bool type_primitive_bool(Light_Type* t) {
     return t == type_primitive_get(TYPE_PRIMITIVE_BOOL);
 }
 
+Light_Type* type_get_bigger(Light_Type* t1, Light_Type* t2) {
+    assert(t1->flags & (TYPE_FLAG_INTERNALIZED|TYPE_FLAG_SIZE_RESOLVED));
+    assert(t2->flags & (TYPE_FLAG_INTERNALIZED|TYPE_FLAG_SIZE_RESOLVED));
+
+    return (t1->size_bits > t2->size_bits) ? t1 : t2;
+}
+
 static Light_Type*
 type_new_primitive(Light_Type_Primitive p) {
     Light_Type* result = type_alloc();
@@ -186,15 +193,14 @@ type_new_function(Light_Type** arguments_types, Light_Type* return_type, s32 arg
 }
 
 Light_Type* 
-type_new_enum(Light_Token** fields_names, Light_Ast** fields_values, s32 fields_count, Light_Type* type_hint, Light_Scope* scope) {
+type_new_enum(Light_Ast** fields, s32 fields_count, Light_Type* type_hint, Light_Scope* scope) {
     Light_Type* result = type_alloc();
 
     result->kind = TYPE_KIND_ENUM;
     result->size_bits = 0;
 
     result->enumerator.field_count = fields_count;
-    result->enumerator.fields_values = fields_values;
-    result->enumerator.fields_names = fields_names;
+    result->enumerator.fields = fields;
     result->enumerator.type_hint = type_hint;
     result->enumerator.enum_scope = scope;
 
@@ -305,7 +311,7 @@ type_hash(Light_Type* type) {
             if(type->enumerator.field_count > 0) {
                 for(s32 i = 0; i < type->enumerator.field_count; ++i) {
                     // TODO(psv): field value be part of the hash
-                    Light_Token* field_name = type->enumerator.fields_names[i];
+                    Light_Token* field_name = type->enumerator.fields[i]->decl_constant.name;
                     hash = fnv_1_hash_from_start(hash, field_name->data, field_name->length);
                 }
             }
@@ -354,7 +360,7 @@ type_tables_initialize() {
 
     global_type_empty_struct = type_internalize(type_new_struct(0, 0, 0));
     global_type_empty_union = type_internalize(type_new_union(0, 0, 0));
-    global_type_empty_enum = type_internalize(type_new_enum(0, 0, 0, 0, 0));
+    global_type_empty_enum = type_internalize(type_new_enum(0, 0, 0, 0));
 }
 
 Light_Type*

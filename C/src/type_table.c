@@ -61,7 +61,8 @@ type_equal(Light_Type* t1, Light_Type* t2) {
                     return 0;
                 // TODO(psv): consider enum values
                 for(s32 i = 0; i < t1->enumerator.field_count; ++i) {
-                    if(t1->enumerator.fields_names[i]->data != t2->enumerator.fields_names[i]->data)
+                    if(t1->enumerator.fields[i]->decl_constant.name->data != 
+                        t2->enumerator.fields[i]->decl_constant.name->data)
                         return 0;
                 }
                 return 1;

@@ -202,7 +202,8 @@ typecheck_resolve_type_symbol_tables(Light_Type* type, u32 flags, u32* error) {
                 symbol_table_new(scope->symb_table, (scope->decl_count + 4) * 8);
             }
             for(s32 i = 0; i < type->enumerator.field_count; ++i) {
-                *error |= decl_check_redefinition(scope, type->enumerator.fields_values[i], type->enumerator.fields_names[i]);
+                Light_Ast* field = type->enumerator.fields[i];
+                *error |= decl_check_redefinition(scope, field, field->decl_constant.name);
             }
         } break;
         default: assert(0); break;
@@ -383,6 +384,11 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
             }
         } break;
         case TYPE_KIND_ENUM: {
+            // Create evaluated values array if there isn't one already
+            if(!type->enumerator.evaluated_values) {
+                type->enumerator.evaluated_values = array_new_len(s64, type->enumerator.field_count);
+            }
+
             if(type->enumerator.type_hint) {
                 type->enumerator.type_hint = typecheck_resolve_type(scope, type->enumerator.type_hint, flags, error);
                 if(type->enumerator.type_hint && type->enumerator.type_hint->flags & TYPE_FLAG_INTERNALIZED) {
@@ -391,17 +397,84 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 }
             } else {
                 bool all_fields_internalized = true;
+                Light_Type* strongest_enum_type = 0;
+                // First infer all expressions and whether or not they are integer types
+                // Type checking against any strong type found
                 for(s32 i = 0; i < type->enumerator.field_count; ++i) {
-                    Light_Ast* field_value = type->enumerator.fields_values[i];
-                    Light_Type* field_type = type_infer_expression(field_value, error);
-                    if(!field_type) {
-                        all_fields_internalized = false;
+                    Light_Ast* field_value = type->enumerator.fields[i]->decl_constant.value;
+                    Light_Token* field_name = type->enumerator.fields[i]->decl_constant.name;
+                    if(!field_value) {
+                        // We are going to infer the value later based on the others
+                        continue;
+                    }
+                    if(field_value) {
+                        Light_Type* field_type = type_infer_expression(field_value, error);
+                        
+                        if(!field_type) {
+                            // When no error is returned there is still unresolved type names
+                            all_fields_internalized = false;
+                            continue;
+                        }
+
+                        if(!type_primitive_int(field_type)) {
+                            all_fields_internalized = false;
+                            type_error(error, field_name,
+                                "enumeration requires integer fields, but field '%.*s' evaluated to '", 
+                                    TOKEN_STR(field_name));
+                            ast_print_type(field_type, LIGHT_AST_PRINT_STDERR, 0);
+                            fprintf(stderr, "'\n");
+                            continue;
+                        }
+
+                        if(field_type->flags & TYPE_FLAG_INTERNALIZED) {
+                            if(!strongest_enum_type) {
+                                // When an internalized
+                                strongest_enum_type = field_type;
+                            } else {
+                                // Convert to the biggest type
+                                strongest_enum_type = type_get_bigger(field_type, strongest_enum_type);
+                            }
+                        }
                     }
                 }
-                type->size_bits = 32;
-                type->flags |= TYPE_FLAG_SIZE_RESOLVED;
-                type = type_internalize(type);
-                type = typecheck_resolve_type_symbol_tables(type, flags, error);
+
+                if(!all_fields_internalized) {
+                    return type;
+                }
+
+                // Check if the expressions are constant and evaluate them aswell as
+                // propagating their types, which could be any integer type
+                s64 previous_value = 0;
+                for(s32 i = 0; i < type->enumerator.field_count; ++i) {
+                    Light_Ast* expr = type->enumerator.fields[i]->decl_constant.value;
+                    Light_Token* field_name = type->enumerator.fields[i]->decl_constant.name;
+                    if(!expr) {
+                        // There is no expression, so the semantic is previous + 1
+                        // even when it collides with another enum field, same as C.
+                        previous_value += 1;
+                        array_push(type->enumerator.evaluated_values, previous_value);
+                        continue;
+                    }
+
+                    expr->type = type_infer_propagate(0, expr, error);
+
+                    if(!eval_expr_is_constant(expr, 0, error)){
+                        all_fields_internalized = false;
+                        type_error(error, field_name,
+                            "enumeration field '%.*s' must be constant\n", TOKEN_STR(field_name));
+                    } else {
+                        s64 v = eval_expr_constant_int(expr, error);
+                        array_push(type->enumerator.evaluated_values, v);
+                        previous_value = v;
+                    }
+                }
+
+                if(all_fields_internalized) {
+                    type->size_bits = 32;
+                    type->flags |= TYPE_FLAG_SIZE_RESOLVED;
+                    type = type_internalize(type);
+                    type = typecheck_resolve_type_symbol_tables(type, flags, error);
+                }
             }
         } break;
         case TYPE_KIND_ALIAS: {
@@ -544,6 +617,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             if(!(node->decl_proc.proc_type->flags & TYPE_FLAG_INTERNALIZED)) {
                 typecheck_push_to_infer_queue(node);
             } else {
+                node->decl_proc.return_type = node->decl_proc.proc_type->function.return_type;
                 typecheck_remove_from_infer_queue(node);
             }
         } break;
@@ -571,6 +645,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
         } break;
         default: typecheck_information_pass_command(node, flags, &error); break;
     }
+    *decl_error |= error;
 }
 
 void
@@ -849,5 +924,4 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
         } break;
         default: assert(0); break;
     }
-
 }

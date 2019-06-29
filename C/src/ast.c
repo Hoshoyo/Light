@@ -195,6 +195,7 @@ ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val) {
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
 
+    result->expr_literal_primitive.type = LITERAL_DEC_UINT;
     result->expr_literal_primitive.flags = 0;
     result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
     result->expr_literal_primitive.token = 0;
@@ -463,7 +464,7 @@ ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_tok
     return result;
 }
 
-
+#define fprintf(...) fprintf(__VA_ARGS__), fflush(stdout)
 
 // Print
 const char* ColorReset   = "\x1B[0m";
@@ -553,7 +554,10 @@ ast_print_expr_literal_primitive(Light_Ast* expr, u32 flags, s32 indent_level) {
         case LITERAL_BOOL:
         case LITERAL_CHAR:
         case LITERAL_FLOAT:{
-            length += fprintf(out, "%.*s", TOKEN_STR(expr->expr_literal_primitive.token));
+            if(expr->expr_literal_primitive.token)
+                length += fprintf(out, "%.*s", TOKEN_STR(expr->expr_literal_primitive.token));
+            else
+                length += fprintf(out, "0");
         }break;
         case LITERAL_POINTER: length += fprintf(out, "null"); break;
         default: length += fprintf(out, "<invalid literal>"); break;
@@ -912,7 +916,14 @@ ast_print_type(Light_Type* type, u32 flags, s32 indent_level) {
             length += fprintf(out, "{ ");
             for(s32 i = 0; i < type->enumerator.field_count; ++i) {
                 if(i != 0) length += fprintf(out, "%s, ", color);
-                length += fprintf(out, "%.*s", type->enumerator.fields_names[i]->length, type->enumerator.fields_names[i]->data);
+                Light_Ast* field = type->enumerator.fields[i];
+                length += fprintf(out, "%.*s", field->decl_constant.name->length, field->decl_constant.name->data);
+                if(field->decl_constant.value) {
+                    length += fprintf(out, " :: ");
+                    length += ast_print_expression(type->enumerator.fields[i]->decl_constant.value, flags, indent_level+1);
+                } else {
+                    length += fprintf(out, " :: %ld", type->enumerator.evaluated_values[i]);
+                }
             }
             length += fprintf(out, "%s }", color);
         } break;

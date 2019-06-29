@@ -1125,8 +1125,7 @@ parse_type_enum(Light_Parser* parser, Light_Scope* scope, u32* error) {
     *error |= parser_require_and_eat(parser, '{');
     ReturnIfError();
 
-    Light_Token** fields_names = array_new(Light_Token*);
-    Light_Ast**   fields_values = array_new(Light_Ast*);
+    Light_Ast** fields = array_new(Light_Ast*);
     Light_Scope*  enum_scope = light_scope_new(0, scope, SCOPE_ENUM);
 
     if(lexer_peek(parser->lexer)->type != '}') {
@@ -1141,22 +1140,22 @@ parse_type_enum(Light_Parser* parser, Light_Scope* scope, u32* error) {
                 return 0;
             }
 
-            array_push(fields_names, name);
-
+            Light_Ast* field_value = 0;
             if(lexer_peek(parser->lexer)->type == ':') {
                 lexer_next(parser->lexer); // skip ':'
                 *error |= parser_require_and_eat(parser, ':');
                 ReturnIfError();
 
-                Light_Ast* val = parse_expression(parser, enum_scope, error);
+                field_value = parse_expression(parser, enum_scope, error);
                 ReturnIfError();
-
-                array_push(fields_values, val);
             } else {
-                array_push(fields_values, 0);
+                field_value = 0;
             }
 
             enum_scope->decl_count++;
+
+            Light_Ast* field = ast_new_decl_constant(enum_scope, name, 0, field_value, 0);
+            array_push(fields, field);
 
             if(lexer_peek(parser->lexer)->type != ',') break;
         }
@@ -1166,8 +1165,8 @@ parse_type_enum(Light_Parser* parser, Light_Scope* scope, u32* error) {
     ReturnIfError();
 
 
-    s32 fields_count = array_length(fields_names);
-    Light_Type* result = type_new_enum(fields_names, fields_values, fields_count, type_hint, enum_scope);
+    s32 fields_count = array_length(fields);
+    Light_Type* result = type_new_enum(fields, fields_count, type_hint, enum_scope);
 
     enum_scope->creator_type = result;
 

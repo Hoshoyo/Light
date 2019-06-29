@@ -37,18 +37,21 @@ type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error
     if(type) {
         assert(TYPE_STRONG(type));
     }
-    assert(expr->type);
 
     if(expr->expr_literal_array.raw_data) {
-        // TODO(psv): Implement
-        assert(0);
-    }
-    for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
-        if(type) {
-            type = type->array_info.array_of;
+        if(type && type_alias_root(type)->kind == TYPE_KIND_POINTER) {
+            expr->type = type;
         }
-        type_infer_propagate(type, expr->expr_literal_array.array_exprs[i], error);
+    } else {
+        assert(expr->type);
+        for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
+            if(type) {
+                type = type->array_info.array_of;
+            }
+            type_infer_propagate(type, expr->expr_literal_array.array_exprs[i], error);
+        }
     }
+
     return expr->type;
 }
 
@@ -781,6 +784,7 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
         left = left->pointer_to;
     }
 
+    Light_Type* original_type = left;
     left = type_alias_root(left);
 
     switch(left->kind) {
@@ -809,7 +813,7 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
                     "undeclared enum field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
                 return 0;
             }
-            type = left;
+            type = original_type;
         } break;
         case TYPE_KIND_POINTER: {
             // Already dereferenced once, if it is still a pointer, error out
@@ -847,6 +851,8 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
 Light_Type* 
 type_infer_expression(Light_Ast* expr, u32* error) {
     assert(expr->flags & AST_FLAG_EXPRESSION);
+    if(expr->type && expr->type->flags && TYPE_FLAG_INTERNALIZED)
+        return expr->type;
 
     Light_Type* type = 0;
     switch(expr->kind) {

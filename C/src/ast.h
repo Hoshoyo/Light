@@ -483,10 +483,10 @@ typedef struct {
 typedef struct {
 	struct Light_Type_t*  type_hint;
 	Light_Scope*          enum_scope;
-	Light_Token**         fields_names;
-	Light_Ast**           fields_values;
+	Light_Ast**           fields;			// Must be CONSTANT_DECL
 	s32                   field_count;
 	uint32_t              flags;
+	int64_t*              evaluated_values;
 } Light_Type_Enum;
 
 typedef struct {
