@@ -780,9 +780,8 @@ parse_expr_literal_array(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Token* array_token = lexer_peek_n(parser->lexer, -1);
 
     Light_Ast* result = 0;
-
+    Light_Ast** exprs = array_new(Light_Ast*);
 	if(lexer_peek(parser->lexer)->type != ']') {
-		Light_Ast** exprs = array_new(Light_Ast*);
 		while(true) {
 			Light_Ast* expr = parse_expression(parser, scope, error);
 			array_push(exprs, expr);
@@ -793,11 +792,12 @@ parse_expr_literal_array(Light_Parser* parser, Light_Scope* scope, u32* error) {
 				lexer_next(parser->lexer);
 			}
 		}
-	    result = ast_new_expr_literal_array(scope, array_token, exprs);
 	}
 
 	*error |= parser_require_and_eat(parser, ']');
     ReturnIfError();
+
+    result = ast_new_expr_literal_array(scope, array_token, exprs);
 
 	return result;
 }

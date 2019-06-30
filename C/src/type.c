@@ -163,7 +163,7 @@ type_new_array(Light_Ast* dimension, Light_Type* type, Light_Token* token_array)
 
     result->kind = TYPE_KIND_ARRAY;
     result->size_bits = 0;
-    if(type->flags & TYPE_FLAG_WEAK)
+    if(!type || (type->flags & TYPE_FLAG_WEAK))
         result->flags |= TYPE_FLAG_WEAK;
     
     result->array_info.array_of = type;

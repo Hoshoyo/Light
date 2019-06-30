@@ -45,11 +45,59 @@ type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error
         }
     } else {
         assert(expr->type);
-        for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
-            if(type) {
-                type = type->array_info.array_of;
+        Light_Type* array_of_type = 0;
+        if(type) {
+            bool all_internalized = true;
+            array_of_type = type->array_info.array_of;
+            for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
+                Light_Type* propagated = type_infer_propagate(array_of_type, expr->expr_literal_array.array_exprs[i], error);
+                if(!propagated) {
+                    all_internalized = false;
+                    continue;
+                }
+                expr->expr_literal_array.array_exprs[i]->type = propagated;
+                if(array_of_type && !type_check_equality(propagated, array_of_type)) {
+                    type_error_mismatch(error, expr->expr_literal_array.token_array, 
+                        propagated, array_of_type);
+                    fprintf(stderr, " in literal array\n");
+                }
             }
-            type_infer_propagate(type, expr->expr_literal_array.array_exprs[i], error);
+            if(!all_internalized) {
+                expr->type = 0;
+            } else {
+                expr->type = type;
+            }
+        } else {
+            bool all_internalized = true;
+            for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
+                Light_Type* propagated = type_infer_propagate(array_of_type, expr->expr_literal_array.array_exprs[i], error);
+                if(!propagated) {
+                    all_internalized = false;
+                    continue;
+                }
+                expr->expr_literal_array.array_exprs[i]->type = propagated;
+
+                if(!array_of_type) {
+                    array_of_type = propagated;
+                    continue;
+                }
+                
+                if(!type_check_equality(propagated, array_of_type)) {
+                    type_error_mismatch(error, expr->expr_literal_array.token_array, 
+                        propagated, array_of_type);
+                    fprintf(stderr, " in literal array\n");
+                }
+            }
+            if(all_internalized) {
+                Light_Type* type = type_new_array(0, array_of_type, expr->expr_literal_array.token_array);
+                type->array_info.dimension_evaluated = true;
+                type->array_info.dimension = array_length(expr->expr_literal_array.array_exprs);
+                type->size_bits = type->array_info.dimension * array_of_type->size_bits;
+                type->flags = TYPE_FLAG_SIZE_RESOLVED;
+                expr->type = type_internalize(type);
+            } else {
+                expr->type = 0;
+            }
         }
     }
 
@@ -395,48 +443,49 @@ type_infer_expr_literal_array(Light_Ast* lexpr, u32* error) {
         return type_internalize(type);
     }
 
-    int passes = 1;
     bool unresolved = false;
     Light_Type* strong_type = 0;
     s32 first_strong_type_index = array_length(lexpr->expr_literal_array.array_exprs);
-    for(s32 p = 0; p < MAX(passes, 2); ++p) {
-        for(s32 i = 0; i < array_length(lexpr->expr_literal_array.array_exprs); ++i) {
-            Light_Ast* expr = lexpr->expr_literal_array.array_exprs[i];
-            
-            expr->type = type_infer_expression(expr, error);
-            if(!expr->type) {
-                unresolved = true;
-                continue;
-            }
 
-            if(strong_type) {
-                if(expr->type->flags & TYPE_FLAG_INTERNALIZED) {
-                    if(!type_check_equality(expr->type, strong_type)) {
-                        // TODO(psv): use lexing range for all expressions when is implemented
-                        type_error_mismatch(error, lexpr->expr_literal_array.token_array, expr->type, strong_type);
-                        fprintf(stderr, " in array literal\n");
-                    }
-                } else {
-                    Light_Type* t = type_infer_propagate(strong_type, expr, error);
-                    if(!t) unresolved = true;
-                    expr->type = t;
-                }
-            } else {
-                if(expr->type->flags & TYPE_FLAG_INTERNALIZED) {
-                    strong_type = expr->type;
-                    first_strong_type_index = i;
-                }
-            }
+    for(s32 i = 0; i < array_length(lexpr->expr_literal_array.array_exprs); ++i) {
+        Light_Ast* expr = lexpr->expr_literal_array.array_exprs[i];
+        
+        expr->type = type_infer_expression(expr, error);
+        if(!expr->type) {
+            unresolved = true;
+            continue;
         }
 
-        if(unresolved) return 0;
+        if(strong_type) {
+            if(expr->type->flags & TYPE_FLAG_INTERNALIZED) {
+                if(!type_check_equality(expr->type, strong_type)) {
+                    // TODO(psv): use lexing range for all expressions when is implemented
+                    type_error_mismatch(error, lexpr->expr_literal_array.token_array, expr->type, strong_type);
+                    fprintf(stderr, " in array literal\n");
+                }
+            } else {
+                Light_Type* t = type_infer_propagate(strong_type, expr, error);
+                if(!t) unresolved = true;
+                expr->type = t;
+            }
+        } else {
+            if(expr->type->flags & TYPE_FLAG_INTERNALIZED) {
+                strong_type = expr->type;
+                first_strong_type_index = i;
+            }
+        }
+    }
 
+    if(unresolved) return 0;
+
+    if(strong_type) {
         for(s32 i = 0; i < first_strong_type_index; ++i) {
             // Expression is already inferred
             Light_Ast* expr = lexpr->expr_literal_array.array_exprs[i];
             if(expr->type->flags & TYPE_FLAG_INTERNALIZED) {
                 if(!type_check_equality(expr->type, strong_type)) {
                     type_error_mismatch(error, lexpr->expr_literal_array.token_array, expr->type, strong_type);
+                    fprintf(stderr, "\n");
                 }
             } else {
                 Light_Type* t = type_infer_propagate(strong_type, expr, error);
@@ -444,14 +493,19 @@ type_infer_expr_literal_array(Light_Ast* lexpr, u32* error) {
                 expr->type = t;
             }
         }
-        if(*error & TYPE_ERROR) return 0;
+    }
+    if(*error & TYPE_ERROR) return 0;
 
-        if(!strong_type && first_strong_type_index > 0) {
-            strong_type = type_infer_propagate(0, lexpr->expr_literal_array.array_exprs[0], error);
-            if(strong_type && !(*error & TYPE_FLAG_INTERNALIZED)) {
-                passes += 1;
-                first_strong_type_index = 0;
-            }
+    if(!strong_type) {
+        if(array_length(lexpr->expr_literal_array.array_exprs) > 0) {
+            lexpr->type = type_new_array(0, lexpr->expr_literal_array.array_exprs[0]->type, lexpr->expr_literal_array.token_array);
+            lexpr->type->array_info.dimension_evaluated = true;
+            lexpr->type->array_info.dimension = array_length(lexpr->expr_literal_array.array_exprs);
+            return lexpr->type;
+        } else {
+            type_error(error, lexpr->expr_literal_array.token_array, 
+                "literal array must have at least 1 element\n");
+            return 0;
         }
     }
 
