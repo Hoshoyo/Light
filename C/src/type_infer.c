@@ -9,6 +9,7 @@
 #include <stdarg.h>
 #include <light_array.h>
 
+#define MAX(A, B) (((A) > (B)) ? A : B)
 #define TOKEN_STR(T) (T)->length, (T)->data
 
 Light_Ast*
@@ -382,9 +383,86 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
 }
 
 static Light_Type*
-type_infer_expr_literal_array(Light_Ast* expr, u32* error) {
-    assert(expr->kind == AST_EXPRESSION_LITERAL_ARRAY);
-    return 0;
+type_infer_expr_literal_array(Light_Ast* lexpr, u32* error) {
+    assert(lexpr->kind == AST_EXPRESSION_LITERAL_ARRAY);
+    if(lexpr->expr_literal_array.raw_data) {
+        // Create the type for the array
+        Light_Type* type = type_new_array(0, type_primitive_get(TYPE_PRIMITIVE_U8), lexpr->expr_literal_array.token_array);
+        type->array_info.dimension_evaluated = true;
+        type->array_info.dimension = lexpr->expr_literal_array.data_length_bytes;
+        type->size_bits = lexpr->expr_literal_array.data_length_bytes * 8;
+        type->flags = TYPE_FLAG_SIZE_RESOLVED;
+        return type_internalize(type);
+    }
+
+    int passes = 1;
+    bool unresolved = false;
+    Light_Type* strong_type = 0;
+    s32 first_strong_type_index = array_length(lexpr->expr_literal_array.array_exprs);
+    for(s32 p = 0; p < MAX(passes, 2); ++p) {
+        for(s32 i = 0; i < array_length(lexpr->expr_literal_array.array_exprs); ++i) {
+            Light_Ast* expr = lexpr->expr_literal_array.array_exprs[i];
+            
+            expr->type = type_infer_expression(expr, error);
+            if(!expr->type) {
+                unresolved = true;
+                continue;
+            }
+
+            if(strong_type) {
+                if(expr->type->flags & TYPE_FLAG_INTERNALIZED) {
+                    if(!type_check_equality(expr->type, strong_type)) {
+                        // TODO(psv): use lexing range for all expressions when is implemented
+                        type_error_mismatch(error, lexpr->expr_literal_array.token_array, expr->type, strong_type);
+                        fprintf(stderr, " in array literal\n");
+                    }
+                } else {
+                    Light_Type* t = type_infer_propagate(strong_type, expr, error);
+                    if(!t) unresolved = true;
+                    expr->type = t;
+                }
+            } else {
+                if(expr->type->flags & TYPE_FLAG_INTERNALIZED) {
+                    strong_type = expr->type;
+                    first_strong_type_index = i;
+                }
+            }
+        }
+
+        if(unresolved) return 0;
+
+        for(s32 i = 0; i < first_strong_type_index; ++i) {
+            // Expression is already inferred
+            Light_Ast* expr = lexpr->expr_literal_array.array_exprs[i];
+            if(expr->type->flags & TYPE_FLAG_INTERNALIZED) {
+                if(!type_check_equality(expr->type, strong_type)) {
+                    type_error_mismatch(error, lexpr->expr_literal_array.token_array, expr->type, strong_type);
+                }
+            } else {
+                Light_Type* t = type_infer_propagate(strong_type, expr, error);
+                if(!t) unresolved = true;
+                expr->type = t;
+            }
+        }
+        if(*error & TYPE_ERROR) return 0;
+
+        if(!strong_type && first_strong_type_index > 0) {
+            strong_type = type_infer_propagate(0, lexpr->expr_literal_array.array_exprs[0], error);
+            if(strong_type && !(*error & TYPE_FLAG_INTERNALIZED)) {
+                passes += 1;
+                first_strong_type_index = 0;
+            }
+        }
+    }
+
+    Light_Type* type = type_new_array(0, strong_type, lexpr->expr_literal_array.token_array);
+    type->array_info.dimension_evaluated = true;
+    type->array_info.dimension = array_length(lexpr->expr_literal_array.array_exprs);
+    type->size_bits = type->array_info.dimension * strong_type->size_bits;
+    type->flags = TYPE_FLAG_SIZE_RESOLVED;
+    lexpr->type = type_internalize(type);
+
+    return lexpr->type;
 }
 
 static Light_Type*
@@ -432,6 +510,7 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
         } break;
         case OP_UNARY_CAST:{
             expr->type = expr->expr_unary.type_to_cast;
+            // TODO(psv): check if type conversion exists
             type_infer_propagate(0, expr->expr_unary.operand, error);
         } break;
         case OP_UNARY_DEREFERENCE:{
@@ -443,6 +522,10 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
         } break;
         case OP_UNARY_LOGIC_NOT:{
             expr->type = type_primitive_get(TYPE_PRIMITIVE_BOOL);
+            if(!type_check_equality(expr->type, operand_type)) {
+                type_error(error, expr->expr_unary.token_op, 
+                    "logic operator '!' requires boolean type\n");
+            }
         } break;
 
         case OP_UNARY_BITWISE_NOT:

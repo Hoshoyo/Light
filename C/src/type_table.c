@@ -39,8 +39,12 @@ type_equal(Light_Type* t1, Light_Type* t2) {
             return 1;
         } break;
         case TYPE_KIND_ARRAY:{
-            assert(0);
-            // TODO(psv):
+            if(!type_check_equality(t1->array_info.array_of, t2->array_info.array_of))
+                return 0;
+            if(t1->array_info.dimension_evaluated && t2->array_info.dimension_evaluated) {
+                return t1->array_info.dimension == t2->array_info.dimension;
+            }
+            return 0;
         } break;
         case TYPE_KIND_FUNCTION:{
             if(!type_equal(t1->function.return_type, t1->function.return_type))
