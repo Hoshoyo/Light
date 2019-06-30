@@ -508,14 +508,14 @@ ast_print_expr_literal_array(Light_Ast* expr, u32 flags, s32 indent_level) {
     if(expr->expr_literal_array.raw_data) {
         length += fprintf(out, "%.*s", (s32)expr->expr_literal_array.data_length_bytes, expr->expr_literal_array.data);
     } else {
-        length += fprintf(out, "array {");
+        length += fprintf(out, "[");
         for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
             if(i != 0) {
                 length += fprintf(out, ", ");
             }
             length += ast_print_expression(expr->expr_literal_array.array_exprs[i], flags, indent_level);
         }
-        length += fprintf(out, "}");
+        length += fprintf(out, "]");
     }
     return length;
 }
@@ -635,10 +635,9 @@ ast_print_expr_unary(Light_Ast* expr, u32 flags, s32 indent_level) {
         case OP_UNARY_MINUS:         length += fprintf(out, "-"); length += ast_print_expression(expr->expr_unary.operand, flags, indent_level); break;
         case OP_UNARY_PLUS:          length += fprintf(out, "+"); length += ast_print_expression(expr->expr_unary.operand, flags, indent_level); break;
         case OP_UNARY_CAST: {
-            length += fprintf(out, "[");
-            length += ast_print_type(expr->expr_unary.type_to_cast, flags, indent_level);
-            length += fprintf(out, "]");
             length += ast_print_expression(expr->expr_unary.operand, flags, indent_level);
+            length += fprintf(out, " -> ");
+            length += ast_print_type(expr->expr_unary.type_to_cast, flags, indent_level);
         }break;
         default: length += fprintf(out, "<invalid unary expr>"); break;
     }

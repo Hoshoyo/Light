@@ -62,6 +62,12 @@ type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error
                     fprintf(stderr, " in literal array\n");
                 }
             }
+            if(type->array_info.dimension != array_length(expr->expr_literal_array.array_exprs)) {
+                type_error(error, expr->expr_literal_array.token_array,
+                    "array literal type dimension mismatch, '%ld' vs '%ld'\n", 
+                    array_length(expr->expr_literal_array.array_exprs), type->array_info.dimension);
+                return 0;
+            }
             if(!all_internalized) {
                 expr->type = 0;
             } else {
