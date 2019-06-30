@@ -323,8 +323,9 @@ typedef struct {
 } Light_Ast_Decl_Constant;
 
 typedef struct {
-	Light_Token*       name;
-	struct Light_Type_t* type_referenced;
+	Light_Token*          name;
+	struct Light_Type_t*  type_referenced;
+	struct Light_Type_t** queued_types; // pointer types waiting for this decl typedef to be resolved
 } Light_Ast_Decl_Typedef;
 
 typedef struct {
@@ -491,6 +492,7 @@ typedef struct {
 
 typedef struct {
     Light_Token* name;
+	Light_Scope*          scope;
     struct Light_Type_t*  alias_to;
 } Light_Type_Alias;
 

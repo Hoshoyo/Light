@@ -303,7 +303,25 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 Light_Type* field_type = typecheck_resolve_type(scope, field->decl_variable.type, flags, error);
                 field->decl_variable.type = field_type;
                 if(field_type && !(field_type->flags & TYPE_FLAG_INTERNALIZED)) {
-                    all_fields_internalized = false;
+                    if(
+                        !(*error & TYPE_ERROR) &&
+                        field_type->kind == TYPE_KIND_POINTER && 
+                        field_type->pointer_to && 
+                        field_type->pointer_to->kind == TYPE_KIND_ALIAS) 
+                    {
+                        // Pointer to an alias, consider it internalized.
+                        // Also put in a queue to be filled as soon as the symbol
+                        // is internalized
+                        Light_Type* tt = type_internalize(field_type);
+                        Light_Ast* decl = type_decl_from_alias(field->scope_at, tt->pointer_to, error);
+                        if(!decl || (*error & TYPE_ERROR)) return 0;
+                        if(!decl->decl_typedef.queued_types) {
+                            decl->decl_typedef.queued_types = array_new(Light_Type*);
+                        }
+                        array_push(decl->decl_typedef.queued_types, tt);
+                    } else {
+                        all_fields_internalized = false;
+                    }
                 } else {
                     if(field->decl_variable.assignment) {
                         field->decl_variable.assignment->type = 
@@ -478,8 +496,8 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
             }
         } break;
         case TYPE_KIND_ALIAS: {
+            Light_Ast* decl = type_decl_from_alias(scope, type, error);
             if(!type->alias.alias_to) {
-                Light_Ast* decl = type_decl_from_alias(scope, type, error);
                 if(*error & TYPE_ERROR) {
                     type_error_undeclared_identifier(error, type->alias.name);
                     return type;
@@ -493,6 +511,8 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 }
                 type = decl->decl_typedef.type_referenced;
             }
+            assert(decl->kind == AST_DECL_TYPEDEF);
+
             if(type->alias.alias_to->flags & TYPE_FLAG_INTERNALIZED) {
                 type = type_internalize(type);
             }
@@ -634,10 +654,20 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             Light_Type* type = typecheck_resolve_type(scope, referenced->alias.alias_to, flags, &error);
             if(error & TYPE_ERROR) { *decl_error |= error; return; }
             if(type->flags & TYPE_FLAG_INTERNALIZED) {
-                Light_Type* alias_type = type_new_alias(node->decl_typedef.name, type);
+                Light_Type* alias_type = type_new_alias(node->scope_at, node->decl_typedef.name, type);
                 alias_type->size_bits = type->size_bits;
                 alias_type->flags = type->flags;
                 node->decl_typedef.type_referenced = type_internalize(alias_type);
+
+                if(node->decl_typedef.queued_types) {
+                    for(s32 i = 0; i < array_length(node->decl_typedef.queued_types); ++i) {
+                        Light_Type* t = node->decl_typedef.queued_types[i];
+                        t->pointer_to = alias_type;
+                    }
+                    array_free(node->decl_typedef.queued_types);
+                    node->decl_typedef.queued_types = 0;
+                }
+
                 typecheck_remove_from_infer_queue(node);
             } else {
                 // Put it on the infer queue

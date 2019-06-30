@@ -31,7 +31,7 @@ bool        type_check_equality(Light_Type* t1, Light_Type* t2);
 
 // type_new_pointer returns an internalized pointer type if the argument type is internalized
 Light_Type* type_new_pointer(Light_Type* pointer_to);
-Light_Type* type_new_alias(Light_Token* name, Light_Type* alias_to);
+Light_Type* type_new_alias(Light_Scope* scope, Light_Token* name, Light_Type* alias_to);
 Light_Type* type_new_array(Light_Ast* dimension, Light_Type* type, Light_Token* token_array);
 Light_Type* type_new_function(Light_Type** arguments_types, Light_Type* return_type, s32 arguments_count, bool all_args_internalized);
 Light_Type* type_new_enum(Light_Ast** fields, s32 fields_count, Light_Type* type_hint, Light_Scope* enum_scope);

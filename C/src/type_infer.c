@@ -63,7 +63,7 @@ type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error
                     break;
                 }
             }
-            
+
             if(all_internalized) {
                 Light_Type* t = type_new_array(0, array_of_type, expr->expr_literal_array.token_array);
                 t->array_info.dimension_evaluated = true;
@@ -331,13 +331,15 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
 
     switch(decl->kind) {
         case AST_DECL_CONSTANT:{
-            return type_alias_root(decl->decl_constant.type_info);
+            //return type_alias_root(decl->decl_constant.type_info);
+            return decl->decl_constant.type_info;
         } break;
         case AST_DECL_PROCEDURE:{
             return decl->decl_proc.proc_type;
         } break;
         case AST_DECL_VARIABLE:{
-            return type_alias_root(decl->decl_variable.type);
+            //return type_alias_root(decl->decl_variable.type);
+            return decl->decl_variable.type;
         } break;
         case AST_DECL_TYPEDEF:{
             Light_Type* type = decl->decl_typedef.type_referenced;

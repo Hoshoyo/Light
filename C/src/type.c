@@ -139,7 +139,7 @@ type_new_pointer(Light_Type* pointer_to) {
 }
 
 Light_Type* 
-type_new_alias(Light_Token* name, Light_Type* alias_to) {
+type_new_alias(Light_Scope* scope, Light_Token* name, Light_Type* alias_to) {
     Light_Type* result = type_alloc();
 
     result->kind = TYPE_KIND_ALIAS;
@@ -147,6 +147,7 @@ type_new_alias(Light_Token* name, Light_Type* alias_to) {
     result->size_bits = 0;
     result->alias.name = name;
     result->alias.alias_to = alias_to;
+    result->alias.scope = scope;
 
     s32 index = -1;
     if(type_table_entry_exist(&global_type_table, result, &index, 0)) {
@@ -303,6 +304,7 @@ type_hash(Light_Type* type) {
             break;
         case TYPE_KIND_ALIAS:
             hash = fnv_1_hash(type->alias.name->data, type->alias.name->length);
+            hash = fnv_1_hash_combine(hash, (u64)type->alias.scope);
             break;
         case TYPE_KIND_ENUM: 
             hash = enum_hash;
@@ -358,13 +360,27 @@ type_tables_initialize() {
     primitive_type_table[TYPE_PRIMITIVE_VOID]  = type_new_primitive(TYPE_PRIMITIVE_VOID);
     primitive_type_table[TYPE_PRIMITIVE_BOOL]  = type_new_primitive(TYPE_PRIMITIVE_BOOL);
 
-    global_type_empty_struct = type_internalize(type_new_struct(0, 0, 0));
-    global_type_empty_union = type_internalize(type_new_union(0, 0, 0));
-    global_type_empty_enum = type_internalize(type_new_enum(0, 0, 0, 0));
+    Light_Type* empty_struct_type = type_new_struct(0, 0, 0);
+    empty_struct_type->size_bits = 0;
+    empty_struct_type->flags = TYPE_FLAG_SIZE_RESOLVED;
+    
+    Light_Type* empty_union_type = type_new_union(0, 0, 0);
+    empty_union_type->size_bits = 0;
+    empty_union_type->flags = TYPE_FLAG_SIZE_RESOLVED;
+
+    Light_Type* empty_enum_type = type_new_enum(0, 0, 0, 0);
+    empty_enum_type->size_bits = 0;
+    empty_enum_type->flags = TYPE_FLAG_SIZE_RESOLVED;
+
+    global_type_empty_struct = type_internalize(empty_struct_type);
+    global_type_empty_union = type_internalize(empty_union_type);
+    global_type_empty_enum = type_internalize(empty_enum_type);
 }
 
 Light_Type*
 type_internalize(Light_Type* type) {
+    assert(type->flags & TYPE_FLAG_SIZE_RESOLVED);
+
     s32 index = 0;
     type_table_add(&global_type_table, type, &index);
     // Works even if the type already exist in the table.

@@ -5,6 +5,7 @@
 
 int 
 type_equal(Light_Type* t1, Light_Type* t2) {
+    if(t1 == t2) return 1;
     if(t1->kind != t2->kind) return 0;
     switch(t1->kind)  {
         case TYPE_KIND_NONE: assert(0); break;
@@ -73,7 +74,11 @@ type_equal(Light_Type* t1, Light_Type* t2) {
             }
         } break;
         case TYPE_KIND_ALIAS: {
-            return (type_equal(t1->alias.alias_to, t2->alias.alias_to));
+            // We only consider names equal to be equal types because
+            // in the same scope there can only be one type definition
+            // with the same name.
+            if(t1->alias.scope != t2->alias.scope) return 0;
+            return t1->alias.name->data == t2->alias.name->data;
         } break;
     }
     return 0;

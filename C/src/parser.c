@@ -595,7 +595,7 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, bool require_semicol
         {
             *error |= parser_require_and_eat(parser, ';');
         }
-        type = type_new_alias(name, type);
+        type = type_new_alias(scope, name, type);
         result = ast_new_decl_typedef(scope, type, name);
     }
 
@@ -1103,7 +1103,7 @@ parse_type_alias(Light_Parser* parser, Light_Scope* scope, u32* error) {
         return 0;
     }
 
-    return type_new_alias(name, 0);
+    return type_new_alias(scope, name, 0);
 }
 
 static Light_Type*
