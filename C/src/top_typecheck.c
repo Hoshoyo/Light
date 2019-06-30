@@ -576,6 +576,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
                 if(error & TYPE_ERROR) { *decl_error |= error; return; }
                 if(TYPE_STRONG(node->decl_variable.type) && node->decl_variable.assignment) {
                     type_infer_propagate(node->decl_variable.type, node->decl_variable.assignment, &error);
+                    if(error & TYPE_ERROR) { *decl_error |= error; return; }
                 } 
             }
 

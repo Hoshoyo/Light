@@ -60,18 +60,27 @@ type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error
                     type_error_mismatch(error, expr->expr_literal_array.token_array, 
                         propagated, array_of_type);
                     fprintf(stderr, " in literal array\n");
+                    break;
                 }
             }
-            if(type->array_info.dimension != array_length(expr->expr_literal_array.array_exprs)) {
-                type_error(error, expr->expr_literal_array.token_array,
-                    "array literal type dimension mismatch, '%ld' vs '%ld'\n", 
-                    array_length(expr->expr_literal_array.array_exprs), type->array_info.dimension);
-                return 0;
-            }
-            if(!all_internalized) {
-                expr->type = 0;
+            
+            if(all_internalized) {
+                Light_Type* t = type_new_array(0, array_of_type, expr->expr_literal_array.token_array);
+                t->array_info.dimension_evaluated = true;
+                t->array_info.dimension = array_length(expr->expr_literal_array.array_exprs);
+                t->size_bits = t->array_info.dimension * array_of_type->size_bits;
+                t->flags = TYPE_FLAG_SIZE_RESOLVED;
+                t = type_internalize(t);
+                if(!type_check_equality(t, type)) {
+                    type_error_mismatch(error, expr->expr_literal_array.token_array, 
+                        t, type);
+                    fprintf(stderr, " in literal array\n");
+                    expr->type = 0;
+                } else {
+                    expr->type = type;
+                }
             } else {
-                expr->type = type;
+                expr->type = 0;
             }
         } else {
             bool all_internalized = true;
@@ -92,6 +101,7 @@ type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error
                     type_error_mismatch(error, expr->expr_literal_array.token_array, 
                         propagated, array_of_type);
                     fprintf(stderr, " in literal array\n");
+                    break;
                 }
             }
             if(all_internalized) {
