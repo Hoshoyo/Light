@@ -226,9 +226,25 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
             assert(type->flags & TYPE_FLAG_WEAK);
         } break;
         case TYPE_KIND_POINTER: {
-            type->pointer_to = typecheck_resolve_type(scope, type->pointer_to, flags, error);
-            if(type->pointer_to && type->pointer_to->flags & TYPE_FLAG_INTERNALIZED) {
-                type = type_internalize(type);
+            if(type->pointer_to->kind == TYPE_KIND_ALIAS) {
+                // Pointer to an alias, consider it internalized.
+                // Also put in a queue to be filled as soon as the symbol
+                // is internalized
+                Light_Type* tt = type_internalize(type);
+                Light_Ast* decl = type_decl_from_alias(scope, tt->pointer_to, error);
+                if(!decl || (*error & TYPE_ERROR)) {
+                    type_error_undeclared_identifier(error, tt->pointer_to->alias.name);
+                    return 0;
+                }
+                if(!decl->decl_typedef.queued_types) {
+                    decl->decl_typedef.queued_types = array_new(Light_Type*);
+                }
+                array_push(decl->decl_typedef.queued_types, tt);
+            } else {
+                type->pointer_to = typecheck_resolve_type(scope, type->pointer_to, flags, error);
+                if(type->pointer_to && type->pointer_to->flags & TYPE_FLAG_INTERNALIZED) {
+                    type = type_internalize(type);
+                }
             }
         } break;
         case TYPE_KIND_ARRAY: {
@@ -301,27 +317,11 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 }
 
                 Light_Type* field_type = typecheck_resolve_type(scope, field->decl_variable.type, flags, error);
+                if(!field_type || (*error & TYPE_ERROR)) return type;
+
                 field->decl_variable.type = field_type;
                 if(field_type && !(field_type->flags & TYPE_FLAG_INTERNALIZED)) {
-                    if(
-                        !(*error & TYPE_ERROR) &&
-                        field_type->kind == TYPE_KIND_POINTER && 
-                        field_type->pointer_to && 
-                        field_type->pointer_to->kind == TYPE_KIND_ALIAS) 
-                    {
-                        // Pointer to an alias, consider it internalized.
-                        // Also put in a queue to be filled as soon as the symbol
-                        // is internalized
-                        Light_Type* tt = type_internalize(field_type);
-                        Light_Ast* decl = type_decl_from_alias(field->scope_at, tt->pointer_to, error);
-                        if(!decl || (*error & TYPE_ERROR)) return 0;
-                        if(!decl->decl_typedef.queued_types) {
-                            decl->decl_typedef.queued_types = array_new(Light_Type*);
-                        }
-                        array_push(decl->decl_typedef.queued_types, tt);
-                    } else {
-                        all_fields_internalized = false;
-                    }
+                    all_fields_internalized = false;
                 } else {
                     if(field->decl_variable.assignment) {
                         field->decl_variable.assignment->type = 

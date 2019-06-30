@@ -1,8 +1,9 @@
 Foo struct {
-    a : Bar;
+    a : ^Bar;
 }
 
 Bar struct {
-    b : ^Bar;
-    c : ^Foo;
+    b : s32;
+    c : r32;
+    f : Foo;
 }
