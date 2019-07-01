@@ -301,7 +301,7 @@ ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, L
 Light_Ast* 
 ast_new_decl_procedure(
     Light_Scope* scope, Light_Token* name, Light_Ast* body, Light_Type* return_type, 
-    Light_Scope* args_scope, Light_Ast_Decl_Variable** args, s32 args_count, u32 flags) 
+    Light_Scope* args_scope, Light_Ast** args, s32 args_count, u32 flags) 
 {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
@@ -753,7 +753,6 @@ ast_print_node(Light_Ast* node, u32 flags, s32 indent_level) {
                 print_indent_level(out, indent_level + 1);
                 length += ast_print_node(node->comm_block.commands[i], flags, indent_level + 1);
                 switch(node->comm_block.commands[i]->kind) {
-                    case AST_COMMAND_ASSIGNMENT:
                     case AST_DECL_CONSTANT:
                     case AST_DECL_VARIABLE:
                         length += fprintf(out, ";");

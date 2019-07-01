@@ -1,9 +1,7 @@
-Foo struct {
-    a : ^Bar;
+main : () -> s32 {
+    return foo();
 }
 
-Bar struct {
-    b : s32;
-    c : r32;
-    f : Foo;
+foo : () -> s32{
+    return 0;
 }

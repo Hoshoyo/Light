@@ -47,20 +47,22 @@ typecheck_decl_proc_from_scope(Light_Scope* scope) {
     }
     return 0;
 }
-static Light_Scope* 
-typecheck_loop_base_scope(Light_Scope* scope) {
-    assert(scope->flags & SCOPE_LOOP);
+
+// Return value 0 means not inside a loop
+static s32
+typecheck_loop_scope_level(Light_Scope* scope) {
+    s32 level = 0;
     while(scope) {
         if(scope->parent) {
-            if(!(scope->parent->flags & SCOPE_LOOP))
-                return scope;
+            if(scope->parent->flags & SCOPE_LOOP)
+                level++;
         } else {
             // we gotta get at least to the global scope
-            assert(0);
+            break;
         }
         scope = scope->parent;
     }
-    return 0;
+    return level;
 }
 
 Light_Type_Error
@@ -74,6 +76,7 @@ decl_check_redefinition(Light_Scope* scope, Light_Ast* node, Light_Token* token)
     s32 index = 0;
     if(symbol_table_entry_exist(symbol_table, s, &index, 0)) {
         Light_Symbol decl_symbol = symbol_table_get(symbol_table, index);
+        if(decl_symbol.decl == node) return TYPE_OK;
         type_error_location(token);
         fprintf(stderr, "Type error: redeclaration of name '%.*s'\n", TOKEN_STR(token));
         fprintf(stderr, "  - previously declared at: ");
@@ -133,6 +136,7 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
         for(u64 i = 0; i < array_length(global_infer_queue); ++i) {
             Light_Ast* node = global_infer_queue[i];
             typecheck_information_pass_decl(node, 0, (u32*)&error);
+            if(error & TYPE_ERROR) break;
         }
 
         if(error & TYPE_ERROR)
@@ -585,7 +589,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             if(node->decl_variable.assignment){
                 Light_Type* inferred = type_infer_expression(node->decl_variable.assignment, &error);
                 if(error & TYPE_ERROR) { *decl_error |= error; return; }
-                if(!inferred) {
+                if(!inferred || TYPE_WEAK(inferred)) {
                     typecheck_push_to_infer_queue(node);
                     return;
                 }
@@ -619,6 +623,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             }
             if(node->decl_variable.type->flags & TYPE_FLAG_INTERNALIZED) {
                 typecheck_remove_from_infer_queue(node);
+                node->decl_variable.flags |= DECL_VARIABLE_FLAG_RESOLVED;
             } else {
                 typecheck_push_to_infer_queue(node);
             }
@@ -627,6 +632,22 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             if(scope->level > 0 && !(node->flags & AST_FLAG_INFER_QUEUED)) {
                 error |= decl_check_redefinition(scope, node, node->decl_proc.name);
                 if(error & TYPE_ERROR) { *decl_error |= error; return; }
+            }
+
+            if(node->decl_proc.argument_count > 0) {
+                Light_Scope* arg_scope = node->decl_proc.arguments_scope;
+                if(!arg_scope->symb_table) {
+                    arg_scope->symb_table = light_alloc(sizeof(Symbol_Table));
+                    symbol_table_new(arg_scope->symb_table, (arg_scope->decl_count + 4) * 8);
+                }
+                for(s32 i = 0; i < node->decl_proc.argument_count; ++i) {
+                    Light_Ast* var = node->decl_proc.arguments[i];
+                    if(var->flags & DECL_VARIABLE_FLAG_RESOLVED) {
+                        continue;
+                    }
+                    typecheck_information_pass_decl(var, flags, &error);
+                    if(error & TYPE_ERROR) { *decl_error |= error; return; }
+                }
             }
 
             node->decl_proc.proc_type = typecheck_resolve_type(scope, node->decl_proc.proc_type, flags, &error);
@@ -707,7 +728,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
 
             inferred_right = type_infer_expression(node->comm_assignment.rvalue, error);
 
-            if(!inferred_left || !inferred_right) {
+            if((!inferred_left && node->comm_assignment.lvalue) || !inferred_right) {
                 typecheck_push_to_infer_queue(node);
                 return;
             }
@@ -716,7 +737,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             }
 
             // Type check
-            if(!type_check_equality(inferred_left, inferred_right)) {
+            if(inferred_left && !type_check_equality(inferred_left, inferred_right)) {
                 type_error_mismatch(error, node->comm_assignment.op_token, inferred_left, inferred_right);
                 fprintf(stderr, "in assignment command\n");
                 return;
@@ -725,13 +746,13 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             typecheck_remove_from_infer_queue(node);
         } break;
         case AST_COMMAND_BREAK:{
-            if(!(node->scope_at->flags & SCOPE_LOOP)) {
-                // not inside a loop
+            s32 level_deep = typecheck_loop_scope_level(node->scope_at);
+            if(level_deep == 0) {
+                // Not inside a loop
                 type_error(error, node->comm_break.token_break, "break not inside a loop\n");
                 return;
             }
-            Light_Scope* base_scope = typecheck_loop_base_scope(node->scope_at);
-            s32 level_deep = node->scope_at->level - base_scope->level + 1;
+
             if(node->comm_break.level) {
                 Light_Type* type = type_infer_expression(node->comm_break.level, error);
                 if(*error & TYPE_ERROR) return;
@@ -769,13 +790,13 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             }
         } break;
         case AST_COMMAND_CONTINUE: {
-            if(!(node->scope_at->flags & SCOPE_LOOP)) {
-                // not inside a loop
+            s32 level_deep = typecheck_loop_scope_level(node->scope_at);
+            if(level_deep == 0) {
+                // Not inside a loop
                 type_error(error, node->comm_break.token_break, "continue not inside a loop\n");
                 return;
             }
-            Light_Scope* base_scope = typecheck_loop_base_scope(node->scope_at);
-            s32 level_deep = node->scope_at->level - base_scope->level + 1;
+
             if(node->comm_continue.level) {
                 Light_Type* type = type_infer_expression(node->comm_continue.level, error);
                 if(*error & TYPE_ERROR) return;

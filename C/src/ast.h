@@ -281,6 +281,7 @@ typedef enum {
     DECL_VARIABLE_FLAG_EXPORTED     = (1 << 0),
     DECL_VARIABLE_FLAG_STRUCT_FIELD = (1 << 1),
 	DECL_VARIABLE_FLAG_UNION_FIELD  = (1 << 2),
+	DECL_VARIABLE_FLAG_RESOLVED     = (1 << 3),
 } Light_Decl_Variable_Flags;
 
 typedef struct {
@@ -302,7 +303,7 @@ typedef enum {
 
 typedef struct {
 	Light_Token*              name;
-	Light_Ast_Decl_Variable** arguments;       // Must be Light_Decl_Variable
+	struct Light_Ast_t**      arguments;       // Must be DECL_VARIABLE
 	struct Light_Ast_t*       body;			   // Must be a Light_Command_Block
 	struct Light_Type_t*      return_type;     // Type of the procedure return
 	struct Light_Type_t*      proc_type;       // Type of the procedure
@@ -531,7 +532,7 @@ Light_Scope* light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint3
 Light_Ast* ast_new_decl_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name);
 Light_Ast* ast_new_decl_variable(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, Light_Storage_Class storage, u32 flags);
 Light_Ast* ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, u32 flags);
-Light_Ast* ast_new_decl_procedure(Light_Scope* scope, Light_Token* name, Light_Ast* body, Light_Type* return_type, Light_Scope* args_scope, Light_Ast_Decl_Variable** args, s32 args_count, u32 flags);
+Light_Ast* ast_new_decl_procedure(Light_Scope* scope, Light_Token* name, Light_Ast* body, Light_Type* return_type, Light_Scope* args_scope, Light_Ast** args, s32 args_count, u32 flags);
 
 // Commands
 Light_Ast* ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, Light_Scope* block_scope);

@@ -347,6 +347,10 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 				// Syntatic sugar void proc call
 				Light_Ast* pcall = parse_expression(parser, scope, error);
                 command = ast_new_comm_assignment(scope, 0, pcall, next);
+                if(require_semicolon) {
+                    *error |= parser_require_and_eat(parser, ';');
+                    ReturnIfError();
+                }
 			} else {
 				command = parse_declaration(parser, scope, require_semicolon, error);
 			}
@@ -441,7 +445,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     body = parse_comm_block(parser, args_scope, error);
     ReturnIfError();
 
-    Light_Ast* result = ast_new_decl_procedure(scope, name, body, return_type, args_scope, (Light_Ast_Decl_Variable**)arguments, args_count, 0);
+    Light_Ast* result = ast_new_decl_procedure(scope, name, body, return_type, args_scope, arguments, args_count, 0);
     result->decl_proc.proc_type = proc_type;
     args_scope->creator_node = result;
 
@@ -675,9 +679,12 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
 
             Light_Ast* arr = ast_new_expr_literal_array(scope, first, 0);
             arr->expr_literal_array.raw_data = true;
-            arr->expr_literal_array.array_strong_type = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_U8));
+            arr->expr_literal_array.array_strong_type = 0;
             arr->expr_literal_array.data = first->data;
             arr->expr_literal_array.data_length_bytes = (u64)first->length;
+
+            Light_Ast* cast = ast_new_expr_unary(scope, arr, string_token, OP_UNARY_CAST);
+            cast->expr_unary.type_to_cast = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_U8));
 
             result = ast_new_expr_literal_struct(scope, string_token, first, 0, false, 0);
             result->expr_literal_struct.struct_exprs = array_new(Light_Ast*);
@@ -687,7 +694,7 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
             // capacity
             array_push(result->expr_literal_struct.struct_exprs, ast_new_expr_literal_primitive_u64(scope, 0));
             // data
-            array_push(result->expr_literal_struct.struct_exprs, arr);
+            array_push(result->expr_literal_struct.struct_exprs, cast);
 
             // @Syntactic Sugar
             // final result is equivalent to struct string { 0, 0, array "data" }

@@ -681,11 +681,37 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
     Light_Type* caller_type = type_infer_expression(expr->expr_proc_call.caller_expr, error);
     if(*error & TYPE_ERROR) return 0;
 
+    if(!caller_type || !(caller_type->flags & TYPE_FLAG_INTERNALIZED)) return 0;
+
     if(caller_type->kind != TYPE_KIND_FUNCTION) {
         type_error(error, expr->expr_proc_call.token, "expected procedure type, but got '");
         ast_print_type(caller_type, LIGHT_AST_PRINT_STDERR, 0);
         fprintf(stderr, "'\n");
         return expr->type;
+    }
+
+    if(expr->expr_proc_call.arg_count < caller_type->function.arguments_count) {
+        type_error(error, expr->expr_proc_call.token, 
+            "too few arguments for procedure call, wanted '%d', but got '%d'\n",
+            caller_type->function.arguments_count, expr->expr_proc_call.arg_count);
+        return 0;
+    } else if(expr->expr_proc_call.arg_count > caller_type->function.arguments_count) {
+        type_error(error, expr->expr_proc_call.token, 
+            "too many arguments for procedure call, wanted '%d', but got '%d'\n",
+            caller_type->function.arguments_count, expr->expr_proc_call.arg_count);
+        return 0;
+    }
+
+    for(s32 i = 0; i < caller_type->function.arguments_count; ++i) {
+        Light_Type* arg_type = caller_type->function.arguments_type[i];
+        Light_Type* at = type_infer_expression(expr->expr_proc_call.args[i], error);
+        at = type_infer_propagate(arg_type, expr->expr_proc_call.args[i], error);
+        expr->expr_proc_call.args[i]->type = at;
+
+        if(!type_check_equality(at, arg_type)) {
+            type_error_mismatch(error, expr->expr_proc_call.token, at, arg_type);
+            fprintf(stderr, " in argument #%d of procedure call\n", i + 1);
+        }
     }
     
     return caller_type->function.return_type;
@@ -799,16 +825,14 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                         type_error_mismatch(error, expr->expr_binary.token_op, left, right);
                         fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
                     }
-                    return res;
+                    left = type_infer_propagate(0, expr->expr_binary.left, error);
+                    right = type_infer_propagate(0, expr->expr_binary.right, error);
                 }
-                if(type_check_equality(left, right)) {
+                if(!type_check_equality(left, right)) {
                     type_error_mismatch(error, expr->expr_binary.token_op, left, right);
                     fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
-                } else {
-                    type_infer_propagate(0, expr->expr_binary.left, error);
-                    type_infer_propagate(0, expr->expr_binary.right, error);
-                    return type_primitive_get(TYPE_PRIMITIVE_BOOL);
                 }
+                return type_primitive_get(TYPE_PRIMITIVE_BOOL);
             } else {
                 type_error(error, expr->expr_binary.token_op, 
                     "comparison operator '%.*s' requires numeric types\n", TOKEN_STR(expr->expr_binary.token_op));
