@@ -347,13 +347,13 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 				// Syntatic sugar void proc call
 				Light_Ast* pcall = parse_expression(parser, scope, error);
                 command = ast_new_comm_assignment(scope, 0, pcall, next);
-                if(require_semicolon) {
-                    *error |= parser_require_and_eat(parser, ';');
-                    ReturnIfError();
-                }
-			} else {
-				command = parse_declaration(parser, scope, require_semicolon, error);
+            } else {
+				command = parse_declaration(parser, scope, false, error);
 			}
+            if(require_semicolon) {
+                *error |= parser_require_and_eat(parser, ';');
+                ReturnIfError();
+            }
 		}break;
 		default: {
 			command = parse_comm_assignment(parser, scope, error);
@@ -562,7 +562,7 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, bool require_semicol
 
         switch(n->type) {
             case ';': {
-                lexer_next(lexer); // eat ';'
+                if(require_semicolon) lexer_next(lexer); // eat ';'
                 // variable declaration without expression assignment
                 result = ast_new_decl_variable(scope, name, decl_type, 0, STORAGE_CLASS_STACK, 0);
             } break;

@@ -572,11 +572,15 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             }
 
             if(node->decl_constant.type_info->flags & TYPE_FLAG_INTERNALIZED) {
-                typecheck_remove_from_infer_queue(node);
+                if(!eval_expr_is_constant(node->decl_constant.value, EVAL_ERROR_REPORT, &error)) {
+                    *decl_error |= error;
+                    return;
+                } else {
+                    typecheck_remove_from_infer_queue(node);
+                }
             } else {
                 typecheck_push_to_infer_queue(node);
             }
-
         } break;
         case AST_DECL_VARIABLE: {
             if(scope->level > 0 && !(node->flags & AST_FLAG_INFER_QUEUED)) {
@@ -723,6 +727,11 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             if(node->comm_assignment.lvalue){
                 inferred_left = type_infer_expression(node->comm_assignment.lvalue, error);
                 if(*error & TYPE_ERROR) return;
+                if(!(node->comm_assignment.lvalue->flags & AST_FLAG_EXPRESSION_LVALUE)) {
+                    type_error(error, node->comm_assignment.op_token, 
+                        "assignment operation requires an lvalue expression as the assigned value\n");
+                    return;
+                }
             }
 
             inferred_right = type_infer_expression(node->comm_assignment.rvalue, error);
@@ -914,7 +923,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
 
                 if(!type_check_equality(type, type_primitive_get(TYPE_PRIMITIVE_BOOL))) {
                     type_error(error, node->comm_for.for_token, 
-                        "Type Error: for command requires boolean type condition, but got '");
+                        "for command requires boolean type condition, but got '");
                     ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);
                     fprintf(stderr, "'\n");
                     return;
@@ -942,7 +951,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
 
             if(!type_check_equality(type, type_primitive_get(TYPE_PRIMITIVE_BOOL))) {
                 type_error(error, node->comm_if.if_token, 
-                    "Type Error: if command requires boolean type condition, but got '");
+                    "if command requires boolean type condition, but got '");
                 ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);
                 fprintf(stderr, "'\n");
                 return;
@@ -964,8 +973,8 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             }
 
             if(!type_check_equality(type, type_primitive_get(TYPE_PRIMITIVE_BOOL))) {
-                type_error(error, node->comm_if.if_token, 
-                    "Type Error: while command requires boolean type condition, but got '");
+                type_error(error, node->comm_while.while_token, 
+                    "while command requires boolean type condition, but got '");
                 ast_print_type(type, LIGHT_AST_PRINT_STDERR, 0);
                 fprintf(stderr, "'\n");
                 return;
