@@ -1,0 +1,41 @@
+foo : () -> ^s32 {}
+
+test struct {
+    a : s32;
+    b : ^s32;
+}
+
+en enum {
+    ZERO,
+    ONE,
+    TWO
+}
+
+main : () -> s32 {
+    st : test;
+    et : en;
+    bt : bool;
+    a : ^s32;
+
+
+    b := &[1, 2, 3];
+    c := &{a : s32 = 1};
+    d := &a;
+    // e := &1;
+    // f := &null;
+    // g := &'a';
+    // h := &true;
+    // i := &(&a);
+    // j := &(a -> ^s32);
+    k := &*a;
+    // l := &!bt;
+    // m := &(a + 2);
+    // n := &(a - a);
+    o := &*foo();
+    // p := &(1 == 2);
+    // q := &(1 + 2);
+    r := &a[2];
+    s := &st.a;
+    t := &st.b;
+    // u := &en.ZERO;
+}

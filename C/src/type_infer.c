@@ -335,10 +335,12 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
             return decl->decl_constant.type_info;
         } break;
         case AST_DECL_PROCEDURE:{
+            expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
             return decl->decl_proc.proc_type;
         } break;
         case AST_DECL_VARIABLE:{
             //return type_alias_root(decl->decl_variable.type);
+            expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
             return decl->decl_variable.type;
         } break;
         case AST_DECL_TYPEDEF:{
@@ -359,6 +361,7 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
 static Light_Type*
 type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
     assert(expr->kind == AST_EXPRESSION_LITERAL_STRUCT);
+    expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
 
     if(expr->expr_literal_struct.name) {
         // If the struct has a name, typecheck against the type
@@ -451,6 +454,9 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
 static Light_Type*
 type_infer_expr_literal_array(Light_Ast* lexpr, u32* error) {
     assert(lexpr->kind == AST_EXPRESSION_LITERAL_ARRAY);
+
+    lexpr->flags |= AST_FLAG_EXPRESSION_LVALUE;
+
     if(lexpr->expr_literal_array.raw_data) {
         // Create the type for the array
         Light_Type* type = type_new_array(0, type_primitive_get(TYPE_PRIMITIVE_U8), lexpr->expr_literal_array.token_array);
@@ -570,11 +576,14 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
         case OP_UNARY_ADDRESSOF: {
             if(operand_type) {
                 if(TYPE_WEAK(operand_type)) {
-                    type_error(error, expr->expr_unary.token_op, 
-                        "operand of unary 'address of' must be an addressable value\n");
-                    expr->type = 0;
-                } else {
+                    operand_type = type_infer_propagate(0, expr->expr_unary.operand, error);
+                }
+                if(expr->expr_unary.operand->flags & AST_FLAG_EXPRESSION_LVALUE) {
                     expr->type = type_new_pointer(operand_type);
+                } else {
+                    type_error(error, expr->expr_unary.token_op, 
+                        "operand of unary 'address of' must be an addressable lvalue\n");
+                    expr->type = 0;
                 }
             } else {
                 expr->type = 0;
@@ -584,6 +593,9 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
             expr->type = expr->expr_unary.type_to_cast;
             // TODO(psv): check if type conversion exists
             type_infer_propagate(0, expr->expr_unary.operand, error);
+            if((expr->expr_unary.flags & AST_FLAG_EXPRESSION_LVALUE)) {
+                expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
+            }
         } break;
         case OP_UNARY_DEREFERENCE:{
             if(operand_type->kind == TYPE_KIND_POINTER) {
@@ -591,6 +603,7 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
             } else {
                 type_error(error, expr->expr_unary.token_op, "cannot derreference a non pointer type\n");
             }
+            expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
         } break;
         case OP_UNARY_LOGIC_NOT:{
             expr->type = type_primitive_get(TYPE_PRIMITIVE_BOOL);
@@ -652,19 +665,24 @@ type_infer_expr_binary_pointer_arithmetic(Light_Ast* expr, Light_Type* inferred_
     switch(expr->expr_binary.op) {
         case OP_BINARY_PLUS:{
             if(type_primitive_int(inferred_right)) {
-                expr->type = type_infer_propagate(type_primitive_get(TYPE_PRIMITIVE_S64), expr->expr_binary.right, error);
+                expr->expr_binary.right->type = type_infer_propagate(type_primitive_get(TYPE_PRIMITIVE_S64), expr->expr_binary.right, error);
             } else {
                 type_error(error, expr->expr_binary.token_op, 
                     "pointer type addition is only valid with an integer type\n");
             }
+            expr->type = inferred_left;
         } break;
         case OP_BINARY_MINUS: {
-            if(type_primitive_int(inferred_right) || inferred_right->kind == TYPE_KIND_POINTER) {
+            if(type_primitive_int(inferred_right)) {
+                // ptr - int
+                expr->expr_binary.right->type = type_infer_propagate(type_primitive_get(TYPE_PRIMITIVE_S64), expr->expr_binary.right, error);
+                expr->type = inferred_left;
+            } else if(inferred_right->kind == TYPE_KIND_POINTER) {
+                // ptr - ptr
                 if(!type_check_equality(inferred_left, inferred_right)) {
                     type_error_mismatch(error, expr->expr_binary.token_op, inferred_left, inferred_right);
-                } else {
-                    expr->type = inferred_left;
                 }
+                expr->type = type_primitive_get(TYPE_PRIMITIVE_S64);
             } else {
                 type_error(error, expr->expr_binary.token_op, 
                     "pointer type difference is only defined for integer and pointer types\n");
@@ -672,7 +690,7 @@ type_infer_expr_binary_pointer_arithmetic(Light_Ast* expr, Light_Type* inferred_
         } break;
         default: assert(0); break;
     }
-    return 0;
+    return expr->type;;
 }
 
 static Light_Type* 
@@ -876,6 +894,8 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
         case OP_BINARY_VECTOR_ACCESS:{
             if(type_primitive_int(right)) {
                 type_infer_propagate(0, expr->expr_binary.right, error);
+                expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
+                
                 if(left->kind == TYPE_KIND_ALIAS) {
                     left = left->alias.alias_to;
                     if(!left) return 0;
@@ -976,7 +996,8 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
                     "undeclared struct field '%.*s'\n", TOKEN_STR(expr->expr_dot.identifier));
                 return 0;
             }
-            type = decl->decl_variable.type; 
+            type = decl->decl_variable.type;
+            expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
         } break;
         case TYPE_KIND_UNION:{
             Light_Ast* decl = find_union_field_decl(left->union_info.union_scope, expr->expr_dot.identifier);
@@ -986,6 +1007,7 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
                 return 0;
             }
             type = decl->decl_variable.type;
+            expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
         } break;
         case TYPE_KIND_ENUM:{
             Light_Ast* decl = find_enum_field_decl(left->enumerator.enum_scope, expr->expr_dot.identifier, error);
@@ -1000,6 +1022,7 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
             // Already dereferenced once, if it is still a pointer, error out
             type_error(error, expr->expr_dot.identifier, 
                 "operator '.' cannot dereference lvalue twice\n");
+            expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
             return 0;
         } break;
         case TYPE_KIND_ALIAS:{

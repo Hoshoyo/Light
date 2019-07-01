@@ -588,7 +588,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             if(node->decl_variable.assignment){
                 Light_Type* inferred = type_infer_expression(node->decl_variable.assignment, &error);
                 if(error & TYPE_ERROR) { *decl_error |= error; return; }
-                if(!inferred || TYPE_WEAK(inferred)) {
+                if(!inferred) {
                     typecheck_push_to_infer_queue(node);
                     return;
                 }
