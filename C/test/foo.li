@@ -1,7 +1,5 @@
-main : () -> s32 {
-    return foo();
-}
+foo : () {}
 
-foo : () -> s32{
-    return 0;
+main : () -> s32 {
+    1 = 2;
 }

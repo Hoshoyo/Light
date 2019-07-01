@@ -53,9 +53,8 @@ static s32
 typecheck_loop_scope_level(Light_Scope* scope) {
     s32 level = 0;
     while(scope) {
-        if(scope->parent) {
-            if(scope->parent->flags & SCOPE_LOOP)
-                level++;
+        if(scope->flags & SCOPE_LOOP) {
+            level++;
         } else {
             // we gotta get at least to the global scope
             break;
