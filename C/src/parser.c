@@ -66,8 +66,10 @@ parse_comm_block(Light_Parser* parser, Light_Scope* scope, u32* error) {
 		array_push(commands, command);
 
 		++command_count;
-        if(command->flags & AST_FLAG_DECLARATION)
+        if(command->flags & AST_FLAG_DECLARATION) {
             block_scope->decl_count++;
+            array_push(block_scope->decls, command);
+        }
 
 		if (lexer_peek(lexer)->type == '}')
 			break;
@@ -133,8 +135,10 @@ parse_comm_comma_list(Light_Parser* parser, Light_Scope* scope, u32* error, s32*
 	while(true) {
 		Light_Ast* comm = parse_command(parser, scope, error, false);
 		array_push(commands, comm);
-        if(comm->flags & AST_FLAG_DECLARATION)
+        if(comm->flags & AST_FLAG_DECLARATION) {
             dc++;
+            array_push(scope->decls, comm);
+        }
         
 		if (lexer_peek(parser->lexer)->type != ',') {
 			break;
@@ -418,6 +422,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
                 all_args_internalized = false;
 
             args_scope->decl_count++;
+            array_push(args_scope->decls, arg);
 			++args_count;
 
 			if (lexer_peek(lexer)->type != ',') break;

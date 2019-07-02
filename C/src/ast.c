@@ -29,6 +29,7 @@ light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags) {
     scope->decl_count = 0;
     scope->creator_node = creator_node;
     scope->parent = parent;
+    scope->decls = array_new(Light_Ast*);
     scope->flags = flags;
     scope->level = parent->level + 1;
 

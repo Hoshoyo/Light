@@ -111,6 +111,24 @@ free_register_for_expr(Bytecode_State* state, Light_Ast* expr, u8 reg) {
     }
 }
 
+static s32
+decl_size_bits(Light_Ast* decl) {
+    if(decl->kind == AST_DECL_VARIABLE) {
+        return decl->decl_variable.type->size_bits;
+    } else {
+        return 0;
+    }
+}
+
+static Light_VM_Instruction_Info
+bytecode_emit_proc_epilogue(Bytecode_State* state) {
+    Light_VM_Instruction_Info first = 
+    light_vm_push(state->vmstate, "mov rsp, rbp");
+    light_vm_push(state->vmstate, "pop rbp");
+    light_vm_push(state->vmstate, "ret");
+    return first;
+}
+
 static Light_VM_Instruction_Info
 bytecode_gen_expr_literal_primitive(Bytecode_State* state, Light_Ast* expr, u8 reg) {
     
@@ -257,13 +275,54 @@ bytecode_gen_expr_unary(Bytecode_State* state, Light_Ast* expr, u8 reg) {
 }
 
 static Light_VM_Instruction_Info
+bytecode_emit_comparison(Bytecode_State* state, Light_Ast* expr, u8 left, u8 right) {
+    Light_VM_Instruction_Info first = {0};
+
+    Light_Type* type = expr->type;
+
+    const char* suffix = "";
+    const char* op = 0;
+
+    if(type_primitive_sint(expr->expr_binary.right->type)) {
+        suffix = "s";
+    }
+    if(type_primitive_uint(expr->expr_binary.right->type)) {
+        suffix = "u";
+    }
+
+    if(type->size_bits <= 64) {
+        char* reg_prefix = "";
+        if(type_primitive_float(type)) {
+            first = light_vm_push_fmt(state->vmstate, "fcmp fr%d, fr%d", left, right);
+            reg_prefix = "f";
+        } else {
+            first = light_vm_push_fmt(state->vmstate, "cmp r%d, r%d", left, right);
+        }
+
+        switch(expr->expr_binary.op) {
+            case OP_BINARY_LT:          first = light_vm_push_fmt(state->vmstate, "movlt%s %sr%d", suffix, reg_prefix, left); break;
+            case OP_BINARY_GT:          first = light_vm_push_fmt(state->vmstate, "movgt%s %sr%d", suffix, reg_prefix, left); break;
+            case OP_BINARY_LE:          first = light_vm_push_fmt(state->vmstate, "movle%s %sr%d", suffix, reg_prefix, left); break;
+            case OP_BINARY_GE:          first = light_vm_push_fmt(state->vmstate, "movge%s %sr%d", suffix, reg_prefix, left); break;
+            case OP_BINARY_EQUAL:       first = light_vm_push_fmt(state->vmstate, "moveq %sr%d", reg_prefix, left); break;
+            case OP_BINARY_NOT_EQUAL:   first = light_vm_push_fmt(state->vmstate, "movne %sr%d", reg_prefix, left); break;
+            default: assert(0); break;
+        }
+    } else {
+        // TODO(psv):
+        assert(0);
+    }
+    return first;
+}
+
+static Light_VM_Instruction_Info
 bytecode_gen_expr_binary(Bytecode_State* state, Light_Ast* expr, u8 reg) {
     Light_VM_Instruction_Info first = bytecode_gen_expr(state, expr->expr_binary.left, reg);
 
     u8 rr = alloc_register_for_expr(state, expr->expr_binary.right);
     bytecode_gen_expr(state, expr->expr_binary.right, rr);
 
-    const char* suffix = 0;
+    const char* suffix = "";
     const char* op = 0;
 
     if(type_primitive_sint(expr->expr_binary.right->type)) {
@@ -286,13 +345,15 @@ bytecode_gen_expr_binary(Bytecode_State* state, Light_Ast* expr, u8 reg) {
         case OP_BINARY_SHL:         op = "shl"; suffix = 0; break;
         case OP_BINARY_SHR:         op = "shr"; suffix = 0; break;
 
-        case OP_BINARY_LT:          op = "movlt"; break;
-        case OP_BINARY_GT:          op = "movgt"; break;
-        case OP_BINARY_LE:          op = "movle"; break;
-        case OP_BINARY_GE:          op = "movge"; break;
-
-        case OP_BINARY_EQUAL:       op = "moveq"; suffix = 0; break;
-        case OP_BINARY_NOT_EQUAL:   op = "movne"; suffix = 0; break;
+        case OP_BINARY_EQUAL:
+        case OP_BINARY_NOT_EQUAL: 
+        case OP_BINARY_LT:
+        case OP_BINARY_GT:
+        case OP_BINARY_LE:
+        case OP_BINARY_GE: {
+            bytecode_emit_comparison(state, expr, reg, rr);
+            return first;
+        }
 
         case OP_BINARY_LOGIC_AND:   op = "and"; suffix = 0; break;
         case OP_BINARY_LOGIC_OR:    op = "or";  suffix = 0; break;
@@ -308,44 +369,26 @@ bytecode_gen_expr_binary(Bytecode_State* state, Light_Ast* expr, u8 reg) {
         switch(type->primitive) {
             case TYPE_PRIMITIVE_R32:
             case TYPE_PRIMITIVE_R64:
-                if(suffix)
-                    light_vm_push_fmt(state->vmstate, "%s%s fr%d, fr%d", op, suffix, reg, rr);
-                else
-                    light_vm_push_fmt(state->vmstate, "%s fr%d, fr%d", op, reg, rr);
+                light_vm_push_fmt(state->vmstate, "%s%s fr%d, fr%d", op, suffix, reg, rr);
                 break;
             case TYPE_PRIMITIVE_BOOL:
-                if(suffix)
-                    light_vm_push_fmt(state->vmstate, "%s%s r%d, r%d", op, suffix, reg, rr);
-                else
-                    light_vm_push_fmt(state->vmstate, "%s r%d, r%d", op, reg, rr);
+                light_vm_push_fmt(state->vmstate, "%s%s r%d, r%d", op, suffix, reg, rr);
                 break;
             case TYPE_PRIMITIVE_S8:
             case TYPE_PRIMITIVE_U8:
-                if(suffix)
-                    light_vm_push_fmt(state->vmstate, "%s%s r%db, r%db", op, suffix, reg, rr);
-                else
-                    light_vm_push_fmt(state->vmstate, "%s r%db, r%db", op, reg, rr);
+                light_vm_push_fmt(state->vmstate, "%s%s r%db, r%db", op, suffix, reg, rr);
                 break;
             case TYPE_PRIMITIVE_S16:
             case TYPE_PRIMITIVE_U16:
-                if(suffix)
-                    light_vm_push_fmt(state->vmstate, "%s%s r%dw, r%dw", op, suffix, reg, rr);
-                else
-                    light_vm_push_fmt(state->vmstate, "%s r%dw, r%dw", op, reg, rr);
+                light_vm_push_fmt(state->vmstate, "%s%s r%dw, r%dw", op, suffix, reg, rr);
                 break;
             case TYPE_PRIMITIVE_S32:
             case TYPE_PRIMITIVE_U32:
-                if(suffix)
-                    light_vm_push_fmt(state->vmstate, "%s%s r%dd, r%dd", op, suffix, reg, rr);
-                else
-                    light_vm_push_fmt(state->vmstate, "%s r%dd, r%dd", op, reg, rr);
+                light_vm_push_fmt(state->vmstate, "%s%s r%dd, r%dd", op, suffix, reg, rr);
                 break;
             case TYPE_PRIMITIVE_S64:
             case TYPE_PRIMITIVE_U64:
-                if(suffix)
-                    light_vm_push_fmt(state->vmstate, "%s%s r%d, r%d", op, suffix, reg, rr);
-                else
-                    light_vm_push_fmt(state->vmstate, "%s r%d, r%d", op, reg, rr);
+                light_vm_push_fmt(state->vmstate, "%s%s r%d, r%d", op, suffix, reg, rr);
                 break;
             case TYPE_PRIMITIVE_VOID:
                 break;
@@ -386,6 +429,24 @@ bytecode_gen_comm(Bytecode_State* state, Light_Ast* comm) {
     Light_VM_Instruction_Info first = {0};
     switch(comm->kind) {
         case AST_COMMAND_BLOCK: {
+            Light_Scope* block_scope = comm->comm_block.block_scope;
+
+            s32 stack_size = 0;
+            
+            // Allocate space in the stack for all block decls
+            assert(array_length(block_scope->decls) == block_scope->decl_count);
+            for(s32 i = 0; i < block_scope->decl_count; ++i) {
+                Light_Ast* decl = block_scope->decls[i];
+                if(decl->kind == AST_DECL_VARIABLE && decl->decl_variable.storage_class == STORAGE_CLASS_STACK) {
+                    decl->decl_variable.stack_offset = stack_size;
+                    stack_size += decl_size_bits(decl);
+                }
+            }
+
+            if(stack_size > 0) {
+                light_vm_push_fmt(state->vmstate, "adds rsp, 0x%x", stack_size / 8);
+            }
+
             for(s32 i = 0; i < comm->comm_block.command_count; ++i) {
                 Light_VM_Instruction_Info inst = {0};
                 Light_Ast* node = comm->comm_block.commands[i];
@@ -393,12 +454,13 @@ bytecode_gen_comm(Bytecode_State* state, Light_Ast* comm) {
                 if(node->flags & AST_FLAG_COMMAND) {
                     inst = bytecode_gen_comm(state, node);
                 } else if(node->flags & AST_FLAG_DECLARATION) {
+                    // TODO(psv): scoped procedures
                     //inst = bytecode_gen_internal_decl(state, node);
                 } else {
                     // Should not be possible to have expressions as commands
                     assert(0);
                 }
-                if(i == 0) {
+                if(i == 0 && stack_size == 0) {
                     first = inst;
                 }
             }
@@ -409,7 +471,27 @@ bytecode_gen_comm(Bytecode_State* state, Light_Ast* comm) {
         } break;
 
         case AST_COMMAND_IF: {
+            u8 reg = alloc_register(state);
+            bytecode_gen_expr(state, comm->comm_if.condition, reg);
+            light_vm_push_fmt(state->vmstate, "cmp r%d, 0", reg);
+            free_register(state, reg);
 
+            Light_VM_Instruction_Info cond_branch = 
+            light_vm_push(state->vmstate, "beq 0xffffffff");
+
+            bytecode_gen_comm(state, comm->comm_if.body_true);
+
+            if(comm->comm_if.body_false) {
+                Light_VM_Instruction_Info skip_false_body = 
+                light_vm_push(state->vmstate, "jmp 0xffffffff");
+
+                Light_VM_Instruction_Info false_body = 
+                bytecode_gen_comm(state, comm->comm_if.body_false);
+                light_vm_patch_immediate_distance(cond_branch, false_body);
+                light_vm_patch_from_to_current_instruction(state->vmstate, skip_false_body);
+            } else {
+                light_vm_patch_from_to_current_instruction(state->vmstate, cond_branch);
+            }
         } break;
 
         case AST_COMMAND_RETURN: {
@@ -427,7 +509,7 @@ bytecode_gen_comm(Bytecode_State* state, Light_Ast* comm) {
                     first = bytecode_gen_expr(state, comm->comm_return.expression, R0);
                 }
             }
-            light_vm_push(state->vmstate, "ret");
+            bytecode_emit_proc_epilogue(state);
         } break;
 
         case AST_COMMAND_FOR: {
@@ -456,8 +538,9 @@ bytecode_gen_decl(Bytecode_State* state, Light_Ast* decl) {
     Light_VM_Instruction_Info first = {0};
     switch(decl->kind) {
         case AST_DECL_PROCEDURE:{
-            // TODO(psv): Calculate stack size
-            first = bytecode_gen_comm(state, decl->decl_proc.body);
+            first = light_vm_push(state->vmstate, "push rbp");
+            light_vm_push(state->vmstate, "mov rbp, rsp");
+            bytecode_gen_comm(state, decl->decl_proc.body);
         }break;
         case AST_DECL_VARIABLE:{
 

@@ -1,3 +1,8 @@
 main : () -> s32 {
-    return ~1;
+    if 2 != 2 {
+        return 2;
+    } else {
+        return 5;
+    }
+    return 13;
 }

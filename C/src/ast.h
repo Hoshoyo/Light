@@ -100,6 +100,7 @@ typedef enum {
 
 typedef struct Light_Scope_t {
 	struct Light_Scope_t* parent;
+	struct Light_Ast_t**  decls;
 	union {
 		struct Light_Ast_t*   creator_node;
 		struct Light_Type_t*  creator_type;
