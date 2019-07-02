@@ -5,6 +5,18 @@
 #include "type.h"
 #include "bytecode.h"
 
+static const char*
+register_size_suffix(int size_bits, u8 reg) {
+    switch(size_bits) {
+        case 64: return "";
+        case 32: return "d";
+        case 16: return "w";
+        case 8: return "b";
+        default: assert(0); break;
+    }
+    return "";
+}
+
 static void
 free_register(Bytecode_State* state, u8 reg) {
     state->iregs[reg].age = 0;
@@ -101,11 +113,13 @@ free_register_for_expr(Bytecode_State* state, Light_Ast* expr, u8 reg) {
 
 static Light_VM_Instruction_Info
 bytecode_gen_expr_literal_primitive(Bytecode_State* state, Light_Ast* expr, u8 reg) {
+    
     if(expr->expr_literal_primitive.type == LITERAL_POINTER) {
         return light_vm_push_fmt(state->vmstate, "mov r%d, 0", reg);
     }
 
-    switch(expr->type->primitive) {
+    Light_Type* type = type_alias_root(expr->type);
+    switch(type->primitive) {
         case TYPE_PRIMITIVE_BOOL: {
             if(expr->expr_literal_primitive.value_bool) {
                 return light_vm_push_fmt(state->vmstate, "mov r%d, 1", reg);
@@ -152,6 +166,97 @@ bytecode_gen_expr_literal_primitive(Bytecode_State* state, Light_Ast* expr, u8 r
 }
 
 static Light_VM_Instruction_Info
+bytecode_gen_expr_vector_access(Bytecode_State* state, Light_Ast* expr, u8 left, u8 right) {
+    // TODO(psv): ABC
+    Light_VM_Instruction_Info first = {0};
+
+    Light_Type* type = type_alias_root(expr->type);
+    
+    Light_Type* ptr_to = 0;
+
+    if(type->kind == TYPE_KIND_ARRAY) {
+        ptr_to = type->array_info.array_of;
+    } else if(type->kind == TYPE_KIND_POINTER) {
+        ptr_to = type->pointer_to;
+    } else {
+        assert(0);
+    }
+
+    switch(ptr_to->size_bits) {
+        case 64:
+            first = light_vm_push_fmt(state->vmstate, "mov r%d, [r%d]", left, right);
+            break;
+        case 32:
+            first = light_vm_push_fmt(state->vmstate, "mov r%dd, [r%d]", left, right);
+            break;
+        case 16:
+            first = light_vm_push_fmt(state->vmstate, "mov r%dw, [r%d]", left, right);
+            break;
+        case 8:
+            first = light_vm_push_fmt(state->vmstate, "mov r%db, [r%d]", left, right);
+            break;
+        default:{
+            // bigger than register size
+            // TODO(psv):
+            assert(0);
+        }break;
+    }
+    return first;
+}
+
+static Light_VM_Instruction_Info
+bytecode_gen_expr_unary(Bytecode_State* state, Light_Ast* expr, u8 reg) {
+    Light_VM_Instruction_Info first = {0};
+    
+    Light_Type* type = type_alias_root(expr->type);
+
+    switch(expr->expr_unary.op) {
+        case OP_UNARY_PLUS:
+            first = bytecode_gen_expr(state, expr->expr_unary.operand, reg);
+        case OP_UNARY_MINUS: {
+            first = bytecode_gen_expr(state, expr->expr_unary.operand, reg);
+            if(type_primitive_float(type)) {
+                light_vm_push_fmt(state->vmstate, "fneg fr%d", reg);
+            } else {
+                light_vm_push_fmt(state->vmstate, "neg r%d%s", reg, register_size_suffix(type->size_bits, reg));
+            }
+        } break;
+        case OP_UNARY_LOGIC_NOT: {
+            first = bytecode_gen_expr(state, expr->expr_unary.operand, reg);
+            light_vm_push_fmt(state->vmstate, "cmp r%d, 0x0", reg);
+            light_vm_push_fmt(state->vmstate, "mov r%d, 0", reg);
+            light_vm_push_fmt(state->vmstate, "moveq r%d, 1", reg);
+        } break;
+        case OP_UNARY_BITWISE_NOT:{
+            first = bytecode_gen_expr(state, expr->expr_unary.operand, reg);
+            light_vm_push_fmt(state->vmstate, "not r%d%s", reg, register_size_suffix(type->size_bits, reg));
+        } break;
+        case OP_UNARY_DEREFERENCE:{
+            // mov r0, [r0]
+            if(type_primitive_float(type)) {
+                u8 r = alloc_register(state);
+                first = bytecode_gen_expr(state, expr->expr_unary.operand, r);
+                light_vm_push_fmt(state->vmstate, "fmov fr%d, [r%d]", reg, r);
+                free_register(state, r);
+            } else if(type->size_bits <= 64) {
+                first = bytecode_gen_expr(state, expr->expr_unary.operand, reg);
+                light_vm_push_fmt(state->vmstate, "mov r%d, [r%d]", reg, reg);
+            } else {
+                // TODO(psv): dereference type bigger than 64 bits
+                assert(0);
+            }
+        } break;
+        case OP_UNARY_ADDRESSOF:
+            // TODO(psv):
+        case OP_UNARY_CAST:
+            // TODO(psv):
+            break;
+        default: assert(0); break;
+    }
+    return first;
+}
+
+static Light_VM_Instruction_Info
 bytecode_gen_expr_binary(Bytecode_State* state, Light_Ast* expr, u8 reg) {
     Light_VM_Instruction_Info first = bytecode_gen_expr(state, expr->expr_binary.left, reg);
 
@@ -161,7 +266,6 @@ bytecode_gen_expr_binary(Bytecode_State* state, Light_Ast* expr, u8 reg) {
     const char* suffix = 0;
     const char* op = 0;
 
-    //bool signed_ = (expr->expr_binary.right)
     if(type_primitive_sint(expr->expr_binary.right->type)) {
         suffix = "s";
     }
@@ -193,34 +297,55 @@ bytecode_gen_expr_binary(Bytecode_State* state, Light_Ast* expr, u8 reg) {
         case OP_BINARY_LOGIC_AND:   op = "and"; suffix = 0; break;
         case OP_BINARY_LOGIC_OR:    op = "or";  suffix = 0; break;
 
-        case OP_BINARY_VECTOR_ACCESS: break;
+        case OP_BINARY_VECTOR_ACCESS: {
+            return bytecode_gen_expr_vector_access(state, expr, reg, rr);
+        } break;
         default: assert(0); break;
     }
 
-    if(expr->type->kind == TYPE_KIND_PRIMITIVE) {
-        switch(expr->type->primitive) {
+    Light_Type* type = type_alias_root(expr->type);
+    if(type->kind == TYPE_KIND_PRIMITIVE) {
+        switch(type->primitive) {
             case TYPE_PRIMITIVE_R32:
             case TYPE_PRIMITIVE_R64:
-                light_vm_push_fmt(state->vmstate, "%s%s fr%d, fr%d", op, suffix, reg, rr);
+                if(suffix)
+                    light_vm_push_fmt(state->vmstate, "%s%s fr%d, fr%d", op, suffix, reg, rr);
+                else
+                    light_vm_push_fmt(state->vmstate, "%s fr%d, fr%d", op, reg, rr);
                 break;
             case TYPE_PRIMITIVE_BOOL:
-                light_vm_push_fmt(state->vmstate, "%s%s r%d, r%d", op, suffix, reg, rr);
+                if(suffix)
+                    light_vm_push_fmt(state->vmstate, "%s%s r%d, r%d", op, suffix, reg, rr);
+                else
+                    light_vm_push_fmt(state->vmstate, "%s r%d, r%d", op, reg, rr);
                 break;
             case TYPE_PRIMITIVE_S8:
             case TYPE_PRIMITIVE_U8:
-                light_vm_push_fmt(state->vmstate, "%s%s r%db, r%db", op, suffix, reg, rr);
+                if(suffix)
+                    light_vm_push_fmt(state->vmstate, "%s%s r%db, r%db", op, suffix, reg, rr);
+                else
+                    light_vm_push_fmt(state->vmstate, "%s r%db, r%db", op, reg, rr);
                 break;
             case TYPE_PRIMITIVE_S16:
             case TYPE_PRIMITIVE_U16:
-                light_vm_push_fmt(state->vmstate, "%s%s r%dw, r%dw", op, suffix, reg, rr);
+                if(suffix)
+                    light_vm_push_fmt(state->vmstate, "%s%s r%dw, r%dw", op, suffix, reg, rr);
+                else
+                    light_vm_push_fmt(state->vmstate, "%s r%dw, r%dw", op, reg, rr);
                 break;
             case TYPE_PRIMITIVE_S32:
             case TYPE_PRIMITIVE_U32:
-                light_vm_push_fmt(state->vmstate, "%s%s r%dd, r%dd", op, suffix, reg, rr);
+                if(suffix)
+                    light_vm_push_fmt(state->vmstate, "%s%s r%dd, r%dd", op, suffix, reg, rr);
+                else
+                    light_vm_push_fmt(state->vmstate, "%s r%dd, r%dd", op, reg, rr);
                 break;
             case TYPE_PRIMITIVE_S64:
             case TYPE_PRIMITIVE_U64:
-                light_vm_push_fmt(state->vmstate, "%s%s r%d, r%d", op, suffix, reg, rr);
+                if(suffix)
+                    light_vm_push_fmt(state->vmstate, "%s%s r%d, r%d", op, suffix, reg, rr);
+                else
+                    light_vm_push_fmt(state->vmstate, "%s r%d, r%d", op, reg, rr);
                 break;
             case TYPE_PRIMITIVE_VOID:
                 break;
@@ -236,16 +361,17 @@ bytecode_gen_expr(Bytecode_State* state, Light_Ast* expr, u8 reg) {
     Light_VM_Instruction_Info first = {0};
 
     switch(expr->kind) {
+        case AST_EXPRESSION_BINARY:
+            return bytecode_gen_expr_binary(state, expr, reg);
+        case AST_EXPRESSION_UNARY:
+            return bytecode_gen_expr_unary(state, expr, reg);
         case AST_EXPRESSION_LITERAL_PRIMITIVE: {
             return bytecode_gen_expr_literal_primitive(state, expr, reg);
         } break;
-        case AST_EXPRESSION_BINARY:
-            return bytecode_gen_expr_binary(state, expr, reg);
-        case AST_EXPRESSION_DOT:
         case AST_EXPRESSION_LITERAL_ARRAY:
         case AST_EXPRESSION_LITERAL_STRUCT:
+        case AST_EXPRESSION_DOT:
         case AST_EXPRESSION_PROCEDURE_CALL:
-        case AST_EXPRESSION_UNARY:
         case AST_EXPRESSION_VARIABLE:
             break;
         case AST_EXPRESSION_DIRECTIVE:
@@ -289,10 +415,11 @@ bytecode_gen_comm(Bytecode_State* state, Light_Ast* comm) {
         case AST_COMMAND_RETURN: {
             Light_Ast* ret_expr = comm->comm_return.expression;
             if(ret_expr) {
-                if(ret_expr->type == type_primitive_get(TYPE_PRIMITIVE_R32)) {
+                Light_Type* type = type_alias_root(ret_expr->type);
+                if(type == type_primitive_get(TYPE_PRIMITIVE_R32)) {
                     alloc_register_specified(state, FR0);
                     first = bytecode_gen_expr(state, comm->comm_return.expression, FR0);
-                } else if(ret_expr->type == type_primitive_get(TYPE_PRIMITIVE_R64)){
+                } else if(type == type_primitive_get(TYPE_PRIMITIVE_R64)){
                     alloc_register_specified(state, FR4);
                     first = bytecode_gen_expr(state, comm->comm_return.expression, FR4);
                 } else {

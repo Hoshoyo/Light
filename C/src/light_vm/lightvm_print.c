@@ -171,12 +171,18 @@ print_push_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
 
 void
 print_unary_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
-    switch(instr.type) {
-        case LVM_NOT:  fprintf(out, "NOT "); break;
-        case LVM_POP:  fprintf(out, "POP "); break;
-        default: fprintf(out, "Invalid unary instruction"); break;
+    if(instr.type == LVM_FNEG) {
+        fprintf(out, "FNEG ");
+        print_float_register(out, instr.unary.reg);
+    } else {
+        switch(instr.type) {
+            case LVM_NEG:  fprintf(out, "NEG "); break;
+            case LVM_NOT:  fprintf(out, "NOT "); break;
+            case LVM_POP:  fprintf(out, "POP "); break;
+            default: fprintf(out, "Invalid unary instruction"); break;
+        }
+        print_register(out, instr.unary.reg, instr.unary.byte_size);
     }
-    print_register(out, instr.unary.reg, instr.unary.byte_size);
 }
 
 void
@@ -394,6 +400,8 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm) 
 
         // Unary instructions
         case LVM_NOT:
+        case LVM_NEG:
+        case LVM_FNEG:
         case LVM_POP:
             print_unary_instruction(out, instr, imm);
             break;

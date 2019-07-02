@@ -25,6 +25,7 @@ typedef enum {
     // Arithmetic instructions
     LVM_ADD_S, LVM_SUB_S, LVM_MUL_S, LVM_DIV_S, LVM_MOD_S,
     LVM_ADD_U, LVM_SUB_U, LVM_MUL_U, LVM_DIV_U, LVM_MOD_U,
+    LVM_NEG,
     // Mov
     LVM_MOV,
     // Bitwise
@@ -34,6 +35,7 @@ typedef enum {
     // Floating point
     LVM_FADD, LVM_FSUB, LVM_FMUL, LVM_FDIV, LVM_FMOV,
     LVM_FBEQ, LVM_FBNE, LVM_FBGT, LVM_FBLT,
+    LVM_FNEG,
 
     // Comparison/Branch
     LVM_FCMP,

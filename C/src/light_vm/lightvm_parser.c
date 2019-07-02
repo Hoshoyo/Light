@@ -116,6 +116,8 @@ instruction_type(const char** at) {
         type = LVM_DIV_U;
     } else if(start_with("modu", *at, &count)) {
         type = LVM_MOD_U;
+    } else if(start_with("neg", *at, &count)) {
+        type = LVM_NEG;
     } else if(start_with("moveq", *at, &count)) {
         type = LVM_MOVEQ;
     } else if(start_with("movne", *at, &count)) {
@@ -158,6 +160,8 @@ instruction_type(const char** at) {
         type = LVM_FMUL;
     } else if(start_with("fdiv", *at, &count)) {
         type = LVM_FDIV;
+    } else if(start_with("fneg", *at, &count)) {
+        type = LVM_FNEG;
     } else if(start_with("fmov", *at, &count)) {
         type = LVM_FMOV;
     } else if(start_with("fcmp", *at, &count)) {
@@ -444,7 +448,15 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
             instruction.unary.reg = get_register(&at, &byte_size);
             instruction.unary.byte_size = byte_size;
         } break;
-
+        case LVM_NEG: {
+            u8 byte_size = 0;
+            instruction.unary.reg = get_register(&at, &byte_size);
+            instruction.unary.byte_size = byte_size;
+        } break;
+        case LVM_FNEG: {
+            instruction.unary.reg = get_float_register(&at);
+            instruction.unary.byte_size = (instruction.unary.reg < FR4) ? 4 : 8;
+        } break;
 
         case LVM_PUSH: case LVM_EXPUSHI: case LVM_EXPUSHF: {
             u8 byte_size = 0;

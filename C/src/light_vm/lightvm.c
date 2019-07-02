@@ -60,6 +60,7 @@ light_vm_push_instruction(Light_VM_State* vm_state, Light_VM_Instruction instr, 
     vm_state->code_offset += sizeof(Light_VM_Instruction);
 
     switch(instr.type) {
+        case LVM_NEG: case LVM_FNEG:
         case LVM_NOT: case LVM_PUSH: case LVM_POP:
         case LVM_NOP: case LVM_RET: case LVM_HLT: break;
 
@@ -873,6 +874,19 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             state->registers[instr.unary.reg] = ~state->registers[instr.unary.reg];
             advance_ip = true;
         }break;
+        case LVM_NEG:{
+            state->registers[instr.unary.reg] = -state->registers[instr.unary.reg];
+            advance_ip = true;
+        }break;
+        case LVM_FNEG:{
+            if(instr.unary.reg < FR4) {
+                state->f32registers[instr.unary.reg] = -state->f32registers[instr.unary.reg];
+            } else {
+                state->f64registers[instr.unary.reg] = -state->f64registers[instr.unary.reg];
+            }
+            advance_ip = true;
+        }break;
+
         case LVM_PUSH:{
             light_vm_execute_push_instruction(state, instr);
             advance_ip = true;
