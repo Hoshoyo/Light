@@ -1,6 +1,7 @@
 #include "type_infer.h"
 #include "symbol_table.h"
 #include "top_typecheck.h"
+#include "eval.h"
 #include "ast.h"
 #include "error.h"
 #include "utils/allocator.h"
@@ -545,23 +546,27 @@ type_infer_expr_literal_array(Light_Ast* lexpr, u32* error) {
 
 static Light_Type*
 type_infer_expr_literal_primitive(Light_Ast* expr, u32* error) {
+    Light_Type* type = 0;
     switch(expr->expr_literal_primitive.type) {
         case LITERAL_BOOL:
-            return type_primitive_get(TYPE_PRIMITIVE_BOOL);
+            type = type_primitive_get(TYPE_PRIMITIVE_BOOL);
+        break;
         case LITERAL_CHAR:
         case LITERAL_FLOAT:
         case LITERAL_DEC_SINT:
         case LITERAL_BIN_INT:
         case LITERAL_HEX_INT:
         case LITERAL_DEC_UINT: {
-            return type_weak_primitive_from_literal(expr->expr_literal_primitive.type);
+            type = type_weak_primitive_from_literal(expr->expr_literal_primitive.type);
         } break;
         case LITERAL_POINTER:{
-            return type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
+            type = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
         } break;
         default: assert(0); break;
     }
-    return 0;
+    expr->type = type;
+    eval_literal_primitive(expr);
+    return type;
 }
 
 static Light_Type*

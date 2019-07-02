@@ -225,12 +225,12 @@ typedef struct {
 typedef struct {
     Light_VM_Flags_Register       rflags;
     Light_VM_Float_Flags_Register rfloat_flags;
-    uint64_t                           registers[R_COUNT];
-    double                           f64registers[FREG_COUNT];
-    float                           f32registers[FREG_COUNT];
+    uint64_t                      registers[R_COUNT];
+    double                        f64registers[FREG_COUNT];
+    float                         f32registers[FREG_COUNT];
     Light_VM_EXT_Stack            ext_stack;
     Memory                        data;
-    uint64_t                           data_offset;
+    uint64_t                      data_offset;
     Memory                        stack;
     Memory                        heap;
     Memory                        code;
@@ -256,8 +256,8 @@ int64_t                   light_vm_patch_immediate_distance(Light_VM_Instruction
 uint64_t                  light_vm_offset_from_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info from);
 uint8_t                   light_vm_patch_to_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info to);
 void                      light_vm_patch_from_to_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info from);
-void*                     light_vm_push_float_to_datasegment(Light_VM_State* state, float f);
-void*                     light_vm_push_double_to_datasegment(Light_VM_State* state, double f);
+void*                     light_vm_push_r32_to_datasegment(Light_VM_State* state, float f);
+void*                     light_vm_push_r64_to_datasegment(Light_VM_State* state, double f);
 
 // -------------------------------------
 // ----------- Printing ----------------
