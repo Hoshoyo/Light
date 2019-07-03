@@ -329,6 +329,7 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
         type_error_undeclared_identifier(error, expr->expr_variable.name);
         return 0;
     }
+    expr->expr_variable.decl = decl;
 
     switch(decl->kind) {
         case AST_DECL_CONSTANT:{

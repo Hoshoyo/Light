@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
 
     light_vm_debug_dump_code(stdout, state.vmstate);
 
-    light_vm_execute(state.vmstate, 0, 0);
+    light_vm_execute(state.vmstate, 0, 1);
     light_vm_debug_dump_registers(stdout, state.vmstate, LVM_PRINT_FLOATING_POINT_REGISTERS|LVM_PRINT_DECIMAL);
 
     return 0;

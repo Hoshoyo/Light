@@ -13,10 +13,22 @@ typedef struct {
     Bytecode_Register fregs[FREG_COUNT];
 } Bytecode_State;
 
+typedef enum {
+    LIGHT_REGISTER_F32,
+    LIGHT_REGISTER_F64,
+    LIGHT_REGISTER_INT,
+} Light_Register_Type;
+
+typedef struct {
+    Light_Register_Type kind;
+    s32                 size_bits;
+    u8                  code;
+} Light_Register;
+
 Light_VM_Instruction_Info bytecode_gen_internal_decl(Bytecode_State* state, Light_Ast* decl);
 Light_VM_Instruction_Info bytecode_gen_decl(Bytecode_State* state, Light_Ast* decl);
 
 Light_VM_Instruction_Info bytecode_gen_comm(Bytecode_State* state, Light_Ast* comm);
-Light_VM_Instruction_Info bytecode_gen_expr(Bytecode_State* state, Light_Ast* expr, u8 reg);
+Light_VM_Instruction_Info bytecode_gen_expr(Bytecode_State* state, Light_Ast* expr, Light_Register reg);
 
 Bytecode_State bytecode_gen_ast(Light_Ast** ast);
