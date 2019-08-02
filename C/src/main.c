@@ -6,6 +6,7 @@
 #include "global_tables.h"
 #include "top_typecheck.h"
 #include "bytecode.h"
+#include "backend_c.h"
 #include <light_array.h>
 
 int main(int argc, char** argv) {
@@ -40,17 +41,23 @@ int main(int argc, char** argv) {
         |LIGHT_AST_PRINT_EXPR_TYPES
         , 0);
 
-    //type_table_print();
+    type_table_print();
 
     double end = os_time_us();
     printf("Time elapsed: %fms\n", (end - start) / 1000.0);
 
+#if 1
+    backend_c_generate_top_level(ast, global_type_table);
+#endif
+
+#if 0
     Bytecode_State state = bytecode_gen_ast(ast);
 
     light_vm_debug_dump_code(stdout, state.vmstate);
 
-    light_vm_execute(state.vmstate, 0, 1);
+    light_vm_execute(state.vmstate, 0, 0);
     light_vm_debug_dump_registers(stdout, state.vmstate, LVM_PRINT_FLOATING_POINT_REGISTERS|LVM_PRINT_DECIMAL);
+#endif
 
     return 0;
 }

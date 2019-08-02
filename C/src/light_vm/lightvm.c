@@ -1035,6 +1035,7 @@ light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
         if(print_steps) {
             void* addr_of_imm = ((u8*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
             u64 imm = get_value_of_immediate(state, in, addr_of_imm);
+            fprintf(stdout, "%ld: ", state->registers[RIP]);
             light_vm_print_instruction(stdout, in, imm);
         }
 

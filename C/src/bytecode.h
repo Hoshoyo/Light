@@ -1,5 +1,13 @@
 #pragma once
 #include "light_vm/lightvm.h"
+#include "utils/hash.h"
+
+typedef struct {
+    Light_Token* name;
+    Light_VM_Instruction_Info info;
+} Bytecode_CallInfo;
+
+GENERATE_HASH_TABLE(Bytecode_Calls, bytecode_calls, Bytecode_CallInfo)
 
 typedef struct {
     int age;
@@ -11,6 +19,8 @@ typedef struct {
 
     Bytecode_Register iregs[R_COUNT];
     Bytecode_Register fregs[FREG_COUNT];
+
+    Bytecode_Calls_Table call_table;
 } Bytecode_State;
 
 typedef enum {

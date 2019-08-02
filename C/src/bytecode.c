@@ -4,6 +4,18 @@
 #include "ast.h"
 #include "type.h"
 #include "bytecode.h"
+#include "utils/allocator.h"
+
+u64 call_info_hash(Bytecode_CallInfo ci) {
+    return fnv_1_hash(ci.name->data, ci.name->length);
+}
+
+int call_info_equal(Bytecode_CallInfo t1, Bytecode_CallInfo t2) {
+    return t1.name->data == t2.name->data;
+}
+
+GENERATE_HASH_TABLE_IMPLEMENTATION(Bytecode_Calls, bytecode_calls, Bytecode_CallInfo, 
+    call_info_hash, light_alloc, light_free, call_info_equal)
 
 static const char*
 register_name(Light_Register reg) {
@@ -498,9 +510,6 @@ bytecode_gen_assignment(Bytecode_State* state, Light_Ast* comm) {
         case AST_EXPRESSION_DOT: {
 
         } break;
-        case AST_EXPRESSION_PROCEDURE_CALL:{
-
-        } break;
         case AST_EXPRESSION_UNARY: {
 
         } break;
@@ -541,7 +550,8 @@ bytecode_gen_comm(Bytecode_State* state, Light_Ast* comm) {
                         Light_Register reg = alloc_register_for_expr(state, decl->decl_variable.assignment);
                         first = bytecode_gen_expr(state, decl->decl_variable.assignment, reg);
                         const char* prefix = (type_primitive_float(decl->decl_variable.assignment->type)) ? "f" : "";
-                        light_vm_push_fmt(state->vmstate, "%smov [rbp + 0x%x], r%d", prefix, reg.code);
+                        light_vm_push_fmt(state->vmstate, "%smov [rbp + 0x%x], r%d", 
+                            prefix, decl->decl_variable.stack_offset, reg.code);
                     }
                 }
             }
@@ -603,7 +613,10 @@ bytecode_gen_comm(Bytecode_State* state, Light_Ast* comm) {
 
         case AST_COMMAND_WHILE: {
             Light_Register reg = alloc_register_for_expr(state, comm->comm_while.condition);
+            
+            Light_VM_Instruction_Info start = 
             bytecode_gen_expr(state, comm->comm_while.condition, reg);
+            
             light_vm_push_fmt(state->vmstate, "cmp r%d, 0", reg.code);
             free_register(state, reg);
 
@@ -612,6 +625,10 @@ bytecode_gen_comm(Bytecode_State* state, Light_Ast* comm) {
 
             bytecode_gen_comm(state, comm->comm_while.body);
 
+            Light_VM_Instruction_Info end_while = 
+            light_vm_push_fmt(state->vmstate, "jmp 0xffffffff");
+
+            light_vm_patch_immediate_distance(end_while, start);
             light_vm_patch_from_to_current_instruction(state->vmstate, cond_branch);
         } break;
 
@@ -667,8 +684,17 @@ bytecode_gen_decl(Bytecode_State* state, Light_Ast* decl) {
     Light_VM_Instruction_Info first = {0};
     switch(decl->kind) {
         case AST_DECL_PROCEDURE:{
+            // Prologue
             first = light_vm_push(state->vmstate, "push rbp");
             light_vm_push(state->vmstate, "mov rbp, rsp");
+            
+            // Put this procedure information in the calls table
+            Bytecode_CallInfo call_info = {0};
+            call_info.name = decl->decl_proc.name;
+            call_info.info = first;
+
+            bytecode_calls_table_add(&state->call_table, call_info, 0);
+            
             bytecode_gen_comm(state, decl->decl_proc.body);
         }break;
         case AST_DECL_VARIABLE:{
@@ -689,7 +715,7 @@ bytecode_gen_decl(Bytecode_State* state, Light_Ast* decl) {
 Light_VM_Instruction_Info
 bytecode_gen_internal_decl(Bytecode_State* state, Light_Ast* decl) {
     Light_VM_Instruction_Info first = {0};
-
+    // TODO(psv):
     return first;
 }
 
@@ -698,6 +724,8 @@ bytecode_gen_ast(Light_Ast** ast) {
     Bytecode_State state = {0};
 
     state.vmstate = light_vm_init();
+
+    bytecode_calls_table_new(&state.call_table, 65536);
 
     Light_VM_Instruction_Info call = 
         light_vm_push(state.vmstate, "call 0xff");
