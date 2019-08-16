@@ -3,6 +3,9 @@
 #include "type_table.h"
 #include <assert.h>
 #include <stdio.h>
+#include <stdarg.h>
+
+#define REGISTER_SIZE 64
 
 // --------------------------------
 // ---------- Catstring -----------
@@ -34,17 +37,6 @@ buffer_grow_by(catstring* s, int amount) {
     s->capacity = a;
 }
 
-//static int 
-//catsprint_u64(catstring* buffer, u64 num) {
-//    if((buffer->length + 32) >= buffer->capacity) {
-//        buffer_grow_by(buffer, 32);
-//    }
-//    int c = sprintf(buffer->data, "%lx", num);
-//    buffer->length += c;
-//
-//    return c;
-//}
-
 int
 catsprint_token(catstring* buffer, Light_Token* t) {
     if(buffer->capacity == 0) {
@@ -63,15 +55,15 @@ catsprint_token(catstring* buffer, Light_Token* t) {
     return t->length;
 }
 
-int 
-catsprint(catstring* buffer, char* str) {
+static int
+catsprint_string(catstring* buffer, const char* str) {
     if(buffer->capacity == 0) {
         buffer->data = calloc(1, 32);
         buffer->capacity = 32;
     }
 
     int n = 0;
-    for(char* at = str;; ++at, ++n) {
+    for(const char* at = str; ; ++at, ++n) {
         // push to stream
         if(buffer->length >= buffer->capacity) {
             buffer_grow(buffer);
@@ -81,6 +73,99 @@ catsprint(catstring* buffer, char* str) {
         if(!(*at)) break;
         buffer->length++;
     }
+
+    return n;
+}
+
+static int
+catsprint_decimal_unsigned(catstring* buffer, long long int value) {
+    if(buffer->capacity == 0) {
+        buffer->data = calloc(1, 32);
+        buffer->capacity = 32;
+    }
+
+    char mem[64] = {0};
+    int n = sprintf(mem, "%llu", value);
+    return catsprint_string(buffer, mem);
+}
+
+static int
+catsprint_decimal_signed(catstring* buffer, long long int value) {
+    if(buffer->capacity == 0) {
+        buffer->data = calloc(1, 32);
+        buffer->capacity = 32;
+    }
+
+    char mem[64] = {0};
+    int n = sprintf(mem, "%lld", value);
+    return catsprint_string(buffer, mem);
+}
+
+static int
+catsprint_hexadecimal(catstring* buffer, long long int value) {
+    if(buffer->capacity == 0) {
+        buffer->data = calloc(1, 32);
+        buffer->capacity = 32;
+    }
+
+    char mem[64] = {0};
+    int n = sprintf(mem, "0x%llx", value);
+    return catsprint_string(buffer, mem);
+}
+
+// %%
+// %s string, %
+int 
+catsprint(catstring* buffer, char* str, ...) {
+    if(buffer->capacity == 0) {
+        buffer->data = calloc(1, 32);
+        buffer->capacity = 32;
+    }
+
+    va_list args;
+    va_start(args, str);
+
+    int n = 0;
+    for(char* at = str; ; ++at, ++n) {
+        // push to stream
+        if(buffer->length >= buffer->capacity) {
+            buffer_grow(buffer);
+        }
+
+        if(*at == '%') {
+            at++; // skip
+            switch(*at) {
+                case '%': break; // do nothing, just push character
+                case 's': {
+                    at++;
+                    // push string
+                    n += catsprint_string(buffer, va_arg(args, const char*));
+                } break;
+                case 'u':{
+                    at++;
+                    n += catsprint_decimal_unsigned(buffer, va_arg(args, unsigned long long int));
+                } break;
+                case 'd':{
+                    at++;
+                    n += catsprint_decimal_signed(buffer, va_arg(args, int));
+                } break;
+                case 'l':{
+                    at++;
+                    n += catsprint_decimal_signed(buffer, va_arg(args, long long int));
+                } break;
+                case 'x':{
+                    at++;
+                    n += catsprint_hexadecimal(buffer, va_arg(args, unsigned long long int));
+                } break;
+            }
+        }
+
+        buffer->data[buffer->length] = *at;
+        if(!(*at)) break;
+        buffer->length++;
+    }
+
+    va_end(args);
 
     return n;
 }
@@ -160,6 +245,41 @@ emit_procedure_part2(catstring* buffer, Light_Type* type, Light_Token* name) {
     return emitted_name;
 }
 
+static bool
+emit_array_part2(catstring* buffer, Light_Type* type, Light_Token* name) {
+    bool emitted_name = false;
+
+    if(name) {
+        catsprint(buffer, " ");
+        catsprint_token(buffer, name);
+        emitted_name = true;
+    }
+
+    if(type->array_info.array_of->kind == TYPE_KIND_ARRAY) {
+        emit_array_part2(buffer, type->array_info.array_of, 0);
+    }
+    catsprint(buffer, "[");
+    catsprint(buffer, "%u", type->array_info.dimension);
+    catsprint(buffer, "]");
+
+    if(type->array_info.array_of->kind == TYPE_KIND_FUNCTION) {
+        emit_procedure_part2(buffer, type->array_info.array_of, 0);
+    }
+
+    return emitted_name;
+}
+
+static void
+emit_array_part1(catstring* buffer, Light_Type* type) {
+    if(type->array_info.array_of->kind == TYPE_KIND_ARRAY) {
+        emit_array_part1(buffer, type->array_info.array_of);
+    } else if(type->array_info.array_of->kind == TYPE_KIND_FUNCTION) {
+        emit_procedure_part1(buffer, type->array_info.array_of->function.return_type);
+    } else {
+        emit_type_declaration(buffer, type->array_info.array_of, 0);
+    }
+}
+
 bool
 emit_type_declaration(catstring* buffer, Light_Type* type, Light_Token* name) {
     bool emitted_name = false;
@@ -210,10 +330,11 @@ emit_type_declaration(catstring* buffer, Light_Type* type, Light_Token* name) {
                 case TYPE_KIND_FUNCTION: {
                     emit_procedure_part1(buffer, type->pointer_to->function.return_type);
                     catsprint(buffer, "*");
-                    emitted_name |=emit_procedure_part2(buffer, type->pointer_to, name);
+                    emitted_name |= emit_procedure_part2(buffer, type->pointer_to, name);
                 } break;
                 case TYPE_KIND_ARRAY: {
-
+                    emit_array_part1(buffer, type);
+                    emitted_name |= emit_array_part2(buffer, type, name);
                 } break;
                 default: {
                     emit_type_declaration(buffer, type->pointer_to, 0);
@@ -223,6 +344,8 @@ emit_type_declaration(catstring* buffer, Light_Type* type, Light_Token* name) {
 
         }break;
         case TYPE_KIND_ARRAY:{
+            emit_array_part1(buffer, type);
+            emitted_name |= emit_array_part2(buffer, type, name);
         }break;
         case TYPE_KIND_ENUM: {
         } break;
@@ -287,6 +410,51 @@ emit_binop(catstring* buffer, Light_Operator_Binary binop) {
     }
 }
 
+static void
+emit_primitive_literal(catstring* buffer, Light_Ast_Expr_Literal_Primitive lit, Light_Type* type) {
+    switch(lit.type) {
+        case LITERAL_BIN_INT:
+        case LITERAL_HEX_INT:
+        case LITERAL_DEC_SINT:
+        case LITERAL_DEC_UINT:{
+            switch(type->primitive) {
+                case TYPE_PRIMITIVE_S8:
+                    catsprint(buffer, "%l", (s64)lit.value_s8); break;
+                case TYPE_PRIMITIVE_S16:
+                    catsprint(buffer, "%l", (s64)lit.value_s16); break;
+                case TYPE_PRIMITIVE_S32:
+                    catsprint(buffer, "%l", (s64)lit.value_s32); break;
+                case TYPE_PRIMITIVE_S64:
+                    catsprint(buffer, "%l", lit.value_s64); break;
+                case TYPE_PRIMITIVE_U8:
+                    catsprint(buffer, "%u", (u64)lit.value_u8); break;
+                case TYPE_PRIMITIVE_U16:
+                    catsprint(buffer, "%u", (u64)lit.value_u16); break;
+                case TYPE_PRIMITIVE_U32:
+                    catsprint(buffer, "%u", (u64)lit.value_u32); break;
+                case TYPE_PRIMITIVE_U64:
+                    catsprint(buffer, "%u", lit.value_u64); break;
+                default: break;
+            }
+        } break;
+        case LITERAL_BOOL:{
+            if (lit.value_bool) {
+                catsprint(buffer, "true");
+            } else {
+                catsprint(buffer, "false");
+            }
+        } break;
+        case LITERAL_CHAR:{
+            catsprint(buffer, "%x", lit.value_u32);
+        } break;
+        case LITERAL_FLOAT:{
+        } break;
+        case LITERAL_POINTER:
+            catsprint(buffer, "0"); break;
+        default: break;
+    }
+}
+
 static void 
 emit_expression(catstring* buffer, Light_Ast* node) {
     assert(node->flags & AST_FLAG_EXPRESSION);
@@ -310,7 +478,7 @@ emit_expression(catstring* buffer, Light_Ast* node) {
             catsprint(buffer, ")");
         } break;
         case AST_EXPRESSION_LITERAL_PRIMITIVE: {
-            catsprint(buffer, "3");
+            emit_primitive_literal(buffer, node->expr_literal_primitive, node->type);
         } break;
         case AST_EXPRESSION_VARIABLE: {
             catsprint_token(buffer, node->expr_variable.name);
@@ -322,6 +490,18 @@ emit_expression(catstring* buffer, Light_Ast* node) {
         case AST_EXPRESSION_LITERAL_STRUCT:
         case AST_EXPRESSION_UNARY:
         default: break;
+    }
+}
+
+static void
+emit_variable_assignment(catstring* buffer, Light_Token* name, Light_Ast* expr) {
+    catsprint_token(buffer, name);
+
+    if(expr->type->size_bits <= REGISTER_SIZE) {
+        catsprint(buffer, " = ");
+        emit_expression(buffer, expr);
+    } else {
+        // TODO(psv): bigger than register size assignment to a variable
     }
 }
 
@@ -341,6 +521,14 @@ emit_command(catstring* buffer, Light_Ast* node) {
                 } else if(n->kind == AST_DECL_VARIABLE) {
                     emit_declaration(buffer, node->comm_block.commands[i]);
                     catsprint(buffer, ";\n");
+
+                    // When there is an assignment
+                    if(n->decl_variable.assignment) {
+                        emit_variable_assignment(buffer, 
+                            n->decl_variable.name,
+                            n->decl_variable.assignment);
+                        catsprint(buffer, ";\n");
+                    }
                 }
             }
             catsprint(buffer, "}\n");
@@ -354,21 +542,35 @@ emit_command(catstring* buffer, Light_Ast* node) {
             catsprint(buffer, ";\n");
         } break;
         case AST_COMMAND_IF:{
+            bool body_true_is_block = node->comm_if.body_true && node->comm_if.body_true->kind == AST_COMMAND_BLOCK;
+            bool body_false_is_block = node->comm_if.body_false && node->comm_if.body_false->kind == AST_COMMAND_BLOCK;
+
+            // Conditional expression
             catsprint(buffer, "if (");
             emit_expression(buffer, node->comm_if.condition);
-            catsprint(buffer, ") {\n");
+            catsprint(buffer, ")");
+
+            // True body
+            if (!body_true_is_block)
+                catsprint(buffer, "{\n");
             emit_command(buffer, node->comm_if.body_true);
-            catsprint(buffer, "}");
-            if (node->comm_if.body_false) {
-                catsprint(buffer, " else {\n");
-                emit_command(buffer, node->comm_if.body_false);
+            if (!body_true_is_block)
                 catsprint(buffer, "}");
+
+            // False body
+            if (node->comm_if.body_false) {
+                catsprint(buffer, " else ");
+                if (!body_false_is_block)
+                    catsprint(buffer, "{\n");
+                emit_command(buffer, node->comm_if.body_false);
+                if (!body_false_is_block)
+                    catsprint(buffer, "}");
             }
+            catsprint(buffer, "\n");
         } break;
         case AST_COMMAND_FOR:{
         } break;
         case AST_COMMAND_WHILE:{
-            
             catsprint(buffer, "while (");
             emit_expression(buffer, node->comm_while.condition);
             catsprint(buffer, ") {\n");
@@ -382,9 +584,11 @@ emit_command(catstring* buffer, Light_Ast* node) {
             }
             catsprint(buffer, ";\n");
         } break;
-        case AST_COMMAND_BREAK:
+        case AST_COMMAND_BREAK: {
+            catsprint(buffer, "goto label_%l;\n", node->comm_break.level_value);
+        } break;
         case AST_COMMAND_CONTINUE:
-            // TODO(psv):
+            catsprint(buffer, "goto label_%l;\n", node->comm_continue.level_value);
         default: break;
     }
 }

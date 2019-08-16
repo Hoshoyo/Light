@@ -28,6 +28,7 @@ type_infer_decl_from_name(Light_Scope* scope, Light_Token* name) {
         s32 index = 0;
         if(symbol_table_entry_exist((Symbol_Table*)scope->symb_table, s, &index, 0)) {
             s = symbol_table_get((Symbol_Table*)scope->symb_table, index);
+            break;
         }
         scope = scope->parent;
     }
@@ -36,6 +37,13 @@ type_infer_decl_from_name(Light_Scope* scope, Light_Token* name) {
 
 static Light_Type*
 type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error) {
+    if(type && type->kind != TYPE_KIND_ARRAY) {
+        type_error_mismatch(error, expr->expr_literal_array.token_array, 
+            type, expr->type);
+            fprintf(stderr, " in literal array\n");
+        return 0;
+    }
+
     if(type) {
         assert(TYPE_STRONG(type));
     }

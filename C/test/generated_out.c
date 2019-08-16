@@ -16,29 +16,7 @@ typedef double r64;
 void __memory_copy(void* dest, void* src, u64 size) {
 	for(u64 i = 0; i < size; ++i) ((char*)dest)[i] = ((char*)src)[i];
 }
-typedef struct foo {struct foo* a; s32(*b)(void(*b)()); } foo;
-typedef s32 hello;
-typedef struct tar {foo b; } tar;
-
-
-
 s32 main(){
-s32 a;
-a = 3;
-}
-
-void(* b(s32 foo, r32 bar))(){
-if (3) {
-{
-(fooz)();
-}
-} else {
-{
-s32 a;
-}
-}}
-
-void fooz(){
-void(**c)(s32, r32);
+s32(**)()* a;
 }
 
