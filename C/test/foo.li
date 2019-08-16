@@ -4,10 +4,26 @@ tar struct {
 
 foo struct {
     a : ^foo;
+    b : (() -> void) -> s32;
 }
 
 hello s32;
 
 main : () -> s32 {
-    a : [3]s32;
+    //a : [3]s32;
+    a : s32;
+    a = 3;
+}
+
+b : (foo : s32, bar : r32) -> () -> void {
+    //if (foo > 2) {
+    if true {
+        fooz();
+    } else {
+        a := 4;
+    }
+}
+
+fooz : () {
+    c : ^(s32, r32) -> void;
 }

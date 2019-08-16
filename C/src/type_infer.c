@@ -413,7 +413,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
         for(s32 i = 0; i < struct_type->struct_info.fields_count; ++i) {
             if(named) {
                 Light_Ast* field = expr->expr_literal_struct.struct_decls[i];
-                if(field->decl_variable.name->data != field->decl_variable.name->data) 
+                if(struct_type->struct_info.fields[i]->decl_variable.name->data != field->decl_variable.name->data) 
                 {
                     // TODO(psv): orderless fields
                     // Fields names are incompatible

@@ -15,7 +15,8 @@ extern string global_compiler_path;
 extern Light_Arena* global_type_arena;
 
 // Types
-extern Type_Table global_type_table;
+extern Type_Table   global_type_table;
+extern Light_Type** global_type_array;
 
 // Ast
 extern Light_Ast**  global_infer_queue;

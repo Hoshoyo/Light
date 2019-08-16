@@ -1,6 +1,7 @@
 #include "type.h"
 #include <assert.h>
 #include "global_tables.h"
+#include "light_array.h"
 
 static u64 primitive_table_hash[TYPE_PRIMITIVE_COUNT] = {0};
 static u64 struct_hash = 0;
@@ -382,11 +383,16 @@ type_internalize(Light_Type* type) {
     assert(type->flags & TYPE_FLAG_SIZE_RESOLVED);
 
     s32 index = 0;
-    type_table_add(&global_type_table, type, &index);
+    bool added = type_table_add(&global_type_table, type, &index);
     // Works even if the type already exist in the table.
     Light_Type* internalized = type_table_get(&global_type_table, index);
     internalized->flags |= TYPE_FLAG_INTERNALIZED;
     internalized->flags &= ~(TYPE_FLAG_WEAK);
+
+    if(added) {
+        array_push(global_type_array, internalized);
+    }
+
     return internalized;
 }
 

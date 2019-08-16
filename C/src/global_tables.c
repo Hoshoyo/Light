@@ -11,6 +11,7 @@ string global_compiler_path = {0};
 
 Light_Arena* global_type_arena = 0;
 Light_Ast**  global_infer_queue = 0;
+Light_Type** global_type_array = 0;
 
 static void
 compiler_setup_global_import_table() {
@@ -25,6 +26,7 @@ compiler_setup_global_type_table() {
     if(global_type_table.entries_capacity == 0) {
         type_table_new(&global_type_table, 65536);
     }
+    global_type_array = array_new_len(Light_Type, 2048);
 }
 
 static void
