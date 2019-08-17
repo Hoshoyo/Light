@@ -16,7 +16,6 @@ typedef double r64;
 void __memory_copy(void* dest, void* src, u64 size) {
 	for(u64 i = 0; i < size; ++i) ((char*)dest)[i] = ((char*)src)[i];
 }
-s32 main(){
-s32(**)()* a;
-}
+
+s32(** l)()[3];
 

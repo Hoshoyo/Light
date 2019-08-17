@@ -6,7 +6,7 @@
 #include "global_tables.h"
 #include "top_typecheck.h"
 #include "bytecode.h"
-#include "backend_c.h"
+#include "backend/c/toplevel.h"
 #include <light_array.h>
 
 int main(int argc, char** argv) {

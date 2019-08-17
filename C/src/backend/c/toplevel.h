@@ -1,6 +1,6 @@
 #pragma once
-#include "ast.h"
-#include "global_tables.h"
+#include "../../ast.h"
+#include "../../global_tables.h"
 
 typedef struct {
 	struct User_Type_Info_t* array_of;
