@@ -1,18 +1,57 @@
-main : () -> s32 {
-    //a := [1, [3]];
-    //a : [3]^(r32)-> s32;
-    //a : ^^()->s32;
+//factorial : (n : s32) -> s32 {
+//	if n <= 1 return 1;
+//	return n * factorial(n - 1);
+//}
+
+string struct {
+	length : u64;
+	capacity : u64;
+	data : ^u8;
 }
 
-//a : s32;
-//b : [3]s32;
-//c : [4][5]r32;
-//d : ^s32;
-//e : ^^s32;
-//f : ^[3]s32;
-//g : ^[3]^s32;
-//h : ^()->s32;
-//i : ^(s32) -> void;
-//j : ^(s32, s32) -> ^bool;
-//k : ^(s32) -> () -> r32;
-l : ^()->[3]s32;
+write : (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
+
+main : () -> s32 {
+	/*
+	i := 0;
+	j := 0;
+	while i < 10 {
+		while j < 10 {
+			if i == 3 && j == 4 {
+				break 2;
+			}
+			j += 1;
+		}
+		j = 0;
+		i += 1;
+	}
+	*/
+
+	//x := 0;
+	//for i := 0; i < 10; i += 1 {
+	//	for j := 0; j < 10; j += 1 {
+	//		if i == 3 && j == 4 {
+	//			break 2;
+	//		}
+	//		x += 1;
+	//	}
+	//}
+
+	buffer := "Hello";
+	//buffer : [5]u8;
+	//buffer[0] = 0x48;
+	//buffer[1] = 0x65;
+	//buffer[2] = 0x6c;
+	//buffer[3] = 0x6c;
+	//buffer[4] = 0x6f;
+
+	//buffer[0] = 'H';
+	//buffer[1] = 'e';
+	//buffer[2] = 'l';
+	//buffer[3] = 'l';
+	//buffer[4] = 'o';
+
+	write(1, buffer -> ^void, 5);
+
+	return 0;
+}

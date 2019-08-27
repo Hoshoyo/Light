@@ -59,3 +59,4 @@ typedef struct {
 } User_Type_Table;
 
 void backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table);
+void backend_c_compile_with_gcc(Light_Ast** ast, const char* filename);

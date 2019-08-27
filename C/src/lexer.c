@@ -23,6 +23,7 @@ initialize_global_identifiers_table() {
     light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF]  = MAKE_STR_LEN("typeof", sizeof("typeof") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_END]     = MAKE_STR_LEN("end", sizeof("end") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_RUN]     = MAKE_STR_LEN("run", sizeof("run") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_EXTERN] = MAKE_STR_LEN("extern", sizeof("extern") - 1);
 
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_MAIN], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_FOREIGN], 0);
@@ -33,6 +34,7 @@ initialize_global_identifiers_table() {
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_END], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_RUN], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_EXTERN], 0);
 }
 
 static bool

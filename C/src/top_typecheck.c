@@ -57,7 +57,6 @@ typecheck_loop_scope_level(Light_Scope* scope) {
             level++;
         } else {
             // we gotta get at least to the global scope
-            break;
         }
         scope = scope->parent;
     }
@@ -103,9 +102,7 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
         Light_Ast* node = top_level[i];
         switch(node->kind) {
             case AST_DECL_PROCEDURE:{
-                if(node->decl_proc.body) {
-                    error |= decl_check_redefinition(global_scope, node, node->decl_proc.name);
-                }
+                error |= decl_check_redefinition(global_scope, node, node->decl_proc.name);
             }break;
             case AST_DECL_CONSTANT:
                 error |= decl_check_redefinition(global_scope, node, node->decl_constant.name);

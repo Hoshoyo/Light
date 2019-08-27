@@ -105,6 +105,18 @@ catsprint_hexadecimal(catstring* buffer, long long int value) {
     return catsprint_string(buffer, mem);
 }
 
+static int
+catsprint_double(catstring* buffer, double value) {
+    if(buffer->capacity == 0) {
+        buffer->data = calloc(1, 32);
+        buffer->capacity = 32;
+    }
+
+    char mem[64] = {0};
+    int n = sprintf(mem, "%f", value);
+    return catsprint_string(buffer, mem);
+}
+
 // %%
 // %s string, %
 int 
@@ -148,6 +160,10 @@ catsprint(catstring* buffer, char* str, ...) {
                 case 'x':{
                     at++;
                     n += catsprint_hexadecimal(buffer, va_arg(args, unsigned long long int));
+                } break;
+                case 'f':{
+                    at++;
+                    n += catsprint_double(buffer, va_arg(args, double));
                 } break;
             }
         }

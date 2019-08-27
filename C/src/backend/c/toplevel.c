@@ -8,7 +8,24 @@
 #include "catstring.h"
 
 static void emit_typed_declaration(catstring* buffer, Light_Type* type, Light_Token* name, u32 flags);
-static void emit_declaration(catstring* buffer, Light_Ast* node);
+static void emit_declaration(catstring* buffer, Light_Ast* node, u32 flags);
+static void emit_expression(catstring* buffer, Light_Ast* node);
+
+// Change level to parent scopes
+static Light_Scope* 
+loop_scope_level_change(Light_Scope* from, s64 level) {
+    Light_Scope* result = from;
+    while(result) {
+        if(result->flags & SCOPE_LOOP) {
+            level--;
+            if(level == 0) break;
+        }
+
+        result = result->parent;
+    }
+
+    return result;
+}
 
 static void
 emit_type_end(catstring* buffer, Light_Type* type) {
@@ -53,6 +70,7 @@ emit_type_end(catstring* buffer, Light_Type* type) {
 
 enum {
     EMIT_FLAG_TREAT_AS_FUNCTION_TYPE = (1 << 0),
+    EMIT_DECLARATION_DEFAULT_VALUE   = (1 << 1),
 };
 
 static void
@@ -127,6 +145,31 @@ emit_type_start(catstring* buffer, Light_Type* type, u32 flags) {
         case TYPE_KIND_ENUM: break;
         default: assert(0); break;
     }
+}
+
+static void
+emit_typed_procedure_declaration(catstring* buffer, Light_Ast* decl) {
+    assert(decl->kind == AST_DECL_PROCEDURE);
+
+    Light_Type* type = decl->decl_proc.proc_type;
+    // start
+    emit_type_start(buffer, type, EMIT_FLAG_TREAT_AS_FUNCTION_TYPE);
+    catsprint(buffer, " ");
+    
+    // name
+    if(decl->decl_proc.name)
+        catsprint_token(buffer, decl->decl_proc.name);
+
+    // end (arguments)
+    catsprint(buffer, ")(");
+    for(int i = 0; i < decl->decl_proc.argument_count; ++i) {
+        if(i > 0) catsprint(buffer, ", ");
+
+        emit_typed_declaration(buffer, decl->decl_proc.arguments[i]->decl_variable.type, 
+            decl->decl_proc.arguments[i]->decl_variable.name, 0);
+    }
+    catsprint(buffer, ")");
+    emit_type_end(buffer, type->function.return_type);
 }
 
 static void
@@ -251,10 +294,77 @@ emit_primitive_literal(catstring* buffer, Light_Ast_Expr_Literal_Primitive lit, 
             catsprint(buffer, "%x", lit.value_u32);
         } break;
         case LITERAL_FLOAT:{
+            if(type->primitive == TYPE_PRIMITIVE_R32)
+                catsprint(buffer, "%f", lit.value_r32);
+            else if(type->primitive == TYPE_PRIMITIVE_R64)
+                catsprint(buffer, "%f", lit.value_r64);
         } break;
         case LITERAL_POINTER:
             catsprint(buffer, "0"); break;
         default: break;
+    }
+}
+
+static void
+emit_expression_binary(catstring* buffer, Light_Ast* node) {
+    assert(node->kind == AST_EXPRESSION_BINARY);
+
+    catsprint(buffer, "(");
+    if(node->expr_binary.op == OP_BINARY_VECTOR_ACCESS) {
+        emit_expression(buffer, node->expr_binary.left);
+        catsprint(buffer, "[");
+        emit_expression(buffer, node->expr_binary.right);
+        catsprint(buffer, "]");
+    } else {
+        emit_expression(buffer, node->expr_binary.left);
+        emit_binop(buffer, node->expr_binary.op);
+        emit_expression(buffer, node->expr_binary.right);
+    }
+    catsprint(buffer, ")");
+}
+
+static void
+emit_expression_unary(catstring* buffer, Light_Ast* node) {
+    assert(node->kind == AST_EXPRESSION_UNARY);
+
+    switch(node->expr_unary.op) {
+        case OP_UNARY_LOGIC_NOT:
+            catsprint(buffer, "(!");
+            emit_expression(buffer, node->expr_unary.operand);
+            catsprint(buffer, ")");
+            break;
+        case OP_UNARY_MINUS:
+            catsprint(buffer, "(-");
+            emit_expression(buffer, node->expr_unary.operand);
+            catsprint(buffer, ")");
+            break;
+        case OP_UNARY_BITWISE_NOT:
+            catsprint(buffer, "(~");
+            emit_expression(buffer, node->expr_unary.operand);
+            catsprint(buffer, ")");
+            break;
+        case OP_UNARY_PLUS:
+            emit_expression(buffer, node->expr_unary.operand);
+            break;
+        case OP_UNARY_ADDRESSOF:
+            catsprint(buffer, "(&");
+            emit_expression(buffer, node->expr_unary.operand);
+            catsprint(buffer, ")");
+            break;
+        case OP_UNARY_DEREFERENCE:
+            catsprint(buffer, "(*");
+            emit_expression(buffer, node->expr_unary.operand);
+            catsprint(buffer, ")");
+            break;
+        case OP_UNARY_CAST:
+            catsprint(buffer, "((");
+            emit_typed_declaration(buffer, node->expr_unary.type_to_cast, 0, 0);
+            catsprint(buffer, ")");
+            emit_expression(buffer, node->expr_unary.operand);
+            catsprint(buffer, ")");
+            break;
+
+        default: assert(0); break;
     }
 }
 
@@ -264,11 +374,7 @@ emit_expression(catstring* buffer, Light_Ast* node) {
     
     switch(node->kind) {
         case AST_EXPRESSION_BINARY:{
-            catsprint(buffer, "(");
-            emit_expression(buffer, node->expr_binary.left);
-            emit_binop(buffer, node->expr_binary.op);
-            emit_expression(buffer, node->expr_binary.right);
-            catsprint(buffer, ")");
+            emit_expression_binary(buffer, node);
         } break;
         case AST_EXPRESSION_PROCEDURE_CALL: {
             catsprint(buffer, "(");
@@ -287,11 +393,22 @@ emit_expression(catstring* buffer, Light_Ast* node) {
             catsprint_token(buffer, node->expr_variable.name);
         } break;
         case AST_EXPRESSION_DOT:{
-
+            if(node->expr_dot.left->type->kind == TYPE_KIND_POINTER) {
+                catsprint(buffer, "(");
+                emit_expression(buffer, node->expr_dot.left);
+                catsprint(buffer, ")->");
+            } else {
+                catsprint(buffer, "(");
+                emit_expression(buffer, node->expr_dot.left);
+                catsprint(buffer, ").");
+            }
+            catsprint_token(buffer, node->expr_dot.identifier);
         } break;
         case AST_EXPRESSION_LITERAL_ARRAY:
         case AST_EXPRESSION_LITERAL_STRUCT:
-        case AST_EXPRESSION_UNARY:
+        case AST_EXPRESSION_UNARY:{
+            emit_expression_unary(buffer, node);
+        } break;
         default: break;
     }
 }
@@ -311,6 +428,9 @@ emit_variable_assignment(catstring* buffer, Light_Token* name, Light_Ast* expr) 
 static void
 emit_command(catstring* buffer, Light_Ast* node) {
     switch(node->kind){
+        case AST_DECL_VARIABLE:
+            emit_declaration(buffer, node, EMIT_DECLARATION_DEFAULT_VALUE);
+            break;
         case AST_COMMAND_BLOCK:{
             catsprint(buffer, "{\n");
 
@@ -319,7 +439,7 @@ emit_command(catstring* buffer, Light_Ast* node) {
                 if(n->flags & AST_FLAG_COMMAND) {
                     emit_command(buffer, node->comm_block.commands[i]);
                 } else if(n->kind == AST_DECL_VARIABLE) {
-                    emit_declaration(buffer, node->comm_block.commands[i]);
+                    emit_declaration(buffer, node->comm_block.commands[i], EMIT_DECLARATION_DEFAULT_VALUE);
 
                     // When there is an assignment
                     if(n->decl_variable.assignment) {
@@ -372,11 +492,17 @@ emit_command(catstring* buffer, Light_Ast* node) {
         } break;
 
         case AST_COMMAND_WHILE:{
+            // label to continue
+            assert(node->comm_while.body->comm_block.block_scope);
+            catsprint(buffer, "label_continue_%d:\n", (u64)node->comm_while.body->comm_block.block_scope->id);
+
             catsprint(buffer, "while (");
             emit_expression(buffer, node->comm_while.condition);
             catsprint(buffer, ") {\n");
             emit_command(buffer, node->comm_while.body);
             catsprint(buffer, "}\n");
+
+            catsprint(buffer, "label_break_%d:;\n", (u64)node->comm_while.body->comm_block.block_scope->id);
         } break;
         
         case AST_COMMAND_RETURN:{
@@ -388,29 +514,77 @@ emit_command(catstring* buffer, Light_Ast* node) {
         } break;
 
         case AST_COMMAND_BREAK:{
-            catsprint(buffer, "break;\n");
+            Light_Scope* scope = loop_scope_level_change(node->scope_at, node->comm_break.level_value);
+            catsprint(buffer, "goto label_break_%d;\n", scope->id);
         } break;
         case AST_COMMAND_CONTINUE:{
-            catsprint(buffer, "continue;\n");
+            Light_Scope* scope = loop_scope_level_change(node->scope_at, node->comm_continue.level_value);
+            catsprint(buffer, "goto label_continue_%d;\n", scope->id);
         } break;
         case AST_COMMAND_FOR:{
-            catsprint(buffer, "for;\n");
+            catsprint(buffer, "label_continue_%d:\n", node->comm_for.for_scope->id);
+            catsprint(buffer, "{\n");
+
+            // first declarations (prologue)
+            for(u64 i = 0; i < array_length(node->comm_for.prologue); ++i) {
+                emit_command(buffer, node->comm_for.prologue[i]);
+            }
+
+            catsprint(buffer, "while(");
+            emit_expression(buffer, node->comm_for.condition);
+            catsprint(buffer, ")");
+
+            catsprint(buffer, "{");
+            emit_command(buffer, node->comm_for.body);
+            
+            // epilogue
+            for(u64 i = 0; i < array_length(node->comm_for.epilogue); ++i) {
+                emit_command(buffer, node->comm_for.epilogue[i]);
+            }
+
+            catsprint(buffer, "}");
+            catsprint(buffer, "}\n");
+
+            catsprint(buffer, "label_break_%d:;\n", node->comm_for.for_scope->id);
         } break;
         default: break;
     }
 }
 
 static void
-emit_declaration(catstring* buffer, Light_Ast* node) {
+emit_default_value_for_type(catstring* buffer, Light_Type* type) {
+    type = type_alias_root(type);
+    switch(type->kind) {
+        case TYPE_KIND_PRIMITIVE:
+        case TYPE_KIND_POINTER:
+        case TYPE_KIND_FUNCTION:
+        case TYPE_KIND_ENUM:
+            catsprint(buffer, "0"); break;
+        case TYPE_KIND_ARRAY:
+        case TYPE_KIND_STRUCT:
+        case TYPE_KIND_UNION:
+            catsprint(buffer, "{0}"); break;
+        default: catsprint(buffer, "0"); break;
+    }
+}
+
+static void
+emit_declaration(catstring* buffer, Light_Ast* node, u32 flags) {
     switch(node->kind) {
         case AST_DECL_PROCEDURE: {
-            emit_typed_declaration(buffer, node->decl_proc.proc_type, node->decl_proc.name, EMIT_FLAG_TREAT_AS_FUNCTION_TYPE);
+            emit_typed_procedure_declaration(buffer, node);
             if(node->decl_proc.body) {
                 emit_command(buffer, node->decl_proc.body);
+            } else {
+                catsprint(buffer, ";\n");
             }
         } break;
         case AST_DECL_VARIABLE: {
             emit_typed_declaration(buffer, node->decl_variable.type, node->decl_variable.name, 0);
+            if(flags & EMIT_DECLARATION_DEFAULT_VALUE) {
+                catsprint(buffer, " = ");
+                emit_default_value_for_type(buffer, node->decl_variable.type);
+            }
             catsprint(buffer, ";\n");
         } break;
 
@@ -462,9 +636,16 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table) {
     catsprint(&code, "\n// Declarations\n\n");
 
     for(int i = 0; i < array_length(ast); ++i) {
-        emit_declaration(&code, ast[i]);
+        emit_declaration(&code, ast[i], 0);
         catsprint(&code, "\n");
     }
 
     catstring_to_file("test/generated_out.c", code);
+}
+
+void 
+backend_c_compile_with_gcc(Light_Ast** ast, const char* filename) {
+    char command_buffer[2048] = {0};
+    sprintf(command_buffer, "gcc -g test/generated_out.c -o %.*s", (int)strlen(filename) - 3, filename);
+    system(command_buffer);
 }

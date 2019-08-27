@@ -560,7 +560,10 @@ type_infer_expr_literal_primitive(Light_Ast* expr, u32* error) {
         case LITERAL_BOOL:
             type = type_primitive_get(TYPE_PRIMITIVE_BOOL);
         break;
-        case LITERAL_CHAR:
+        case LITERAL_CHAR:{
+            type = type_weak_primitive_from_literal(expr->expr_literal_primitive.type);
+            // TODO(psv): eval character literal
+        } break;
         case LITERAL_FLOAT:
         case LITERAL_DEC_SINT:
         case LITERAL_BIN_INT:
@@ -891,7 +894,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                     }
                     return res;
                 }
-                if(type_check_equality(left, right)) {
+                if(!type_check_equality(left, right)) {
                     type_error_mismatch(error, expr->expr_binary.token_op, left, right);
                     fprintf(stderr, " in binary operation '%.*s'\n", TOKEN_STR(expr->expr_binary.token_op));
                 } else {

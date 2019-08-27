@@ -124,7 +124,12 @@ parse_comm_while(Light_Parser* parser, Light_Scope* scope, u32* error) {
 	if (body->kind == AST_COMMAND_BLOCK) {
 		if (body->comm_block.block_scope)
 			body->comm_block.block_scope->flags |= SCOPE_LOOP;
-	}
+	} else {
+        Light_Scope* while_scope = light_scope_new(0, scope, SCOPE_LOOP);
+        Light_Ast** while_commands = array_new(Light_Ast*);
+        array_push(while_commands, body);
+        body = ast_new_comm_block(scope, while_commands, 1, while_scope);
+    }
 	return ast_new_comm_while(scope, condition, body, while_token);
 }
 
@@ -194,7 +199,7 @@ parse_comm_for(Light_Parser* parser, Light_Scope* scope, u32* error) {
     // Parse Body
     Light_Ast* body = parse_command(parser, for_scope, error, true);
     ReturnIfError();
-
+    
     Light_Ast* result = ast_new_comm_for(scope, for_scope, condition, body, prologue, epilogue, for_token);
     for_scope->creator_node = result;
 
@@ -351,6 +356,8 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 				// Syntatic sugar void proc call
 				Light_Ast* pcall = parse_expression(parser, scope, error);
                 command = ast_new_comm_assignment(scope, 0, pcall, next);
+            } else if(t->type == '[') {
+                command = parse_comm_assignment(parser, scope, error);
             } else {
 				command = parse_declaration(parser, scope, false, error);
 			}
@@ -445,13 +452,48 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     Light_Type* proc_type = type_new_function(args_types, return_type, args_count, all_args_internalized);
 
     Light_Ast* body = 0;
+    u32 flags = 0;
+    Light_Token* external_library_name = 0;
 
-    // TODO(psv): foreign declaration and forward declaration
-    body = parse_comm_block(parser, args_scope, error);
-    ReturnIfError();
+    // compiler parameters
+    if(lexer_peek(lexer)->type == '#') {
+        lexer_next(lexer); // eat #
+        Light_Token* tag = lexer_next(lexer);
 
-    Light_Ast* result = ast_new_decl_procedure(scope, name, body, return_type, args_scope, arguments, args_count, 0);
+        // extern
+        if(tag->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_EXTERN].data) {
+            flags |= DECL_PROC_FLAG_EXTERN;
+            
+            *error |= parser_require_and_eat(parser, '(');
+            ReturnIfError();
+            
+            external_library_name = lexer_next(lexer);
+
+            if(external_library_name->type != TOKEN_LITERAL_STRING) {
+                *error |= parser_error_fatal(parser, external_library_name, "expected library name as a string literal\n");
+                ReturnIfError();
+            }
+
+            *error |= parser_require_and_eat(parser, ')');
+            ReturnIfError();
+
+            *error |= parser_require_and_eat(parser, ';');
+            ReturnIfError();
+        }
+    }
+
+    if(lexer_peek(lexer)->type == ';') {
+        // TODO(psv): forward declaration
+    }
+
+    if(!(flags & DECL_PROC_FLAG_EXTERN)) {
+        body = parse_comm_block(parser, args_scope, error);
+        ReturnIfError();
+    }
+
+    Light_Ast* result = ast_new_decl_procedure(scope, name, body, return_type, args_scope, arguments, args_count, flags);
     result->decl_proc.proc_type = proc_type;
+    result->decl_proc.extern_library_name = external_library_name;
     args_scope->creator_node = result;
 
     if(body && body->comm_block.block_scope) {

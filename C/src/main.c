@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
 
 #if 1
     backend_c_generate_top_level(ast, global_type_table);
+    backend_c_compile_with_gcc(ast, argv[1]);
 #endif
 
 #if 0

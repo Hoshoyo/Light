@@ -300,6 +300,7 @@ typedef struct {
 typedef enum {
     DECL_PROC_FLAG_FOREIGN = (1 << 0),
     DECL_PROC_FLAG_MAIN    = (1 << 1),
+	DECL_PROC_FLAG_EXTERN  = (1 << 2),
 } Light_Decl_Procedure_Flags;
 
 typedef struct {

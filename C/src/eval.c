@@ -269,44 +269,62 @@ eval_expr_constant_int(Light_Ast* expr, u32* error) {
 bool 
 eval_literal_primitive(Light_Ast* p) {
     assert(p->type->kind == TYPE_KIND_PRIMITIVE);
-    switch(p->type->primitive) {
-        case TYPE_PRIMITIVE_BOOL:
-            p->expr_literal_primitive.value_bool = (p->expr_literal_primitive.token->type == TOKEN_LITERAL_BOOL_TRUE);
-            break;
 
-        case TYPE_PRIMITIVE_R32:
-            p->expr_literal_primitive.value_r32 = str_to_r32((char*)p->expr_literal_primitive.token->data, p->expr_literal_primitive.token->length);
-            break;
-        case TYPE_PRIMITIVE_R64:
-            p->expr_literal_primitive.value_r64 = str_to_r64((char*)p->expr_literal_primitive.token->data, p->expr_literal_primitive.token->length);
-            break;
+	Light_Literal_Type ltype = p->expr_literal_primitive.type;
 
-        case TYPE_PRIMITIVE_S8:
-            p->expr_literal_primitive.value_s8 = (s8)str_to_s64((char*)p->expr_literal_primitive.token->data, p->expr_literal_primitive.token->length);
-            break;
-        case TYPE_PRIMITIVE_S16:
-            p->expr_literal_primitive.value_s16 = (s16)str_to_s64((char*)p->expr_literal_primitive.token->data, p->expr_literal_primitive.token->length);
-            break;
-        case TYPE_PRIMITIVE_S32:
-            p->expr_literal_primitive.value_s32 = (s32)str_to_s64((char*)p->expr_literal_primitive.token->data, p->expr_literal_primitive.token->length);
-            break;
-        case TYPE_PRIMITIVE_S64:
-            p->expr_literal_primitive.value_s64 = str_to_s64((char*)p->expr_literal_primitive.token->data, p->expr_literal_primitive.token->length);
-            break;
-        case TYPE_PRIMITIVE_U8:
-            p->expr_literal_primitive.value_u8 = (u8)str_to_u64((char*)p->expr_literal_primitive.token->data, p->expr_literal_primitive.token->length);
-            break;
-        case TYPE_PRIMITIVE_U16:
-            p->expr_literal_primitive.value_u16 = (u16)str_to_u64((char*)p->expr_literal_primitive.token->data, p->expr_literal_primitive.token->length);
-            break;
-        case TYPE_PRIMITIVE_U32:
-            p->expr_literal_primitive.value_u32 = (u32)str_to_u64((char*)p->expr_literal_primitive.token->data, p->expr_literal_primitive.token->length);
-            break;
-        case TYPE_PRIMITIVE_U64:
-            p->expr_literal_primitive.value_u64 = str_to_u64((char*)p->expr_literal_primitive.token->data, p->expr_literal_primitive.token->length);
-            break;
-        case TYPE_PRIMITIVE_VOID: break;
-        default: assert(0); break;
-    }
+	char* token_data = (char*)p->expr_literal_primitive.token->data;
+	s32 token_length = 	p->expr_literal_primitive.token->length;
+
+	if( (ltype == LITERAL_FLOAT) || 
+		(ltype == LITERAL_DEC_UINT) || 
+		(ltype == LITERAL_DEC_SINT))
+	{
+		switch(p->type->primitive) {
+			case TYPE_PRIMITIVE_BOOL:
+				p->expr_literal_primitive.value_bool = (p->expr_literal_primitive.token->type == TOKEN_LITERAL_BOOL_TRUE);
+				break;
+
+			case TYPE_PRIMITIVE_R32:
+				p->expr_literal_primitive.value_r32 = str_to_r32(token_data, token_length);
+				break;
+			case TYPE_PRIMITIVE_R64:
+				p->expr_literal_primitive.value_r64 = str_to_r64(token_data, token_length);
+				break;
+
+			case TYPE_PRIMITIVE_S8:
+				p->expr_literal_primitive.value_s8 = (s8)str_to_s64(token_data, token_length);
+				break;
+			case TYPE_PRIMITIVE_S16:
+				p->expr_literal_primitive.value_s16 = (s16)str_to_s64(token_data, token_length);
+				break;
+			case TYPE_PRIMITIVE_S32:
+				p->expr_literal_primitive.value_s32 = (s32)str_to_s64(token_data, token_length);
+				break;
+			case TYPE_PRIMITIVE_S64:
+				p->expr_literal_primitive.value_s64 = str_to_s64(token_data, token_length);
+				break;
+			case TYPE_PRIMITIVE_U8:
+				p->expr_literal_primitive.value_u8 = (u8)str_to_u64(token_data, token_length);
+				break;
+			case TYPE_PRIMITIVE_U16:
+				p->expr_literal_primitive.value_u16 = (u16)str_to_u64(token_data, token_length);
+				break;
+			case TYPE_PRIMITIVE_U32:
+				p->expr_literal_primitive.value_u32 = (u32)str_to_u64(token_data, token_length);
+				break;
+			case TYPE_PRIMITIVE_U64:
+				p->expr_literal_primitive.value_u64 = str_to_u64(token_data, token_length);
+				break;
+			case TYPE_PRIMITIVE_VOID: break;
+			default: assert(0); break;
+		}
+	} else if(ltype == LITERAL_HEX_INT) {
+		p->expr_literal_primitive.value_u64 = str_hex_to_u64(token_data, token_length);
+	} else if(ltype == LITERAL_BIN_INT) {
+		// TODO(psv):
+	} else if(ltype == LITERAL_CHAR) {
+		p->expr_literal_primitive.value_u32 = (u32)str_to_u8(token_data + 1, token_length - 2);
+	}
+    
     return true;
 }
