@@ -527,6 +527,7 @@ token_print(Light_Token t) {
 
 static void
 lexer_eat_whitespace(Light_Lexer* lexer) {
+    int multiline_level = 0;
     while(true) {
         u8 c = lexer->stream[lexer->index];
         if (c == ' ' ||
@@ -554,9 +555,16 @@ lexer_eat_whitespace(Light_Lexer* lexer) {
             } else if(c == '/' && lexer->stream[lexer->index + 1] == '*') {
                 // multi line comment
                 lexer->index += 2;
+                multiline_level++;
                 u8* at = lexer->stream + lexer->index;
                 while(true) {
-                    if(*at == '*' && at[1] == '/') break;
+                    if(*at == '*' && at[1] == '/') {
+                        multiline_level--;
+                        if(multiline_level == 0) break;
+                    }
+                    if(*at == '/' && at[1] == '*') {
+                        multiline_level++;
+                    }
                     if(*at == '\n') {
                         lexer->line++;
                         lexer->column = 0;

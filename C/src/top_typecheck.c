@@ -148,6 +148,22 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
         starting_length = array_length(global_infer_queue);
     }
 
+    // Patching
+    for(u64 i = 0; i < array_length(top_level); ++i) {
+        Light_Ast* node = top_level[i];
+
+        if(node->kind == AST_DECL_TYPEDEF) {
+            if(node->decl_typedef.queued_types) {
+                for(s32 i = 0; i < array_length(node->decl_typedef.queued_types); ++i) {
+                    Light_Type* t = node->decl_typedef.queued_types[i];
+                    t->pointer_to = node->decl_typedef.type_referenced;
+                }
+                array_free(node->decl_typedef.queued_types);
+                node->decl_typedef.queued_types = 0;
+            }
+        }
+    }
+
     return error;
 }
 
@@ -243,6 +259,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                     decl->decl_typedef.queued_types = array_new(Light_Type*);
                 }
                 array_push(decl->decl_typedef.queued_types, tt);
+                //array_push(global_queued_pointer_types, tt);
             } else {
                 type->pointer_to = typecheck_resolve_type(scope, type->pointer_to, flags, error);
                 if(type->pointer_to && type->pointer_to->flags & TYPE_FLAG_INTERNALIZED) {
@@ -683,6 +700,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
                 alias_type->flags = type->flags;
                 node->decl_typedef.type_referenced = type_internalize(alias_type);
 
+                /*
                 if(node->decl_typedef.queued_types) {
                     for(s32 i = 0; i < array_length(node->decl_typedef.queued_types); ++i) {
                         Light_Type* t = node->decl_typedef.queued_types[i];
@@ -691,6 +709,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
                     array_free(node->decl_typedef.queued_types);
                     node->decl_typedef.queued_types = 0;
                 }
+                */
 
                 typecheck_remove_from_infer_queue(node);
             } else {
