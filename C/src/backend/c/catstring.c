@@ -48,6 +48,24 @@ catsprint_token(catstring* buffer, Light_Token* t) {
 }
 
 static int
+catsprint_string_length(catstring* buffer, const char* str, int length) {
+    if(buffer->capacity == 0) {
+        buffer->data = calloc(1, MAX(32, length));
+        buffer->capacity = MAX(32, length);
+    }
+
+    int n = 0;
+
+    if((buffer->length + length) >= buffer->capacity) {
+        buffer_grow_by(buffer, length);
+    }
+    memcpy(buffer->data + buffer->length, str, length);
+    buffer->length += length;
+
+    return length;
+}
+
+static int
 catsprint_string(catstring* buffer, const char* str) {
     if(buffer->capacity == 0) {
         buffer->data = calloc(1, 32);
@@ -142,8 +160,15 @@ catsprint(catstring* buffer, char* str, ...) {
                 case '%': break; // do nothing, just push character
                 case 's': {
                     at++;
-                    // push string
-                    n += catsprint_string(buffer, va_arg(args, const char*));
+                    if(*at == '+') {
+                        at++;
+                        int length = va_arg(args, int);
+                        // push string
+                        n += catsprint_string_length(buffer, va_arg(args, const char*), length);
+                    } else {
+                        // push string
+                        n += catsprint_string(buffer, va_arg(args, const char*));
+                    }
                 } break;
                 case 'u':{
                     at++;
@@ -176,6 +201,24 @@ catsprint(catstring* buffer, char* str, ...) {
     va_end(args);
 
     return n;
+}
+
+int
+catstring_append(catstring* to, catstring* s) {
+    if(to->capacity == 0) {
+        to->data = calloc(1, MAX(32, s->length));
+        to->capacity = MAX(32, s->length);
+    }
+
+    int n = 0;
+
+    if((to->length + s->length) >= to->capacity) {
+        buffer_grow_by(to, s->length);
+    }
+    memcpy(to->data + to->length, s->data, s->length);
+    to->length += s->length;
+
+    return s->length;
 }
 
 catstring 

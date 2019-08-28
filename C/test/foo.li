@@ -9,9 +9,23 @@ string struct {
 	data : ^u8;
 }
 
+vec2 struct {
+	x : r32;
+	y : r32;
+}
+
+Person struct {
+	position: vec2;
+	age: s32;
+}
+
 write : (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
 
 main : () -> s32 {
+	//hello := "Hello";
+	a := Person:{vec2:{1.0, 2.0}, 32}.age;
+	return a;
+
 	/*
 	i := 0;
 	j := 0;
@@ -37,21 +51,4 @@ main : () -> s32 {
 	//	}
 	//}
 
-	buffer := "Hello";
-	//buffer : [5]u8;
-	//buffer[0] = 0x48;
-	//buffer[1] = 0x65;
-	//buffer[2] = 0x6c;
-	//buffer[3] = 0x6c;
-	//buffer[4] = 0x6f;
-
-	//buffer[0] = 'H';
-	//buffer[1] = 'e';
-	//buffer[2] = 'l';
-	//buffer[3] = 'l';
-	//buffer[4] = 'o';
-
-	write(1, buffer -> ^void, 5);
-
-	return 0;
 }

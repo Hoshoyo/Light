@@ -773,7 +773,10 @@ parse_expr_literal_struct(Light_Parser* parser, Light_Scope* scope, u32* error) 
 	
     Light_Scope* struct_scope = 0;
     // Check if it is named
-    if(lexer_peek(parser->lexer)->type == TOKEN_IDENTIFIER && lexer_peek_n(parser->lexer, 1)->type == ':') {
+    if( lexer_peek(parser->lexer)->type == TOKEN_IDENTIFIER && 
+        lexer_peek_n(parser->lexer, 1)->type == ':' &&
+        lexer_peek_n(parser->lexer, 2)->type != '{') 
+    {
         named = true;
         struct_scope = light_scope_new(0, scope, SCOPE_STRUCTURE);
     }

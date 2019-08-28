@@ -13,6 +13,47 @@
 #define MAX(A, B) (((A) > (B)) ? A : B)
 #define TOKEN_STR(T) (T)->length, (T)->data
 
+static bool
+type_cast_is_valid(Light_Type* from, Light_Type* to) {
+    // Valid conversions:
+    // number  -> number
+    // ^T      -> ^U
+    // ^T      -> integer
+    // integer -> ^T
+    // []T     -> ^U
+    // func    -> ^T
+    // enum    -> integer
+    // integer -> enum
+
+    if(from == to) return true;
+
+    if(type_primitive_numeric(from) && type_primitive_numeric(to)) {
+        return true;
+    }
+
+    if(from->kind == TYPE_KIND_POINTER) {
+        return type_primitive_int(to) || to->kind == TYPE_KIND_POINTER;
+    }
+
+    if(to->kind == TYPE_KIND_POINTER && type_primitive_int(from)) {
+        return true;
+    }
+
+    if(from->kind == TYPE_KIND_ARRAY || from->kind == TYPE_KIND_FUNCTION) {
+        return to->kind == TYPE_KIND_POINTER;
+    }
+
+    if(from->kind == TYPE_KIND_ENUM && type_primitive_int(to)) {
+        return true;
+    }
+
+    if(type_primitive_int(from) && to->kind == TYPE_KIND_ENUM) {
+        return true;
+    }
+
+    return false;
+}
+
 Light_Ast*
 type_infer_decl_from_name(Light_Scope* scope, Light_Token* name) {
     Light_Symbol s = {0};
@@ -613,6 +654,14 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
             if((expr->expr_unary.flags & AST_FLAG_EXPRESSION_LVALUE)) {
                 expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
             }
+
+            if(!type_cast_is_valid(expr->expr_unary.operand->type, expr->expr_unary.type_to_cast)) {
+                type_error(error, expr->expr_unary.token_op, "invalid type conversion from '");
+                ast_print_type(expr->expr_unary.operand->type, LIGHT_AST_PRINT_STDERR, 0);
+                fprintf(stderr, "' to '");
+                ast_print_type(expr->expr_unary.type_to_cast, LIGHT_AST_PRINT_STDERR, 0);
+                fprintf(stderr, "'\n");
+            }
         } break;
         case OP_UNARY_DEREFERENCE:{
             if(operand_type->kind == TYPE_KIND_POINTER) {
@@ -740,6 +789,9 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
     for(s32 i = 0; i < caller_type->function.arguments_count; ++i) {
         Light_Type* arg_type = caller_type->function.arguments_type[i];
         Light_Type* at = type_infer_expression(expr->expr_proc_call.args[i], error);
+    
+        if(*error & TYPE_ERROR) continue;
+
         at = type_infer_propagate(arg_type, expr->expr_proc_call.args[i], error);
         expr->expr_proc_call.args[i]->type = at;
 
