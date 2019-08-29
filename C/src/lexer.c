@@ -640,6 +640,9 @@ lexer_file(Light_Lexer* lexer, const char* filename, u32 flags) {
     lexer->filepath = light_alloc(filename_size + 1);
     memcpy((void*)lexer->filepath, filename, filename_size);
 
+    size_t filepath_absolute_size = 0;
+    lexer->filepath_absolute = (char*)light_path_from_filename(filename, &filepath_absolute_size);
+
     lexer->filename = light_filename_from_path(lexer->filepath);
 
     return lexer_cstr(lexer, stream, (s32)length_bytes, flags);

@@ -147,12 +147,14 @@ catsprint(catstring* buffer, char* str, ...) {
     va_list args;
     va_start(args, str);
 
-    int n = 0;
-    for(char* at = str; ; ++at, ++n) {
+    int len = 0;
+    for(char* at = str; ;) {
         // push to stream
         if(buffer->length >= buffer->capacity) {
             buffer_grow(buffer);
         }
+
+        int n = 0;
 
         if(*at == '%') {
             at++; // skip
@@ -164,43 +166,46 @@ catsprint(catstring* buffer, char* str, ...) {
                         at++;
                         int length = va_arg(args, int);
                         // push string
-                        n += catsprint_string_length(buffer, va_arg(args, const char*), length);
+                        n = catsprint_string_length(buffer, va_arg(args, const char*), length);
                     } else {
                         // push string
-                        n += catsprint_string(buffer, va_arg(args, const char*));
+                        n = catsprint_string(buffer, va_arg(args, const char*));
                     }
                 } break;
                 case 'u':{
                     at++;
-                    n += catsprint_decimal_unsigned(buffer, va_arg(args, unsigned long long int));
+                    n = catsprint_decimal_unsigned(buffer, va_arg(args, unsigned long long int));
                 } break;
                 case 'd':{
                     at++;
-                    n += catsprint_decimal_signed(buffer, va_arg(args, int));
+                    n = catsprint_decimal_signed(buffer, va_arg(args, int));
                 } break;
                 case 'l':{
                     at++;
-                    n += catsprint_decimal_signed(buffer, va_arg(args, long long int));
+                    n = catsprint_decimal_signed(buffer, va_arg(args, long long int));
                 } break;
                 case 'x':{
                     at++;
-                    n += catsprint_hexadecimal(buffer, va_arg(args, unsigned long long int));
+                    n = catsprint_hexadecimal(buffer, va_arg(args, unsigned long long int));
                 } break;
                 case 'f':{
                     at++;
-                    n += catsprint_double(buffer, va_arg(args, double));
+                    n = catsprint_double(buffer, va_arg(args, double));
                 } break;
             }
+            len += n;
+        } else {
+            buffer->data[buffer->length] = *at;
+            if(!(*at)) break;
+            buffer->length++;
+            len++;
+            at++;
         }
-
-        buffer->data[buffer->length] = *at;
-        if(!(*at)) break;
-        buffer->length++;
     }
 
     va_end(args);
 
-    return n;
+    return len;
 }
 
 int
@@ -249,4 +254,21 @@ catstring_to_file(const char* filename, catstring s) {
 
     fclose(out);
     return 0;
+}
+
+catstring 
+catstring_new(const char* str, int length) {
+    catstring result = {0};
+
+    result.data = calloc(1, length);
+    result.capacity = length;
+    memcpy(result.data, str, length);
+
+    return result;
+}
+
+void
+catstring_print(catstring* s) {
+    if(!s->data) return;
+    printf("%.*s", s->length, s->data);
 }

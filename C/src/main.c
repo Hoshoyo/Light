@@ -3,6 +3,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "utils/os.h"
+#include "utils/utils.h"
 #include "global_tables.h"
 #include "top_typecheck.h"
 #include "bytecode.h"
@@ -31,17 +32,19 @@ int main(int argc, char** argv) {
 
     if(parser_error & PARSER_ERROR_FATAL)
         return 1;
-
     
     Light_Type_Error type_error = top_typecheck(ast, &global_scope);
     if(type_error & TYPE_ERROR) {
         return 1;
     }
+    
+#if 0
     ast_print(ast, LIGHT_AST_PRINT_STDOUT
         |LIGHT_AST_PRINT_EXPR_TYPES
         , 0);
 
     type_table_print();
+#endif
 
     double end = os_time_us();
     printf("Time elapsed: %fms\n", (end - start) / 1000.0);

@@ -103,3 +103,68 @@ str_hex_to_u64(char* text, int length) {
     }
     return res;
 }
+
+#if 0
+catstring 
+path_from_fullpath(catstring s) {
+	s64 index = 0;
+    for (s64 i = s.length - 1; i >= 0; --i){
+		if (s.data[i] == '/'
+#if defined (_WIN32) || defined(_WIN64)
+			|| s.data[i] == '\\'
+#endif
+			){
+            index = i + 1;
+			break;
+        }
+    }
+    catstring result = catstring_copy(&s);
+	result.length = index;
+
+    return result;
+}
+
+catstring 
+filename_from_path(catstring s) {
+    s64 index = 0;
+    for (s64 i = s.length - 1; i >= 0; --i){
+        if(s.data[i] == '/'){
+            index = i + 1;
+			break;
+        }
+    }
+    catstring result = catstring_new(s.data, s.length - index);
+    return result;
+}
+
+bool
+file_exists(const char* filename) {
+	int r = access(filename, F_OK);
+	return r == 0;
+}
+
+static char* 
+file_realpath(const char* path, size_t* size)
+{
+	// this function uses malloc, should free after
+	char* result = realpath(path, 0);
+	if(result)
+		*size = strlen(result);
+	else
+		*size = 0;
+	return result;
+}
+
+catstring
+fullpath_from_filename(const char* filename) {
+	size_t size = 0;
+	char* fullpath = file_realpath(filename, &size);
+
+	catstring result = {0};
+	result.capacity = (int)size;
+	result.data = fullpath;
+	result.length = (int)size;
+
+	return result;
+}
+#endif

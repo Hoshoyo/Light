@@ -43,6 +43,40 @@ parser_require_and_eat(Light_Parser* parser, Light_Token_Type type) {
     return PARSER_OK;
 }
 
+static Light_Ast* 
+parse_directive(Light_Parser* parser, Light_Scope* scope, u32* error) {
+    *error |= parser_require_and_eat(parser, '#');
+    ReturnIfError();
+
+    Light_Token* tag = lexer_next(parser->lexer);
+
+    if(tag->type == TOKEN_IDENTIFIER && tag->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_IMPORT].data) {
+        Light_Token* filename_token = lexer_next(parser->lexer);
+
+        if(filename_token->type != TOKEN_LITERAL_STRING) {
+            
+        }
+
+        // Directive #import "filename"
+        const char* current_filepath_absolute = parser->lexer->filepath_absolute;
+
+        char* full_imported_filepath = light_filepath_relative_to(
+            (char*)filename_token->data + 1, filename_token->length - 2, 
+            current_filepath_absolute);
+
+        printf("%s\n", full_imported_filepath);
+
+    } else if(tag->type == TOKEN_IDENTIFIER) {
+        *error |= parser_error_fatal(parser, tag, "Unrecognized directive '%.*s'\n", tag->length, tag->data);
+    } else if(tag->type != TOKEN_END_OF_STREAM) {
+        *error |= parser_error_fatal(parser, tag, "Expected directive identifier but got '%.*s'\n", tag->length, tag->data);
+    } else {
+        *error |= parser_error_fatal(parser, tag, "Unexpected end of file in directive declaration\n");
+    }
+
+    return 0;
+}
+
 static Light_Ast*
 parse_comm_block(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Lexer* lexer = parser->lexer;
@@ -546,6 +580,7 @@ parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_sc
     parser->scope_global = global_scope;
     parser->lexer = lexer;
     parser->top_level = array_new_len(Light_Ast*, 1024);
+    parser->parse_queue = array_new_len(Light_Ast*, 1024);
 
     bool parsing = true;
     while(!(*error & PARSER_ERROR_FATAL) && parsing) {
@@ -554,9 +589,10 @@ parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_sc
         switch(t->type) {
             case TOKEN_END_OF_STREAM: parsing = false; break;
             case '#':{
-                // TODO(psv):
-                // parse_directive
-                assert(0);
+                Light_Ast* directive = parse_directive(parser, global_scope, error);
+                if(directive) {
+                    array_push(parser->top_level, directive);
+                }
             }break;
             case TOKEN_IDENTIFIER:{
                 Light_Ast* decl = parse_declaration(parser, global_scope, true, error);

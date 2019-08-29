@@ -6,7 +6,7 @@
 
 #include "../../symbol_table.h"
 #include "light_array.h"
-#include "catstring.h"
+#include "../../utils/catstring.h"
 
 static void emit_typed_declaration(catstring* buffer, Light_Type* type, Light_Token* name, u32 flags);
 static void emit_declaration(catstring* buffer, Light_Ast* node, u32 flags);
@@ -741,6 +741,9 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table) {
 
     // Emit, in order, all type aliases
     emit_forward_type_decl(&code, global_type_array);
+
+    // Emit type table
+    //emit_type_table(&code, global_type_array);
 
     catsprint(&code, "\n// Declarations\n\n");
 

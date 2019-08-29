@@ -2,6 +2,7 @@
 #include "allocator.h"
 #include <stdlib.h>
 #include <string.h>
+#include "catstring.h"
 
 #if defined(__linux__)
 #include <time.h>
@@ -105,4 +106,13 @@ light_filename_from_path(const char* path) {
 		}
 	}
 	return path + i;
+}
+
+char*
+light_filepath_relative_to(const char* path, int path_length, const char* path_relative) {
+	catstring result = {0};
+
+	catsprint(&result, "%s%s+", path_relative, path_length, path);
+
+	return result.data;
 }

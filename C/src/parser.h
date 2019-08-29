@@ -1,6 +1,7 @@
 #include <common.h>
 #include "ast.h"
 #include "lexer.h"
+#include "utils/catstring.h"
 
 typedef enum {
     PARSER_OK            = 0,
@@ -8,11 +9,22 @@ typedef enum {
     PARSER_ERROR_WARNING = (1 << 1),
 } Light_Parser_Error;
 
+typedef struct {
+    char* filename;
+    int   length;
+} Source_File;
+
 typedef struct Light_Parser_t{
     Light_Lexer* lexer;
     Light_Scope* scope_global;
 
     Light_Ast**  top_level;
+
+    // Paths
+    catstring fullpath_compiler;
+    catstring fullpath_working_directory;
+
+    Source_File* parse_queue;
 } Light_Parser;
 
 // General

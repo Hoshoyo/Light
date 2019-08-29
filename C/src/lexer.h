@@ -128,6 +128,8 @@ typedef enum {
 typedef struct {
     const char*  filename;
 	char*        filepath;
+	char*        filepath_absolute;
+
     s32          line;
     s32          column;
     s32          index;
