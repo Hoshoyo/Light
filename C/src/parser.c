@@ -798,9 +798,10 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
             result->expr_literal_struct.struct_exprs = array_new(Light_Ast*);
 
             // length
+            u64 len = first->length - 2;
             array_push(result->expr_literal_struct.struct_exprs, ast_new_expr_literal_primitive_u64(scope, 0));
             // capacity
-            array_push(result->expr_literal_struct.struct_exprs, ast_new_expr_literal_primitive_u64(scope, 0));
+            array_push(result->expr_literal_struct.struct_exprs, ast_new_expr_literal_primitive_u64(scope, len));
             // data
             array_push(result->expr_literal_struct.struct_exprs, cast);
 

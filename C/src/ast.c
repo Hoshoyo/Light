@@ -200,6 +200,7 @@ ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val) {
     result->expr_literal_primitive.flags = 0;
     result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
     result->expr_literal_primitive.token = 0;
+    result->expr_literal_primitive.value_u64 = val;
 
     return result;
 }

@@ -1,54 +1,17 @@
-//factorial : (n : s32) -> s32 {
-//	if n <= 1 return 1;
-//	return n * factorial(n - 1);
-//}
+//#import "test.li"
 
 string struct {
-	length : u64;
 	capacity : u64;
-	data : ^u8;
+	length   : u64;
+	data     : ^u8;
 }
 
-vec2 struct {
-	x : r32;
-	y : r32;
-}
-
-Person struct {
-	position: vec2;
-	age: s32;
-}
-
-write : (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
+write :(fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
 
 main : () -> s32 {
-	//hello := "Hello";
-	a := Person:{vec2:{1.0, 2.0}, 32}.age;
-	return a;
+	b := "Hello";
 
-	/*
-	i := 0;
-	j := 0;
-	while i < 10 {
-		while j < 10 {
-			if i == 3 && j == 4 {
-				break 2;
-			}
-			j += 1;
-		}
-		j = 0;
-		i += 1;
-	}
-	*/
+	write(1, b.data->^void, b.length);
 
-	//x := 0;
-	//for i := 0; i < 10; i += 1 {
-	//	for j := 0; j < 10; j += 1 {
-	//		if i == 3 && j == 4 {
-	//			break 2;
-	//		}
-	//		x += 1;
-	//	}
-	//}
-
+	return 0;
 }

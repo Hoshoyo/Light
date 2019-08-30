@@ -101,7 +101,7 @@ type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error
             array_of_type = type->array_info.array_of;
             for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
                 Light_Type* propagated = type_infer_propagate(array_of_type, expr->expr_literal_array.array_exprs[i], error);
-                if(!propagated) {
+                if(!propagated || !(propagated->flags & TYPE_FLAG_INTERNALIZED)) {
                     all_internalized = false;
                     continue;
                 }
@@ -136,7 +136,7 @@ type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error
             bool all_internalized = true;
             for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
                 Light_Type* propagated = type_infer_propagate(array_of_type, expr->expr_literal_array.array_exprs[i], error);
-                if(!propagated) {
+                if(!propagated || !(propagated->flags & TYPE_FLAG_INTERNALIZED)) {
                     all_internalized = false;
                     continue;
                 }
@@ -368,6 +368,7 @@ type_infer_propagate(Light_Type* type, Light_Ast* expr, u32* error) {
             // passthrough
         case AST_EXPRESSION_VARIABLE:
             assert(TYPE_STRONG(expr->type));
+            //return expr->type;
             break;
         case AST_EXPRESSION_DIRECTIVE:
             // TODO(psv):

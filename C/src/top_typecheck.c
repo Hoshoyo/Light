@@ -638,7 +638,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
                     }
                 }
             }
-            if(node->decl_variable.type->flags & TYPE_FLAG_INTERNALIZED) {
+            if(node->decl_variable.type && node->decl_variable.type->flags & TYPE_FLAG_INTERNALIZED) {
                 typecheck_remove_from_infer_queue(node);
                 node->decl_variable.flags |= DECL_VARIABLE_FLAG_RESOLVED;
             } else {
@@ -696,17 +696,6 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
                 alias_type->size_bits = type->size_bits;
                 alias_type->flags = type->flags;
                 node->decl_typedef.type_referenced = type_internalize(alias_type);
-
-                /*
-                if(node->decl_typedef.queued_types) {
-                    for(s32 i = 0; i < array_length(node->decl_typedef.queued_types); ++i) {
-                        Light_Type* t = node->decl_typedef.queued_types[i];
-                        t->pointer_to = alias_type;
-                    }
-                    array_free(node->decl_typedef.queued_types);
-                    node->decl_typedef.queued_types = 0;
-                }
-                */
 
                 typecheck_remove_from_infer_queue(node);
             } else {
@@ -883,7 +872,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
                 node->comm_return.expression->type = type_infer_propagate(decl_proc->decl_proc.proc_type->function.return_type, 
                     node->comm_return.expression, error);
                 if(*error & TYPE_ERROR) return;
-                if(TYPE_WEAK(node->comm_return.expression)) {
+                if(!node->comm_return.expression->type || !(node->comm_return.expression->type->flags & TYPE_FLAG_INTERNALIZED)) {
                     typecheck_push_to_infer_queue(node);
                     return;
                 }
