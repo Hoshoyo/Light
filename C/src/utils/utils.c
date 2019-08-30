@@ -1,4 +1,5 @@
 #include "utils.h"
+#include <light_array.h>
 
 r64 str_to_r64(char* text, int length)
 {

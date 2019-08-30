@@ -20,19 +20,29 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Light_Lexer lexer = {0};
-    //Light_Token* tokens = lexer_file(&lexer, argv[1], LIGHT_LEXER_PRINT_TOKENS);
-    Light_Token* tokens = lexer_file(&lexer, argv[1], 0);
+    Light_Lexer  lexer = {0};
+    Light_Parser parser = {0};
+    Light_Scope  global_scope = {0};
 
     u32 parser_error = 0;
-    Light_Parser parser = {0};
+    parse_init(&parser, &lexer, &global_scope, argv[1]);
 
-    Light_Scope global_scope = {0};
-    Light_Ast** ast = parse_top_level(&parser, &lexer, &global_scope, &parser_error);
+    Light_Ast** ast = 0;
 
-    if(parser_error & PARSER_ERROR_FATAL)
-        return 1;
+    // Parse all other files included in the main file
+    while(array_length(parser.parse_queue_array) > 0) {
+        Light_Lexer lexer = {0};
+        Light_Token* tokens = lexer_file(&lexer, parser.parse_queue_array[0].data, 0);
+
+        ast = parse_top_level(&parser, &lexer, &global_scope, &parser_error);
+
+        if(parser_error & PARSER_ERROR_FATAL)
+            return 1;
+
+        array_remove(parser.parse_queue_array, 0);
+    }
     
+    // Type checking
     Light_Type_Error type_error = top_typecheck(ast, &global_scope);
     if(type_error & TYPE_ERROR) {
         return 1;

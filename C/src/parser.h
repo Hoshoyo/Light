@@ -9,26 +9,19 @@ typedef enum {
     PARSER_ERROR_WARNING = (1 << 1),
 } Light_Parser_Error;
 
-typedef struct {
-    char* filename;
-    int   length;
-} Source_File;
-
 typedef struct Light_Parser_t{
     Light_Lexer* lexer;
     Light_Scope* scope_global;
 
     Light_Ast**  top_level;
 
-    // Paths
-    catstring fullpath_compiler;
-    catstring fullpath_working_directory;
-
-    Source_File* parse_queue;
+    String_Table parse_queue;
+    string*      parse_queue_array;
 } Light_Parser;
 
 // General
 Light_Ast** parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, u32* error);
+void        parse_init(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, const char* main_file);
 
 // Type
 Light_Type* parse_type(Light_Parser* parser, Light_Scope* scope, u32* error);

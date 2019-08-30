@@ -272,3 +272,10 @@ catstring_print(catstring* s) {
     if(!s->data) return;
     printf("%.*s", s->length, s->data);
 }
+
+void
+catstring_free(catstring* s) {
+    free(s->data);
+    s->capacity = 0;
+    s->length = 0;
+}

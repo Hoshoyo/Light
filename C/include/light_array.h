@@ -136,4 +136,11 @@ static LIGHT_ARRAY_API void* array_dyn_allocate_capacity(size_t size_element, si
 /* removes the last value of the array in an unordered way, putting the last element in its place. */
 #define array_remove(A, Index) (array_length(A)--, (A)[Index] = (A)[array_length(A)])
 
+/* appends all elements from A2 at the end of A1. A2 remains unchanged */
+#define array_append(A1, A2) (array_length(A1) + array_length(A2) >= array_capacity(A1)) \
+    ? *((void**)&(A1)) = (void*)((Dynamic_ArrayBase*)realloc((Dynamic_ArrayBase*)(A1) - 1, sizeof(Dynamic_ArrayBase) + sizeof(*(A1)) * (array_capacity(A1) + array_capacity(A2)) * 2) + 1), \
+    array_capacity(A1) = (array_capacity(A1) + array_capacity(A2)) * 2 : 0, \
+    memcpy(A1 + array_length(A1), A2, array_length(A2) * sizeof(*(A1))), \
+    array_length(A1) += array_length(A2)
+
 #endif /* H_LIGHT_ARRAY */

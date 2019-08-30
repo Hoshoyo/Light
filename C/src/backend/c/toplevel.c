@@ -666,6 +666,12 @@ emit_default_value_for_type(catstring* buffer, Light_Type* type) {
 }
 
 static void
+emit_proc_forward_decl(catstring* buffer, Light_Ast* node) {
+    emit_typed_procedure_declaration(buffer, node);
+    catsprint(buffer, ";\n");
+}
+
+static void
 emit_declaration(catstring* buffer, Light_Ast* node, u32 flags) {
     switch(node->kind) {
         case AST_DECL_PROCEDURE: {
@@ -745,9 +751,17 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table) {
     // Emit type table
     //emit_type_table(&code, global_type_array);
 
-    catsprint(&code, "\n// Declarations\n\n");
-
     catstring decls = {0};
+    catsprint(&decls, "\n// Forward Declarations\n\n");
+
+    for(int i = 0; i < array_length(ast); ++i) {
+        if(ast[i]->kind == AST_DECL_PROCEDURE) {
+            emit_proc_forward_decl(&decls, ast[i]);
+        }
+    }
+
+    catsprint(&decls, "\n// Declarations\n\n");
+
     for(int i = 0; i < array_length(ast); ++i) {
         emit_declaration(&decls, ast[i], 0);
         catsprint(&decls, "\n");

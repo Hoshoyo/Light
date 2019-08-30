@@ -7,6 +7,8 @@
 #include <stdarg.h>
 #include <assert.h>
 
+//#include "hash_tables.h"
+
 #define ReturnIfError() if(*error & PARSER_ERROR_FATAL) return 0
 #define TOKEN_STR(T) (T)->length, (T)->data
 
@@ -54,7 +56,8 @@ parse_directive(Light_Parser* parser, Light_Scope* scope, u32* error) {
         Light_Token* filename_token = lexer_next(parser->lexer);
 
         if(filename_token->type != TOKEN_LITERAL_STRING) {
-            
+            *error |= parser_error_fatal(parser, filename_token, "Expected filename as a string literal\n");
+            return 0;
         }
 
         // Directive #import "filename"
@@ -64,7 +67,17 @@ parse_directive(Light_Parser* parser, Light_Scope* scope, u32* error) {
             (char*)filename_token->data + 1, filename_token->length - 2, 
             current_filepath_absolute);
 
-        printf("%s\n", full_imported_filepath);
+        string src_str = {0};
+        src_str.data = full_imported_filepath;
+        src_str.length = strlen(full_imported_filepath);
+
+        int index = 0;
+        if(!string_table_entry_exist(&parser->parse_queue, src_str, &index, 0)) 
+        {
+            string_table_add(&parser->parse_queue, src_str, &index);
+            array_push(parser->parse_queue_array, src_str);
+            printf("pushed %.*s\n", src_str.length, src_str.data);
+        }
 
     } else if(tag->type == TOKEN_IDENTIFIER) {
         *error |= parser_error_fatal(parser, tag, "Unrecognized directive '%.*s'\n", tag->length, tag->data);
@@ -570,17 +583,29 @@ parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, L
     return ast_new_decl_variable(scope, name, type, expr, STORAGE_CLASS_STACK, 0);
 }
 
+void
+parse_init(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, const char* main_file) {
+    parser->scope_global = global_scope;
+    parser->lexer = lexer;
+    parser->top_level = array_new_len(Light_Ast*, 1024);
+
+    // Create hash table for files to parse
+    parser->parse_queue_array = array_new_len(string, 2048);
+    string_table_new(&parser->parse_queue, 1024 * 1024);
+
+    string mf = {0, 0, (char*)main_file};
+    array_push(parser->parse_queue_array, mf);
+    string_table_add(&parser->parse_queue, mf, 0);
+}
+
 Light_Ast** 
 parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, u32* error) {
     // Check empty file
     if(lexer_peek(lexer)->type == TOKEN_END_OF_STREAM){
         return 0;
+    } else {
+        parser->lexer = lexer;
     }
-
-    parser->scope_global = global_scope;
-    parser->lexer = lexer;
-    parser->top_level = array_new_len(Light_Ast*, 1024);
-    parser->parse_queue = array_new_len(Light_Ast*, 1024);
 
     bool parsing = true;
     while(!(*error & PARSER_ERROR_FATAL) && parsing) {
