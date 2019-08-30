@@ -48,11 +48,8 @@ int main(int argc, char** argv) {
         return 1;
     }
     
+    ast_print(ast, LIGHT_AST_PRINT_STDOUT|LIGHT_AST_PRINT_EXPR_TYPES, 0);
 #if 0
-    ast_print(ast, LIGHT_AST_PRINT_STDOUT
-        |LIGHT_AST_PRINT_EXPR_TYPES
-        , 0);
-
     type_table_print();
 #endif
 

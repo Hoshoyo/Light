@@ -450,7 +450,11 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
                 catsprint(&after, " = %s+;\n", node->expr_literal_array.data_length_bytes, node->expr_literal_array.data);
             } else {
                 catsprint(&after, " = {");
-                // TODO(psv): implement
+                for(u64 i = 0; i < array_length(node->expr_literal_array.array_exprs); ++i) {
+                    if(i > 0) catsprint(&after, ", ");
+                    Light_Ast* expr = node->expr_literal_array.array_exprs[i];
+                    emit_expression(literal_decls, &after, expr);
+                }
                 catsprint(&after, "};\n");
             }
 
@@ -489,25 +493,34 @@ static void
 emit_variable_assignment(catstring* buffer, Light_Token* name, Light_Ast* expr) {
     catstring assignment = {0};
 
-    catsprint_token(&assignment, name);
-
     Light_Type* root_type = type_alias_root(expr->type);
     switch(root_type->kind) {
         case TYPE_KIND_POINTER:
         case TYPE_KIND_FUNCTION:
         case TYPE_KIND_ENUM:
         case TYPE_KIND_PRIMITIVE:{
+            catsprint_token(&assignment, name);
             catsprint(&assignment, " = ");
             emit_expression(buffer, &assignment, expr);
             catstring_append(buffer, &assignment);
         } break;
             
         case TYPE_KIND_STRUCT:{
+            catsprint_token(&assignment, name);
             catsprint(&assignment, " = ");
             emit_expression(buffer, &assignment, expr);
             catstring_append(buffer, &assignment);
         } break;
-        case TYPE_KIND_ARRAY:
+        case TYPE_KIND_ARRAY: {
+            catsprint(&assignment, "__memory_copy(");
+            catsprint_token(&assignment, name);
+            catsprint(&assignment, ", ");
+
+            emit_expression(buffer, &assignment, expr);
+            catstring_append(buffer, &assignment);
+
+            catsprint(buffer, ", %l)", root_type->size_bits/8);
+        } break;
         case TYPE_KIND_UNION:
             // TODO(psv): implement
         default: break;

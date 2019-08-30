@@ -296,7 +296,15 @@ type_infer_propagate_binary(Light_Type* type, Light_Ast* expr, u32* error) {
         } break;
 
         case OP_BINARY_VECTOR_ACCESS:
-            assert(0);
+            //assert(0);
+            type_infer_propagate(type, expr->expr_binary.left, error);
+            type_infer_propagate(0, expr->expr_binary.right, error);
+            Light_Type* left_type = expr->expr_binary.left->type;
+            if(left_type->kind == TYPE_KIND_ARRAY) {
+                expr->type = left_type->array_info.array_of;
+            } else {
+                expr->type = left_type->pointer_to;
+            }
             break;
 
         default: assert(0); break;
