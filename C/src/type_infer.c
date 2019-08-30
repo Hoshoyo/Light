@@ -623,6 +623,8 @@ type_infer_expr_literal_primitive(Light_Ast* expr, u32* error) {
         } break;
         case LITERAL_POINTER:{
             type = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
+            expr->type = type;
+            return type;
         } break;
         default: assert(0); break;
     }
@@ -658,7 +660,6 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
         } break;
         case OP_UNARY_CAST:{
             expr->type = expr->expr_unary.type_to_cast;
-            // TODO(psv): check if type conversion exists
             type_infer_propagate(0, expr->expr_unary.operand, error);
             if((expr->expr_unary.flags & AST_FLAG_EXPRESSION_LVALUE)) {
                 expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
@@ -795,11 +796,15 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
         return 0;
     }
 
+    bool all_arguments_internalized = true;
     for(s32 i = 0; i < caller_type->function.arguments_count; ++i) {
         Light_Type* arg_type = caller_type->function.arguments_type[i];
         Light_Type* at = type_infer_expression(expr->expr_proc_call.args[i], error);
     
-        if(*error & TYPE_ERROR) continue;
+        if(!at || (*error & TYPE_ERROR)) {
+            all_arguments_internalized = false;
+            continue;
+        }
 
         at = type_infer_propagate(arg_type, expr->expr_proc_call.args[i], error);
         expr->expr_proc_call.args[i]->type = at;
@@ -810,7 +815,13 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
         }
     }
     
-    return caller_type->function.return_type;
+    // Only return the correct type if everything is internalized,
+    // otherwise things won't be put in the infer queue.
+    // @Optimization: Maybe think about putting individual expressions to the infer queue
+    if(all_arguments_internalized) {
+        return caller_type->function.return_type;
+    }
+    return 0;
 }
 
 static Light_Type* 

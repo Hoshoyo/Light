@@ -257,6 +257,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 }
                 array_push(decl->decl_typedef.queued_types, tt);
                 //array_push(global_queued_pointer_types, tt);
+                type = tt;
             } else {
                 type->pointer_to = typecheck_resolve_type(scope, type->pointer_to, flags, error);
                 if(type->pointer_to && type->pointer_to->flags & TYPE_FLAG_INTERNALIZED) {
@@ -752,7 +753,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             // Type check
             if(inferred_left && !type_check_equality(inferred_left, inferred_right)) {
                 type_error_mismatch(error, node->comm_assignment.op_token, inferred_left, inferred_right);
-                fprintf(stderr, "in assignment command\n");
+                fprintf(stderr, " in assignment\n");
                 return;
             }
 

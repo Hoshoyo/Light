@@ -67,6 +67,12 @@ parse_directive(Light_Parser* parser, Light_Scope* scope, u32* error) {
             (char*)filename_token->data + 1, filename_token->length - 2, 
             current_filepath_absolute);
 
+        if(!full_imported_filepath) {
+            // TODO(psv): maybe to not fatal here
+            *error |= parser_error_fatal(parser, filename_token, "Could not import %.*s: file not found\n", TOKEN_STR(filename_token));
+            ReturnIfError();
+        }
+
         string src_str = {0};
         src_str.data = full_imported_filepath;
         src_str.length = strlen(full_imported_filepath);
@@ -624,6 +630,7 @@ parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_sc
                 if(*error & PARSER_ERROR_FATAL) break;
                 if(decl) {
                     array_push(parser->top_level, decl);
+                    global_scope->decl_count++;
                 }
             }break;
             default:{

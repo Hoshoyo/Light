@@ -112,10 +112,20 @@ char*
 light_filepath_relative_to(const char* path, int path_length, const char* path_relative) {
 	catstring result = {0};
 
-	catsprint(&result, "%s%s+\0", path_relative, path_length, path);
+#if defined(__linux__)
+	if(path[0] == '/') {
+		// absolute path
+		catsprint(&result, "%s+\0", path_length, path);
+	} else {
+		catsprint(&result, "%s%s+\0", path_relative, path_length, path);
+	}
 
 	size_t size = 0;
 	const char* p = light_real_path(result.data, &size);
+#else
+#error os not supporteds
+#endif
+
 
 	catstring_free(&result);
 

@@ -104,6 +104,14 @@ static void
 emit_type_start(catstring* buffer, Light_Type* type, u32 flags) {
     switch(type->kind) {
         case TYPE_KIND_ALIAS:{
+            Light_Type* root_type = type_alias_root(type);
+            switch(root_type->kind) {
+                case TYPE_KIND_STRUCT:
+                    catsprint(buffer, "struct "); break;
+                case TYPE_KIND_UNION:
+                    catsprint(buffer, "union "); break;
+                default: break;
+            }
             catsprint_token(buffer, type->alias.name);
         } break;
         case TYPE_KIND_ARRAY:{
@@ -209,8 +217,8 @@ emit_typed_declaration(catstring* buffer, Light_Type* type, Light_Token* name, u
                 catsprint_token(buffer, name);
         } break;
 
-        case TYPE_KIND_FUNCTION:
         case TYPE_KIND_POINTER:
+        case TYPE_KIND_FUNCTION:
         case TYPE_KIND_ARRAY:{
             emit_type_start(buffer, type, flags);
             catsprint(buffer, " ");
@@ -417,7 +425,14 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
             emit_primitive_literal(buffer, node->expr_literal_primitive, node->type);
         } break;
         case AST_EXPRESSION_VARIABLE: {
-            catsprint_token(buffer, node->expr_variable.name);
+            
+            if(node->expr_variable.decl->kind == AST_DECL_CONSTANT) {
+                // Constants are not declared, so use the value directly
+                emit_expression(literal_decls, buffer, node->expr_variable.decl->decl_constant.value);
+            } else {
+                // Is a variable, therefore it is declared
+                catsprint_token(buffer, node->expr_variable.name);
+            }
         } break;
         case AST_EXPRESSION_DOT:{
             Light_Type* root_type = type_alias_root(node->expr_dot.left->type);
@@ -460,6 +475,7 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
 
             catstring_append(literal_decls, &after);
 
+            // Dereference, since the array is already considered a pointer type
             catsprint(buffer, "_lit_array_%d", node->id);
         } break;
         case AST_EXPRESSION_LITERAL_STRUCT:{
