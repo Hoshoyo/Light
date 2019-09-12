@@ -651,8 +651,10 @@ emit_command(catstring* buffer, Light_Ast* node) {
             catsprint(buffer, "{\n");
 
             // first declarations (prologue)
-            for(u64 i = 0; i < array_length(node->comm_for.prologue); ++i) {
-                emit_command(buffer, node->comm_for.prologue[i]);
+            if(node->comm_for.prologue) {
+                for(u64 i = 0; i < array_length(node->comm_for.prologue); ++i) {
+                    emit_command(buffer, node->comm_for.prologue[i]);
+                }
             }
 
             catsprint(buffer, "while(");
@@ -664,8 +666,10 @@ emit_command(catstring* buffer, Light_Ast* node) {
             emit_command(buffer, node->comm_for.body);
             
             // epilogue
-            for(u64 i = 0; i < array_length(node->comm_for.epilogue); ++i) {
-                emit_command(buffer, node->comm_for.epilogue[i]);
+            if(node->comm_for.epilogue) {
+                for(u64 i = 0; i < array_length(node->comm_for.epilogue); ++i) {
+                    emit_command(buffer, node->comm_for.epilogue[i]);
+                }
             }
 
             catsprint(buffer, "}");

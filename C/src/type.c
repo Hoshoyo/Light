@@ -27,6 +27,8 @@ type_alias_root(Light_Type* type) {
     return type;
 }
 
+
+// t1 is always the left type in an expression
 bool
 type_check_equality(Light_Type* t1, Light_Type* t2) {
     if(!(t1->flags & TYPE_FLAG_INTERNALIZED) || !(t2->flags & TYPE_FLAG_INTERNALIZED))
@@ -44,6 +46,12 @@ type_check_equality(Light_Type* t1, Light_Type* t2) {
     if(t1root->kind == TYPE_KIND_PRIMITIVE && t2root->kind == TYPE_KIND_PRIMITIVE) {
         return t1root == t2root;
     }
+
+    //if(t1root->kind == TYPE_KIND_POINTER && t2root->kind == TYPE_KIND_POINTER && 
+    //    t2root->pointer_to == type_primitive_get(TYPE_PRIMITIVE_VOID)) 
+    //{
+    //    return true;
+    //}
 
     return t1 == t2;
 }
@@ -153,7 +161,15 @@ type_new_alias(Light_Scope* scope, Light_Token* name, Light_Type* alias_to) {
     s32 index = -1;
     if(type_table_entry_exist(&global_type_table, result, &index, 0)) {
         assert(index >= 0);
-        return type_table_get(&global_type_table, index);
+        
+        Light_Type* found_type = type_table_get(&global_type_table, index);
+        if(found_type->flags & TYPE_FLAG_UNRESOLVED) {
+            found_type->flags &= ~(TYPE_FLAG_UNRESOLVED);
+            assert(alias_to->flags & TYPE_FLAG_INTERNALIZED);
+            found_type->alias.alias_to = alias_to;
+            found_type->alias.scope = scope;
+        }
+        result = found_type;
     }
 
     return result;
@@ -380,7 +396,8 @@ type_tables_initialize() {
 
 Light_Type*
 type_internalize(Light_Type* type) {
-    assert(type->flags & TYPE_FLAG_SIZE_RESOLVED);
+    if(type->kind != TYPE_KIND_ALIAS)
+        assert(type->flags & TYPE_FLAG_SIZE_RESOLVED);
 
     s32 index = 0;
     bool added = type_table_add(&global_type_table, type, &index);

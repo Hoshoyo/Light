@@ -328,7 +328,6 @@ typedef struct {
 typedef struct {
 	Light_Token*          name;
 	struct Light_Type_t*  type_referenced;
-	struct Light_Type_t** queued_types; // pointer types waiting for this decl typedef to be resolved
 } Light_Ast_Decl_Typedef;
 
 typedef struct {
@@ -504,6 +503,7 @@ typedef enum {
     TYPE_FLAG_WEAK          = (1 << 1),
     TYPE_FLAG_INTERNALIZED  = (1 << 2),
     TYPE_FLAG_SIZE_RESOLVED = (1 << 3),
+	TYPE_FLAG_UNRESOLVED    = (1 << 4),
 } Light_Type_Flags;
 
 typedef struct Light_Type_t{

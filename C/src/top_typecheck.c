@@ -125,23 +125,6 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
     if(error & TYPE_ERROR)
         return error;
 
-    // Patching TODO(psv): verify if we need to do patching after
-    // the infer queue solving (which checks for circular dependencies)
-    for(u64 i = 0; i < array_length(top_level); ++i) {
-        Light_Ast* node = top_level[i];
-
-        if(node->kind == AST_DECL_TYPEDEF) {
-            if(node->decl_typedef.queued_types) {
-                for(s32 i = 0; i < array_length(node->decl_typedef.queued_types); ++i) {
-                    Light_Type* t = node->decl_typedef.queued_types[i];
-                    t->pointer_to = node->decl_typedef.type_referenced;
-                }
-                array_free(node->decl_typedef.queued_types);
-                node->decl_typedef.queued_types = 0;
-            }
-        }
-    }
-
     // Try to resolve everything in the infer table while
     // the table is shrinking
     u64 starting_length = array_length(global_infer_queue);
@@ -244,9 +227,6 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
         } break;
         case TYPE_KIND_POINTER: {
             if(type->pointer_to->kind == TYPE_KIND_ALIAS) {
-                // Pointer to an alias, consider it internalized.
-                // Also put in a queue to be filled as soon as the symbol
-                // is internalized
 
                 // @Important same scope as the declaration, otherwise it
                 // won't work, since the scope from the expression is not
@@ -254,16 +234,18 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 Light_Ast* type_decl_from_name = type_infer_decl_from_name(scope, type->pointer_to->alias.name);
                 type->pointer_to->alias.scope = type_decl_from_name->scope_at;
 
+
+                // flagged as unresolved, meaning the alias is not yet internalized, but
+                // it is considered so in order to do recursive referencing
+                type->pointer_to->flags |= TYPE_FLAG_UNRESOLVED;
+                type->pointer_to = type_internalize(type->pointer_to);
+
                 Light_Type* tt = type_internalize(type);
                 Light_Ast* decl = type_decl_from_alias(scope, tt->pointer_to, error);
                 if(!decl || (*error & TYPE_ERROR)) {
                     type_error_undeclared_identifier(error, tt->pointer_to->alias.name);
                     return 0;
                 }
-                if(!decl->decl_typedef.queued_types) {
-                    decl->decl_typedef.queued_types = array_new(Light_Type*);
-                }
-                array_push(decl->decl_typedef.queued_types, tt);
                 type = tt;
             } else {
                 type->pointer_to = typecheck_resolve_type(scope, type->pointer_to, flags, error);
@@ -740,6 +722,11 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
             if(node->comm_assignment.lvalue){
                 inferred_left = type_infer_expression(node->comm_assignment.lvalue, error);
                 if(*error & TYPE_ERROR) return;
+                if(!inferred_left) {
+                    typecheck_push_to_infer_queue(node);
+                    return;
+                }
+
                 if(!(node->comm_assignment.lvalue->flags & AST_FLAG_EXPRESSION_LVALUE)) {
                     type_error(error, node->comm_assignment.op_token, 
                         "assignment operation requires an lvalue expression as the assigned value\n");

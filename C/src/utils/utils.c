@@ -105,6 +105,18 @@ str_hex_to_u64(char* text, int length) {
     return res;
 }
 
+u64
+str_bin_to_u64(char* text, int length) {
+	u64 res = 0;
+	for(int i = 0; i < length; ++i) {
+		res <<= 1; 
+		if(text[i] == '1') {
+			res |= 1;
+		}
+	}
+	return res;
+}
+
 #if 0
 catstring 
 path_from_fullpath(catstring s) {

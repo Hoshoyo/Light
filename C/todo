@@ -1,0 +1,2 @@
+internalization of pointers to aliases that are not declared do not cause an error
+numeric literals better type inference

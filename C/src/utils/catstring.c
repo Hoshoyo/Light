@@ -159,7 +159,14 @@ catsprint(catstring* buffer, char* str, ...) {
         if(*at == '%') {
             at++; // skip
             switch(*at) {
-                case '%': break; // do nothing, just push character
+                case '%': {
+                    // just push character
+                    buffer->data[buffer->length] = *at;
+                    if(!(*at)) break;
+                    buffer->length++;
+                    len++;
+                    at++;
+                } break; 
                 case 's': {
                     at++;
                     if(*at == '+') {

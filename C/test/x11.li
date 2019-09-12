@@ -1,0 +1,748 @@
+Screen struct {
+	ext_data        : ^void;	/* hook for extension to hang data */
+	display         : ^Display; /* back pointer to display structure */
+	root            : u64;		/* back pointer to display structure */
+	width           : s32;		/* Root window id. */
+	height          : s32;		/* width and height of screen */
+	mwidth          : s32;		
+	mheight         : s32;		/* width and height of  in millimeters */
+	ndepths         : s32;		/* number of depths possible */
+	depths          : ^void;	/* list of allowable depths on the screen */
+	root_depth      : s32;		/* bits per pixel */
+	root_visual     : ^void;	/* root visual */
+	default_gc      : ^void;	/* GC for the root root visual */
+	cmap            : u64; 		/* default color map */
+	white_pixel     : u64;		
+	black_pixel     : u64;		/* White and Black pixel values */
+	max_maps        : s32;		/* max and min color maps */
+	min_maps        : s32;
+	backing_store   : s32;		/* Never, WhenMapped, Always */
+	save_unders     : s32;
+	root_input_mask : s64;		/* initial root input mask */
+}
+
+
+Display struct {
+	ext_data            : ^void; 	/* hook for extension to hang data */
+	private1            : ^void;
+	fd                  : s32;		/* Network socket. */
+	private2            : s32;
+	proto_major_version : s32;		/* major version of server's X protocol */
+	proto_minor_version : s32;		/* minor version of servers X protocol */
+	vendor              : ^s8;		/* vendor of the server hardware */
+    private3            : u64;
+	private4            : u64;
+	private5            : u64;
+	private6            : s32;
+    resource_alloc      : (^void) ->u64;
+	byte_order          : s32;		/* screen byte order, LSBFirst, MSBFirst */
+	bitmap_unit         : s32;		/* padding and data requirements */
+	bitmap_pad          : s32;		/* padding requirements on bitmaps */
+	bitmap_bit_order    : s32;		/* LeastSignificant or MostSignificant */
+	nformats            : s32;		/* number of pixmap formats in list */
+	pixmap_format       : ^void;	/* pixmap format list */
+	private8            : s32;
+	release             : s32;		/* release of the server */
+	private9            : ^void;
+	private10           : ^void;
+	qlen                : s32;		/* Length of input event queue */
+	last_request_read   : u64; 		/* seq number of last event read */
+	request             : u64;		/* sequence number of last request. */
+	private11           : ^s8;
+	private12           : ^s8;
+	private13           : ^s8;
+	private14           : ^s8;
+	max_request_size    : u32; 		/* maximum number 32 bit words in request*/
+	db                  : ^void;
+    private15           : (^void) -> s32;
+	display_name        : ^s8;		/* "host:display" string used on this connect*/
+	default_screen      : s32;		/* default screen for operations */
+	nscreens            : s32;		/* number of screens on this server*/
+	screens             : ^Screen;	/* pointer to list of screens */
+	motion_buffer       : u64;		/* size of motion buffer */
+	private16           : u64;
+	min_keycode         : s32;		/* minimum defined keycode */
+	max_keycode         : s32;		/* maximum defined keycode */
+	private17           : ^s8;
+	private18           : ^s8;
+	private19           : s32;
+	xdefaults           : ^s8;		/* contents of defaults from server */
+	/* there is more to this structure, but it is private to Xlib */
+}
+
+XGenericEvent struct {
+    type       : s32;		/* of event. Always GenericEvent */
+    serial     : u64;		/* # of last request processed */
+    send_event : s32;		/* true if from SendEvent request */
+    display    : ^Display;	/* Display the event was read from */
+    extension  : s32;		/* major opcode of extension that caused the event */
+    evtype     : s32;		/* actual event type. */
+}
+
+XGenericEventCookie struct {
+    type       : s32;		/* of event. Always GenericEvent */
+    serial     : u64;		/* # of last request processed */
+    send_event : s32;		/* true if from SendEvent request */
+    display    : ^Display;	/* Display the event was read from */
+    extension  : s32;		/* major opcode of extension that caused the event */
+    evtype     : s32;		/* actual event type. */
+    cookie     : u32;
+    data       : ^void;
+}
+
+/* generated on EnterWindow and FocusIn  when KeyMapState selected */
+XKeymapEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	window     : u64;
+	key_vector : [32]s8;
+}
+
+XClientMessageEvent struct {
+	type         : s32;
+	serial       : u64;			/* # of last request processed by server */
+	send_event   : s32;			/* true if this came from a SendEvent request */
+	display      : ^Display;	/* Display the event was read from */
+	window       : u64;
+	message_type : u64;
+	format       : s32;
+	data         : [20]s8;
+}
+
+XMappingEvent struct {
+	type          : s32;
+	serial        : u64;		/* # of last request processed by server */
+	send_event    : s32;		/* true if this came from a SendEvent request */
+	display       : ^Display;	/* Display the event was read from */
+	window        : u64;		/* unused */
+	request       : s32;		/* one of MappingModifier, MappingKeyboard, MappingPointer */
+	first_keycode : s32;		/* first keycode */
+	count         : s32;		/* defines range of change w. first_keycode*/
+}
+
+XErrorEvent struct {
+	type         : s32;
+	display      : ^Display;	/* Display the event was read from */
+	resourceid   : u64;			/* resource id */
+	serial       : u64;			/* serial number of failed request */
+	error_code   : u8;			/* error code of failed request */
+	request_code : u8;			/* Major op-code of failed request */
+	minor_code   : u8;			/* Minor op-code of failed request */
+}
+
+XColormapEvent struct {
+	type       : s32;
+	serial     : u64;			/* # of last request processed by server */
+	send_event : s32;			/* true if this came from a SendEvent request */
+	display    : ^Display;		/* Display the event was read from */
+	window     : u64;
+	colormap   : u64;			/* COLORMAP or None */
+	new        : s32;
+	state      : s32;			/* ColormapInstalled, ColormapUninstalled */
+}
+
+XConfigureEvent struct {
+	type              : s32;
+	serial            : u64;		/* # of last request processed by server */
+	send_event        : s32;		/* true if this came from a SendEvent request */
+	display           : ^Display;	/* Display the event was read from */
+	event             : u64;
+	window            : u64;
+	x                 : s32;
+	y                 : s32;
+	width             : s32;
+	height            : s32;
+	border_width      : s32;
+	above             : u64;
+	override_redirect : s32;
+}
+
+XGravityEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	event      : u64;
+	window     : u64;
+	x          : s32;
+	y          : s32;
+}
+
+XResizeRequestEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	window     : u64;
+	width      : s32;
+	height     : s32;
+}
+
+
+XConfigureRequestEvent struct {
+	type          : s32;
+	serial        : u64;		/* # of last request processed by server */
+	send_event    : s32;		/* true if this came from a SendEvent request */
+	display       : ^Display;	/* Display the event was read from */
+	parent        : u64;
+	window        : u64;
+	x             : s32;
+	y             : s32;
+	width         : s32;
+	height        : s32;
+	border_width  : s32;
+	above         : u64;
+	detail        : s32;		/* Above, Below, TopIf, BottomIf, Opposite */
+	value_mask    : u64;
+}
+
+XCirculateEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	event      : u64;
+	window     : u64;
+	place      : s32;		/* PlaceOnTop, PlaceOnBottom */
+}
+
+XCirculateRequestEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	parent     : u64;
+	window     : u64;
+	place      : s32;		/* PlaceOnTop, PlaceOnBottom */
+}
+
+XPropertyEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	window     : u64;
+	atom       : u64;
+	time       : u64;
+	state      : s32;		/* NewValue, Deleted */
+}
+
+XSelectionClearEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	window     : u64;
+	selection  : u64;
+	time       : u64;
+}
+
+XSelectionRequestEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	owner      : u64;
+	requestor  : u64;
+	selection  : u64;
+	target     : u64;
+	property   : u64;
+	time       : u64;
+}
+
+XSelectionEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	requestor  : u64;
+	selection  : u64;
+	target     : u64;
+	property   : u64;		/* ATOM or None */
+	time       : u64;
+}
+
+XMapRequestEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	parent     : u64;
+	window     : u64;
+}
+
+XReparentEvent struct {
+	type              : s32;
+	serial            : u64;		/* # of last request processed by server */
+	send_event        : s32;		/* true if this came from a SendEvent request */
+	display           : ^Display;	/* Display the event was read from */
+	event             : u64;
+	window            : u64;
+	parent            : u64;
+	x                 : s32;
+	y                 : s32;
+	override_redirect : s32;
+}
+
+XDestroyWindowEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	event      : u64;
+	window     : u64;
+}
+
+XUnmapEvent struct {
+	type           : s32;
+	serial         : u64;		/* # of last request processed by server */
+	send_event     : s32;		/* true if this came from a SendEvent request */
+	display        : ^Display;	/* Display the event was read from */
+	event          : u64;
+	window         : u64;
+	from_configure : s32;
+}
+
+XMapEvent struct {
+	type              : s32;
+	serial            : u64;		/* # of last request processed by server */
+	send_event        : s32;		/* true if this came from a SendEvent request */
+	display           : ^Display;	/* Display the event was read from */
+	event             : u64;
+	window            : u64;
+	override_redirect : s32;		/* boolean, is override set... */
+}
+
+XNoExposeEvent struct {
+	type       : s32;
+	serial     : u64;			/* # of last request processed by server */
+	send_event : s32;			/* true if this came from a SendEvent request */
+	display    : ^Display;		/* Display the event was read from */
+	drawable   : u64;
+	major_code : s32;			/* core is CopyArea or CopyPlane */
+	minor_code : s32;			/* not defined in the core */
+}
+
+XVisibilityEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	window     : u64;
+	state      : s32;		/* Visibility state */
+}
+
+XCreateWindowEvent struct {
+	type              : s32;
+	serial            : u64;		/* # of last request processed by server */
+	send_event        : s32;		/* true if this came from a SendEvent request */
+	display           : ^Display;	/* Display the event was read from */
+	parent            : u64;		/* parent of the window */
+	window            : u64;		/* window id of window created */
+	x                 : s32;		/* window location */
+	y                 : s32;
+	width             : s32;		/* size of window */
+	height            : s32;
+	border_width      : s32;		/* border width */
+	override_redirect : s32;		/* creation should be overridden */
+}
+
+XGraphicsExposeEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	drawable   : u64;
+	x          : s32;
+	y          : s32;
+	width      : s32;
+	height     : s32;
+	count      : s32;		/* if non-zero, at least this many more */
+	major_code : s32;		/* core is CopyArea or CopyPlane */
+	minor_code : s32;		/* not defined in the core */
+}
+
+XExposeEvent struct {
+	type       : s32;
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	window     : u64;
+	x          : s32;
+	y          : s32;
+	width      : s32;
+	height     : s32;
+	count      : s32;		/* if non-zero, at least this many more */
+}
+
+XFocusChangeEvent struct {
+	type       : s32;		/* FocusIn or FocusOut */
+	serial     : u64;		/* # of last request processed by server */
+	send_event : s32;		/* true if this came from a SendEvent request */
+	display    : ^Display;	/* Display the event was read from */
+	window     : u64;		/* window of event */
+	mode       : s32;		/* NotifyNormal, NotifyWhileGrabbed, NotifyGrab, NotifyUngrab */
+	detail     : s32;
+	/*
+	 * NotifyAncestor, NotifyVirtual, NotifyInferior,
+	 * NotifyNonlinear,NotifyNonlinearVirtual, NotifyPointer,
+	 * NotifyPointerRoot, NotifyDetailNone
+	 */
+}
+
+XMotionEvent struct {
+	type        : s32;		/* of event */
+	serial      : u64;		/* # of last request processed by server */
+	send_event  : s32;		/* true if this came from a SendEvent request */
+	display     : ^Display;	/* Display the event was read from */
+	window      : u64;		/* "event" window reported relative to */
+	root        : u64;		/* root window that the event occurred on */
+	subwindow   : u64;		/* child window */
+	time        : u64;		/* milliseconds */
+	x           : s32;		/* pointer x, y coordinates in event window */
+	y           : s32;
+	x_root      : s32;		/* coordinates relative to root */
+	y_root      : s32;
+	state       : s32;		/* key or button mask */
+	is_hint     : s8;		/* detail */
+	same_screen : s32;		/* same screen flag */
+}
+
+XButtonEvent struct {
+	type        : s32;		/* of event */
+	serial      : u64;		/* # of last request processed by server */
+	send_event  : s32;		/* true if this came from a SendEvent request */
+	display     : ^Display;	/* Display the event was read from */
+	window      : u64;		/* "event" window it is reported relative to */
+	root        : u64;		/* root window that the event occurred on */
+	subwindow   : u64;		/* child window */
+	time        : u64;		/* milliseconds */
+	x           : s32;		/* pointer x, y coordinates in event window */
+	y           : s32;
+	x_root      : s32;		/* coordinates relative to root */
+	y_root      : s32;
+	state       : u32;		/* key or button mask */
+	button      : u32;		/* detail */
+	same_screen : s32;		/* same screen flag */
+}
+
+XCrossingEvent struct {
+	type        : s32;		/* of event */
+	serial      : u64;		/* # of last request processed by server */
+	send_event  : s32;		/* true if this came from a SendEvent request */
+	display     : ^Display;	/* Display the event was read from */
+	window      : u64;	    /* "event" window reported relative to */
+	root        : u64;	    /* root window that the event occurred on */
+	subwindow   : u64;		/* child window */
+	time        : u64;		/* milliseconds */
+	x           : s32;		/* pointer x, y coordinates in event window */
+	y           : s32;
+	x_root      : s32;		/* coordinates relative to root */
+	y_root      : s32;
+	mode        : s32;		/* NotifyNormal, NotifyGrab, NotifyUngrab */
+	detail      : s32;
+	/*
+	 * NotifyAncestor, NotifyVirtual, NotifyInferior,
+	 * NotifyNonlinear,NotifyNonlinearVirtual
+	 */
+	same_screen : s32;		/* same screen flag */
+	focus       : s32;		/* boolean focus */
+	state       : u32;		/* key or button mask */
+}
+XKeyEvent struct {
+	type        : s32;		/* of event */
+	serial      : u64;		/* # of last request processed by server */
+	send_event  : s32;		/* true if this came from a SendEvent request */
+	display     : ^Display;	/* Display the event was read from */
+	window      : u64;		/* "event" window it is reported relative to */
+	root        : u64;		/* root window that the event occurred on */
+	subwindow   : u64;		/* child window */
+	time        : u64;		/* milliseconds */
+	x           : s32;		/* pointer x, y coordinates in event window */
+	y           : s32;
+	x_root      : s32;		/* coordinates relative to root */
+	y_root      : s32;
+	state       : u32;		/* key or button mask */
+	keycode     : u32;		/* detail */
+	same_screen : s32;		/* same screen flag */
+}
+
+XAnyEvent struct {
+	type       : s32;
+	serial     : u64;
+	send_event : s32;
+	display    : ^Display;
+	window     : u64;
+}
+
+
+XEvent struct {
+	type              : s32;
+	xany              : XAnyEvent;
+	xkey              : XKeyEvent;
+	xbutton           : XButtonEvent;
+	xmotion           : XMotionEvent;
+	xcrossing         : XCrossingEvent;
+	xfocus            : XFocusChangeEvent;
+	xexpose           : XExposeEvent;
+	xgraphicsexpose   : XGraphicsExposeEvent;
+	xnoexpose         : XNoExposeEvent;
+	xvisibility       : XVisibilityEvent;
+	xcreatewindow     : XCreateWindowEvent;
+	xdestroywindow    : XDestroyWindowEvent;
+	xunmap            : XUnmapEvent;
+	xmap              : XMapEvent;
+	xmaprequest       : XMapRequestEvent;
+	xreparent         : XReparentEvent;
+	xconfigure        : XConfigureEvent;
+	xgravity          : XGravityEvent;
+	xresizerequest    : XResizeRequestEvent;
+	xconfigurerequest : XConfigureRequestEvent;
+	xcirculate        : XCirculateEvent;
+	xcirculaterequest : XCirculateRequestEvent;
+	xproperty         : XPropertyEvent;
+	xselectionclear   : XSelectionClearEvent;
+	xselectionrequest : XSelectionRequestEvent;
+	xselection        : XSelectionEvent;
+	xcolormap         : XColormapEvent;
+	xclient           : XClientMessageEvent;
+	xmapping          : XMappingEvent;
+	xerror            : XErrorEvent;
+	xkeymap           : XKeymapEvent;
+	xgeneric          : XGenericEvent;
+	xcookie           : XGenericEventCookie;
+	pad               : [24]s64;
+}
+
+XExtData struct {
+	number : s32;					/* number returned by XRegisterExtension */
+	next : ^XExtData;					/* next item on list of data for structure */
+	free_private : (^XExtData) -> s32; 	/* called to free private storage */
+	private_data : ^s8;					/* data private to this extension. */
+}
+
+Visual struct {
+	ext_data     : ^XExtData;	/* hook for extension to hang data */
+	visualid     : u64;			/* visual id of this visual */
+	class        : s32;			/* class of screen (monochrome, etc.) */
+	red_mask     : u64;			/* mask values */
+	green_mask   : u64;
+	blue_mask    : u64;
+	bits_per_rgb : s32;			/* log base 2 of distinct color values */
+	map_entries  : s32;			/* color map entries */
+}
+
+XVisualInfo struct {
+	visual        : ^Visual;
+	visualid      : u64;
+	screen        : s32;
+	depth         : s32;
+	class         : s32;
+	red_mask      : u64;
+	green_mask    : u64;
+	blue_mask     : u64;
+	colormap_size : s32;
+	bits_per_rgb  : s32;
+}
+
+XSetWindowAttributes struct {
+	background_pixmap     : u64;	/* background or None or ParentRelative */
+	background_pixel      : u64;	/* background pixel */
+	border_pixmap         : u64;	/* border of the window */
+	border_pixel          : u64;	/* border pixel value */
+	bit_gravity           : s32;	/* one of bit gravity values */
+	win_gravity           : s32;	/* one of the window gravity values */
+	backing_store         : s32;	/* NotUseful, WhenMapped, Always */
+	backing_planes        : u64;	/* planes to be preseved if possible */
+	backing_pixel         : u64;	/* value to use in restoring planes */
+	save_under            : s32;	/* should bits under be saved? (popups) */
+	event_mask            : s64;	/* set of events that should be saved */
+	do_not_propagate_mask : s64;	/* set of events that should not propagate */
+	override_redirect     : s32;	/* boolean value for override-redirect */
+	colormap              : u64;	/* color map to be associated with window */
+	cursor                : u64;	/* cursor to be displayed (or None) */
+}
+
+XWindowAttributes struct {
+	x                     : s32;		/* location of window */
+	y                     : s32;
+	width                 : s32;		/* width and height of window */
+	height                : s32;
+	border_width          : s32;		/* border width of window */
+	depth                 : s32;		/* depth of window */
+    visual                : ^Visual;	/* the associated visual structure */
+    root                  : u64;       	/* root of screen containing window */
+    class                 : s32;		/* InputOutput, InputOnly*/
+    bit_gravity           : s32;		/* one of bit gravity values */
+    win_gravity           : s32;		/* one of the window gravity values */
+    backing_store         : s32;		/* NotUseful, WhenMapped, Always */
+    backing_planes        : u64;		/* planes to be preserved if possible */
+    backing_pixel         : u64;		/* value to be used when restoring planes */
+    save_under            : s32;		/* boolean, should bits under be saved? */
+    colormap              : u64;		/* color map to be associated with window */
+    map_installed         : s32;		/* boolean, is color map currently installed*/
+    map_state             : s32;		/* IsUnmapped, IsUnviewable, IsViewable */
+    all_event_masks       : s64;		/* set of events all people have interest in*/
+    your_event_mask       : s64;		/* my event mask */
+    do_not_propagate_mask : s64; 		/* set of events that should not propagate */
+    override_redirect     : s32;		/* boolean value for override-redirect */
+    screen                : ^Screen;	/* back pointer to correct screen */
+}
+
+
+XOpenDisplay : (v : ^s8) -> ^Display #extern("X11");
+XCreateSimpleWindow : (display : ^Display, 
+	parent : u64, 
+	x : s32, 
+	y : s32, 
+	width : u32, 
+	height : u32, 
+	border_width : u32, 
+	border : u64, 
+	background : u64) -> u64 #extern("X11");
+
+XCreateWindow : (display : ^Display, 
+	parent : u64, 
+	x : s32, y : s32, 
+	width : u32, height : u32,
+	border_width : u32,
+	depth : s32,
+	class : u32,
+	visual : ^Visual,
+	valuemask : u64,
+	attribs : ^XSetWindowAttributes) -> u64 #extern("X11");
+
+XSelectInput : (dpy : ^Display, w : u64, event_mask : s64) -> s32 #extern("X11");
+XMapWindow : (dpy : ^Display, w : u64) -> s32 #extern("X11");
+XNextEvent : (dpy : ^Display, xevent : ^void) -> s32 #extern("X11");
+XCreateColormap : (display : ^Display, w : u64, visual : ^Visual, alloc : s32) -> u64 #extern("X11");
+XStoreName : (display : ^Display, w : u64, window_name : ^u8) -> s32 #extern("X11");
+XDestroyWindow : (display : ^Display, w : u64) -> s32 #extern("X11");
+XCloseDisplay : (display : ^Display) -> s32 #extern("X11");
+XGetWindowAttributes : (dpy : ^Display, win : u64, window_attribs_return : ^XWindowAttributes) -> s32 #extern("X11");
+
+glXChooseVisual : (dpy : ^Display, screen : s32, attrib_list : ^s32) -> ^XVisualInfo #extern("GL");
+glXCreateContext : (dpy : ^Display, vis : ^XVisualInfo, share_list : ^void, direct : s32) -> ^void #extern("GL");
+glXMakeCurrent : (dpy : ^Display, drawable : u64, ctx : ^void) -> s32 #extern("GL");
+glXSwapBuffers : (dpy : ^Display, drawable : u64) -> void #extern("GL");
+glXDestroyContext : (dpy : ^Display, ctx : ^void) -> void #extern("GL");
+
+GL_TRUE  : s32 : 1;
+GL_FALSE : s32 : 0;
+
+CopyFromParent : u64 : 0;	/* border pixmap in CreateWindow */
+
+InputOutput	: u32 : 1;
+InputOnly	: u32 : 2;
+
+
+AllocNone      : s32 : 0;	/* create map with no entries */
+AllocAll       : s32 : 1;	/* allocate entire map writeable */
+
+NoEventMask				: s64 : 0;
+KeyPressMask			: s64 : (1<<0);
+KeyReleaseMask			: s64 : (1<<1);
+ButtonPressMask			: s64 : (1<<2);
+ButtonReleaseMask		: s64 : (1<<3);
+EnterWindowMask			: s64 : (1<<4);
+LeaveWindowMask			: s64 : (1<<5);
+PointerMotionMask		: s64 : (1<<6);
+PointerMotionHintMask	: s64 : (1<<7);
+Button1MotionMask		: s64 : (1<<8);
+Button2MotionMask		: s64 : (1<<9);
+Button3MotionMask		: s64 : (1<<10);
+Button4MotionMask		: s64 : (1<<11);
+Button5MotionMask		: s64 : (1<<12);
+ButtonMotionMask		: s64 : (1<<13);
+KeymapStateMask			: s64 : (1<<14);
+ExposureMask			: s64 : (1<<15);
+VisibilityChangeMask	: s64 : (1<<16);
+StructureNotifyMask		: s64 : (1<<17);
+ResizeRedirectMask		: s64 : (1<<18);
+SubstructureNotifyMask	: s64 : (1<<19);
+SubstructureRedirectMask: s64 : (1<<20);
+FocusChangeMask			: s64 : (1<<21);
+PropertyChangeMask		: s64 : (1<<22);
+ColormapChangeMask		: s64 : (1<<23);
+OwnerGrabButtonMask		: s64 : (1<<24);
+
+/* Window attributes for CreateWindow and ChangeWindowAttributes */
+
+CWBackPixmap       : u64 : (1<<0);
+CWBackPixel        : u64 : (1<<1);
+CWBorderPixmap     : u64 : (1<<2);
+CWBorderPixel      : u64 : (1<<3);
+CWBitGravity       : u64 : (1<<4);
+CWWinGravity       : u64 : (1<<5);
+CWBackingStore     : u64 : (1<<6);
+CWBackingPlanes    : u64 : (1<<7);
+CWBackingPixel     : u64 : (1<<8);
+CWOverrideRedirect : u64 : (1<<9);
+CWSaveUnder        : u64 : (1<<10);
+CWEventMask        : u64 : (1<<11);
+CWDontPropagate    : u64 : (1<<12);
+CWColormap         : u64 : (1<<13);
+CWCursor           : u64 : (1<<14);
+
+/* Event names.  Used in "type" field in XEvent structures.  Not to be
+confused with event masks above.  They start from 2 because 0 and 1
+are reserved in the protocol for errors and replies. */
+
+KeyPress	     : s32 : 2;
+KeyRelease	     : s32 : 3;
+ButtonPress	     : s32 : 4;
+ButtonRelease	 : s32 : 5;
+MotionNotify	 : s32 : 6;
+EnterNotify	     : s32 : 7;
+LeaveNotify	     : s32 : 8;
+FocusIn	         : s32 : 9;
+FocusOut	     : s32 : 10;
+KeymapNotify	 : s32 : 11;
+Expose	         : s32 : 12;
+GraphicsExpose	 : s32 : 13;
+NoExpose	     : s32 : 14;
+VisibilityNotify : s32 : 15;
+CreateNotify	 : s32 : 16;
+DestroyNotify	 : s32 : 17;
+UnmapNotify	     : s32 : 18;
+MapNotify	     : s32 : 19;
+MapRequest	     : s32 : 20;
+ReparentNotify	 : s32 : 21;
+ConfigureNotify	 : s32 : 22;
+ConfigureRequest : s32 : 23;
+GravityNotify	 : s32 : 24;
+ResizeRequest	 : s32 : 25;
+CirculateNotify	 : s32 : 26;
+CirculateRequest : s32 : 27;
+PropertyNotify	 : s32 : 28;
+SelectionClear	 : s32 : 29;
+SelectionRequest : s32 : 30;
+SelectionNotify	 : s32 : 31;
+ColormapNotify	 : s32 : 32;
+ClientMessage	 : s32 : 33;
+MappingNotify	 : s32 : 34;
+GenericEvent	 : s32 : 35;
+LASTEvent	     : s32 : 36;	/* must be bigger than any event # */
+
+GLXFBConfig ^void;
+Window      u64;
+Colormap    u64;
+GLXContext  ^void;
+GLXDrawable u32;
+
+
+XSetErrorHandler : (errorHandler : (^Display, ^XErrorEvent) -> s32) -> (^Display, ^XErrorEvent) -> s32 #extern("X11");
+XFreeColormap : (display : ^Display, cmap : Colormap) -> s32 #extern("X11");
+XFree : (data : ^void) -> s32 #extern("X11");
+XSync : (display : ^Display, discard : bool) -> s32 #extern("X11");
+
+DefaultScreen : (dpy : ^Display) -> s32 {
+	return (*dpy).default_screen;
+}
+
+RootWindow : (dpy : ^Display, screen : s32) -> Window {
+	//return (((*dpy).screens)[screen]).root;
+	return ((dpy.screens)[screen]).root;
+}

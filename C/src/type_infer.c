@@ -24,6 +24,7 @@ type_cast_is_valid(Light_Type* from, Light_Type* to) {
     // func    -> ^T
     // enum    -> integer
     // integer -> enum
+    assert(from->kind != TYPE_KIND_ALIAS && to->kind != TYPE_KIND_ALIAS);
 
     if(from == to) return true;
 
@@ -32,7 +33,7 @@ type_cast_is_valid(Light_Type* from, Light_Type* to) {
     }
 
     if(from->kind == TYPE_KIND_POINTER) {
-        return type_primitive_int(to) || to->kind == TYPE_KIND_POINTER;
+        return type_primitive_int(to) || to->kind == TYPE_KIND_POINTER || to->kind == TYPE_KIND_FUNCTION;
     }
 
     if(to->kind == TYPE_KIND_POINTER && type_primitive_int(from)) {
@@ -296,7 +297,6 @@ type_infer_propagate_binary(Light_Type* type, Light_Ast* expr, u32* error) {
         } break;
 
         case OP_BINARY_VECTOR_ACCESS:
-            //assert(0);
             type_infer_propagate(type, expr->expr_binary.left, error);
             type_infer_propagate(0, expr->expr_binary.right, error);
             Light_Type* left_type = expr->expr_binary.left->type;
@@ -391,17 +391,17 @@ type_infer_expr_variable(Light_Ast* expr, u32* error) {
 
     switch(decl->kind) {
         case AST_DECL_CONSTANT:{
-            //return type_alias_root(decl->decl_constant.type_info);
             return decl->decl_constant.type_info;
         } break;
         case AST_DECL_PROCEDURE:{
             expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
-            return decl->decl_proc.proc_type;
+            if(decl->decl_proc.proc_type && decl->decl_proc.proc_type->flags & TYPE_FLAG_INTERNALIZED)
+                return decl->decl_proc.proc_type;
         } break;
         case AST_DECL_VARIABLE:{
-            //return type_alias_root(decl->decl_variable.type);
             expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
-            return decl->decl_variable.type;
+            if(decl->decl_variable.type && decl->decl_variable.type->flags & TYPE_FLAG_INTERNALIZED)
+                return decl->decl_variable.type;
         } break;
         case AST_DECL_TYPEDEF:{
             Light_Type* type = decl->decl_typedef.type_referenced;
@@ -665,6 +665,7 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
                     expr->type = 0;
                 } else {
                     expr->type = resolved;
+                    expr->expr_unary.type_to_cast = resolved;
                 }
             } else {
                 expr->type = expr->expr_unary.type_to_cast;
@@ -675,7 +676,11 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
                 expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
             }
 
-            if(!type_cast_is_valid(expr->expr_unary.operand->type, expr->expr_unary.type_to_cast)) {
+            Light_Type* lroot = type_alias_root(expr->expr_unary.operand->type);
+            Light_Type* rroot = type_alias_root(expr->expr_unary.type_to_cast);
+            if(!lroot || !rroot) {
+                expr->type = 0;
+            } else if(!type_cast_is_valid(lroot, rroot)) {
                 type_error(error, expr->expr_unary.token_op, "invalid type conversion from '");
                 ast_print_type(expr->expr_unary.operand->type, LIGHT_AST_PRINT_STDERR, 0);
                 fprintf(stderr, "' to '");
@@ -702,7 +707,11 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
         case OP_UNARY_BITWISE_NOT:
         case OP_UNARY_MINUS:
         case OP_UNARY_PLUS:{
-            expr->type = operand_type;
+            if(!(operand_type->flags & TYPE_FLAG_INTERNALIZED)) {
+                expr->type = type_infer_propagate(0, expr->expr_unary.operand, error);
+            } else {
+                expr->type = operand_type;
+            }
         } break;
         default: assert(0); break;
     }
@@ -1160,7 +1169,7 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
 Light_Type* 
 type_infer_expression(Light_Ast* expr, u32* error) {
     assert(expr->flags & AST_FLAG_EXPRESSION);
-    if(expr->type && expr->type->flags && TYPE_FLAG_INTERNALIZED)
+    if(expr->type && expr->type->flags & TYPE_FLAG_INTERNALIZED)
         return expr->type;
 
     Light_Type* type = 0;
