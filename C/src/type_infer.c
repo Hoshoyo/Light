@@ -327,7 +327,7 @@ type_infer_propagate_unary(Light_Type* type, Light_Ast* expr, u32* error) {
         case OP_UNARY_DEREFERENCE:
             // cast, addressof and dereference should already be strong
             assert(TYPE_STRONG(expr->type));
-            break;
+            return expr->type;
         case OP_UNARY_LOGIC_NOT:{
             expr->type = type_primitive_get(TYPE_PRIMITIVE_BOOL);
             return type_infer_propagate(expr->type, expr->expr_unary.operand, error);
@@ -659,7 +659,17 @@ type_infer_expr_unary(Light_Ast* expr, u32* error) {
             }
         } break;
         case OP_UNARY_CAST:{
-            expr->type = expr->expr_unary.type_to_cast;
+            if(!(expr->expr_unary.type_to_cast->flags & TYPE_FLAG_INTERNALIZED)) {
+                Light_Type* resolved = typecheck_resolve_type(expr->scope_at, expr->expr_unary.type_to_cast, 0, error);
+                if(!resolved || *error & TYPE_ERROR) {
+                    expr->type = 0;
+                } else {
+                    expr->type = resolved;
+                }
+            } else {
+                expr->type = expr->expr_unary.type_to_cast;
+            }
+
             type_infer_propagate(0, expr->expr_unary.operand, error);
             if((expr->expr_unary.flags & AST_FLAG_EXPRESSION_LVALUE)) {
                 expr->flags |= AST_FLAG_EXPRESSION_LVALUE;
@@ -807,6 +817,10 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
         }
 
         at = type_infer_propagate(arg_type, expr->expr_proc_call.args[i], error);
+        if(!at || !(at->flags & TYPE_FLAG_INTERNALIZED)) {
+            all_arguments_internalized = false;
+            continue;
+        }
         expr->expr_proc_call.args[i]->type = at;
 
         if(!type_check_equality(at, arg_type)) {
@@ -1073,6 +1087,8 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
     if(left->kind == TYPE_KIND_POINTER) {
         left = left->pointer_to;
     }
+
+    if(!left || !(left->flags & TYPE_FLAG_INTERNALIZED)) return 0;
 
     Light_Type* original_type = left;
     left = type_alias_root(left);

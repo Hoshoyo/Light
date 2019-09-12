@@ -125,6 +125,23 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
     if(error & TYPE_ERROR)
         return error;
 
+    // Patching TODO(psv): verify if we need to do patching after
+    // the infer queue solving (which checks for circular dependencies)
+    for(u64 i = 0; i < array_length(top_level); ++i) {
+        Light_Ast* node = top_level[i];
+
+        if(node->kind == AST_DECL_TYPEDEF) {
+            if(node->decl_typedef.queued_types) {
+                for(s32 i = 0; i < array_length(node->decl_typedef.queued_types); ++i) {
+                    Light_Type* t = node->decl_typedef.queued_types[i];
+                    t->pointer_to = node->decl_typedef.type_referenced;
+                }
+                array_free(node->decl_typedef.queued_types);
+                node->decl_typedef.queued_types = 0;
+            }
+        }
+    }
+
     // Try to resolve everything in the infer table while
     // the table is shrinking
     u64 starting_length = array_length(global_infer_queue);
@@ -143,22 +160,6 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
             break;
         }
         starting_length = array_length(global_infer_queue);
-    }
-
-    // Patching
-    for(u64 i = 0; i < array_length(top_level); ++i) {
-        Light_Ast* node = top_level[i];
-
-        if(node->kind == AST_DECL_TYPEDEF) {
-            if(node->decl_typedef.queued_types) {
-                for(s32 i = 0; i < array_length(node->decl_typedef.queued_types); ++i) {
-                    Light_Type* t = node->decl_typedef.queued_types[i];
-                    t->pointer_to = node->decl_typedef.type_referenced;
-                }
-                array_free(node->decl_typedef.queued_types);
-                node->decl_typedef.queued_types = 0;
-            }
-        }
     }
 
     return error;
@@ -246,6 +247,13 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 // Pointer to an alias, consider it internalized.
                 // Also put in a queue to be filled as soon as the symbol
                 // is internalized
+
+                // @Important same scope as the declaration, otherwise it
+                // won't work, since the scope from the expression is not
+                // unique.
+                Light_Ast* type_decl_from_name = type_infer_decl_from_name(scope, type->pointer_to->alias.name);
+                type->pointer_to->alias.scope = type_decl_from_name->scope_at;
+
                 Light_Type* tt = type_internalize(type);
                 Light_Ast* decl = type_decl_from_alias(scope, tt->pointer_to, error);
                 if(!decl || (*error & TYPE_ERROR)) {
@@ -256,7 +264,6 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                     decl->decl_typedef.queued_types = array_new(Light_Type*);
                 }
                 array_push(decl->decl_typedef.queued_types, tt);
-                //array_push(global_queued_pointer_types, tt);
                 type = tt;
             } else {
                 type->pointer_to = typecheck_resolve_type(scope, type->pointer_to, flags, error);

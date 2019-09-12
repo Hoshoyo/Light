@@ -82,9 +82,10 @@ parse_directive(Light_Parser* parser, Light_Scope* scope, u32* error) {
         {
             string_table_add(&parser->parse_queue, src_str, &index);
             array_push(parser->parse_queue_array, src_str);
-            printf("pushed %.*s\n", src_str.length, src_str.data);
         }
-
+    } else if(tag->type == TOKEN_IDENTIFIER && tag->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_EXTERN].data) {
+        // TODO(psv): Implement extern
+        assert(0);        
     } else if(tag->type == TOKEN_IDENTIFIER) {
         *error |= parser_error_fatal(parser, tag, "Unrecognized directive '%.*s'\n", tag->length, tag->data);
     } else if(tag->type != TOKEN_END_OF_STREAM) {

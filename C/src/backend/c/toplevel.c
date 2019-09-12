@@ -804,6 +804,6 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table) {
 void 
 backend_c_compile_with_gcc(Light_Ast** ast, const char* filename) {
     char command_buffer[2048] = {0};
-    sprintf(command_buffer, "gcc -g test/generated_out.c -o %.*s", (int)strlen(filename) - 3, filename);
+    sprintf(command_buffer, "gcc -g test/generated_out.c -o %.*s -lX11 -lGL", (int)strlen(filename) - 3, filename);
     system(command_buffer);
 }
