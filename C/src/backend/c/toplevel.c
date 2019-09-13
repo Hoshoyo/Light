@@ -98,6 +98,7 @@ emit_type_end(catstring* buffer, Light_Type* type) {
 enum {
     EMIT_FLAG_TREAT_AS_FUNCTION_TYPE = (1 << 0),
     EMIT_DECLARATION_DEFAULT_VALUE   = (1 << 1),
+    EMIT_FLAG_ARRAY_AS_POINTER       = (1 << 2),
 };
 
 static void
@@ -218,13 +219,24 @@ emit_typed_declaration(catstring* buffer, Light_Type* type, Light_Token* name, u
         } break;
 
         case TYPE_KIND_POINTER:
-        case TYPE_KIND_FUNCTION:
-        case TYPE_KIND_ARRAY:{
+        case TYPE_KIND_FUNCTION: {
             emit_type_start(buffer, type, flags);
             catsprint(buffer, " ");
             if(name)
                 catsprint_token(buffer, name);
             emit_type_end(buffer, type);
+        } break;
+        case TYPE_KIND_ARRAY:{
+            Light_Type arrptr = *type;
+            if(flags & EMIT_FLAG_ARRAY_AS_POINTER) {
+                arrptr.kind = TYPE_KIND_POINTER;
+                arrptr.pointer_to = type->array_info.array_of;
+            }
+            emit_type_start(buffer, &arrptr, flags);
+            catsprint(buffer, " ");
+            if(name)
+                catsprint_token(buffer, name);
+            emit_type_end(buffer, &arrptr);
         } break;
 
         case TYPE_KIND_PRIMITIVE:
@@ -393,7 +405,7 @@ emit_expression_unary(catstring* literal_decls, catstring* buffer, Light_Ast* no
             break;
         case OP_UNARY_CAST:
             catsprint(buffer, "((");
-            emit_typed_declaration(buffer, node->expr_unary.type_to_cast, 0, 0);
+            emit_typed_declaration(buffer, node->expr_unary.type_to_cast, 0, EMIT_FLAG_ARRAY_AS_POINTER);
             catsprint(buffer, ")");
             emit_expression(literal_decls, buffer, node->expr_unary.operand);
             catsprint(buffer, ")");

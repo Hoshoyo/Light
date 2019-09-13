@@ -33,7 +33,8 @@ type_cast_is_valid(Light_Type* from, Light_Type* to) {
     }
 
     if(from->kind == TYPE_KIND_POINTER) {
-        return type_primitive_int(to) || to->kind == TYPE_KIND_POINTER || to->kind == TYPE_KIND_FUNCTION;
+        return type_primitive_int(to) || to->kind == TYPE_KIND_POINTER 
+            || to->kind == TYPE_KIND_FUNCTION || to->kind == TYPE_KIND_ARRAY;
     }
 
     if(to->kind == TYPE_KIND_POINTER && type_primitive_int(from)) {
