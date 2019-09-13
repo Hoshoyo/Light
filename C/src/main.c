@@ -29,6 +29,7 @@ int main(int argc, char** argv) {
 
     Light_Ast** ast = 0;
 
+    double parse_start = os_time_us();
     // Parse all other files included in the main file
     while(array_length(parser.parse_queue_array) > 0) {
         Light_Lexer lexer = {0};
@@ -41,15 +42,18 @@ int main(int argc, char** argv) {
 
         array_remove(parser.parse_queue_array, 0);
     }
+    printf("Parse time: %fms\n", (os_time_us() - parse_start) / 1000.0);
     
     // Type checking
+    double tcheck_start = os_time_us();
     Light_Type_Error type_error = top_typecheck(ast, &global_scope);
     if(type_error & TYPE_ERROR) {
         return 1;
     }
+    printf("Typecheck time: %fms\n", (os_time_us() - tcheck_start) / 1000.0);
     
-    ast_print(ast, LIGHT_AST_PRINT_STDOUT|LIGHT_AST_PRINT_EXPR_TYPES, 0);
 #if 0
+    ast_print(ast, LIGHT_AST_PRINT_STDOUT|LIGHT_AST_PRINT_EXPR_TYPES, 0);
     type_table_print();
 #endif
 
@@ -57,8 +61,13 @@ int main(int argc, char** argv) {
     printf("Time elapsed: %fms\n", (end - start) / 1000.0);
 
 #if 1
+    double generate_start = os_time_us();
     backend_c_generate_top_level(ast, global_type_table);
+    printf("Generate time: %fms\n", (os_time_us() - generate_start) / 1000.0);
+
+    double gcc_start = os_time_us();
     backend_c_compile_with_gcc(ast, argv[1]);
+    printf("Backend time: %fms\n", (os_time_us() - gcc_start) / 1000.0);
 #endif
 
 #if 0

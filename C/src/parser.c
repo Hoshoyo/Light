@@ -448,6 +448,27 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
         ReturnIfError();
     }
 
+    // Check if the pattern 'name :' appears next, that indicates
+    // a normal procedure declaration instead of a type declaration.
+    if( lexer_peek(lexer)->type == '(' &&
+        lexer_peek_n(lexer, 1)->type == TOKEN_IDENTIFIER && 
+        lexer_peek_n(lexer, 2)->type == ':') 
+    {
+        // Normal declaration
+    } else if(
+        lexer_peek(lexer)->type == '(' &&
+        lexer_peek_n(lexer, 1)->type == ')')
+    {
+        // Normal declaration
+    } else {
+        Light_Type* function_type = parse_type(parser, scope, error);
+        ReturnIfError();
+
+        // This is in fact a variable declaration of procedure type.
+        Light_Ast* decl_var = ast_new_decl_variable(scope, name, function_type, 0, STORAGE_CLASS_DATA_SEGMENT, 0);
+        return decl_var;
+    }
+
     *error |= parser_require_and_eat(parser, '(');
     ReturnIfError();
 
@@ -456,6 +477,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     s32 args_count = 0;
     Light_Type** args_types = 0;
     bool all_args_internalized = true;
+    bool variable_declaration = false;
 
     if(lexer_peek(lexer)->type != ')') {
         arguments = array_new(Light_Ast*);
@@ -465,26 +487,27 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
                 *error |= parser_require_and_eat(parser, ',');
                 ReturnIfError();
             }
-			Light_Token* name = lexer_next(lexer);
-			if (name->type != TOKEN_IDENTIFIER) {
-				*error |= parser_error_fatal(parser, name, "expected argument #%d declaration identifier but got '%.*s'\n", args_count + 1, TOKEN_STR(name));
+
+            Light_Token* name = lexer_next(lexer);
+            if (name->type != TOKEN_IDENTIFIER) {
+                *error |= parser_error_fatal(parser, name, "expected argument #%d declaration identifier but got '%.*s'\n", args_count + 1, TOKEN_STR(name));
                 return 0;
-			}
+            }
             *error |= parser_require_and_eat(parser, ':');
             ReturnIfError();
 
             Light_Type* arg_type = parse_type(parser, scope, error);
             ReturnIfError();
 
-			Light_Ast* arg = parse_decl_variable(parser, name, arg_type, args_scope, error, false);
-			array_push(arguments, arg);
+            Light_Ast* arg = parse_decl_variable(parser, name, arg_type, args_scope, error, false);
+            array_push(arguments, arg);
             array_push(args_types, arg_type);
             if(!(arg_type->flags & TYPE_FLAG_INTERNALIZED))
                 all_args_internalized = false;
 
             args_scope->decl_count++;
             array_push(args_scope->decls, arg);
-			++args_count;
+            ++args_count;
 
 			if (lexer_peek(lexer)->type != ',') break;
 		}        
@@ -537,7 +560,9 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     }
 
     if(lexer_peek(lexer)->type == ';') {
-        // TODO(psv): forward declaration
+        // Variable with procedure type
+        Light_Ast* decl_var = ast_new_decl_variable(scope, name, proc_type, 0, STORAGE_CLASS_DATA_SEGMENT, 0);
+        return decl_var;
     }
 
     if(!(flags & DECL_PROC_FLAG_EXTERN)) {

@@ -221,7 +221,7 @@ init_opengl : (display : ^Display) -> u64 {
 	glXCreateContextAttribsARB := glXGetProcAddressARB("glXCreateContextAttribsARB".data) -> (^Display, GLXFBConfig, GLXContext, bool, ^s32) -> GLXContext;
 	ctx : GLXContext;
 
-	ctxErrorHandler := null -> (^Display, ^XErrorEvent) -> s32;
+	ctxErrorHandler : (^Display, ^XErrorEvent) -> s32;
 	XSetErrorHandler(ctxErrorHandler);
 
 	context_attribs := [

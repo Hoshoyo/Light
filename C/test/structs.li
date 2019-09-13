@@ -7,12 +7,12 @@ before struct {
 }
 
 main : () -> s32 {
-    v0 := { a : s32 = 1, b : foo = 2.0};
-    v1 := { a :s32 = 4, b :s32 = 3};  // normal decl
-    v2 := { a := 4,     b :s32 = 3};  // infer only one field
-    v4 := { a := 4,     b := 3};      // infer both
+    //v0 := { a : s32 = 1, b : foo = 2.0};
+    //v1 := { a :s32 = 4, b :s32 = 3};  // normal decl
+    //v2 := { a := 4,     b :s32 = 3};  // infer only one field
+    //v4 := { a := 4,     b := 3};      // infer both
     
-    v5 : struct{ a:s32; b:s32; } = { a :s32 = 4, b :s32 = 3}; // infer and check
+    //v5 : struct{ a:s32; b:s32; } = { a :s32 = 4, b :s32 = 3}; // infer and check
     //v6 : struct{ a:s32; b:s32; } = { a :s32 = 4, b :u32 = 3}; // infer and check error
 
     //v9 : struct{ a:s32; } = { a :s32 = 4.0 }; // infer and check
@@ -23,7 +23,7 @@ main : () -> s32 {
     //vc1 : after = after:{ 27, 1.75 }; // check after ok
     //vc2 : after = after:{ 27, 3 }; // check after error
 
-    //vd1 := before:{ 3, 4 }; // check before ok
+    vd1 := before:{ 3, 4 }; // check before ok
     //vd2 := before:{ 3, 3.4 }; // check before error
     //ve1 := after:{ 27, 1.75 }; // check after ok
     //ve2 := after:{ 27, 3 }; // check after error
