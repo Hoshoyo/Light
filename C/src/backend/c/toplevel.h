@@ -58,5 +58,5 @@ typedef struct {
 	s64 type_table_length;
 } User_Type_Table;
 
-void backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table);
-void backend_c_compile_with_gcc(Light_Ast** ast, const char* filename);
+void backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, const char* path, const char* filename);
+void backend_c_compile_with_gcc(Light_Ast** ast, const char* filename, const char* working_directory);

@@ -20,6 +20,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    size_t real_path_size = 0;
+    //const char* main_file_path = light_real_path(argv[1], &real_path_size);
+    const char* main_file_directory = light_path_from_filename(argv[1], &real_path_size);
+
     Light_Lexer  lexer = {0};
     Light_Parser parser = {0};
     Light_Scope  global_scope = {0};
@@ -61,12 +65,16 @@ int main(int argc, char** argv) {
     printf("Time elapsed: %fms\n", (end - start) / 1000.0);
 
 #if 1
+    const char* outfile = light_extensionless_filename(light_filename_from_path(argv[1]));
+
     double generate_start = os_time_us();
-    backend_c_generate_top_level(ast, global_type_table);
+    backend_c_generate_top_level(ast, global_type_table, main_file_directory, outfile);
     printf("Generate time: %fms\n", (os_time_us() - generate_start) / 1000.0);
 
     double gcc_start = os_time_us();
-    backend_c_compile_with_gcc(ast, argv[1]);
+
+    // Remove file extension
+    backend_c_compile_with_gcc(ast, outfile, main_file_directory);
     printf("Backend time: %fms\n", (os_time_us() - gcc_start) / 1000.0);
 #endif
 

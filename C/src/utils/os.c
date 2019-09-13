@@ -123,11 +123,27 @@ light_filepath_relative_to(const char* path, int path_length, const char* path_r
 	size_t size = 0;
 	const char* p = light_real_path(result.data, &size);
 #else
-#error os not supporteds
+#error os not supported
 #endif
 
 
 	catstring_free(&result);
 
 	return (char*)p;
+}
+
+const char* 
+light_extensionless_filename(const char* filename) {
+	int length = strlen(filename);
+	int newlen = 0;
+	for(int i = length - 1; i >= 0; --i) {
+		if(filename[i] == '.') {
+			newlen = i;
+			break;
+		}
+	}
+	void* mem = calloc(1, newlen + 1);
+
+	memcpy(mem, filename, newlen);
+	return (const char*)mem;
 }

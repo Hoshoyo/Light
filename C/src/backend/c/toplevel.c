@@ -768,7 +768,7 @@ emit_forward_type_decl(catstring* buffer, Light_Type** type_array) {
 }
 
 void 
-backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table) {
+backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, const char* path, const char* filename) {
     catstring code = {0};
 
     catsprint(&code, "typedef char s8;\n");
@@ -814,12 +814,15 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table) {
 
     catstring_append(&code, &decls);
 
-    catstring_to_file("test/generated_out.c", code);
+    catstring outfile = {0};
+    catsprint(&outfile, "%s%s.c\0", path, filename);
+    catstring_to_file(outfile.data, code);
 }
 
 void 
-backend_c_compile_with_gcc(Light_Ast** ast, const char* filename) {
+backend_c_compile_with_gcc(Light_Ast** ast, const char* filename, const char* working_directory) {
     char command_buffer[2048] = {0};
-    sprintf(command_buffer, "gcc -g test/generated_out.c -o %.*s -lX11 -lGL", (int)strlen(filename) - 3, filename);
+    sprintf(command_buffer, "gcc -g %s%s.c -o %s%s -lX11 -lGL", 
+        working_directory, filename, working_directory, filename);
     system(command_buffer);
 }
