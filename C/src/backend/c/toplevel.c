@@ -767,8 +767,63 @@ emit_forward_type_decl(catstring* buffer, Light_Type** type_array) {
     }
 }
 
+static void
+emit_type_table(catstring* buffer, Light_Type** type_table) {
+    catsprint(buffer, "User_Type_Info __light_type_table[%l] = {\n", array_length(type_table));
+
+    for(int i = 0; i < array_length(type_table); ++i) {
+        Light_Type* type = type_table[i];
+
+        if(i > 0) {
+            catsprint(buffer, ",\n");
+        }
+
+        // kind, flags, type_size_bytes
+        catsprint(buffer, "{ %d, %d, %d, {", type->kind, type->flags, type->size_bits / 8);
+
+        switch(type->kind) {
+            case TYPE_KIND_PRIMITIVE:
+                catsprint(buffer, " .primitive = %d", type->primitive);
+                break;
+            case TYPE_KIND_POINTER:
+                catsprint(buffer, " .pointer_to = 0");
+                break;
+            case TYPE_KIND_ARRAY:
+                catsprint(buffer, " .array_desc = { 0, %u }", type->array_info.dimension);
+                break;
+            case TYPE_KIND_ALIAS:
+                // TODO(psv): name, alias_to
+                catsprint(buffer, " .alias_desc = { {0, %d, 0}, 0 }", type->alias.name->length);
+                break;
+            case TYPE_KIND_ENUM:
+                // TODO(psv):
+                catsprint(buffer, " .primitive = 0");
+                break;
+            case TYPE_KIND_FUNCTION:
+                // TODO(psv): arguments_types, arguments_names
+                catsprint(buffer, " .function_desc = { 0, 0, 0, %d }", type->function.arguments_count);
+                break;
+            case TYPE_KIND_STRUCT:
+                // TODO(psv): fields_types, fields_names, fields_offsets_bits
+                catsprint(buffer, " .struct_desc = { 0, 0, 0, %d, %d }", type->struct_info.fields_count, type->struct_info.alignment_bytes);
+                break;
+            case TYPE_KIND_UNION:
+                // TODO(psv): fields_types, fields_names, fields_count, alignment
+                catsprint(buffer, " .union_desc = { 0, 0, %d, %d }", type->union_info.fields_count, type->union_info.alignment_bytes);
+                break;
+            default: assert(0); break;
+        }
+
+        catsprint(buffer, "}}");
+    }
+
+    catsprint(buffer, "};\n");
+}
+
 void 
-backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, const char* path, const char* filename) {
+backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, 
+    const char* path, const char* filename, const char* compiler_path) 
+{
     catstring code = {0};
 
     catsprint(&code, "typedef char s8;\n");
@@ -793,9 +848,6 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, const char*
     // Emit, in order, all type aliases
     emit_forward_type_decl(&code, global_type_array);
 
-    // Emit type table
-    //emit_type_table(&code, global_type_array);
-
     catstring decls = {0};
     catsprint(&decls, "\n// Forward Declarations\n\n");
 
@@ -805,11 +857,20 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, const char*
         }
     }
 
-    catsprint(&decls, "\n// Declarations\n\n");
+    // User type table struct declarations
+    catstring type_table_definitions_path = {0};
+    catsprint(&type_table_definitions_path, "%s../src/backend/user_type_table.h\0", compiler_path);
+    catstring type_table_definitions = catstring_new_from_file(type_table_definitions_path.data);
 
+    catstring_append(&decls, &type_table_definitions);
+
+    // Emit type table
+    catsprint(&decls, "\n// Type table\n\n");
+    emit_type_table(&decls, global_type_array);
+
+    catsprint(&decls, "\n// Declarations\n\n");
     for(int i = 0; i < array_length(ast); ++i) {
         emit_declaration(&decls, ast[i], 0);
-        catsprint(&decls, "\n");
     }
 
     catstring_append(&code, &decls);

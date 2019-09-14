@@ -147,3 +147,26 @@ light_extensionless_filename(const char* filename) {
 	memcpy(mem, filename, newlen);
 	return (const char*)mem;
 }
+
+#include <stdio.h>
+char*
+light_read_entire_file(const char* filename, size_t* size) {
+	FILE* file = fopen(filename, "rb");
+
+    if(!file) {
+        fprintf(stderr, "Could not load file %s\n", filename);
+        return 0;
+    }
+
+    fseek(file, 0, SEEK_END);
+    size_t length_bytes = ftell(file);
+	if(size) *size = length_bytes;
+    fseek(file, 0, SEEK_SET);
+    
+    char* stream = light_alloc(length_bytes + 1);
+
+    fread(stream, length_bytes, 1, file);
+    fclose(file);
+
+	return stream;
+}

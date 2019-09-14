@@ -1,5 +1,6 @@
 #include "catstring.h"
 #include "light_array.h"
+#include "os.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -261,6 +262,19 @@ catstring_to_file(const char* filename, catstring s) {
 
     fclose(out);
     return 0;
+}
+
+catstring
+catstring_new_from_file(const char* filename) {
+    size_t size = 0;
+    char* file_data = light_read_entire_file(filename, &size);
+
+    catstring result = {0};
+    result.data = file_data;
+    result.capacity = (int)size;
+    result.length = (int)size;
+
+    return result;
 }
 
 catstring 

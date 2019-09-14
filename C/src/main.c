@@ -20,8 +20,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    size_t compiler_path_size = 0;
+    const char* compiler_path = light_path_from_filename(argv[0], &compiler_path_size);
+
     size_t real_path_size = 0;
-    //const char* main_file_path = light_real_path(argv[1], &real_path_size);
     const char* main_file_directory = light_path_from_filename(argv[1], &real_path_size);
 
     Light_Lexer  lexer = {0};
@@ -68,7 +70,7 @@ int main(int argc, char** argv) {
     const char* outfile = light_extensionless_filename(light_filename_from_path(argv[1]));
 
     double generate_start = os_time_us();
-    backend_c_generate_top_level(ast, global_type_table, main_file_directory, outfile);
+    backend_c_generate_top_level(ast, global_type_table, main_file_directory, outfile, compiler_path);
     printf("Generate time: %fms\n", (os_time_us() - generate_start) / 1000.0);
 
     double gcc_start = os_time_us();
