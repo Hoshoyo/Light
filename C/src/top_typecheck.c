@@ -524,6 +524,12 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 type = type_internalize(type);
             }
         } break;
+        case TYPE_KIND_DIRECTIVE: {
+            Light_Ast* directive_expr = type->directive->expr_directive.expr;
+            Light_Type* inferred = type_infer_expression(directive_expr, error);
+            if(!inferred || *error & TYPE_ERROR) return 0;
+            return typecheck_resolve_type(directive_expr->scope_at, inferred, 0, error);
+        } break;
         default: assert(0); break;
     }
 

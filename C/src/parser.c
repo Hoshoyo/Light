@@ -954,6 +954,51 @@ parse_expr_literal_array(Light_Parser* parser, Light_Scope* scope, u32* error) {
 	return result;
 }
 
+Light_Ast*
+parse_expr_directive(Light_Parser* parser, Light_Scope* scope, u32* error) {
+    Light_Lexer* lexer = parser->lexer;
+    lexer_next(lexer); // eat #
+
+    Light_Token* directive = lexer_next(lexer);
+
+    if(directive->type != TOKEN_IDENTIFIER) {
+        if(error) *error |= PARSER_ERROR_FATAL;
+        *error |= parser_error_fatal(parser, directive, "expected directive but got '%.*s'\n", TOKEN_STR(directive));
+        return 0;
+    }
+
+    if(directive->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF].data) {
+        Light_Ast* expression = parse_expression(parser, scope, error);
+        ReturnIfError();
+        return ast_new_expr_directive(scope, EXPR_DIRECTIVE_TYPEOF, directive, expression, 0);
+    } else if(directive->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEVALUE].data) {
+        Light_Type* type = parse_type(parser, scope, error);
+        ReturnIfError();
+        return ast_new_expr_directive(scope, EXPR_DIRECTIVE_TYPEVALUE, directive, 0, type);
+    } else if(directive->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_SIZEOF].data) {
+        // optional parentheses
+        bool optional_paren = false;
+        if(lexer_peek(lexer)->type == '(') {
+            optional_paren = true;
+            lexer_next(lexer);
+        }
+        Light_Type* type = parse_type(parser, scope, error);
+        ReturnIfError();
+
+        if(optional_paren) {
+            *error |= parser_require_and_eat(parser, ')');
+            ReturnIfError();
+        }
+        return ast_new_expr_directive(scope, EXPR_DIRECTIVE_SIZEOF, directive, 0, type);
+    } else {
+        *error |= parser_error_fatal(parser, directive, "invalid directive expression '%.*s'\n", TOKEN_STR(directive));
+        ReturnIfError();
+    }
+
+    // TODO(psv): #code #run
+    return 0;
+}
+
 Light_Ast* 
 parse_expression_precedence10(Light_Parser* parser, Light_Scope* scope, u32* error) {
 	Light_Token* t = lexer_peek(parser->lexer);
@@ -976,9 +1021,7 @@ parse_expression_precedence10(Light_Parser* parser, Light_Scope* scope, u32* err
             return ast_new_expr_variable(scope, t);
         }
 	} else if(t->type == '#') {
-        // TODO(psv):
-        assert(0);
-		//return parse_directive_expression(parser, scope, error);
+		return parse_expr_directive(parser, scope, error);
 	} else if(t->type == '(') {
 		// ( expr )
 		lexer_next(parser->lexer);
@@ -1401,6 +1444,26 @@ parse_type_union(Light_Parser* parser, Light_Scope* scope, u32* error) {
 }
 
 Light_Type*
+parse_directive_typeof(Light_Parser* parser, Light_Scope* scope, u32* error) {
+    *error |= parser_require_and_eat(parser, '#');
+    ReturnIfError();
+
+    Light_Token* directive = lexer_next(parser->lexer);
+    if(directive->type != TOKEN_IDENTIFIER) {
+        *error |= parser_error_fatal(parser, directive, "expected 'type_of' but got '%.*s'\n", TOKEN_STR(directive));
+        return 0;
+    }
+
+    Light_Ast* expr = parse_expression(parser, scope, error);
+    ReturnIfError();
+
+    Light_Ast* expr_directive = ast_new_expr_directive(scope, EXPR_DIRECTIVE_TYPEOF, directive, expr, 0);
+    ReturnIfError();
+
+    return type_new_directive(expr_directive);
+}
+
+Light_Type*
 parse_type(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Token* t = lexer_peek(parser->lexer);
 
@@ -1433,6 +1496,9 @@ parse_type(Light_Parser* parser, Light_Scope* scope, u32* error) {
             return parse_type_struct(parser, scope, error);
         case TOKEN_KEYWORD_UNION:
             return parse_type_union(parser, scope, error);
+        case '#':
+            // a type can be returned from #type_of
+            return parse_directive_typeof(parser, scope, error);
         default:
             *error |= parser_error_fatal(parser, t, "invalid token '%.*s' in type declaration\n", TOKEN_STR(t));
             break;

@@ -37,3 +37,4 @@ Light_Type* type_new_function(Light_Type** arguments_types, Light_Type* return_t
 Light_Type* type_new_enum(Light_Ast** fields, s32 fields_count, Light_Type* type_hint, Light_Scope* enum_scope);
 Light_Type* type_new_struct(Light_Ast** fields, s32 fields_count, Light_Scope* struct_scope);
 Light_Type* type_new_union(Light_Ast** fields, s32 fields_count, Light_Scope* union_scope);
+Light_Type* type_new_directive(Light_Ast* expr);

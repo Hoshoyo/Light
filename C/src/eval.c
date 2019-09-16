@@ -326,3 +326,19 @@ eval_literal_primitive(Light_Ast* p) {
     
     return true;
 }
+
+void
+eval_directive_sizeof(Light_Ast* directive) {
+	assert(directive->expr_directive.type == EXPR_DIRECTIVE_SIZEOF);
+	assert(directive->expr_directive.type_expr && directive->expr_directive.type_expr->flags & TYPE_FLAG_INTERNALIZED);
+
+	Light_Type* type = directive->expr_directive.type_expr;
+	Light_Token* dir_token = directive->expr_directive.directive_token;
+
+	// transform
+	directive->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
+	directive->type = type_primitive_get(TYPE_PRIMITIVE_S64); // default type is s64
+	directive->expr_literal_primitive.token = dir_token;
+	directive->expr_literal_primitive.type = LITERAL_HEX_INT;
+	directive->expr_literal_primitive.value_s64 = type->size_bits / 8; // size in bytes
+}

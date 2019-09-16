@@ -209,10 +209,11 @@ typedef struct {
 } Light_Ast_Expr_Proc_Call;
 
 typedef enum {
-	EXPR_DIRECTIVE_SIZEOF,	// #sizeof type
-	EXPR_DIRECTIVE_TYPEOF,  // #typeof expr
-	EXPR_DIRECTIVE_RUN,		// #run expr
-	EXPR_DIRECTIVE_COMPILE, // #compile `string`
+	EXPR_DIRECTIVE_SIZEOF,	  // #size_of type
+	EXPR_DIRECTIVE_TYPEOF,    // #type_of expr
+	EXPR_DIRECTIVE_TYPEVALUE, // #type_value type
+	EXPR_DIRECTIVE_RUN,		  // #run expr
+	EXPR_DIRECTIVE_COMPILE,   // #compile `string`
 } Light_Expr_Directive_Type;
 
 typedef struct {
@@ -422,6 +423,7 @@ typedef enum {
     TYPE_KIND_FUNCTION,
 	TYPE_KIND_ENUM,
     TYPE_KIND_ALIAS,
+	TYPE_KIND_DIRECTIVE,
 } Light_Type_Kind;
 
 typedef enum {
@@ -509,8 +511,8 @@ typedef enum {
 typedef struct Light_Type_t{
     Light_Type_Kind kind;
     uint32_t        flags;
-    uint32_t        size_bits;
 	uint32_t        type_table_index;
+    uint64_t        size_bits;
 
     union {
         Light_Type_Primitive primitive;
@@ -521,6 +523,7 @@ typedef struct Light_Type_t{
         Light_Type_Function  function;
 		Light_Type_Enum      enumerator;
         Light_Type_Alias     alias;
+		Light_Ast*           directive;
     };
 } Light_Type;
 
@@ -558,6 +561,7 @@ Light_Ast* ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* r
 Light_Ast* ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier);
 Light_Ast* ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count, Light_Token* op);
 Light_Ast* ast_new_expr_variable(Light_Scope* scope, Light_Token* name);
+Light_Ast* ast_new_expr_directive(Light_Scope* scope, Light_Expr_Directive_Type directive_type, Light_Token* token, Light_Ast* expr, Light_Type* type);
 
 // Utils
 bool literal_primitive_evaluate(Light_Ast* p);

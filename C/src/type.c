@@ -141,8 +141,20 @@ type_new_pointer(Light_Type* pointer_to) {
     result->size_bits = type_pointer_size_bits();
     result->pointer_to = pointer_to;
 
-    if(pointer_to->flags & TYPE_FLAG_INTERNALIZED)
+    if(pointer_to && pointer_to->flags & TYPE_FLAG_INTERNALIZED)
         result = type_internalize(result);
+
+    return result;
+}
+
+Light_Type* 
+type_new_directive(Light_Ast* expr) {
+    Light_Type* result = type_alloc();
+
+    result->kind = TYPE_KIND_DIRECTIVE;
+    result->flags = 0;
+    result->size_bits = 0;
+    result->directive = expr;
 
     return result;
 }

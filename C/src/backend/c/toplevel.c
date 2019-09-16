@@ -128,6 +128,10 @@ emit_type_start(catstring* buffer, Light_Type* type, u32 flags) {
             }
         } break;
         case TYPE_KIND_POINTER:{
+            if(type->pointer_to->kind == TYPE_KIND_STRUCT)
+                catsprint(buffer, "struct ");
+            if(type->pointer_to->kind == TYPE_KIND_UNION)
+                catsprint(buffer, "union ");
             emit_type_start(buffer, type->pointer_to, flags);
             catsprint(buffer, "*");
         } break;
@@ -967,7 +971,7 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table,
 
     catstring_append(&code, &decls);
 
-    catsprint(&code, "int main() { __light_load_type_table(); __light_main(); }\n");
+    catsprint(&code, "int main() { __light_load_type_table(); return __light_main(); }\n");
 
     catstring outfile = {0};
     catsprint(&outfile, "%s%s.c\0", path, filename);

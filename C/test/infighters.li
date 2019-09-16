@@ -1,22 +1,119 @@
-#import "../x11/x11.li"
-#import "../linux/print.li"
-#import "../GL/gl.li"
-#import "../GL/ho_gl.li"
-#import "renderer.li"
+#import "x11.li"
 
-Window_Info :: struct {
-	width : s32;
-	height : s32;
-	display : ^Display;
-	window_handle : u64;
-	vi : ^XVisualInfo;
-	swa : XSetWindowAttributes;
-	ctx : GLXContext;
-	cmap : Colormap;
+string struct {
+	capacity : u64;
+	length   : u64;
+	data     : ^u8;
 }
 
-init_opengl :: (info : ^Window_Info) -> s32 {
-    visual_attribs := array{
+memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("C");
+
+glEnable : (cap : u32) -> void #extern("GL");
+glClear : (mask : u32) -> void #extern("GL");
+glClearColor : (r : r32, g : r32, b : r32, a : r32) -> void #extern("GL");
+glViewport : (x : s32, y : s32, width : s32, height : s32) -> void #extern("GL");
+
+glXChooseFBConfig : (dpy : ^Display, screen : s32, attrib_list : ^u32, nelements : ^s32) -> ^GLXFBConfig #extern("C");
+glXGetVisualFromFBConfig : (dpy : ^Display, config : GLXFBConfig) -> ^XVisualInfo #extern("C");
+glXGetFBConfigAttrib : (dpy : ^Display, config : GLXFBConfig, attribute : s32, value : ^s32) -> s32 #extern("C");
+glXGetProcAddressARB : (name : ^u8) -> ^void #extern("C");
+glXIsDirect : (display : ^Display, ctx : GLXContext) -> bool #extern("C");
+glXQueryVersion : (dpy : ^Display, major : ^s32, minor : ^s32) -> bool #extern("C");
+
+// Glx Linux specific
+
+GL_DEPTH_TEST : u32 : 0x0B71;
+GL_DEPTH_BUFFER_BIT : u32 : 0x00000100;
+GL_COLOR_BUFFER_BIT : u32 : 0x00004000;
+GL_PROJECTION : u32 : 0x1701;
+
+GLX_X_RENDERABLE : u32 : 0x8012;
+GLX_DRAWABLE_TYPE : u32 : 0x8010;
+GLX_RENDER_TYPE : u32 : 0x8011;
+GLX_RGBA_BIT : u32 : 0x1;
+GLX_X_VISUAL_TYPE : u32 : 0x22;
+GLX_TRUE_COLOR : u32 : 0x8002;
+GLX_RED_SIZE : u32 : 8;
+GLX_GREEN_SIZE : u32 : 9;
+GLX_BLUE_SIZE : u32 : 10;
+GLX_ALPHA_SIZE : u32 : 11;
+GLX_DEPTH_SIZE : u32 : 12;
+GLX_STENCIL_SIZE : u32 : 13;
+GLX_DOUBLEBUFFER : u32 : 5;
+GLX_WINDOW_BIT : u32 : 1;
+GLX_SAMPLE_BUFFERS : s32 : 100000;
+GLX_SAMPLES : s32 : 100001;
+True : u32 : 1;
+
+GLX_CONTEXT_MAJOR_VERSION_ARB : s32 : 0x2091;
+GLX_CONTEXT_MINOR_VERSION_ARB : s32 : 0x2092;
+GLX_CONTEXT_FLAGS_ARB : s32 : 0x2094;
+GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB : s32 : 0x00000002;
+
+s32_to_str : (val : s32, buffer : [16]u8) -> s64 {
+    b : [16]u8;
+    sum : s32;
+
+    if val == 0 {
+        buffer[0] = '0';
+        return 1;
+    }
+
+    if val < 0 {
+        val = -val;
+        buffer[0] = '-' -> u8;
+        sum = 1;
+    }
+    auxbuffer := &b[16];
+    start := auxbuffer + sum;
+
+    while val != 0 {
+        rem := val % 10;
+        val /= 10;
+        *auxbuffer = '0' + rem -> u8;
+        auxbuffer -= 1;
+    }
+
+    size := start - auxbuffer;
+    memcpy((&buffer[sum]) -> ^void, (auxbuffer + 1) -> ^void, size -> u64);
+    return size;
+}
+
+u32_to_str_base16 : (value : u32, leading_zeros : bool, buffer : ^s8) -> s64
+{
+    i : s64 = 0;
+    for ; i < 8; i += 1 {
+        f : u32 = (value & 0xf0000000) >> 28;
+        if(f > 9) buffer[i] = f -> s8 + 0x37;
+        else buffer[i] = f -> s8 + 0x30;
+        value = value << 4;
+    }
+    return i;
+}
+
+write : (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
+print_string : (str : string) -> s64{
+	return write(1, str.data -> ^void, str.length -> u64);
+}
+print_string_l : (str : ^u8, len : s64) -> s64 {
+	return write(1, str -> ^void, len -> u64);
+}
+
+print_s32 : (v : s32) -> s64 {
+	buffer : [16]u8;
+    len := s32_to_str(v, buffer);
+    return print_string_l(buffer -> ^u8, len);
+}
+
+print_u32 : (v : u32) -> s64 {
+    buffer : [16]u8;
+    print_string("0x");
+    len := u32_to_str_base16(v, true, buffer -> ^s8);
+    return print_string_l(buffer -> ^u8, len);
+}
+
+init_opengl : (display : ^Display) -> u64 {
+	visual_attribs := [
 		GLX_X_RENDERABLE, True,
 		GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
 		GLX_RENDER_TYPE, GLX_RGBA_BIT,
@@ -29,20 +126,23 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 		GLX_STENCIL_SIZE, 8,
 		GLX_DOUBLEBUFFER, True,
 		0
-	};
+	];
+
 	glx_minor : s32;
 	glx_major : s32;
 
-	if !glXQueryVersion(info.display, &glx_major, &glx_minor) || ((glx_major == 1) && (glx_minor < 3)) || (glx_major < 1){
+	if !glXQueryVersion(display, &glx_major, &glx_minor) || ((glx_major == 1) && (glx_minor < 3)) || (glx_major < 1){
 		print_string("invalid glx version!\n");
-		return -1;
+		return 0;
 	}
+	
 	// Getting framebuffer config
 	fbcount : s32;
-	fbc := glXChooseFBConfig(info.display, DefaultScreen(info.display), [^u32]visual_attribs, &fbcount);
-	if fbc == [^GLXFBConfig]0 {
+	fbc := glXChooseFBConfig(display, DefaultScreen(display), visual_attribs->^u32, &fbcount);
+
+	if fbc == null -> ^GLXFBConfig {
 		print_string("Failed to get framebuffer configuration\n");
-		return -1;
+		return 0;
 	}
 
 	best_fbc : s32 = -1;
@@ -51,17 +151,17 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 	worst_num_samp : s32 = 999;
 
 	for i :s32= 0; i < fbcount; i += 1 {
-		vi : ^XVisualInfo = glXGetVisualFromFBConfig(info.display, fbc[i]);
-		if vi != [^XVisualInfo]0 {
+		vi : ^XVisualInfo = glXGetVisualFromFBConfig(display, fbc[i]);
+		if vi != null -> ^XVisualInfo {
 			samp_buf : s32;
 			samples : s32;
-			glXGetFBConfigAttrib(info.display, fbc[i], GLX_SAMPLE_BUFFERS, &samp_buf);
-			glXGetFBConfigAttrib(info.display, fbc[i], GLX_SAMPLES       , &samples);
-			
+			glXGetFBConfigAttrib(display, fbc[i], GLX_SAMPLE_BUFFERS, &samp_buf);
+			glXGetFBConfigAttrib(display, fbc[i], GLX_SAMPLES       , &samples);
+
 			print_string( "  Matching fbconfig ");
 			print_s32(i);
 			print_string(", visual ID 0x");
-			print_u32([u32](*vi).visualid);
+			print_u32(vi.visualid -> u32);
 			print_string(": SAMPLE_BUFFERS = ");
 			print_s32(samp_buf);
 			print_string(", SAMPLES = ");
@@ -77,161 +177,95 @@ init_opengl :: (info : ^Window_Info) -> s32 {
 				worst_num_samp = samples;
 			}
 		}
-		XFree([^void]vi);
+		XFree(vi -> ^void);
 	}
 
 	bestFbc := fbc[best_fbc];
-	XFree([^void]fbc);
+	XFree(fbc -> ^void);
 
-	print_string("best fbc: ");
-	print_s64([s64]bestFbc);
-	print_string("\n");
-
-
-	vi := glXGetVisualFromFBConfig(info.display, bestFbc);
+	vi := glXGetVisualFromFBConfig(display, bestFbc);
 	print_string("Chosen visual ID = 0x");
-	print_u32([u32](*vi).visualid);
+	print_u32(vi.visualid -> u32);
 	print_string("\n");
-	
+
 
 	swa : XSetWindowAttributes;
 	cmap : Colormap;
 
-	cmap = XCreateColormap(info.display, RootWindow(info.display, (*vi).screen), (*vi).visual, 0);
+	cmap = XCreateColormap(display, RootWindow(display, vi.screen), vi.visual, 0);
 	swa.colormap = cmap;
 	swa.background_pixmap = 0;
 	swa.border_pixel      = 0;
 	swa.event_mask        = StructureNotifyMask;
-	info.cmap = cmap;
+	//info.cmap = cmap;
 
 	print_string("Creating window\n");
-	win := XCreateWindow(info.display, RootWindow(info.display, (*vi).screen),
-		0, 0, 800, 600, 0, (*vi).depth, InputOutput, (*vi).visual,
-		CWBorderPixel|CWColormap|CWEventMask, &swa);
+	win := XCreateWindow(display, RootWindow(display, vi.screen),
+			0, 0, 800, 600, 0, vi.depth, InputOutput, vi.visual,
+			CWBorderPixel|CWColormap|CWEventMask, &swa);
 
-	info.window_handle = win;
+	window_handle := win;
 
 	if win == 0 {
 		print_string("Failed to create window.\n");
-		return -1;
+		return 0;
 	}
 
-	XFree([^void]vi);
+	XFree(vi -> ^void);
 
-	XStoreName(info.display, win, "GL 3.0 Window".data);
-	
+	XStoreName(display, win, "GL 3.0 Window".data);
+
 	print_string("Mapping window\n");
-	XMapWindow(info.display, win);
+	XMapWindow(display, win);
 
-	glXCreateContextAttribsARB := [(^Display, GLXFBConfig, GLXContext, bool, ^s32) -> GLXContext]glXGetProcAddressARB("glXCreateContextAttribsARB".data);
+	glXCreateContextAttribsARB := glXGetProcAddressARB("glXCreateContextAttribsARB".data) -> (^Display, GLXFBConfig, GLXContext, bool, ^s32) -> GLXContext;
 	ctx : GLXContext;
 
 	ctxErrorHandler : (^Display, ^XErrorEvent) -> s32;
 	XSetErrorHandler(ctxErrorHandler);
 
-	context_attribs := array {
-		GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
-		GLX_CONTEXT_MINOR_VERSION_ARB, 3,
-		GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
-		//GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
-		0
-	};
+	context_attribs := [
+			GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
+			GLX_CONTEXT_MINOR_VERSION_ARB, 3,
+			GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+			//GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+			0
+	];
 
-	ctx = glXCreateContextAttribsARB(info.display, bestFbc, [^void]0, true, [^s32]context_attribs);
-	info.ctx = ctx;
+	ctx = glXCreateContextAttribsARB(display, bestFbc, null -> GLXContext, true, context_attribs -> ^s32);
+	//info.ctx = ctx;
 
-	XSync(info.display, false);
+	XSync(display, false);
 
-	glXMakeCurrent(info.display, win, ctx);
+	glXMakeCurrent(display, win, ctx -> ^void);
 
 	// Verifying that context is a direct context
-	if (!glXIsDirect(info.display, ctx)) {
+	if (!glXIsDirect(display, ctx)) {
 		print_string( "Indirect GLX rendering context obtained\n" );
 	} else {
 		print_string( "Direct GLX rendering context obtained\n" );
 	}
+
+	return win;
 }
 
-release_opengl :: (info : ^Window_Info) -> s32 {
-	glXMakeCurrent(info.display, 0, null);
-	glXDestroyContext(info.display, info.ctx);
-
-	XDestroyWindow(info.display, info.window_handle);
-	XFreeColormap(info.display, info.cmap);
-	XCloseDisplay(info.display);
-}
-
-sleep :: (seconds : u32) -> s32 #foreign("c");
-usleep :: (useconds : u64) -> s32 #foreign("c");
-
-assert :: (expr : bool) -> void {
-	if !expr {
-		print_string("Assertion failed\n");
-		*[^u8]0 = 0;
-	}
-}
-
-main :: () -> s32 {
-	info : Window_Info;
-	info.display = XOpenDisplay([^s8]0);
-	if info.display == [^Display]0 {
+main : () -> s32 {
+	display := XOpenDisplay(null -> ^s8);
+	if display == null -> ^Display {
 		print_string("could not open display\n");
+		return 1;
 	}
 
-	if init_opengl(&info) == -1 return -1;
-	hogl_init_extensions();
-
-	render_context_init();
-
-	screen_width : s32;
-	screen_height : s32;
-
-	screen_size(&info, &screen_width, &screen_height);
-
-	cube := cube_new();
-
+	window_handle := init_opengl(display);
+	
 	while true {
 		// 126,192,238
 		glClearColor(126.0 / 255.0, 192.0 / 255.0, 238.0 / 255.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		width : s32;
-		height : s32;
-		window_size(&info, &width, &height);
-
-		wnd_ctx.width = width;
-		wnd_ctx.height = height;
-		
-		glViewport(0,0, width, height);
-
-		quad : Quad_2D;
-		quad = quad_new(vec2:{0.0, 0.0}, 100.0, 100.0, vec4:{1.0, 0.0, 0.0, 1.0});
-
-		render_quad_immediate(&quad);
-		render_immediate_flush();
-
-		render_cube(cube);
-
-		glXSwapBuffers (info.display, info.window_handle);
+		glXSwapBuffers (display, window_handle);
 		//usleep(1000);
 	}
 
-	release_opengl(&info);
-
-    return 0;
-}
-
-screen_size :: (info : ^Window_Info, width : ^s32, height : ^s32) {
-	scr := DefaultScreen(info.display);
-	screen := info.display.screens[scr];
-	*width = screen.width;
-	*height = screen.height;
-}
-
-window_size :: (info : ^Window_Info, width : ^s32, height : ^s32) {
-	attribs : XWindowAttributes;
-	XGetWindowAttributes(info.display, info.window_handle, &attribs);
-
-	*width = attribs.width;
-	*height = attribs.height;
+	return 0;
 }

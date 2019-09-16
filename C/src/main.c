@@ -40,6 +40,10 @@ int main(int argc, char** argv) {
     while(array_length(parser.parse_queue_array) > 0) {
         Light_Lexer lexer = {0};
         Light_Token* tokens = lexer_file(&lexer, parser.parse_queue_array[0].data, 0);
+        if(tokens == 0) {
+            // File does not exist
+            return 1;
+        }
 
         ast = parse_top_level(&parser, &lexer, &global_scope, &parser_error);
 

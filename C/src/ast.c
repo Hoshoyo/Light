@@ -36,6 +36,26 @@ light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags) {
     return scope;
 }
 
+Light_Ast* ast_new_expr_directive(Light_Scope* scope, Light_Expr_Directive_Type directive_type, Light_Token* token, Light_Ast* expr, Light_Type* type) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_DIRECTIVE;
+    result->scope_at = scope;
+    result->type = 0;
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+
+    result->expr_directive.directive_token = token;
+    result->expr_directive.type = directive_type;
+
+    if(expr)
+        result->expr_directive.expr = expr;
+    else if(type)
+        result->expr_directive.type_expr = type;
+
+    return result;
+}
+
 Light_Ast* 
 ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));

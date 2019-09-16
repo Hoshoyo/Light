@@ -19,8 +19,9 @@ initialize_global_identifiers_table() {
     light_special_idents_table[LIGHT_SPECIAL_IDENT_ASSERT]  = MAKE_STR_LEN("assert", sizeof("assert") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_STRING]  = MAKE_STR_LEN("string", sizeof("string") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_IMPORT]  = MAKE_STR_LEN("import", sizeof("import") - 1);
-    light_special_idents_table[LIGHT_SPECIAL_IDENT_SIZEOF]  = MAKE_STR_LEN("sizeof", sizeof("sizeof") - 1);
-    light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF]  = MAKE_STR_LEN("typeof", sizeof("typeof") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_SIZEOF]  = MAKE_STR_LEN("size_of", sizeof("size_of") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF]  = MAKE_STR_LEN("type_of", sizeof("type_of") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEVALUE]  = MAKE_STR_LEN("type_value", sizeof("type_value") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_END]     = MAKE_STR_LEN("end", sizeof("end") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_RUN]     = MAKE_STR_LEN("run", sizeof("run") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_EXTERN] = MAKE_STR_LEN("extern", sizeof("extern") - 1);

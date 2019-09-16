@@ -1019,7 +1019,7 @@ type_infer_expr_binary(Light_Ast* expr, u32* error) {
                 } else if(left->kind == TYPE_KIND_POINTER) {
                     return left->pointer_to;
                 } else {
-                    type_error(error, expr->expr_binary.token_op, "Type Error: cannot access non array/pointer type\n");
+                    type_error(error, expr->expr_binary.token_op, "cannot access non array/pointer type\n");
                 }
             } else {
                 type_error(error, expr->expr_binary.token_op, 
@@ -1079,6 +1079,35 @@ find_enum_field_decl(Light_Scope* scope, Light_Token* ident, u32* error) {
     return 0;
 }
 
+Light_Type*
+type_infer_expr_directive(Light_Ast* expr, u32* error) {
+    assert(expr->kind == AST_EXPRESSION_DIRECTIVE);
+
+    switch(expr->expr_directive.type) {
+        case EXPR_DIRECTIVE_SIZEOF:{
+            Light_Type* type = typecheck_resolve_type(expr->scope_at, expr->expr_directive.type_expr, 0, error);
+            if(type && type->flags & TYPE_FLAG_INTERNALIZED) {
+                // transform this node into a literal with the size of the type
+                expr->expr_directive.type_expr = type;
+                eval_directive_sizeof(expr);
+                return expr->type;
+            }
+        } break;
+        case EXPR_DIRECTIVE_TYPEOF:{
+            type_error(error, expr->expr_directive.directive_token, "'#type_of' directive cannot be used as an expression, consider using '#type_value' instead.\n");
+        } break;
+        case EXPR_DIRECTIVE_TYPEVALUE:{
+            assert(0);
+        } break;
+
+        case EXPR_DIRECTIVE_RUN:
+        case EXPR_DIRECTIVE_COMPILE:
+        // TODO(psv): other directives
+        default: assert(0); break;
+    }
+
+    return 0;
+}
 
 Light_Type* 
 type_infer_expr_dot(Light_Ast* expr, u32* error) {
@@ -1201,8 +1230,7 @@ type_infer_expression(Light_Ast* expr, u32* error) {
             break;
 
         case AST_EXPRESSION_DIRECTIVE:
-            // TODO(psv):
-            assert(0);
+            type = type_infer_expr_directive(expr, error);
             break;
         default: assert(0); break;
     }
