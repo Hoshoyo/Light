@@ -510,6 +510,7 @@ typedef struct Light_Type_t{
     Light_Type_Kind kind;
     uint32_t        flags;
     uint32_t        size_bits;
+	uint32_t        type_table_index;
 
     union {
         Light_Type_Primitive primitive;

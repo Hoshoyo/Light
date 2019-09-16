@@ -193,8 +193,11 @@ emit_typed_procedure_declaration(catstring* buffer, Light_Ast* decl) {
     catsprint(buffer, " ");
     
     // name
-    if(decl->decl_proc.name)
+    if(decl->decl_proc.name && decl->decl_proc.flags & DECL_PROC_FLAG_MAIN) {
+        catsprint(buffer, "__light_main");
+    } else {
         catsprint_token(buffer, decl->decl_proc.name);
+    }
 
     // end (arguments)
     catsprint(buffer, ")(");
@@ -769,55 +772,144 @@ emit_forward_type_decl(catstring* buffer, Light_Type** type_array) {
 
 static void
 emit_type_table(catstring* buffer, Light_Type** type_table) {
-    catsprint(buffer, "User_Type_Info __light_type_table[%l] = {\n", array_length(type_table));
+    catstring table = {0};
+    catstring arrays_before = {0};
+    catstring arrays_after = {0};
+    catstring loader = {0};
+
+    catsprint(&loader, "\nvoid __light_load_type_table() {\n");
+
+    //catsprint(&arrays, "string __light_type_array_names[] = {\n");
+    catsprint(&table, "User_Type_Info __light_type_table[%l] = {\n", array_length(type_table));
 
     for(int i = 0; i < array_length(type_table); ++i) {
         Light_Type* type = type_table[i];
+        type_table[i]->type_table_index = i;
 
         if(i > 0) {
-            catsprint(buffer, ",\n");
+            catsprint(&table, ",\n");
         }
 
         // kind, flags, type_size_bytes
-        catsprint(buffer, "{ %d, %d, %d, {", type->kind, type->flags, type->size_bits / 8);
+        catsprint(&table, "{ %d, %d, %d, {", type->kind, type->flags, type->size_bits / 8);
 
         switch(type->kind) {
             case TYPE_KIND_PRIMITIVE:
-                catsprint(buffer, " .primitive = %d", type->primitive);
+                catsprint(&table, " .primitive = %d", type->primitive);
                 break;
             case TYPE_KIND_POINTER:
-                catsprint(buffer, " .pointer_to = 0");
+                catsprint(&table, " .pointer_to = &__light_type_table[%l]", type->pointer_to->type_table_index);
                 break;
             case TYPE_KIND_ARRAY:
-                catsprint(buffer, " .array_desc = { 0, %u }", type->array_info.dimension);
+                catsprint(&table, " .array_desc = { &__light_type_table[%l], %u }", type->array_info.array_of->type_table_index, type->array_info.dimension);
                 break;
             case TYPE_KIND_ALIAS:
-                // TODO(psv): name, alias_to
-                catsprint(buffer, " .alias_desc = { {0, %d, 0}, 0 }", type->alias.name->length);
+                catsprint(&table, " .alias_desc = { {0, %d, \"%s+\"}, &__light_type_table[%l] }", type->alias.name->length, 
+                    type->alias.name->length, type->alias.name->data, type->alias.alias_to->type_table_index);
                 break;
             case TYPE_KIND_ENUM:
                 // TODO(psv):
-                catsprint(buffer, " .primitive = 0");
+                catsprint(&table, " .primitive = 0");
                 break;
             case TYPE_KIND_FUNCTION:
                 // TODO(psv): arguments_types, arguments_names
-                catsprint(buffer, " .function_desc = { 0, 0, 0, %d }", type->function.arguments_count);
+                if(type->function.arguments_names) {
+                    catsprint(&arrays_after, "__type_names[] = {");
+                    for(int a = 0; a < type->function.arguments_count; ++a) {
+                        if(a > 0) catsprint(&arrays_after, ", ");
+                        catsprint(&arrays_after, "\"%s+\"", 
+                            type->function.arguments_names_length[a], 
+                            type->function.arguments_names[a]);
+                    }
+                    catsprint(&arrays_after, "};\n");
+                }
+
+                catsprint(&table, " .function_desc = { &__light_type_table[%l], 0, 0, %d }", 
+                    type->function.return_type->type_table_index,
+                    type->function.arguments_count);
                 break;
-            case TYPE_KIND_STRUCT:
-                // TODO(psv): fields_types, fields_names, fields_offsets_bits
-                catsprint(buffer, " .struct_desc = { 0, 0, 0, %d, %d }", type->struct_info.fields_count, type->struct_info.alignment_bytes);
-                break;
-            case TYPE_KIND_UNION:
-                // TODO(psv): fields_types, fields_names, fields_count, alignment
-                catsprint(buffer, " .union_desc = { 0, 0, %d, %d }", type->union_info.fields_count, type->union_info.alignment_bytes);
-                break;
+            case TYPE_KIND_STRUCT:{
+                if(type->struct_info.fields_count > 0) {
+                    // forward declaration
+                    catsprint(&arrays_before, "User_Type_Info* __struct_field_types_%x[%l] = {0};\n", type, type->struct_info.fields_count);
+
+                    // Emit array with the names of all fields before, since we don't depend
+                    // on any information other than the name string and length.
+                    catsprint(&arrays_before, "string __struct_field_names_%x[%l] = {", type, type->struct_info.fields_count);
+                    for(int f = 0; f < type->struct_info.fields_count; ++f) {
+                        Light_Ast* field = type->struct_info.fields[f];
+                        assert(field->kind == AST_DECL_VARIABLE);
+                        if(f > 0) catsprint(&arrays_before, ", ");
+                        catsprint(&arrays_before, "{ 0, %l, \"%s+\" }", 
+                            field->decl_variable.name->length, field->decl_variable.name->length, field->decl_variable.name->data);
+                    }
+                    catsprint(&arrays_before, "};\n");
+                    
+                    // TODO(psv): emit offsets
+
+                    for(int f = 0; f < type->struct_info.fields_count; ++f) {
+                        Light_Ast* field = type->struct_info.fields[f];
+                        assert(field->kind == AST_DECL_VARIABLE);
+                        catsprint(&loader, "__struct_field_types_%x[%l] = &__light_type_table[%l];\n", type, f, type->struct_info.fields[f]->decl_variable.type->type_table_index);
+                    }
+                    catsprint(&loader, "\n");
+
+                    catsprint(&table, " .struct_desc = { (User_Type_Info**)&__struct_field_types_%x, __struct_field_names_%x, 0, %d, %d }", 
+                        type, type,
+                        type->struct_info.fields_count, 
+                        type->struct_info.alignment_bytes);
+                } else {
+                    catsprint(&table, " .struct_desc = { 0, 0, 0, %d, %d }", 
+                        type->struct_info.fields_count, type->struct_info.alignment_bytes);
+                }
+            } break;
+            case TYPE_KIND_UNION: {
+                if(type->union_info.fields_count > 0) {
+                    // forward declaration
+                    catsprint(&arrays_before, "User_Type_Info* __union_field_types_%x[%l] = {0};\n", type, type->union_info.fields_count);
+
+                    // Emit array with the names of all fields before, since we don't depend
+                    // on any information other than the name string and length.
+                    catsprint(&arrays_before, "string __union_field_names_%x[%l] = {", type, type->union_info.fields_count);
+                    for(int f = 0; f < type->union_info.fields_count; ++f) {
+                        Light_Ast* field = type->union_info.fields[f];
+                        assert(field->kind == AST_DECL_VARIABLE);
+                        if(f > 0) catsprint(&arrays_before, ", ");
+                        catsprint(&arrays_before, "{ 0, %l, \"%s+\" }", 
+                            field->decl_variable.name->length, field->decl_variable.name->length, field->decl_variable.name->data);
+                    }
+                    catsprint(&arrays_before, "};\n");
+
+                    for(int f = 0; f < type->union_info.fields_count; ++f) {
+                        Light_Ast* field = type->union_info.fields[f];
+                        assert(field->kind == AST_DECL_VARIABLE);
+                        catsprint(&loader, "__union_field_types_%x[%l] = &__light_type_table[%l];\n", type, f, type->union_info.fields[f]->decl_variable.type->type_table_index);
+                    }
+                    catsprint(&loader, "\n");
+
+                    catsprint(&table, " .union_desc = { (User_Type_Info**)&__union_field_types_%x, __union_field_names_%x, 0, %d, %d }", 
+                        type, type,
+                        type->union_info.fields_count, 
+                        type->union_info.alignment_bytes);
+                } else {
+                    catsprint(&table, " .union_desc = { 0, 0, %d, %d }", 
+                        type->union_info.fields_count, type->union_info.alignment_bytes);
+                }
+            } break;
             default: assert(0); break;
         }
 
-        catsprint(buffer, "}}");
+        catsprint(&table, "}}");
     }
 
-    catsprint(buffer, "};\n");
+    catsprint(&table, "};\n");
+
+    catsprint(&loader, "}\n");
+
+    catstring_append(buffer, &arrays_before);
+    catstring_append(buffer, &table);
+    catstring_append(buffer, &arrays_after);
+    catstring_append(buffer, &loader);
 }
 
 void 
@@ -874,6 +966,8 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table,
     }
 
     catstring_append(&code, &decls);
+
+    catsprint(&code, "int main() { __light_load_type_table(); __light_main(); }\n");
 
     catstring outfile = {0};
     catsprint(&outfile, "%s%s.c\0", path, filename);

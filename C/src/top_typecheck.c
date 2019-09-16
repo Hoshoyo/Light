@@ -668,6 +668,10 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             } else {
                 node->decl_proc.return_type = node->decl_proc.proc_type->function.return_type;
                 typecheck_remove_from_infer_queue(node);
+
+                if(node->decl_proc.name->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_MAIN].data) {
+                    node->decl_proc.flags |= DECL_PROC_FLAG_MAIN;
+                }
             }
         } break;
         case AST_DECL_TYPEDEF: {
