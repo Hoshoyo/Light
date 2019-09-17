@@ -478,6 +478,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     Light_Type** args_types = 0;
     bool all_args_internalized = true;
     bool variable_declaration = false;
+    u32 function_flags = 0;
 
     if(lexer_peek(lexer)->type != ')') {
         arguments = array_new(Light_Ast*);
@@ -496,8 +497,27 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
             *error |= parser_require_and_eat(parser, ':');
             ReturnIfError();
 
-            Light_Type* arg_type = parse_type(parser, scope, error);
-            ReturnIfError();
+            Light_Type* arg_type = 0;
+
+            bool variadic = false;
+            // TODO(psv): refactor token to be ...
+            if(lexer_peek(parser->lexer)->type == '.') {
+                *error |= parser_require_and_eat(parser, '.');
+                ReturnIfError();
+                *error |= parser_require_and_eat(parser, '.');
+                ReturnIfError();
+                *error |= parser_require_and_eat(parser, '.');
+                ReturnIfError();
+                function_flags |= TYPE_FUNCTION_VARIADIC;
+                variadic = true;
+
+                // TODO(psv): make it ^User_Type_Info when variadic
+                // this will probably be done in the type checking phase
+                arg_type = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
+            } else {
+                arg_type = parse_type(parser, scope, error);
+                ReturnIfError();
+            }
 
             Light_Ast* arg = parse_decl_variable(parser, name, arg_type, args_scope, error, false);
             array_push(arguments, arg);
@@ -508,6 +528,9 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
             args_scope->decl_count++;
             array_push(args_scope->decls, arg);
             ++args_count;
+
+            if(variadic)
+                break; // must be the last one
 
 			if (lexer_peek(lexer)->type != ',') break;
 		}        
@@ -526,7 +549,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
         ReturnIfError();
 	}
 
-    Light_Type* proc_type = type_new_function(args_types, return_type, args_count, all_args_internalized);
+    Light_Type* proc_type = type_new_function(args_types, return_type, args_count, all_args_internalized, function_flags);
 
     Light_Ast* body = 0;
     u32 flags = 0;
@@ -976,19 +999,10 @@ parse_expr_directive(Light_Parser* parser, Light_Scope* scope, u32* error) {
         ReturnIfError();
         return ast_new_expr_directive(scope, EXPR_DIRECTIVE_TYPEVALUE, directive, 0, type);
     } else if(directive->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_SIZEOF].data) {
-        // optional parentheses
-        bool optional_paren = false;
-        if(lexer_peek(lexer)->type == '(') {
-            optional_paren = true;
-            lexer_next(lexer);
-        }
+        // can't have optional parantheses because of functional types
         Light_Type* type = parse_type(parser, scope, error);
         ReturnIfError();
 
-        if(optional_paren) {
-            *error |= parser_require_and_eat(parser, ')');
-            ReturnIfError();
-        }
         return ast_new_expr_directive(scope, EXPR_DIRECTIVE_SIZEOF, directive, 0, type);
     } else {
         *error |= parser_error_fatal(parser, directive, "invalid directive expression '%.*s'\n", TOKEN_STR(directive));
@@ -1257,6 +1271,7 @@ parse_type_procedure(Light_Parser* parser, Light_Scope* scope, u32* error) {
     ReturnIfError();
 
     bool all_args_internalized = true;
+    u32 flags = 0;
     Light_Type** arguments_types = 0;
     if(lexer_peek(parser->lexer)->type != ')') {
         arguments_types = array_new(Light_Type*);
@@ -1265,6 +1280,18 @@ parse_type_procedure(Light_Parser* parser, Light_Scope* scope, u32* error) {
                 *error |= parser_require_and_eat(parser, ',');
                 ReturnIfError();
             }
+            // TODO(psv): refactor token to be ...
+            if(lexer_peek(parser->lexer)->type == '.') {
+                *error |= parser_require_and_eat(parser, '.');
+                ReturnIfError();
+                *error |= parser_require_and_eat(parser, '.');
+                ReturnIfError();
+                *error |= parser_require_and_eat(parser, '.');
+                ReturnIfError();
+                flags |= TYPE_FUNCTION_VARIADIC;
+                break; // must be the last one
+            }
+
             Light_Type* arg_type = parse_type(parser, scope, error);
             array_push(arguments_types, arg_type);
             if(!(arg_type->flags & TYPE_FLAG_INTERNALIZED)) all_args_internalized = false;
@@ -1288,7 +1315,7 @@ parse_type_procedure(Light_Parser* parser, Light_Scope* scope, u32* error) {
     }
 
     s32 args_count = (arguments_types) ? array_length(arguments_types) : 0;
-    return type_new_function(arguments_types, return_type, args_count, all_args_internalized);
+    return type_new_function(arguments_types, return_type, args_count, all_args_internalized, flags);
 }
 static Light_Type*
 parse_type_alias(Light_Parser* parser, Light_Scope* scope, u32* error) {
@@ -1449,7 +1476,7 @@ parse_directive_typeof(Light_Parser* parser, Light_Scope* scope, u32* error) {
     ReturnIfError();
 
     Light_Token* directive = lexer_next(parser->lexer);
-    if(directive->type != TOKEN_IDENTIFIER) {
+    if(directive->type != TOKEN_IDENTIFIER || directive->data != (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF].data) {
         *error |= parser_error_fatal(parser, directive, "expected 'type_of' but got '%.*s'\n", TOKEN_STR(directive));
         return 0;
     }

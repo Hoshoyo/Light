@@ -476,6 +476,9 @@ typedef struct {
 	int32_t       alignment_bytes;
 } Light_Type_Union;
 
+typedef enum {
+	TYPE_FUNCTION_VARIADIC = (1 << 0),
+} Light_Type_Function_Flags;
 typedef struct {
     struct Light_Type_t*  return_type;
 	struct Light_Type_t** arguments_type;
@@ -484,6 +487,7 @@ typedef struct {
         int32_t* arguments_names_length;
     };
 	int32_t      arguments_count;
+	uint32_t     flags;
 } Light_Type_Function;
 
 typedef struct {

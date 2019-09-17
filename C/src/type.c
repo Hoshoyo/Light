@@ -204,7 +204,7 @@ type_new_array(Light_Ast* dimension, Light_Type* type, Light_Token* token_array)
 }
 
 Light_Type* 
-type_new_function(Light_Type** arguments_types, Light_Type* return_type, s32 arguments_count, bool all_arguments_internalized) {
+type_new_function(Light_Type** arguments_types, Light_Type* return_type, s32 arguments_count, bool all_arguments_internalized, u32 flags) {
     Light_Type* result = type_alloc();
 
     result->kind = TYPE_KIND_FUNCTION;
@@ -214,6 +214,7 @@ type_new_function(Light_Type** arguments_types, Light_Type* return_type, s32 arg
     result->function.arguments_count = arguments_count;
     result->function.arguments_type = arguments_types;
     result->function.return_type = return_type;
+    result->function.flags = flags;
 
     if(return_type->flags & TYPE_FLAG_INTERNALIZED && all_arguments_internalized) {
         result = type_internalize(result);

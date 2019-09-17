@@ -232,6 +232,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 // won't work, since the scope from the expression is not
                 // unique.
                 Light_Ast* type_decl_from_name = type_infer_decl_from_name(scope, type->pointer_to->alias.name);
+                if(!type_decl_from_name) return 0;
                 type->pointer_to->alias.scope = type_decl_from_name->scope_at;
 
 

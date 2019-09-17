@@ -18,6 +18,7 @@ initialize_global_identifiers_table() {
     light_special_idents_table[LIGHT_SPECIAL_IDENT_FOREIGN] = MAKE_STR_LEN("foreign", sizeof("foreign") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_ASSERT]  = MAKE_STR_LEN("assert", sizeof("assert") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_STRING]  = MAKE_STR_LEN("string", sizeof("string") - 1);
+    light_special_idents_table[LIGHT_SPECIAL_IDENT_ARRAY]  = MAKE_STR_LEN("array", sizeof("array") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_IMPORT]  = MAKE_STR_LEN("import", sizeof("import") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_SIZEOF]  = MAKE_STR_LEN("size_of", sizeof("size_of") - 1);
     light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF]  = MAKE_STR_LEN("type_of", sizeof("type_of") - 1);
@@ -30,9 +31,11 @@ initialize_global_identifiers_table() {
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_FOREIGN], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_ASSERT], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_STRING], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_ARRAY], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_IMPORT], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_SIZEOF], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF], 0);
+    string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEVALUE], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_END], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_RUN], 0);
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_EXTERN], 0);
@@ -549,7 +552,11 @@ lexer_eat_whitespace(Light_Lexer* lexer) {
             if(c == '/' && lexer->stream[lexer->index + 1] == '/') {
                 // single line comment
                 lexer->index += 2;
-				while (lexer->stream[lexer->index] && lexer->stream[lexer->index] != '\n') {
+				while (lexer->stream[lexer->index] != '\n') {
+                    if(!lexer->stream[lexer->index]) {
+                        lexer->index--;
+                        break;
+                    }
 					lexer->index++;
 				}
                 lexer->line++;
@@ -613,7 +620,6 @@ lexer_internalize_keywords(Light_Lexer* lexer) {
         string_table_add(&lexer->keyword_table, MAKE_STR("struct", TOKEN_KEYWORD_STRUCT), 0);
         string_table_add(&lexer->keyword_table, MAKE_STR("enum", TOKEN_KEYWORD_ENUM), 0);
         string_table_add(&lexer->keyword_table, MAKE_STR("union", TOKEN_KEYWORD_UNION), 0);
-        string_table_add(&lexer->keyword_table, MAKE_STR("array", TOKEN_KEYWORD_ARRAY), 0);
         string_table_add(&lexer->keyword_table, MAKE_STR("null", TOKEN_KEYWORD_NULL), 0);
     }
 }
@@ -794,7 +800,6 @@ token_type_to_str(Light_Token_Type token_type) {
         case TOKEN_KEYWORD_ENUM:         return "enum"; break;
         case TOKEN_KEYWORD_STRUCT:       return "struct"; break;
         case TOKEN_KEYWORD_UNION:        return "union"; break;
-        case TOKEN_KEYWORD_ARRAY:        return "array"; break;
         case TOKEN_KEYWORD_NULL:         return "null"; break;
         default:                         return "unknown"; break;
     }

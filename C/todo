@@ -1,3 +1,5 @@
 internalization of pointers to aliases that are not declared do not cause an error
 numeric literals better type inference
 type max size now is 32bit
+size_of struct with only a character is 4
+variable declared void ( a := arr[0]; where arr is ^void)
