@@ -365,6 +365,8 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 offset_bits += field_type_size_bits;
             }
 
+            // @Important TODO(psv): default alignment is 4, but we gotta
+            // support smaller ones
             if(struct_alignment_bytes == 0) struct_alignment_bytes = 4; // default alignment is 32 bit/4 byte
             size_bits = offset_bits + (offset_bits % (struct_alignment_bytes * 8));
             type->size_bits = size_bits;
@@ -391,9 +393,29 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 }
             }
 
+            if(!all_fields_internalized)
+                return type;
+
+            // Calculate sizes for every field
+            s32 max_size = 0;
+            s32 size_bits = 0;
+            s32 offset_bits = 0;
+            s32 union_alignment_bytes = type->union_info.alignment_bytes;
+            for(s32 i = 0; i < type->union_info.fields_count; ++i) {
+                s32 field_type_size_bits = type->union_info.fields[i]->decl_variable.type->size_bits;
+                if(field_type_size_bits > max_size) max_size = field_type_size_bits;
+            }
+
+            // TODO(psv): consider alignment here
+            size_bits = max_size;
+            type->size_bits = size_bits;
+            type->union_info.size_bits = size_bits;
+            type->union_info.alignment_bytes = 4; // TODO(psv): alignment
+            type->flags |= TYPE_FLAG_SIZE_RESOLVED;
+
             if(all_fields_internalized) {
-                type = type_internalize(type);
                 type = typecheck_resolve_type_symbol_tables(type, flags, error);
+                type = type_internalize(type);
             }
         } break;
         case TYPE_KIND_FUNCTION: {
@@ -627,7 +649,7 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
                     node->decl_variable.type = type;
                 } else {
                     // Type check
-                    if(node->decl_variable.type != type) {
+                    if(!type_check_equality(node->decl_variable.type, type)) {
                         type_error_mismatch(&error, node->decl_variable.name, node->decl_variable.type, type);
                         fprintf(stderr, " in '%.*s' variable declaration\n", TOKEN_STR(node->decl_variable.name));
                         *decl_error |= error;
@@ -693,9 +715,9 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             Light_Type* type = typecheck_resolve_type(scope, referenced->alias.alias_to, flags, &error);
             if(error & TYPE_ERROR) { *decl_error |= error; return; }
             if(type->flags & TYPE_FLAG_INTERNALIZED) {
+                // @PatchType
                 Light_Type* alias_type = type_new_alias(node->scope_at, node->decl_typedef.name, type);
                 alias_type->size_bits = type->size_bits;
-                alias_type->flags = type->flags;
                 node->decl_typedef.type_referenced = type_internalize(alias_type);
 
                 typecheck_remove_from_infer_queue(node);

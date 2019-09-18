@@ -167,4 +167,6 @@ void         lexer_free(Light_Lexer* lexer);
 
 const char*  token_type_to_str(Light_Token_Type token_type);
 
+Light_Token* token_new_identifier_from_string(const char* str, int length);
+
 extern string light_special_idents_table[LIGHT_SPECIAL_IDENT_COUNT];

@@ -804,3 +804,16 @@ token_type_to_str(Light_Token_Type token_type) {
         default:                         return "unknown"; break;
     }
 }
+
+Light_Token* 
+token_new_identifier_from_string(const char* str, int length) {
+    Light_Token* token = (Light_Token*)light_alloc(sizeof(Light_Token));
+    token->column = 0;
+    token->line = 0;
+    token->type = TOKEN_IDENTIFIER;
+    token->length = length;
+    token->flags = 0;
+    token->filepath = 0;
+    token->data = (u8*)str;
+    return token;
+}

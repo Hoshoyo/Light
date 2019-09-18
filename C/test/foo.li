@@ -1,3 +1,5 @@
+#import "../modules/reflect.li"
+
 string struct {
     capacity : u64;
     length   : u64;
@@ -8,28 +10,20 @@ array struct {
     capacity  : u64;
     length    : u64;
     //type_info : ^User_Type_Info;
+    //type_info : ^void;
     data      : ^void;
 }
-hellow : (args : ...) {
-    a := args;
+hellow : (args : ...) -> s32 {
+    a := args -> ^array;
+    sum : s32 = 0;
+    for i :u64= 0; i < a.length; i += 1 {
+        d := (a.data -> ^s32)[i];
+        sum = sum + d;
+    }
+    return sum;
 }
-
-//hello : (args : array) {
-//    for i :u64= 0; i < args.length; i += 1 {
-//        value := (args.data -> ^s32)[i]; // value is ^void which is of type pointed by args.type_info
-//    }
-//}
 
 main : () -> s32 {
-    a := [&a];
-    hellow(1, 2, 3);
+    //return hellow(1, 2, 3);
     return 0;
 }
-
-//foo : (a : s32, b : s32, c : s32) -> s32 {
-//    return a + b + c;
-//}
-//
-//main : () -> s32 {
-//    return foo(1, 2.0, 3);
-//}

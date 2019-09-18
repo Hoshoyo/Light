@@ -47,11 +47,15 @@ type_check_equality(Light_Type* t1, Light_Type* t2) {
         return t1root == t2root;
     }
 
-    //if(t1root->kind == TYPE_KIND_POINTER && t2root->kind == TYPE_KIND_POINTER && 
-    //    t2root->pointer_to == type_primitive_get(TYPE_PRIMITIVE_VOID)) 
-    //{
-    //    return true;
-    //}
+    if(t1root->kind == TYPE_KIND_POINTER && t2root->kind == TYPE_KIND_POINTER) 
+    {
+        if(
+            t2root->pointer_to == type_primitive_get(TYPE_PRIMITIVE_VOID) ||
+            t1root->pointer_to == type_primitive_get(TYPE_PRIMITIVE_VOID))
+        {
+            return true;
+        }
+    }
 
     return t1 == t2;
 }
@@ -419,7 +423,14 @@ type_internalize(Light_Type* type) {
     internalized->flags |= TYPE_FLAG_INTERNALIZED;
     internalized->flags &= ~(TYPE_FLAG_WEAK);
 
-    if(added) {
+    if(added && !(internalized->flags & TYPE_FLAG_UNRESOLVED)) {
+        internalized->flags |= TYPE_FLAG_IN_TYPE_ARRAY;
+        array_push(global_type_array, internalized);
+    } else if(
+        !(internalized->flags & TYPE_FLAG_IN_TYPE_ARRAY) && 
+        !(internalized->flags & TYPE_FLAG_UNRESOLVED)) 
+    {
+        internalized->flags |= TYPE_FLAG_IN_TYPE_ARRAY;
         array_push(global_type_array, internalized);
     }
 

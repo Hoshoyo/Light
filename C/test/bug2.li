@@ -1,0 +1,20 @@
+#import "../modules/reflect.li"
+string struct {
+    capacity : u64;
+    length   : u64;
+    data     : ^u8;
+}
+
+base struct {
+    a : foo;
+}
+
+foo struct {
+    b : ^base;
+}
+
+main : () -> s32 {
+    xx : foo;
+    a := xx.b.a;
+    return 0;
+}

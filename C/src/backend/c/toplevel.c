@@ -761,6 +761,7 @@ emit_forward_type_decl(catstring* buffer, Light_Type** type_array) {
                     catsprint(buffer, "typedef ");
                     emit_typed_declaration(buffer, root->enumerator.type_hint, 0, 0);
                 } else {
+                    // TODO(psv): not always int
                     catsprint(buffer, "typedef int ");
                 }
                 catsprint_token(buffer, type->alias.name);
@@ -891,7 +892,7 @@ emit_type_table(catstring* buffer, Light_Type** type_table) {
                     }
                     catsprint(&loader, "\n");
 
-                    catsprint(&table, " .union_desc = { (User_Type_Info**)&__union_field_types_%x, __union_field_names_%x, 0, %d, %d }", 
+                    catsprint(&table, " .union_desc = { (User_Type_Info**)&__union_field_types_%x, __union_field_names_%x, %d, %d }", 
                         type, type,
                         type->union_info.fields_count, 
                         type->union_info.alignment_bytes);
@@ -953,12 +954,14 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table,
         }
     }
 
+#if 0
     // User type table struct declarations
     catstring type_table_definitions_path = {0};
     catsprint(&type_table_definitions_path, "%s../src/backend/user_type_table.h\0", compiler_path);
     catstring type_table_definitions = catstring_new_from_file(type_table_definitions_path.data);
 
     catstring_append(&decls, &type_table_definitions);
+#endif
 
     // Emit type table
     catsprint(&decls, "\n// Type table\n\n");

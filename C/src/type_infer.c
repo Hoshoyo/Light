@@ -484,7 +484,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
                 expr_type = type_infer_propagate(field_type, field, error);
                 if(!type_check_equality(expr_type, field_type)) {
                     type_error(error, expr->expr_literal_struct.token_struct,
-                        "type mismatch in field #%d of struct literal.\n  '", i + 1);
+                        "type mismatch in field #%d of struct literal. '", i + 1);
                     ast_print_type(expr_type, LIGHT_AST_PRINT_STDERR, 0);
                     fprintf(stderr, "' vs '");
                     ast_print_type(field_type, LIGHT_AST_PRINT_STDERR, 0);
@@ -803,8 +803,7 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
         fprintf(stderr, "'\n");
         return expr->type;
     }
-
-    // TODO(psv): variadic functions
+    
     bool variadic = (caller_type->function.flags & TYPE_FUNCTION_VARIADIC) != 0;
 
     if(expr->expr_proc_call.arg_count < caller_type->function.arguments_count) {
@@ -849,6 +848,9 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
 
     if(variadic) {
         // TODO(psv): transform the trailing arguments into an array literal.
+        Light_Ast** trailing_exprs = array_new(Light_Ast*);
+        int count_trailing_exprs = expr->expr_proc_call.arg_count - (caller_type->function.arguments_count - 1);
+        assert(count_trailing_exprs >= 0);
 
         // When variadic, propagate each argument after the not variadic
         // arguments.
@@ -858,7 +860,46 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
             Light_Type* t = type_infer_expression(arg, error);
             arg->type = t;
             arg->type = type_infer_propagate(0, arg, error);
+
+            // fill the array of trailing expressions
+            array_push(trailing_exprs, arg);
         }
+
+        // type_info : ^User_Type_Info;
+        // i.e.: array{ capacity, length, ^User_Type_Info, [a, b, c, d]} 
+        
+        Light_Ast** struct_exprs = array_new(Light_Ast*);
+
+        Light_Ast* capacity_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs);
+        Light_Ast* length_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs);
+        // TODO(psv): user type info
+        Light_Ast* trailing_array_literal = ast_new_expr_literal_array(expr->scope_at, 0, trailing_exprs);
+        Light_Ast* array_cast = ast_new_expr_unary(expr->scope_at, trailing_array_literal, 0, OP_UNARY_CAST);
+        array_cast->expr_unary.type_to_cast = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
+
+        array_push(struct_exprs, capacity_expr);
+        array_push(struct_exprs, length_expr);
+        array_push(struct_exprs, array_cast);
+
+        Light_Token* arr_token = token_new_identifier_from_string(
+            light_special_idents_table[LIGHT_SPECIAL_IDENT_ARRAY].data, 
+            light_special_idents_table[LIGHT_SPECIAL_IDENT_ARRAY].length);
+
+        Light_Ast* struct_literal = ast_new_expr_literal_struct(expr->scope_at, 
+            arr_token, 0, struct_exprs, false, 0);
+
+        Light_Ast* addr_of_struct_literal = ast_new_expr_unary(expr->scope_at, struct_literal, 
+            0, OP_UNARY_ADDRESSOF);
+
+        expr->expr_proc_call.arg_count -= count_trailing_exprs;
+        expr->expr_proc_call.arg_count++;
+        array_length(expr->expr_proc_call.args) -= count_trailing_exprs;
+        array_push(expr->expr_proc_call.args, addr_of_struct_literal);
+
+        addr_of_struct_literal->type = type_infer_expression(addr_of_struct_literal, error);
+        if(!addr_of_struct_literal->type || *error & TYPE_ERROR) return 0;
+        if(!(addr_of_struct_literal->type->flags & TYPE_FLAG_INTERNALIZED))
+            all_arguments_internalized = false;
     }
     
     // Only return the correct type if everything is internalized,
@@ -1153,6 +1194,7 @@ type_infer_expr_dot(Light_Ast* expr, u32* error) {
 
     Light_Type* original_type = left;
     left = type_alias_root(left);
+    if(!left || !(left->flags & TYPE_FLAG_INTERNALIZED)) return 0;
 
     switch(left->kind) {
         case TYPE_KIND_STRUCT:{

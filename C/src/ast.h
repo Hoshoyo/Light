@@ -510,6 +510,7 @@ typedef enum {
     TYPE_FLAG_INTERNALIZED  = (1 << 2),
     TYPE_FLAG_SIZE_RESOLVED = (1 << 3),
 	TYPE_FLAG_UNRESOLVED    = (1 << 4),
+	TYPE_FLAG_IN_TYPE_ARRAY = (1 << 5),
 } Light_Type_Flags;
 
 typedef struct Light_Type_t{
