@@ -103,7 +103,7 @@ type_infer_propagate_literal_array(Light_Type* type, Light_Ast* expr, u32* error
             array_of_type = type->array_info.array_of;
             for(u64 i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i) {
                 Light_Type* propagated = type_infer_propagate(array_of_type, expr->expr_literal_array.array_exprs[i], error);
-                if(!propagated || !(propagated->flags & TYPE_FLAG_INTERNALIZED)) {
+                if(!propagated) {
                     all_internalized = false;
                     continue;
                 }
@@ -243,6 +243,7 @@ type_infer_propagate_literal_primitive(Light_Type* type, Light_Ast* expr, u32* e
         default: assert(0); break;
     }
 
+    eval_literal_primitive(expr);
     return expr->type;
 }
 
@@ -375,6 +376,8 @@ type_infer_propagate(Light_Type* type, Light_Ast* expr, u32* error) {
             // TODO(psv):
             assert(0);
             break;
+        case AST_EXPRESSION_COMPILER_GENERATED:
+            break;
         default: assert(0); break;
     }
     return 0;
@@ -383,6 +386,9 @@ type_infer_propagate(Light_Type* type, Light_Ast* expr, u32* error) {
 static Light_Type*
 type_infer_expr_variable(Light_Ast* expr, u32* error) {
     assert(expr->kind == AST_EXPRESSION_VARIABLE);
+    if(expr->id == 552) {
+        int x = 0;
+    }
     Light_Ast* decl = type_infer_decl_from_name(expr->scope_at, expr->expr_variable.name);
     if(!decl) {
         type_error_undeclared_identifier(error, expr->expr_variable.name);
@@ -480,6 +486,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
             } else {
                 Light_Ast* field = expr->expr_literal_struct.struct_exprs[i];
                 Light_Type* expr_type = type_infer_expression(field, error);
+                if(!expr_type) continue;
                 Light_Type* field_type = struct_type->struct_info.fields[i]->decl_variable.type;
                 expr_type = type_infer_propagate(field_type, field, error);
                 if(!type_check_equality(expr_type, field_type)) {
@@ -630,7 +637,9 @@ type_infer_expr_literal_primitive(Light_Ast* expr, u32* error) {
         default: assert(0); break;
     }
     expr->type = type;
-    eval_literal_primitive(expr);
+    if(type->flags & TYPE_FLAG_INTERNALIZED) {
+        eval_literal_primitive(expr);
+    }
     return type;
 }
 
@@ -792,6 +801,7 @@ type_infer_expr_binary_pointer_arithmetic(Light_Ast* expr, Light_Type* inferred_
 static Light_Type* 
 type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
     assert(expr->kind == AST_EXPRESSION_PROCEDURE_CALL);
+
     Light_Type* caller_type = type_infer_expression(expr->expr_proc_call.caller_expr, error);
     if(*error & TYPE_ERROR) return 0;
 
@@ -847,8 +857,8 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
     }
 
     if(variadic) {
-        // TODO(psv): transform the trailing arguments into an array literal.
-        Light_Ast** trailing_exprs = array_new(Light_Ast*);
+
+        // Transform the trailing arguments into an array literal.
         int count_trailing_exprs = expr->expr_proc_call.arg_count - (caller_type->function.arguments_count - 1);
         assert(count_trailing_exprs >= 0);
 
@@ -858,11 +868,65 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
             if(i < caller_type->function.arguments_count - 1) continue;
             Light_Ast* arg = expr->expr_proc_call.args[i];
             Light_Type* t = type_infer_expression(arg, error);
+            if(!t) {
+                all_arguments_internalized = false;
+                continue;
+            }
             arg->type = t;
             arg->type = type_infer_propagate(0, arg, error);
 
-            // fill the array of trailing expressions
-            array_push(trailing_exprs, arg);
+            if(!(arg->type->flags & TYPE_FLAG_INTERNALIZED)) {
+                all_arguments_internalized = false;
+                continue;
+            }
+
+            //array_push(trailing_exprs, arg);
+        }
+
+        if(!all_arguments_internalized) {
+            return 0;
+        }
+
+        // User type value token
+        Light_Token* user_type_value = token_new_identifier_from_string("User_Type_Value", sizeof("User_Type_Value") -1);
+
+        Light_Ast** trailing_exprs = array_new(Light_Ast*);
+        for(s32 i = 0; i < expr->expr_proc_call.arg_count; ++i) {
+            if(i < caller_type->function.arguments_count - 1) continue;
+            Light_Ast* arg = expr->expr_proc_call.args[i];
+
+            // To fill the array of trailing expressions
+            // we first need to transform it into an User_Type_Value
+            // struct literal
+
+            // 1, 2
+            // to
+            // User_Type_Value:{&[1], <ptr user type info>}, User_Type_Value:{&[2], <ptr user type info>}
+            
+            Light_Ast** arr_exprs = array_new(Light_Ast*);
+            array_push(arr_exprs, arg);
+
+            Light_Ast* arr = ast_new_expr_literal_array(arg->scope_at, 0, arr_exprs);
+            Light_Ast* addr = ast_new_expr_unary(arg->scope_at, arr, 0, OP_UNARY_ADDRESSOF);
+
+            Light_Ast** struct_exprs = array_new(Light_Ast*);
+            array_push(struct_exprs, addr);
+            Light_Ast* ptr_user_info = ast_new_expr_compiler_generated(arg->scope_at, COMPILER_GENERATED_POINTER_TO_TYPE_INFO);
+            ptr_user_info->expr_compiler_generated.type_value = arg->type;
+            array_push(struct_exprs, ptr_user_info);
+
+            Light_Ast* arg_struct_literal = ast_new_expr_literal_struct(arg->scope_at, user_type_value, user_type_value, struct_exprs, false, 0);
+            array_push(trailing_exprs, arg_struct_literal);
+
+            arg_struct_literal->type = type_infer_expression(arg_struct_literal, error);
+            if(!arg_struct_literal->type || !(arg_struct_literal->type->flags & TYPE_FLAG_INTERNALIZED)) {
+                all_arguments_internalized = false;
+                break;
+            }
+        }
+
+        if(!all_arguments_internalized) {
+            return 0;
         }
 
         // type_info : ^User_Type_Info;
@@ -872,13 +936,14 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
 
         Light_Ast* capacity_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs);
         Light_Ast* length_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs);
-        // TODO(psv): user type info
+        Light_Ast* type_info_expr = ast_new_expr_compiler_generated(expr->scope_at, COMPILER_GENERATED_USER_TYPE_INFO_POINTER);
         Light_Ast* trailing_array_literal = ast_new_expr_literal_array(expr->scope_at, 0, trailing_exprs);
         Light_Ast* array_cast = ast_new_expr_unary(expr->scope_at, trailing_array_literal, 0, OP_UNARY_CAST);
         array_cast->expr_unary.type_to_cast = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
 
         array_push(struct_exprs, capacity_expr);
         array_push(struct_exprs, length_expr);
+        array_push(struct_exprs, type_info_expr);
         array_push(struct_exprs, array_cast);
 
         Light_Token* arr_token = token_new_identifier_from_string(
@@ -1295,6 +1360,9 @@ type_infer_expression(Light_Ast* expr, u32* error) {
 
         case AST_EXPRESSION_DIRECTIVE:
             type = type_infer_expr_directive(expr, error);
+            break;
+        case AST_EXPRESSION_COMPILER_GENERATED:
+            // TODO(psv): should this be empty?
             break;
         default: assert(0); break;
     }

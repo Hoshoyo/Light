@@ -1,4 +1,5 @@
 #import "x11.li"
+#import "../modules/reflect.li"
 
 string struct {
 	capacity : u64;
@@ -232,7 +233,7 @@ init_opengl : (display : ^Display) -> u64 {
 			0
 	];
 
-	ctx = glXCreateContextAttribsARB(display, bestFbc, null -> GLXContext, true, context_attribs -> ^s32);
+	ctx = glXCreateContextAttribsARB(display, bestFbc, null, true, context_attribs -> ^s32);
 	//info.ctx = ctx;
 
 	XSync(display, false);
@@ -250,8 +251,8 @@ init_opengl : (display : ^Display) -> u64 {
 }
 
 main : () -> s32 {
-	display := XOpenDisplay(null -> ^s8);
-	if display == null -> ^Display {
+	display := XOpenDisplay(null);
+	if display == null {
 		print_string("could not open display\n");
 		return 1;
 	}

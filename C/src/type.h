@@ -10,7 +10,8 @@ extern Light_Type* global_type_empty_enum;
 void        type_tables_initialize();
 void        type_table_print();
 Light_Type* type_internalize(Light_Type* type);
-Light_Type* type_alias_by_name(Light_Token* name);
+Light_Type* type_alias_by_name(Light_Scope* decl_scope, Light_Token* name);
+Light_Type* type_alias_by_name_str(Light_Scope* decl_scope, const char* name, int length);
 Light_Type* type_primitive_from_token(Light_Token_Type token);
 Light_Type* type_weak_primitive_from_literal(Light_Literal_Type literal);
 Light_Type* type_from_token(Light_Token* t);
@@ -23,6 +24,8 @@ bool        type_primitive_int(Light_Type* t);
 bool        type_primitive_float(Light_Type* t);
 bool        type_primitive_numeric(Light_Type* t);
 bool        type_primitive_bool(Light_Type* t);
+
+Light_Ast*  type_value_expression(Light_Scope* scope, Light_Type* t);
 
 u64         type_hash(Light_Type* type);
 bool        type_check_equality(Light_Type* t1, Light_Type* t2);

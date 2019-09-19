@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
 
         array_remove(parser.parse_queue_array, 0);
     }
-    printf("Parse time: %fms\n", (os_time_us() - parse_start) / 1000.0);
+    double parse_elapsed = (os_time_us() - parse_start) / 1000.0;
     
     // Type checking
     double tcheck_start = os_time_us();
@@ -60,28 +60,33 @@ int main(int argc, char** argv) {
     if(type_error & TYPE_ERROR) {
         return 1;
     }
-    printf("Typecheck time: %fms\n", (os_time_us() - tcheck_start) / 1000.0);
+    double tcheck_elapsed = (os_time_us() - tcheck_start) / 1000.0;
     
-#if 0
+#if 1
     ast_print(ast, LIGHT_AST_PRINT_STDOUT|LIGHT_AST_PRINT_EXPR_TYPES, 0);
     type_table_print();
 #endif
-
-    double end = os_time_us();
-    printf("Time elapsed: %fms\n", (end - start) / 1000.0);
 
 #if 1
     const char* outfile = light_extensionless_filename(light_filename_from_path(argv[1]));
 
     double generate_start = os_time_us();
-    backend_c_generate_top_level(ast, global_type_table, main_file_directory, outfile, compiler_path);
-    printf("Generate time: %fms\n", (os_time_us() - generate_start) / 1000.0);
+    backend_c_generate_top_level(ast, global_type_table, &global_scope, main_file_directory, outfile, compiler_path);
+    double generate_elapsed = (os_time_us() - generate_start) / 1000.0;
+
+    double total_elapsed = (os_time_us() - start) / 1000.0;
 
     double gcc_start = os_time_us();
-
-    // Remove file extension
     backend_c_compile_with_gcc(ast, outfile, main_file_directory);
-    printf("Backend time: %fms\n", (os_time_us() - gcc_start) / 1000.0);
+    double gcc_elapsed = (os_time_us() - gcc_start) / 1000.0;
+
+    printf("- elapsed time:\n\n");
+    printf("  parse:           %.2f ms\n", parse_elapsed);
+    printf("  type check:      %.2f ms\n", tcheck_elapsed);
+    printf("  code generation: %.2f ms\n", generate_elapsed);
+    printf("  total:           %.2f ms\n", total_elapsed);
+    printf("\n");
+    printf("  gcc backend:     %.2f ms\n", gcc_elapsed);
 #endif
 
 #if 0

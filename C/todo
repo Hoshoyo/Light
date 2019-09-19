@@ -3,3 +3,11 @@ numeric literals better type inference
 type max size now is 32bit
 size_of struct with only a character is 4
 variable declared void ( a := arr[0]; where arr is ^void)
+<<= not working
+referencing main in a variable causes error since we renamed it to __light_main
+enum reflecting
+
+
+
+// done
+referencing a declared variable inside a for loop does not work

@@ -232,7 +232,10 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 // won't work, since the scope from the expression is not
                 // unique.
                 Light_Ast* type_decl_from_name = type_infer_decl_from_name(scope, type->pointer_to->alias.name);
-                if(!type_decl_from_name) return 0;
+                if(!type_decl_from_name) {
+                    type_error_undeclared_identifier(error, type->pointer_to->alias.name);
+                    return 0;
+                }
                 type->pointer_to->alias.scope = type_decl_from_name->scope_at;
 
 
@@ -739,7 +742,7 @@ typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error) {
         case AST_COMMAND_BLOCK: {
             Light_Scope* block_scope = node->comm_block.block_scope;
             if(!block_scope) return;
-            if(block_scope->decl_count > 0) {
+            if(!block_scope->symb_table && block_scope->decl_count > 0) {
                 block_scope->symb_table = light_alloc(sizeof(Symbol_Table));
                 symbol_table_new(block_scope->symb_table, (block_scope->decl_count + 4) * 8);
             }

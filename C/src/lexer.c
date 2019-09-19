@@ -478,13 +478,7 @@ token_next(Light_Lexer* lexer) {
                         r.flags |= TOKEN_FLAG_LITERAL;
                 } else {
                     // internalize the identifier
-                    s32 identifier_index = 0;
-                    if(string_table_entry_exist(&global_identifiers_table, MAKE_STR_LEN((char*)r.data, r.length), &identifier_index, 0)) {
-                        string v = string_table_get(&global_identifiers_table, identifier_index);
-                        r.data = (u8*)v.data;
-                    } else {
-                        string_table_add(&global_identifiers_table, MAKE_STR_LEN((char*)r.data, r.length), 0);
-                    }
+                    r.data = (u8*)lexer_internalize_identifier((const char*)r.data, r.length);
                 }
 
                 break;
@@ -503,6 +497,16 @@ token_next(Light_Lexer* lexer) {
 	return r;
 }
 
+const char*
+lexer_internalize_identifier(const char* data, int length) {
+    s32 identifier_index = 0;
+    if(string_table_entry_exist(&global_identifiers_table, MAKE_STR_LEN((char*)data, length), &identifier_index, 0)) {
+        string v = string_table_get(&global_identifiers_table, identifier_index);
+        return (const char*)v.data;
+    }
+    string_table_add(&global_identifiers_table, MAKE_STR_LEN((char*)data, length), 0);
+    return data;
+}
 
 static void
 token_print(Light_Token t) {
@@ -814,6 +818,6 @@ token_new_identifier_from_string(const char* str, int length) {
     token->length = length;
     token->flags = 0;
     token->filepath = 0;
-    token->data = (u8*)str;
+    token->data = (u8*)lexer_internalize_identifier(str, length);;
     return token;
 }

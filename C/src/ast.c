@@ -206,6 +206,26 @@ ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** a
     return result;
 }
 
+// TODO(psv): refactor to be more generic
+Light_Ast*
+ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
+    result->scope_at = scope;
+    result->type = type_primitive_get(TYPE_PRIMITIVE_U32);
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+
+    result->expr_literal_primitive.type = LITERAL_DEC_UINT;
+    result->expr_literal_primitive.flags = 0;
+    result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
+    result->expr_literal_primitive.token = 0;
+    result->expr_literal_primitive.value_u32 = val;
+
+    return result;
+}
+
 Light_Ast*
 ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
@@ -263,6 +283,21 @@ ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token) {
             default: assert(0); break;
         }
     }    
+
+    return result;
+}
+
+Light_Ast* 
+ast_new_expr_compiler_generated(Light_Scope* scope, Light_Compiler_Generated_Kind kind) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_COMPILER_GENERATED;
+    result->scope_at = scope;
+    result->type = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+
+    result->expr_compiler_generated.kind = kind;
 
     return result;
 }

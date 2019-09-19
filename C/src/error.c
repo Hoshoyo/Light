@@ -11,7 +11,7 @@ static const char* ColorRed     = "\x1B[31m";
 s32
 type_error_location(Light_Token* t) {
     if(!t) {
-        return fprintf(stderr, "%s: ", t->filepath);
+        return 0;//fprintf(stderr, "%s: ", t->filepath);
     } else {
         return fprintf(stderr, "%s:%d:%d: ", t->filepath, t->line + 1, t->column + 1);
     }

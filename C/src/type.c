@@ -487,16 +487,77 @@ type_from_token(Light_Token* t) {
     return 0;
 }
 
-Light_Type* 
-type_alias_by_name(Light_Token* name) {
+Light_Type*
+type_alias_by_name_str(Light_Scope* decl_scope, const char* name, int length) {
     Light_Type t = {0};
     t.kind = TYPE_KIND_ALIAS;
-    t.alias.name = name;
+    const char* str = lexer_internalize_identifier(name, length);
+    t.alias.name = token_new_identifier_from_string(str, length);
+    t.alias.scope = decl_scope;
 
     s32 index = -1;
     if(type_table_entry_exist(&global_type_table, &t, &index, 0)) {
         assert(index >= 0);
         return type_table_get(&global_type_table, index);
+    }
+    return 0;
+}
+
+Light_Type* 
+type_alias_by_name(Light_Scope* decl_scope, Light_Token* name) {
+    Light_Type t = {0};
+    t.kind = TYPE_KIND_ALIAS;
+    t.alias.name = name;
+    t.alias.scope = decl_scope;
+
+    s32 index = -1;
+    if(type_table_entry_exist(&global_type_table, &t, &index, 0)) {
+        assert(index >= 0);
+        return type_table_get(&global_type_table, index);
+    }
+    return 0;
+}
+
+// Creates a struct literal of type User_Type_Info representing the type
+Light_Ast* 
+type_value_expression(Light_Scope* scope, Light_Type* type) {
+    assert(type->flags & TYPE_FLAG_INTERNALIZED);
+    
+    // User_Type_Info:{u32, u32, u64, User_Type_Description}
+    // User_Type_Info:{kind, flags, type_size_bytes, description}
+
+    Light_Ast** user_type_info_struct_exprs = array_new(Light_Ast*);
+    Light_Ast* user_type_info_kind = ast_new_expr_literal_primitive_u32(scope, TYPE_KIND_PRIMITIVE);
+    Light_Ast* user_type_info_flags = ast_new_expr_literal_primitive_u32(scope, 0);
+    Light_Ast* user_type_info_size_bytes = ast_new_expr_literal_primitive_u64(scope, type->size_bits / 8);
+    array_push(user_type_info_struct_exprs, user_type_info_kind);
+    array_push(user_type_info_struct_exprs, user_type_info_flags);
+    array_push(user_type_info_struct_exprs, user_type_info_size_bytes);
+    
+    //Light_Ast* user_type_info_description 
+
+    int user_type_info_string_length = sizeof("User_Type_Info") - 1;
+    const char* user_type_info_string = lexer_internalize_identifier("User_Type_Info", user_type_info_string_length);
+    Light_Token* user_type_info_token = token_new_identifier_from_string(user_type_info_string, user_type_info_string_length);
+    Light_Ast* type_info_struct_literal = ast_new_expr_literal_struct(
+        scope, 
+        user_type_info_token,
+        user_type_info_token,
+        0, false, 0);
+
+    switch(type->kind) {
+        case TYPE_KIND_PRIMITIVE:{
+            // {}
+        } break;
+        case TYPE_KIND_ALIAS:
+        case TYPE_KIND_ARRAY:
+        case TYPE_KIND_DIRECTIVE:
+        case TYPE_KIND_ENUM:
+        case TYPE_KIND_FUNCTION:
+        case TYPE_KIND_POINTER:
+        case TYPE_KIND_STRUCT:
+        case TYPE_KIND_UNION:
+        default: break;
     }
     return 0;
 }

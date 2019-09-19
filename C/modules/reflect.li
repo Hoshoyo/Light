@@ -1,0 +1,85 @@
+User_Type_Array struct {
+    array_of  : ^User_Type_Info;
+    dimension : u64;
+}
+
+User_Type_Union struct {
+    fields_types : ^^User_Type_Info;
+	fields_names : ^string;
+	fields_count : s32;
+	alignment : s32;
+}
+
+User_Type_Struct struct {
+	fields_types        : ^^User_Type_Info;
+	fields_names        : ^string;
+	fields_offsets_bits : ^s64;
+	fields_count        : s32;
+	alignment           : s32;
+}
+
+User_Type_Function struct {
+	return_type     : ^User_Type_Info;
+	arguments_type  : ^^User_Type_Info;
+	arguments_name  : ^string;
+	arguments_count : s32;
+}
+
+User_Type_Alias struct {
+    name     : string;
+    alias_to : ^User_Type_Info;
+}
+
+//User_Type_Enum struct {
+//    type   : ^User_Type_Info;
+//    fields : 
+//}
+
+User_Type_Desc union {
+    primitive     : u32;
+    pointer_to    : ^User_Type_Info;
+    array_desc    : User_Type_Array;
+    struct_desc   : User_Type_Struct;
+    union_desc    : User_Type_Union;
+    function_desc : User_Type_Function;
+    alias_desc    : User_Type_Alias;
+    //enum_desc     : User_Type_Enum;
+}
+
+User_Type_Info struct {
+    kind            : u32;
+	flags           : u32;
+	type_size_bytes : s64;
+    description     : User_Type_Desc;
+}
+
+User_Type_Value struct {
+    value : ^void;
+    type  : ^User_Type_Info;
+}
+
+// TODO(psv): substitute this for an enum once is ready
+LIGHT_TYPE_KIND_PRIMITIVE :u32: 1;
+LIGHT_TYPE_KIND_POINTER   :u32: 2;
+LIGHT_TYPE_KIND_STRUCT    :u32: 3;
+LIGHT_TYPE_KIND_UNION     :u32: 4;
+LIGHT_TYPE_KIND_ARRAY     :u32: 5;
+LIGHT_TYPE_KIND_FUNCTION  :u32: 6;
+LIGHT_TYPE_KIND_ENUM      :u32: 7;
+LIGHT_TYPE_KIND_ALIAS     :u32: 8;
+
+LIGHT_TYPE_PRIMITIVE_VOID     :u32: 0;
+LIGHT_TYPE_PRIMITIVE_S8       :u32: 1;
+LIGHT_TYPE_PRIMITIVE_S16      :u32: 2;
+LIGHT_TYPE_PRIMITIVE_S32      :u32: 3;
+LIGHT_TYPE_PRIMITIVE_S64      :u32: 4;
+LIGHT_TYPE_PRIMITIVE_U8       :u32: 5;
+LIGHT_TYPE_PRIMITIVE_U16      :u32: 6;
+LIGHT_TYPE_PRIMITIVE_U32      :u32: 7;
+LIGHT_TYPE_PRIMITIVE_U64      :u32: 8;
+LIGHT_TYPE_PRIMITIVE_R32      :u32: 9;
+LIGHT_TYPE_PRIMITIVE_R64      :u32: 10;
+LIGHT_TYPE_PRIMITIVE_BOOL     :u32: 11;
+
+LIGHT_TYPE_FUNCTION_VARIADIC :u32: 1 << 0;
+LIGHT_STRUCT_FLAG_PACKED     :u32: 1 << 0;

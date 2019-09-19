@@ -12,6 +12,12 @@ static void emit_typed_declaration(catstring* buffer, Light_Type* type, Light_To
 static void emit_declaration(catstring* buffer, Light_Ast* node, u32 flags);
 static void emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node);
 
+enum {
+    REFLECT_TYPE_USER_TYPE_INFO_POINTER = 0,
+    REFLECT_TYPE_COUNT,
+};
+static Light_Type* reflect_types[REFLECT_TYPE_COUNT] = {0};
+
 static Light_Ast*
 decl_from_name(Light_Scope* scope, Light_Token* name) {
     Light_Symbol s = {0};
@@ -58,7 +64,7 @@ static void
 emit_type_end(catstring* buffer, Light_Type* type) {
     switch(type->kind) {
         case TYPE_KIND_ARRAY:{
-            catsprint(buffer, "[%u]", type->array_info.dimension);
+            catsprint(buffer, ")[%u]", type->array_info.dimension);
             emit_type_end(buffer, type->array_info.array_of);
         } break;
         case TYPE_KIND_FUNCTION:{
@@ -117,6 +123,7 @@ emit_type_start(catstring* buffer, Light_Type* type, u32 flags) {
         } break;
         case TYPE_KIND_ARRAY:{
             emit_type_start(buffer, type->array_info.array_of, flags);
+            catsprint(buffer, "(");
         } break;
         case TYPE_KIND_FUNCTION:{
             emit_type_start(buffer, type->function.return_type, 0);
@@ -327,13 +334,13 @@ emit_primitive_literal(catstring* buffer, Light_Ast_Expr_Literal_Primitive lit, 
                 case TYPE_PRIMITIVE_S64:
                     catsprint(buffer, "%l", lit.value_s64); break;
                 case TYPE_PRIMITIVE_U8:
-                    catsprint(buffer, "%u", (u64)lit.value_u8); break;
+                    catsprint(buffer, "%x", (u64)lit.value_u8); break;
                 case TYPE_PRIMITIVE_U16:
-                    catsprint(buffer, "%u", (u64)lit.value_u16); break;
+                    catsprint(buffer, "%x", (u64)lit.value_u16); break;
                 case TYPE_PRIMITIVE_U32:
-                    catsprint(buffer, "%u", (u64)lit.value_u32); break;
+                    catsprint(buffer, "%x", (u64)lit.value_u32); break;
                 case TYPE_PRIMITIVE_U64:
-                    catsprint(buffer, "%u", lit.value_u64); break;
+                    catsprint(buffer, "%x", lit.value_u64); break;
                 default: break;
             }
         } break;
@@ -520,7 +527,22 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
         case AST_EXPRESSION_UNARY:{
             emit_expression_unary(literal_decls, buffer, node);
         } break;
-        default: break;
+        case AST_EXPRESSION_COMPILER_GENERATED: {
+            switch(node->expr_compiler_generated.kind) {
+                case COMPILER_GENERATED_TYPE_VALUE_POINTER:
+                    catsprint(buffer, "0");
+                    break;
+                case COMPILER_GENERATED_USER_TYPE_INFO_POINTER: {
+                    Light_Type* user_info_ptr_type = reflect_types[REFLECT_TYPE_USER_TYPE_INFO_POINTER];
+                    catsprint(buffer, "&__light_type_table[%l]", user_info_ptr_type->type_table_index);
+                } break;
+                case COMPILER_GENERATED_POINTER_TO_TYPE_INFO: {
+                    catsprint(buffer, "&__light_type_table[%l]", node->expr_compiler_generated.type_value->type_table_index);
+                } break;
+                default: assert(0); break;
+            }
+        } break;
+        default: assert(0); break;
     }
 }
 
@@ -818,20 +840,36 @@ emit_type_table(catstring* buffer, Light_Type** type_table) {
                 break;
             case TYPE_KIND_FUNCTION:
                 // TODO(psv): arguments_types, arguments_names
-                if(type->function.arguments_names) {
-                    catsprint(&arrays_after, "__type_names[] = {");
-                    for(int a = 0; a < type->function.arguments_count; ++a) {
-                        if(a > 0) catsprint(&arrays_after, ", ");
-                        catsprint(&arrays_after, "\"%s+\"", 
-                            type->function.arguments_names_length[a], 
-                            type->function.arguments_names[a]);
-                    }
-                    catsprint(&arrays_after, "};\n");
-                }
+                if(type->function.arguments_count > 0) {
+                    // forward declarations
+                    catsprint(&arrays_before, "User_Type_Info* __function_args_types_%x[%l] = {0};\n", type, type->function.arguments_count);
 
-                catsprint(&table, " .function_desc = { &__light_type_table[%l], 0, 0, %d }", 
-                    type->function.return_type->type_table_index,
-                    type->function.arguments_count);
+                    if(type->function.arguments_names) {
+                        catsprint(&arrays_after, "__type_names[] = {");
+                        for(int a = 0; a < type->function.arguments_count; ++a) {
+                            if(a > 0) catsprint(&arrays_after, ", ");
+                            catsprint(&arrays_after, "\"%s+\"", 
+                                type->function.arguments_names_length[a], 
+                                type->function.arguments_names[a]);
+                        }
+                        catsprint(&arrays_after, "};\n");
+                    }
+
+                    for(int f = 0; f < type->function.arguments_count; ++f) {
+                        Light_Type* arg_type = type->function.arguments_type[f];
+                        catsprint(&loader, "__function_args_types_%x[%l] = &__light_type_table[%l];\n", type, f, arg_type->type_table_index);
+                    }
+                    catsprint(&loader, "\n");
+                    catsprint(&table, " .function_desc = { &__light_type_table[%l], (User_Type_Info**)&__function_args_types_%x, 0, %d }", 
+                        type->function.return_type->type_table_index,
+                        type,
+                        type->function.arguments_count);
+                } else {
+                    catsprint(&table, " .function_desc = { &__light_type_table[%l], 0, 0, %d }", 
+                        type->function.return_type->type_table_index,
+                        type->function.arguments_count);
+                }
+                
                 break;
             case TYPE_KIND_STRUCT:{
                 if(type->struct_info.fields_count > 0) {
@@ -850,7 +888,14 @@ emit_type_table(catstring* buffer, Light_Type** type_table) {
                     }
                     catsprint(&arrays_before, "};\n");
                     
-                    // TODO(psv): emit offsets
+                    // Fields offsets
+                    catsprint(&arrays_before, "s64 __struct_field_offsets_%x[%l] = {", type, type->struct_info.fields_count);
+                    for(int f = 0; f < type->struct_info.fields_count; ++f) {
+                        if(f > 0) catsprint(&arrays_before, ", ");
+                        catsprint(&arrays_before, "%l", type->struct_info.offset_bits[f]);
+                    }
+                    catsprint(&arrays_before, "};\n");
+                    
 
                     for(int f = 0; f < type->struct_info.fields_count; ++f) {
                         Light_Ast* field = type->struct_info.fields[f];
@@ -859,8 +904,8 @@ emit_type_table(catstring* buffer, Light_Type** type_table) {
                     }
                     catsprint(&loader, "\n");
 
-                    catsprint(&table, " .struct_desc = { (User_Type_Info**)&__struct_field_types_%x, __struct_field_names_%x, 0, %d, %d }", 
-                        type, type,
+                    catsprint(&table, " .struct_desc = { (User_Type_Info**)&__struct_field_types_%x, __struct_field_names_%x, (s64*)__struct_field_offsets_%x, %d, %d }", 
+                        type, type, type,
                         type->struct_info.fields_count, 
                         type->struct_info.alignment_bytes);
                 } else {
@@ -918,9 +963,14 @@ emit_type_table(catstring* buffer, Light_Type** type_table) {
 }
 
 void 
-backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, 
+backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, Light_Scope* global_scope,
     const char* path, const char* filename, const char* compiler_path) 
 {
+    Light_Token* user_type_info_token = token_new_identifier_from_string("User_Type_Info", sizeof("User_Type_Info") - 1);
+    Light_Ast* user_type_info_decl = decl_from_name(global_scope, user_type_info_token);
+    Light_Type* user_type_info_type = user_type_info_decl->decl_typedef.type_referenced;
+    reflect_types[REFLECT_TYPE_USER_TYPE_INFO_POINTER] = type_new_pointer(user_type_info_type);
+
     catstring code = {0};
 
     catsprint(&code, "typedef char s8;\n");
