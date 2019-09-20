@@ -1,0 +1,5 @@
+string struct {
+    capacity : u64;
+    length   : u64;
+    data     : ^u8;
+}

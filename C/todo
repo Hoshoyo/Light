@@ -1,13 +1,14 @@
-internalization of pointers to aliases that are not declared do not cause an error
+investigate dot operator when struct type is still not internalized
+strings escape sequences in C backend are wrong
 numeric literals better type inference
 type max size now is 32bit
 size_of struct with only a character is 4
-variable declared void ( a := arr[0]; where arr is ^void)
-<<= not working
-referencing main in a variable causes error since we renamed it to __light_main
 enum reflecting
 
 
-
 // done
+internalization of pointers to aliases that are not declared do not cause an error
 referencing a declared variable inside a for loop does not work
+referencing main in a variable causes error since we renamed it to __light_main
+<<= not working
+variable declared void ( a := arr[0]; where arr is ^void)

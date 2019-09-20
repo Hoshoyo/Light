@@ -1,17 +1,3 @@
-#import "reflect.li"
-string struct {
-    capacity : u64;
-    length   : u64;
-    data     : ^u8;
-}
-
-array struct {
-    capacity  : u64;
-    length    : u64;
-    type_info : ^User_Type_Info;
-    data      : ^void;
-}
-
 // System calls
 write : (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
 memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("C");
@@ -40,7 +26,43 @@ print_test:(args : ...) -> u64 {
     }
 }
 
+print_bad:(fmt : string, args : ...) -> u64 {
+    length :u64= 0;
+
+    if args == null {
+        length += print_string(fmt);
+        return length;
+    }
+
+    a := args -> ^array;
+    count := a.length;
+    values := a.data -> ^User_Type_Value;
+
+    previous :u8= 0;
+    for i :u64= 0, j := 0; i < fmt.length; i += 1 {
+        at := fmt.data[i];
+        value := values[j];
+        if at == '%' && previous != '\\' {
+            j += 1;
+            print_value_literal(value);
+        } else if at == '$' && previous != '\\' {
+            print_type(value.type);
+        } else if at == '\\' && previous != '\\' {
+        } else {
+            write(STDOUT_FILENO, &at, 1);
+        }
+        previous = at;
+    }
+}
+
 print:(fmt : string, args : ...) -> u64 {
+    length :u64= 0;
+
+    if args == null {
+        length += print_string(fmt);
+        return length;
+    }
+
     a := args -> ^array;
     count := a.length;
     
@@ -80,6 +102,10 @@ print_value_literal_struct:(v : User_Type_Value) -> u64 {
     }
 
     print_string(" }");
+}
+
+print_value_literal_union:(v : User_Type_Value) -> u64 {
+    
 }
 
 print_value_literal_array:(v : User_Type_Value) -> u64 {
@@ -151,12 +177,14 @@ print_value_literal:(v : User_Type_Value) -> u64 {
                 print_string("false");
             }
         }
-    } else if t.kind == LIGHT_TYPE_KIND_POINTER {
+    } else if t.kind == LIGHT_TYPE_KIND_POINTER || t.kind == LIGHT_TYPE_KIND_FUNCTION {
         l := *(val -> ^^void) -> u64;
         print_string("0x");
         print_u64(l, 16);
     } else if t.kind == LIGHT_TYPE_KIND_STRUCT {
         print_value_literal_struct(v);
+    } else if t.kind == LIGHT_TYPE_KIND_UNION {
+        print_value_literal_union(v);
     } else if t.kind == LIGHT_TYPE_KIND_ALIAS {
         if t.description.alias_desc.alias_to.kind == LIGHT_TYPE_KIND_STRUCT {
             print_string(t.description.alias_desc.name);
@@ -509,43 +537,4 @@ print_r64:(v : r64) -> u64 {
     length := r64_to_str(v, buffer);
     write(STDOUT_FILENO, buffer->^void, length);
     return length;
-}
-
-u union {
-    a : s32;
-    b : r32;
-}
-
-main : () -> s32 {
-    //print_s8(32);
-    //print_s16(32);
-    //print_s32(32);
-    //print_s64(32);
-    //print_string("0x");
-    //print_u64(0xffffffffffffffff, 10);
-    //print_string("\n");
-    //print_u32(12345, 16);
-
-    //a : ^s32;
-    //b : u;
-    //c : [3]s32;
-    //print_test(1, 1.0, a, "hello", b, c, print_string);
-
-    a : s8 = 233;
-    b : s16 = 1231;
-    c : s32 = 43332424;
-    d : s64 = 1234567891011;
-
-    e : u8 = 233;
-    f : u16 = 1231;
-    g : u32 = 43332424;
-    h : u64 = 1234567891011;
-
-    i := 3.14;
-    j := 2.22234;
-
-    //print("foo", a, b, c, d, e, f, g, h, i, j, true, false, &a, "hello", [1, 2, 3]);
-    print("foo", [1,2]);
-
-    return 0;
 }

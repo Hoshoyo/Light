@@ -130,6 +130,7 @@ token_next(Light_Lexer* lexer) {
             } else if(*at == '<') {
                 ++at;
                 if(*at == '=') {
+                    at++;
                     r.type = TOKEN_SHL_EQUAL;
                     r.flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
                 } else {
@@ -151,6 +152,7 @@ token_next(Light_Lexer* lexer) {
             } else if(*at == '>') {
                 ++at;
                 if(*at == '=') {
+                    at++;
                     r.type = TOKEN_SHR_EQUAL;
                     r.flags |= TOKEN_FLAG_ASSIGNMENT_OPERATOR;
                 } else {

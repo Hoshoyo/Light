@@ -1,0 +1,36 @@
+#import "../modules/print.li"
+
+main : () -> s32 {
+    //print_s8(32);
+    //print_s16(32);
+    //print_s32(32);
+    //print_s64(32);
+    //print_string("0x");
+    //print_u64(0xffffffffffffffff, 10);
+    //print_string("\n");
+    //print_u32(12345, 16);
+
+    //a : ^s32;
+    //b : u;
+    //c : [3]s32;
+    //print_test(1, 1.0, a, "hello", b, c, print_string);
+
+    a : s8 = 233;
+    b : s16 = 1231;
+    c : s32 = 43332424;
+    d : s64 = 1234567891011;
+
+    e : u8 = 233;
+    f : u16 = 1231;
+    g : u32 = 43332424;
+    h : u64 = 1234567891011;
+
+    i := 3.14;
+    j := 2.22234;
+
+    //print("foo", a, b, c, d, e, f, g, h, i, j, true, false, &a, "hello", [1, 2, 3]);
+    print("foo", &[1,2], main);
+    //print_bytes(&[1, 2]->^u8, 8);
+
+    return 0;
+}

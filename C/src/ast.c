@@ -260,29 +260,31 @@ ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token) {
     result->expr_literal_primitive.token = token;
 
     Light_Literal_Type type = 0;
-    switch(token->type) {
-        case TOKEN_LITERAL_BIN_INT:     type = LITERAL_BIN_INT; break;
-        case TOKEN_LITERAL_BOOL_FALSE:
-        case TOKEN_LITERAL_BOOL_TRUE:   type = LITERAL_BOOL; break;
-        case TOKEN_LITERAL_CHAR:        type = LITERAL_CHAR; break;
-        case TOKEN_LITERAL_DEC_INT:     type = LITERAL_DEC_SINT; break;
-        case TOKEN_LITERAL_DEC_UINT:    type = LITERAL_DEC_UINT; break;
-        case TOKEN_LITERAL_FLOAT:       type = LITERAL_FLOAT; break;
-        case TOKEN_LITERAL_HEX_INT:     type = LITERAL_HEX_INT; break;
-        case TOKEN_KEYWORD_NULL:        type = LITERAL_POINTER; break;
-        default: type = 0; break;
-    }
-    result->expr_literal_primitive.type = type;
-
-    if(result->type) {
-        switch(result->type->kind) {
-            case TYPE_KIND_POINTER: break; // value is 0
-            case TYPE_KIND_PRIMITIVE:{
-                eval_literal_primitive(result);
-            }break;
-            default: assert(0); break;
+    if(token) {
+        switch(token->type) {
+            case TOKEN_LITERAL_BIN_INT:     type = LITERAL_BIN_INT; break;
+            case TOKEN_LITERAL_BOOL_FALSE:
+            case TOKEN_LITERAL_BOOL_TRUE:   type = LITERAL_BOOL; break;
+            case TOKEN_LITERAL_CHAR:        type = LITERAL_CHAR; break;
+            case TOKEN_LITERAL_DEC_INT:     type = LITERAL_DEC_SINT; break;
+            case TOKEN_LITERAL_DEC_UINT:    type = LITERAL_DEC_UINT; break;
+            case TOKEN_LITERAL_FLOAT:       type = LITERAL_FLOAT; break;
+            case TOKEN_LITERAL_HEX_INT:     type = LITERAL_HEX_INT; break;
+            case TOKEN_KEYWORD_NULL:        type = LITERAL_POINTER; break;
+            default: type = 0; break;
         }
-    }    
+        result->expr_literal_primitive.type = type;
+
+        if(result->type) {
+            switch(result->type->kind) {
+                case TYPE_KIND_POINTER: break; // value is 0
+                case TYPE_KIND_PRIMITIVE:{
+                    eval_literal_primitive(result);
+                }break;
+                default: assert(0); break;
+            }
+        }    
+    }
 
     return result;
 }

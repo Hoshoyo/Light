@@ -451,13 +451,18 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
             emit_primitive_literal(buffer, node->expr_literal_primitive, node->type);
         } break;
         case AST_EXPRESSION_VARIABLE: {
-            
             if(node->expr_variable.decl->kind == AST_DECL_CONSTANT) {
                 // Constants are not declared, so use the value directly
                 emit_expression(literal_decls, buffer, node->expr_variable.decl->decl_constant.value);
             } else {
                 // Is a variable, therefore it is declared
-                catsprint_token(buffer, node->expr_variable.name);
+                if(node->expr_variable.decl->kind == AST_DECL_PROCEDURE && 
+                    node->expr_variable.decl->decl_proc.flags & DECL_PROC_FLAG_MAIN)
+                {
+                    catsprint(buffer, "__light_main");
+                } else {
+                    catsprint_token(buffer, node->expr_variable.name);
+                }
             }
         } break;
         case AST_EXPRESSION_DOT:{

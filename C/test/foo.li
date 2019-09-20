@@ -1,81 +1,9 @@
-#import "../modules/reflect.li"
-
-string struct {
-    capacity : u64;
-    length   : u64;
-    data     : ^u8;
-}
-
-array struct {
-    capacity  : u64;
-    length    : u64;
-    type_info : ^User_Type_Info;
-    data      : ^void;
-}
-
-write : (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
-memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("C");
-
-s32_to_str : (val : s32, buffer : [16]u8) -> s64 {
-    b : [16]u8;
-    sum : s32;
-
-    if val == 0 {
-        buffer[0] = '0';
-        return 1;
-    }
-
-    if val < 0 {
-        val = -val;
-        buffer[0] = '-' -> u8;
-        sum = 1;
-    }
-    auxbuffer := &b[16];
-    start := auxbuffer + sum;
-
-    while val != 0 {
-        rem := val % 10;
-        val /= 10;
-        *auxbuffer = '0' + rem -> u8;
-        auxbuffer -= 1;
-    }
-
-    size := start - auxbuffer;
-    memcpy((&buffer[sum]) -> ^void, (auxbuffer + 1) -> ^void, size -> u64);
-    return size;
-}
-
-print_string_l : (str : ^u8, len : s64) -> s64 {
-	return write(1, str -> ^void, len -> u64);
-}
-
-print_s32 : (v : s32) -> s64 {
-	buffer : [16]u8;
-    len := s32_to_str(v, buffer);
-    return print_string_l(buffer -> ^u8, len);
-}
-
-prints : (s : string) {
-    write(1, s.data, s.length);
-}
-
-hellow : (args : ...) -> s32 {
-    a := args -> ^array;
-    count := a.length;
-    type_info := a.type_info;
-    
-    //
-    values := a.data -> ^User_Type_Value;
-    for i :u64= 0; i < count; i += 1 {
-        value := values[i];
-        print_s32(value.type.kind -> s32);
-        prints("\n");
-    }
-    
-    return 0;
-}
+#import "../modules/print.li"
 
 main : () -> s32 {
-    a : ^s32;
-    return hellow(1, 2, a, "hello");
+    //a := print;
+    //print_type(a);
+    print_bad("Hello $", 1.2123);
+    //print("Hello world\n", 1, 3);
+    return 0;
 }

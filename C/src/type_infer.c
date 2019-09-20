@@ -817,10 +817,12 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
     bool variadic = (caller_type->function.flags & TYPE_FUNCTION_VARIADIC) != 0;
 
     if(expr->expr_proc_call.arg_count < caller_type->function.arguments_count) {
-        type_error(error, expr->expr_proc_call.token, 
-            "too few arguments for procedure call, wanted '%d', but got '%d'\n",
-            caller_type->function.arguments_count, expr->expr_proc_call.arg_count);
-        return 0;
+        if(variadic && expr->expr_proc_call.arg_count < (caller_type->function.arguments_count - 1))  {
+            type_error(error, expr->expr_proc_call.token, 
+                "too few arguments for procedure call, wanted '%d', but got '%d'\n",
+                caller_type->function.arguments_count, expr->expr_proc_call.arg_count);
+            return 0;
+        }
     } else if(expr->expr_proc_call.arg_count > caller_type->function.arguments_count && !variadic) {
         type_error(error, expr->expr_proc_call.token, 
             "too many arguments for procedure call, wanted '%d', but got '%d'\n",
@@ -862,109 +864,125 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
         int count_trailing_exprs = expr->expr_proc_call.arg_count - (caller_type->function.arguments_count - 1);
         assert(count_trailing_exprs >= 0);
 
-        // When variadic, propagate each argument after the not variadic
-        // arguments.
-        for(s32 i = 0; i < expr->expr_proc_call.arg_count; ++i) {
-            if(i < caller_type->function.arguments_count - 1) continue;
-            Light_Ast* arg = expr->expr_proc_call.args[i];
-            Light_Type* t = type_infer_expression(arg, error);
-            if(!t) {
-                all_arguments_internalized = false;
-                continue;
+        if(count_trailing_exprs > 0) {
+
+            // When variadic, propagate each argument after the not variadic
+            // arguments.
+            for(s32 i = 0; i < expr->expr_proc_call.arg_count; ++i) {
+                if(i < caller_type->function.arguments_count - 1) continue;
+                Light_Ast* arg = expr->expr_proc_call.args[i];
+                Light_Type* t = type_infer_expression(arg, error);
+                if(!t) {
+                    all_arguments_internalized = false;
+                    continue;
+                }
+                arg->type = t;
+                arg->type = type_infer_propagate(0, arg, error);
+
+                if(!(arg->type->flags & TYPE_FLAG_INTERNALIZED)) {
+                    all_arguments_internalized = false;
+                    continue;
+                }
+
+                //array_push(trailing_exprs, arg);
             }
-            arg->type = t;
-            arg->type = type_infer_propagate(0, arg, error);
 
-            if(!(arg->type->flags & TYPE_FLAG_INTERNALIZED)) {
-                all_arguments_internalized = false;
-                continue;
+            if(!all_arguments_internalized) {
+                return 0;
             }
 
-            //array_push(trailing_exprs, arg);
-        }
+            // User type value token
+            Light_Token* user_type_value = token_new_identifier_from_string("User_Type_Value", sizeof("User_Type_Value") -1);
 
-        if(!all_arguments_internalized) {
-            return 0;
-        }
+            Light_Ast** trailing_exprs = array_new(Light_Ast*);
+            for(s32 i = 0; i < expr->expr_proc_call.arg_count; ++i) {
+                if(i < caller_type->function.arguments_count - 1) continue;
+                Light_Ast* arg = expr->expr_proc_call.args[i];
 
-        // User type value token
-        Light_Token* user_type_value = token_new_identifier_from_string("User_Type_Value", sizeof("User_Type_Value") -1);
+                // To fill the array of trailing expressions
+                // we first need to transform it into an User_Type_Value
+                // struct literal
 
-        Light_Ast** trailing_exprs = array_new(Light_Ast*);
-        for(s32 i = 0; i < expr->expr_proc_call.arg_count; ++i) {
-            if(i < caller_type->function.arguments_count - 1) continue;
-            Light_Ast* arg = expr->expr_proc_call.args[i];
+                // 1, 2
+                // to
+                // User_Type_Value:{&[1], <ptr user type info>}, User_Type_Value:{&[2], <ptr user type info>}
+                
+                Light_Ast** arr_exprs = array_new(Light_Ast*);
+                array_push(arr_exprs, arg);
 
-            // To fill the array of trailing expressions
-            // we first need to transform it into an User_Type_Value
-            // struct literal
+                Light_Ast* arr = ast_new_expr_literal_array(arg->scope_at, 0, arr_exprs);
+                Light_Ast* addr = ast_new_expr_unary(arg->scope_at, arr, 0, OP_UNARY_ADDRESSOF);
 
-            // 1, 2
-            // to
-            // User_Type_Value:{&[1], <ptr user type info>}, User_Type_Value:{&[2], <ptr user type info>}
+                Light_Ast** struct_exprs = array_new(Light_Ast*);
+                array_push(struct_exprs, addr);
+                Light_Ast* ptr_user_info = ast_new_expr_compiler_generated(arg->scope_at, COMPILER_GENERATED_POINTER_TO_TYPE_INFO);
+                ptr_user_info->expr_compiler_generated.type_value = arg->type;
+                array_push(struct_exprs, ptr_user_info);
+
+                Light_Ast* arg_struct_literal = ast_new_expr_literal_struct(arg->scope_at, user_type_value, user_type_value, struct_exprs, false, 0);
+                array_push(trailing_exprs, arg_struct_literal);
+
+                arg_struct_literal->type = type_infer_expression(arg_struct_literal, error);
+                if(!arg_struct_literal->type || !(arg_struct_literal->type->flags & TYPE_FLAG_INTERNALIZED)) {
+                    all_arguments_internalized = false;
+                    break;
+                }
+            }
+
+            if(!all_arguments_internalized) {
+                return 0;
+            }
+
+            // type_info : ^User_Type_Info;
+            // i.e.: array{ capacity, length, ^User_Type_Info, [a, b, c, d]} 
             
-            Light_Ast** arr_exprs = array_new(Light_Ast*);
-            array_push(arr_exprs, arg);
-
-            Light_Ast* arr = ast_new_expr_literal_array(arg->scope_at, 0, arr_exprs);
-            Light_Ast* addr = ast_new_expr_unary(arg->scope_at, arr, 0, OP_UNARY_ADDRESSOF);
-
             Light_Ast** struct_exprs = array_new(Light_Ast*);
-            array_push(struct_exprs, addr);
-            Light_Ast* ptr_user_info = ast_new_expr_compiler_generated(arg->scope_at, COMPILER_GENERATED_POINTER_TO_TYPE_INFO);
-            ptr_user_info->expr_compiler_generated.type_value = arg->type;
-            array_push(struct_exprs, ptr_user_info);
 
-            Light_Ast* arg_struct_literal = ast_new_expr_literal_struct(arg->scope_at, user_type_value, user_type_value, struct_exprs, false, 0);
-            array_push(trailing_exprs, arg_struct_literal);
+            Light_Ast* capacity_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs);
+            Light_Ast* length_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs);
+            Light_Ast* type_info_expr = ast_new_expr_compiler_generated(expr->scope_at, COMPILER_GENERATED_USER_TYPE_INFO_POINTER);
+            Light_Ast* trailing_array_literal = ast_new_expr_literal_array(expr->scope_at, 0, trailing_exprs);
+            Light_Ast* array_cast = ast_new_expr_unary(expr->scope_at, trailing_array_literal, 0, OP_UNARY_CAST);
+            array_cast->expr_unary.type_to_cast = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
 
-            arg_struct_literal->type = type_infer_expression(arg_struct_literal, error);
-            if(!arg_struct_literal->type || !(arg_struct_literal->type->flags & TYPE_FLAG_INTERNALIZED)) {
+            array_push(struct_exprs, capacity_expr);
+            array_push(struct_exprs, length_expr);
+            array_push(struct_exprs, type_info_expr);
+            array_push(struct_exprs, array_cast);
+
+            Light_Token* arr_token = token_new_identifier_from_string(
+                light_special_idents_table[LIGHT_SPECIAL_IDENT_ARRAY].data, 
+                light_special_idents_table[LIGHT_SPECIAL_IDENT_ARRAY].length);
+
+            Light_Ast* struct_literal = ast_new_expr_literal_struct(expr->scope_at, 
+                arr_token, 0, struct_exprs, false, 0);
+
+            Light_Ast* addr_of_struct_literal = ast_new_expr_unary(expr->scope_at, struct_literal, 
+                0, OP_UNARY_ADDRESSOF);
+
+            expr->expr_proc_call.arg_count -= count_trailing_exprs;
+            expr->expr_proc_call.arg_count++;
+            array_length(expr->expr_proc_call.args) -= count_trailing_exprs;
+            array_push(expr->expr_proc_call.args, addr_of_struct_literal);
+
+            addr_of_struct_literal->type = type_infer_expression(addr_of_struct_literal, error);
+            if(!addr_of_struct_literal->type || *error & TYPE_ERROR) return 0;
+            if(!(addr_of_struct_literal->type->flags & TYPE_FLAG_INTERNALIZED))
                 all_arguments_internalized = false;
-                break;
+        } else {
+            // Insert a null as second argument to call
+            // to avoid zero arguments passed to a variadic function
+            if(all_arguments_internalized) {
+                Light_Ast* nullexpr = ast_new_expr_literal_primitive(expr->scope_at, 0);
+                nullexpr->expr_literal_primitive.type = LITERAL_POINTER;
+                nullexpr->type = type_infer_expression(nullexpr, error);
+                if(!expr->expr_proc_call.args) {
+                    expr->expr_proc_call.args = array_new(Light_Ast*);
+                }
+                array_push(expr->expr_proc_call.args, nullexpr);
+                expr->expr_proc_call.arg_count++;
             }
         }
-
-        if(!all_arguments_internalized) {
-            return 0;
-        }
-
-        // type_info : ^User_Type_Info;
-        // i.e.: array{ capacity, length, ^User_Type_Info, [a, b, c, d]} 
-        
-        Light_Ast** struct_exprs = array_new(Light_Ast*);
-
-        Light_Ast* capacity_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs);
-        Light_Ast* length_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs);
-        Light_Ast* type_info_expr = ast_new_expr_compiler_generated(expr->scope_at, COMPILER_GENERATED_USER_TYPE_INFO_POINTER);
-        Light_Ast* trailing_array_literal = ast_new_expr_literal_array(expr->scope_at, 0, trailing_exprs);
-        Light_Ast* array_cast = ast_new_expr_unary(expr->scope_at, trailing_array_literal, 0, OP_UNARY_CAST);
-        array_cast->expr_unary.type_to_cast = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
-
-        array_push(struct_exprs, capacity_expr);
-        array_push(struct_exprs, length_expr);
-        array_push(struct_exprs, type_info_expr);
-        array_push(struct_exprs, array_cast);
-
-        Light_Token* arr_token = token_new_identifier_from_string(
-            light_special_idents_table[LIGHT_SPECIAL_IDENT_ARRAY].data, 
-            light_special_idents_table[LIGHT_SPECIAL_IDENT_ARRAY].length);
-
-        Light_Ast* struct_literal = ast_new_expr_literal_struct(expr->scope_at, 
-            arr_token, 0, struct_exprs, false, 0);
-
-        Light_Ast* addr_of_struct_literal = ast_new_expr_unary(expr->scope_at, struct_literal, 
-            0, OP_UNARY_ADDRESSOF);
-
-        expr->expr_proc_call.arg_count -= count_trailing_exprs;
-        expr->expr_proc_call.arg_count++;
-        array_length(expr->expr_proc_call.args) -= count_trailing_exprs;
-        array_push(expr->expr_proc_call.args, addr_of_struct_literal);
-
-        addr_of_struct_literal->type = type_infer_expression(addr_of_struct_literal, error);
-        if(!addr_of_struct_literal->type || *error & TYPE_ERROR) return 0;
-        if(!(addr_of_struct_literal->type->flags & TYPE_FLAG_INTERNALIZED))
-            all_arguments_internalized = false;
     }
     
     // Only return the correct type if everything is internalized,

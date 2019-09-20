@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
     Light_Scope  global_scope = {0};
 
     u32 parser_error = 0;
-    parse_init(&parser, &lexer, &global_scope, argv[1]);
+    parse_init(&parser, &lexer, &global_scope, compiler_path, compiler_path_size, argv[1]);
 
     Light_Ast** ast = 0;
 
@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
     }
     double tcheck_elapsed = (os_time_us() - tcheck_start) / 1000.0;
     
-#if 1
+#if 0
     ast_print(ast, LIGHT_AST_PRINT_STDOUT|LIGHT_AST_PRINT_EXPR_TYPES, 0);
     type_table_print();
 #endif

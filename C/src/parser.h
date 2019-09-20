@@ -21,7 +21,7 @@ typedef struct Light_Parser_t{
 
 // General
 Light_Ast** parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, u32* error);
-void        parse_init(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, const char* main_file);
+void        parse_init(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, const char* compiler_path, u64 compiler_path_size, const char* main_file);
 
 // Type
 Light_Type* parse_type(Light_Parser* parser, Light_Scope* scope, u32* error);

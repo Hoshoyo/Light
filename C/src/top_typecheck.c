@@ -663,6 +663,13 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
             if(node->decl_variable.type && node->decl_variable.type->flags & TYPE_FLAG_INTERNALIZED) {
                 typecheck_remove_from_infer_queue(node);
                 node->decl_variable.flags |= DECL_VARIABLE_FLAG_RESOLVED;
+
+                // Cannot declare a variable of type void
+                if(node->decl_variable.type == type_primitive_get(TYPE_PRIMITIVE_VOID)) {
+                    type_error(decl_error, node->decl_variable.name, 
+                        "cannot declare the variable '%.*s' with type 'void'\n", TOKEN_STR(node->decl_variable.name));
+                    return;
+                }
             } else {
                 typecheck_push_to_infer_queue(node);
             }

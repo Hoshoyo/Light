@@ -1,3 +1,10 @@
+array struct {
+    capacity  : u64;
+    length    : u64;
+    type_info : ^User_Type_Info;
+    data      : ^void;
+}
+
 User_Type_Array struct {
     array_of  : ^User_Type_Info;
     dimension : u64;

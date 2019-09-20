@@ -638,8 +638,18 @@ parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, L
     return ast_new_decl_variable(scope, name, type, expr, STORAGE_CLASS_STACK, 0);
 }
 
+static void
+parse_push_internal_file(Light_Parser* parser, const char* filepath, const char* compiler_path, u64 compiler_path_size) {
+    // Find internal files based on compiler path
+    uint64_t internal_file_size = 0;
+    const char* internal_file = light_real_path_from(compiler_path, compiler_path_size, filepath, &internal_file_size);
+    string ifile = {internal_file_size, 0, (char*)internal_file};
+    array_push(parser->parse_queue_array, ifile);
+    string_table_add(&parser->parse_queue, ifile, 0);
+}
+
 void
-parse_init(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, const char* main_file) {
+parse_init(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, const char* compiler_path, u64 compiler_path_size, const char* main_file) {
     parser->scope_global = global_scope;
     parser->lexer = lexer;
     parser->top_level = array_new_len(Light_Ast*, 1024);
@@ -648,7 +658,11 @@ parse_init(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, 
     parser->parse_queue_array = array_new_len(string, 2048);
     string_table_new(&parser->parse_queue, 1024 * 1024);
 
-    string mf = {0, 0, (char*)main_file};
+    // TODO(psv): error when this file is not found
+    parse_push_internal_file(parser, "/../modules/base.li", compiler_path, compiler_path_size); // base must be first
+    parse_push_internal_file(parser, "/../modules/reflect.li", compiler_path, compiler_path_size);
+
+    string mf = {strlen(main_file), 0, (char*)main_file};
     array_push(parser->parse_queue_array, mf);
     string_table_add(&parser->parse_queue, mf, 0);
 }
