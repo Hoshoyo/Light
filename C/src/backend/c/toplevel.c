@@ -481,6 +481,8 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
         } break;
         case AST_EXPRESSION_LITERAL_ARRAY: {
             catstring after = {0};
+            catstring epilogue = {0};
+            catstring discard = {0};
 
             char b[256] = {0};
             Light_Token name = token_from_name(b, "_lit_array", node->id);
@@ -494,12 +496,22 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
                 for(u64 i = 0; i < array_length(node->expr_literal_array.array_exprs); ++i) {
                     if(i > 0) catsprint(&after, ", ");
                     Light_Ast* expr = node->expr_literal_array.array_exprs[i];
-                    emit_expression(literal_decls, &after, expr);
+                    if(expr->kind == AST_EXPRESSION_LITERAL_ARRAY) {
+                        catsprint(&after, "{0}");
+                        // TODO(psv): alignment and padding are important here
+                        catsprint(&epilogue, "__memory_copy(_lit_array_%d + %l, _lit_array_%d, %l);\n", 
+                            node->id, i * node->type->size_bits / 8, expr->id, expr->type->size_bits / 8);
+                        // emit anyway, but discard the rvalue since were are memcopying
+                        emit_expression(literal_decls, &discard, expr);
+                    } else {
+                        emit_expression(literal_decls, &after, expr);
+                    }
                 }
                 catsprint(&after, "};\n");
             }
 
             catstring_append(literal_decls, &after);
+            catstring_append(literal_decls, &epilogue);
 
             // Dereference, since the array is already considered a pointer type
             catsprint(buffer, "_lit_array_%d", node->id);

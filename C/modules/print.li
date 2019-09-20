@@ -54,6 +54,14 @@ print:(fmt : string, args : ...) -> u64 {
 
 // 
 
+print_bytes:(v : ^u8, count : s32) -> u64 {
+    for i := 0; i < count; i += 1 {
+        if i > 0 print_string(", ");
+        print_string("0x");
+        print_u8(v[i], 16);
+    }
+}
+
 print_value_literal_struct:(v : User_Type_Value) -> u64 {
     t := v.type;
     val := v.value; // ^void
@@ -72,6 +80,25 @@ print_value_literal_struct:(v : User_Type_Value) -> u64 {
     }
 
     print_string(" }");
+}
+
+print_value_literal_array:(v : User_Type_Value) -> u64 {
+    t := v.type;
+    val := v.value; // ^void
+
+    array_type := t.description.array_desc;
+    element_type := array_type.array_of;
+
+    print_string("[");
+
+    for i :u64= 0; i < array_type.dimension; i += 1 {
+        if i > 0 print_string(", ");
+        offset := val + element_type.type_size_bytes->u64 * i;
+        type_val := User_Type_Value:{offset, element_type};
+        print_value_literal(type_val);
+    }
+
+    print_string("]");
 }
 
 print_value_literal:(v : User_Type_Value) -> u64 {
@@ -137,6 +164,8 @@ print_value_literal:(v : User_Type_Value) -> u64 {
             s := User_Type_Value:{val, t.description.alias_desc.alias_to};
             print_value_literal_struct(s);
         }
+    } else if t.kind == LIGHT_TYPE_KIND_ARRAY {
+        print_value_literal_array(v);
     }
 
     return 0;
@@ -515,7 +544,8 @@ main : () -> s32 {
     i := 3.14;
     j := 2.22234;
 
-    print("foo", a, b, c, d, e, f, g, h, i, j, true, false, &a, "hello");
+    //print("foo", a, b, c, d, e, f, g, h, i, j, true, false, &a, "hello", [1, 2, 3]);
+    print("foo", [1,2]);
 
     return 0;
 }
