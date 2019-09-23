@@ -268,7 +268,8 @@ eval_expr_constant_int(Light_Ast* expr, u32* error) {
 
 bool 
 eval_literal_primitive(Light_Ast* p) {
-    assert(p->type->kind == TYPE_KIND_PRIMITIVE);
+	Light_Type* root_type = type_alias_root(p->type);
+    assert(root_type->kind == TYPE_KIND_PRIMITIVE);
 
 	Light_Literal_Type ltype = p->expr_literal_primitive.type;
 
@@ -281,7 +282,7 @@ eval_literal_primitive(Light_Ast* p) {
 		(ltype == LITERAL_DEC_UINT) || 
 		(ltype == LITERAL_DEC_SINT))
 	{
-		switch(p->type->primitive) {
+		switch(root_type->primitive) {
 			case TYPE_PRIMITIVE_R32:
 				p->expr_literal_primitive.value_r32 = str_to_r32(token_data, token_length);
 				break;

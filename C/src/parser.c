@@ -448,6 +448,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
         ReturnIfError();
     }
 
+    bool is_variable_declaration = false;
     // Check if the pattern 'name :' appears next, that indicates
     // a normal procedure declaration instead of a type declaration.
     if( lexer_peek(lexer)->type == '(' &&
@@ -460,12 +461,30 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
         lexer_peek_n(lexer, 1)->type == ')')
     {
         // Normal declaration
+        s32 current_lexer_index = lexer->index;
+
+        parse_type(parser, scope, error);   // discard
+
+        if(lexer_peek(lexer)->type == ';')
+            is_variable_declaration = true;
+        lexer->index = current_lexer_index;
     } else {
+        is_variable_declaration = true;
+    }
+
+    if(is_variable_declaration) {
         Light_Type* function_type = parse_type(parser, scope, error);
         ReturnIfError();
 
         // This is in fact a variable declaration of procedure type.
         Light_Ast* decl_var = ast_new_decl_variable(scope, name, function_type, 0, STORAGE_CLASS_DATA_SEGMENT, 0);
+
+        if(scope->level == 0) {
+            // global scope
+            *error |= parser_require_and_eat(parser, ';');
+            ReturnIfError();
+        }
+
         return decl_var;
     }
 

@@ -67,6 +67,37 @@ catsprint_string_length(catstring* buffer, const char* str, int length) {
 }
 
 static int
+catsprint_string_length_escaped(catstring* buffer, const char* str, int length) {
+    if(buffer->capacity == 0) {
+        buffer->data = calloc(1, MAX(32, length));
+        buffer->capacity = MAX(32, length);
+    }
+
+    int n = 0;
+
+    if((buffer->length + length) >= buffer->capacity) {
+        buffer_grow_by(buffer, length * 2);
+    }
+    
+    char* at = buffer->data + buffer->length;
+    for(int i = 0; i < length; ++i) {
+        char c = *(str + i);
+        if(c == '\n') {
+            *at = '\\';
+            at++;
+            *at = 'n';
+            buffer->length++;
+        } else {
+            *at = c;
+        }
+        at++;
+    }
+    buffer->length += length;
+
+    return length;
+}
+
+static int
 catsprint_string(catstring* buffer, const char* str) {
     if(buffer->capacity == 0) {
         buffer->data = calloc(1, 32);
@@ -175,6 +206,11 @@ catsprint(catstring* buffer, char* str, ...) {
                         int length = va_arg(args, int);
                         // push string
                         n = catsprint_string_length(buffer, va_arg(args, const char*), length);
+                    } else if (*at == '*') {
+                        at++;
+                        int length = va_arg(args, int);
+                        // push string
+                        n = catsprint_string_length_escaped(buffer, va_arg(args, const char*), length);
                     } else {
                         // push string
                         n = catsprint_string(buffer, va_arg(args, const char*));

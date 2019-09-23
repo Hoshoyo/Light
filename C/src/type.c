@@ -55,6 +55,12 @@ type_check_equality(Light_Type* t1, Light_Type* t2) {
         {
             return true;
         }
+        Light_Type* ptr_to_root1 = type_alias_root(t1root->pointer_to);
+        Light_Type* ptr_to_root2 = type_alias_root(t2root->pointer_to);
+        if(ptr_to_root1 == ptr_to_root2) {
+            if(ptr_to_root1 && ptr_to_root1->kind == TYPE_KIND_PRIMITIVE)
+                return true;
+        }
     }
 
     return t1 == t2;

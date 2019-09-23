@@ -817,7 +817,7 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
     bool variadic = (caller_type->function.flags & TYPE_FUNCTION_VARIADIC) != 0;
 
     if(expr->expr_proc_call.arg_count < caller_type->function.arguments_count) {
-        if(variadic && expr->expr_proc_call.arg_count < (caller_type->function.arguments_count - 1))  {
+        if(!variadic || (variadic && expr->expr_proc_call.arg_count < (caller_type->function.arguments_count - 1)))  {
             type_error(error, expr->expr_proc_call.token, 
                 "too few arguments for procedure call, wanted '%d', but got '%d'\n",
                 caller_type->function.arguments_count, expr->expr_proc_call.arg_count);
@@ -853,6 +853,7 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
         expr->expr_proc_call.args[i]->type = at;
 
         if(!type_check_equality(at, arg_type)) {
+            type_check_equality(at, arg_type);
             type_error_mismatch(error, expr->expr_proc_call.token, at, arg_type);
             fprintf(stderr, " in argument #%d of procedure call\n", i + 1);
         }

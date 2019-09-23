@@ -319,6 +319,7 @@ emit_binop(catstring* buffer, Light_Operator_Binary binop) {
 
 static void
 emit_primitive_literal(catstring* buffer, Light_Ast_Expr_Literal_Primitive lit, Light_Type* type) {
+    type = type_alias_root(type);
     switch(lit.type) {
         case LITERAL_BIN_INT:
         case LITERAL_HEX_INT:
@@ -495,7 +496,8 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
 
             if(node->expr_literal_array.raw_data) {
                 //node->expr_literal_array.data
-                catsprint(&after, " = %s+;\n", node->expr_literal_array.data_length_bytes, node->expr_literal_array.data);
+                //catsprint(&after, " = %s+;\n", node->expr_literal_array.data_length_bytes, node->expr_literal_array.data);
+                catsprint(&after, " = %s*;\n", node->expr_literal_array.data_length_bytes, node->expr_literal_array.data);
             } else {
                 catsprint(&after, " = {");
                 for(u64 i = 0; i < array_length(node->expr_literal_array.array_exprs); ++i) {
@@ -523,6 +525,7 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
         } break;
         case AST_EXPRESSION_LITERAL_STRUCT:{
             catstring after = {0};
+            catstring arrays = {0};
 
             char b[256] = {0};
             Light_Token name = token_from_name(b, "_lit_struct", node->id);
@@ -532,12 +535,21 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
             for(u64 i = 0; i < array_length(node->expr_literal_struct.struct_exprs); ++i) {
                 if(i > 0) catsprint(&after, ", ");
                 Light_Ast* expr = node->expr_literal_struct.struct_exprs[i];
-                emit_expression(literal_decls, &after, expr);
+                if(expr->kind == AST_EXPRESSION_LITERAL_ARRAY) {
+                    catsprint(&after, "{0}");
+                    catsprint(&arrays, "__memory_copy(&_lit_struct_%d, ", node->id);
+                    emit_expression(literal_decls, &arrays, expr);
+                    catsprint(&arrays, ", %l);\n", expr->type->size_bits / 8);
+                } else {
+                    emit_expression(literal_decls, &after, expr);
+                }
             }
 
             catstring_append(literal_decls, &after);
 
             catsprint(literal_decls, "};\n");
+
+            catstring_append(literal_decls, &arrays);
 
             catsprint(buffer, "_lit_struct_%d", node->id);
         } break;
@@ -592,6 +604,40 @@ emit_variable_assignment(catstring* buffer, Light_Token* name, Light_Ast* expr) 
 
             emit_expression(buffer, &assignment, expr);
             catstring_append(buffer, &assignment);
+
+            catsprint(buffer, ", %l)", root_type->size_bits/8);
+        } break;
+        case TYPE_KIND_UNION:
+            // TODO(psv): implement
+        default: break;
+    }
+}
+
+static void
+emit_variable_assignment_top_level(catstring* buffer, catstring* top_level, Light_Token* name, Light_Ast* expr) {
+    Light_Type* root_type = type_alias_root(expr->type);
+    switch(root_type->kind) {
+        case TYPE_KIND_POINTER:
+        case TYPE_KIND_FUNCTION:
+        case TYPE_KIND_ENUM:
+        case TYPE_KIND_PRIMITIVE:{
+            catsprint_token(buffer, name);
+            catsprint(buffer, " = ");
+            emit_expression(top_level, buffer, expr);
+        } break;
+            
+        case TYPE_KIND_STRUCT:{
+            catsprint_token(buffer, name);
+            catsprint(buffer, " = ");
+            emit_expression(top_level, buffer, expr);
+        } break;
+        case TYPE_KIND_ARRAY: {
+            catsprint(buffer, "__memory_copy(");
+            catsprint_token(buffer, name);
+            catsprint(buffer, ", ");
+
+            emit_expression(top_level, buffer, expr);
+            catstring_append(top_level, buffer);
 
             catsprint(buffer, ", %l)", root_type->size_bits/8);
         } break;
@@ -1018,6 +1064,8 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, Light_Scope
     for(int i = 0; i < array_length(ast); ++i) {
         if(ast[i]->kind == AST_DECL_PROCEDURE) {
             emit_proc_forward_decl(&decls, ast[i]);
+        } else if(ast[i]->kind == AST_DECL_VARIABLE) {
+            emit_declaration(&decls, ast[i], 0);
         }
     }
 
@@ -1034,14 +1082,28 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, Light_Scope
     catsprint(&decls, "\n// Type table\n\n");
     emit_type_table(&decls, global_type_array);
 
+    // Emit top level initialization
+    catstring init_function = {0};
+    catstring init_function_before = {0};
+    catsprint(&init_function, "void __light_initialize_top_level() {\n");
+
     catsprint(&decls, "\n// Declarations\n\n");
     for(int i = 0; i < array_length(ast); ++i) {
-        emit_declaration(&decls, ast[i], 0);
+        Light_Ast* node = ast[i];
+        emit_declaration(&decls, node, 0);
+        if(node->kind == AST_DECL_VARIABLE && node->decl_variable.assignment) {            
+            //emit_variable_assignment(&init_function, node->decl_variable.name, node->decl_variable.assignment);
+            emit_variable_assignment_top_level(&init_function, &init_function_before, node->decl_variable.name, node->decl_variable.assignment);
+            catsprint(&init_function, ";\n");
+        }
     }
+    catsprint(&init_function, "}\n");
 
     catstring_append(&code, &decls);
+    catstring_append(&code, &init_function_before);
+    catstring_append(&code, &init_function);
 
-    catsprint(&code, "int main() { __light_load_type_table(); return __light_main(); }\n");
+    catsprint(&code, "int main() { __light_load_type_table(); __light_initialize_top_level(); return __light_main(); }\n");
 
     catstring outfile = {0};
     catsprint(&outfile, "%s%s.c\0", path, filename);
@@ -1051,7 +1113,7 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, Light_Scope
 void 
 backend_c_compile_with_gcc(Light_Ast** ast, const char* filename, const char* working_directory) {
     char command_buffer[2048] = {0};
-    sprintf(command_buffer, "gcc -g %s%s.c -o %s%s -lX11 -lGL", 
+    sprintf(command_buffer, "gcc -g %s%s.c -o %s%s -lX11 -lGL -lm", 
         working_directory, filename, working_directory, filename);
     system(command_buffer);
 }

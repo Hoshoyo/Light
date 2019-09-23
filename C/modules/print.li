@@ -12,6 +12,16 @@ print_string:(s : string) -> u64 {
     write(STDOUT_FILENO, s.data, s.length);
 }
 
+print_string_c:(str : ^u8) -> u64 {
+    length :u64= 0;
+    start := str;
+    while *str != 0 {
+        length += 1;
+        str += 1;
+    }
+    return print_string(string:{0, length, start});
+}
+
 print_test:(args : ...) -> u64 {
     a := args -> ^array;
     count := a.length;
@@ -26,7 +36,8 @@ print_test:(args : ...) -> u64 {
     }
 }
 
-print_bad:(fmt : string, args : ...) -> u64 {
+// TODO(psv): make it faster
+print:(fmt : string, args : ...) -> u64 {
     length :u64= 0;
 
     if args == null {
@@ -53,28 +64,7 @@ print_bad:(fmt : string, args : ...) -> u64 {
         }
         previous = at;
     }
-}
-
-print:(fmt : string, args : ...) -> u64 {
-    length :u64= 0;
-
-    if args == null {
-        length += print_string(fmt);
-        return length;
-    }
-
-    a := args -> ^array;
-    count := a.length;
-    
-    values := a.data -> ^User_Type_Value;
-    for i :u64= 0; i < count; i += 1 {
-        value := values[i];
-        print_value_literal(value);
-        print_string("\n");
-    }
-}
-
-// 
+} 
 
 print_bytes:(v : ^u8, count : s32) -> u64 {
     for i := 0; i < count; i += 1 {
@@ -191,6 +181,9 @@ print_value_literal:(v : User_Type_Value) -> u64 {
             print_string(":");
             s := User_Type_Value:{val, t.description.alias_desc.alias_to};
             print_value_literal_struct(s);
+        } else {
+            type_val := User_Type_Value:{val, t.description.alias_desc.alias_to};
+            print_value_literal(type_val);
         }
     } else if t.kind == LIGHT_TYPE_KIND_ARRAY {
         print_value_literal_array(v);

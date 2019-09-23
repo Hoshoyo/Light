@@ -10,6 +10,8 @@
 #include <assert.h>
 
 #define TOKEN_STR(T) (T)->length, (T)->data
+#define MAX(A, B) (((A) > (B)) ? (A) : (B))
+#define MIN(A, B) (((A) < (B)) ? (A) : (B))
 
 void typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* error);
 void typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error);
@@ -261,6 +263,8 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
         case TYPE_KIND_ARRAY: {
             // Check array type
             type->array_info.array_of = typecheck_resolve_type(scope, type->array_info.array_of, flags, error);
+            if(!type->array_info.array_of || !(type->array_info.array_of->flags & TYPE_FLAG_INTERNALIZED))
+                return type;
             if(*error & TYPE_ERROR) return type;
             if(TYPE_WEAK(type->array_info.array_of)) return type;
 
@@ -362,7 +366,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
             for(s32 i = 0; i < type->struct_info.fields_count; ++i) {
                 s32 field_type_size_bits = type->struct_info.fields[i]->decl_variable.type->size_bits;
                 // align to whatever size bits of the current field is
-                offset_bits += (offset_bits % field_type_size_bits);
+                offset_bits += (offset_bits % MAX(field_type_size_bits, 32));
                 
                 array_push(type->struct_info.offset_bits, offset_bits);
                 offset_bits += field_type_size_bits;

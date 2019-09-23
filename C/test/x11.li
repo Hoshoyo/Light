@@ -629,9 +629,6 @@ glXMakeCurrent : (dpy : ^Display, drawable : u64, ctx : ^void) -> s32 #extern("G
 glXSwapBuffers : (dpy : ^Display, drawable : u64) -> void #extern("GL");
 glXDestroyContext : (dpy : ^Display, ctx : ^void) -> void #extern("GL");
 
-GL_TRUE  : s32 : 1;
-GL_FALSE : s32 : 0;
-
 CopyFromParent : u64 : 0;	/* border pixmap in CreateWindow */
 
 InputOutput	: u32 : 1;
