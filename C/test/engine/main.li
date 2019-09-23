@@ -168,6 +168,13 @@ window_size : (info : ^Window_Info, width : ^s32, height : ^s32) {
     *height = attribs.height;
 }
 
+screen_size : (info : ^Window_Info, width : ^s32, height : ^s32) {
+	scr := DefaultScreen(info.display);
+	screen := info.display.screens[scr];
+	*width = screen.width;
+	*height = screen.height;
+}
+
 main : () -> s32 {
     window_info : Window_Info;
 	if !init_opengl(&window_info) {
@@ -177,7 +184,10 @@ main : () -> s32 {
     hogl_init_extensions();
     render_context_init();
 
-    print("size: % %\n", #size_of Vertex_3D, #size_of Quad_2D);
+    screen_width : s32;
+	screen_height : s32;
+
+	screen_size(&window_info, &screen_width, &screen_height);
 
 	while true 
     {
@@ -194,11 +204,10 @@ main : () -> s32 {
 
         glViewport(0,0, width, height);
 
-        //quad : Quad_2D;
-        //quad = quad_new(vec2:{0.0, 0.0}, 100.0, 100.0, vec4:{1.0, 0.0, 0.0, 1.0});
-        //render_quad_immediate(&quad);
+        quad := quad_new(vec2:{0.0, 0.0}, 100.0, 100.0, vec4:{1.0, 0.0, 0.0, 1.0});
+        render_quad_immediate(&quad);
 
-        //render_immediate_flush();
+        render_immediate_flush();
 
 		glXSwapBuffers (window_info.display, window_info.window_handle);
 		//usleep(1000);

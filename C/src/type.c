@@ -568,6 +568,41 @@ type_value_expression(Light_Scope* scope, Light_Type* type) {
     return 0;
 }
 
+s32 type_alignment_get(Light_Type* type){
+    type = type_alias_root(type);
+	switch(type->kind) {
+		case TYPE_KIND_PRIMITIVE: return type->size_bits / 8;
+		case TYPE_KIND_POINTER:   return type_pointer_size_bits() / 8;
+		case TYPE_KIND_FUNCTION:  return type_pointer_size_bits() / 8;
+		case TYPE_KIND_ARRAY:     return type_alignment_get(type->array_info.array_of);
+		case TYPE_KIND_STRUCT:{
+			if(type->struct_info.fields_count > 0){
+				return type_alignment_get(type->struct_info.fields[0]->decl_variable.type);
+			} else {
+				return 0;
+			}
+		} break;
+		case TYPE_KIND_UNION: {
+			// TODO(psv): maybe do this process earlier?
+			// calculate union alignment is the alignment of the biggest type
+			Light_Type* biggest_type = 0;
+			for (size_t i = 0; i < type->union_info.fields_count; ++i) {
+				size_t type_size = type->union_info.fields[i]->decl_variable.type->size_bits;
+				assert(type_size > 0); // this needs to be calculated first
+				if (biggest_type && type->union_info.fields[i]->decl_variable.type->size_bits > biggest_type->size_bits) {
+					biggest_type = type->union_info.fields[i]->decl_variable.type;
+				} else {
+					biggest_type = type->union_info.fields[i]->decl_variable.type;
+				}
+			}
+			return type_alignment_get(biggest_type);
+		}break;
+        default: 
+        assert(0); break;// invalid node 
+	}
+	return 0;
+}
+
 #include <stdio.h>
 void
 type_table_print() {

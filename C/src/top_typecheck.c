@@ -213,6 +213,11 @@ typecheck_resolve_type_symbol_tables(Light_Type* type, u32 flags, u32* error) {
     return type;
 }
 
+s32 align_delta(s32 offset, s32 align_to){
+	s32 rest = offset % align_to;
+	return((align_to - rest) % align_to);
+}
+
 // This function tries to internalize a type if possible
 //
 // Returns TYPE_ERROR in 'error' if undeclared type name is found.
@@ -363,18 +368,36 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
             s32 size_bits = 0;
             s32 offset_bits = 0;
             s32 struct_alignment_bytes = type->struct_info.alignment_bytes;
+            s32 alignment = 0;
+            bool packed = false; // TODO(psv): implement
+
             for(s32 i = 0; i < type->struct_info.fields_count; ++i) {
                 s32 field_type_size_bits = type->struct_info.fields[i]->decl_variable.type->size_bits;
                 // align to whatever size bits of the current field is
-                offset_bits += (offset_bits % MAX(field_type_size_bits, 32));
-                
+
+                if (!packed) {
+                    // align type to its boundary
+                    s32 offset_bytes = offset_bits / 8;
+                    s32 field_type_size_bytes = field_type_size_bits / 8;
+                    alignment = type_alignment_get(type->struct_info.fields[i]->decl_variable.type);
+
+                    if (alignment > 0 && offset_bytes % alignment != 0) {
+                        s64 delta = align_delta(offset_bytes, alignment);
+                        delta *= 8; // delta in bits
+                        offset_bits += delta;
+                        field_type_size_bits += delta;
+                        offset_bits += delta;
+                    }
+                }
                 array_push(type->struct_info.offset_bits, offset_bits);
+
                 offset_bits += field_type_size_bits;
+                if (i == 0 || alignment == 0) {
+                    struct_alignment_bytes = alignment;
+                }
             }
 
-            // @Important TODO(psv): default alignment is 4, but we gotta
-            // support smaller ones
-            if(struct_alignment_bytes == 0) struct_alignment_bytes = 4; // default alignment is 32 bit/4 byte
+            // @Important TODO(psv): check if alignment is correct
             size_bits = offset_bits + (offset_bits % (struct_alignment_bytes * 8));
             type->size_bits = size_bits;
             type->struct_info.size_bits = size_bits;
