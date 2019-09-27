@@ -1,10 +1,15 @@
 #import "../x11.li"
 #import "../../modules/reflect.li"
 #import "../../modules/print.li"
+#import "../../modules/io.li"
 #import "gl.li"
 #import "ho_gl.li"
 #import "math.li"
 #import "renderer.li"
+#import "os.li"
+#import "mesh.li"
+#import "quaternion.li"
+#import "camera.li"
 
 Window_Info struct {
     width         : s32;
@@ -175,6 +180,14 @@ screen_size : (info : ^Window_Info, width : ^s32, height : ^s32) {
 	*height = screen.height;
 }
 
+Object_Binary struct {
+	vertices_size_bytes : s32;
+	indices_size_bytes : s32;
+	vertices_count : s32;
+	indices_count : s32;
+	data : ^u8;
+}
+
 main : () -> s32 {
     window_info : Window_Info;
 	if !init_opengl(&window_info) {
@@ -184,14 +197,28 @@ main : () -> s32 {
     hogl_init_extensions();
     render_context_init();
 
+	file_data := read_entire_file("/home/hoshoyo/dev/c/playground/sphere.bin", malloc).data -> ^Object_Binary;
+	mesh := create_simple_mesh(&file_data.data -> ^Vertex, file_data.vertices_count, 
+		(((&file_data.data -> ^u8) + file_data.vertices_size_bytes) -> ^u32), file_data.indices_count);
+	
+/*
+	Camera_Common struct {
+		position          : vec4;
+		near_plane        : r32;
+		far_plane         : r32;
+		fov               : r32;
+		view_matrix       : mat4;
+		projection_matrix : mat4;
+	}
+*/
+
     screen_width : s32;
 	screen_height : s32;
 
 	screen_size(&window_info, &screen_width, &screen_height);
 
-	while true 
+	while true
     {
-		// 126,192,238
 		glClearColor(126.0 / 255.0, 192.0 / 255.0, 238.0 / 255.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
 
@@ -210,7 +237,7 @@ main : () -> s32 {
         render_immediate_flush();
 
 		glXSwapBuffers (window_info.display, window_info.window_handle);
-		//usleep(1000);
+		usleep(1000);
 	}
 
     release_opengl(&window_info);

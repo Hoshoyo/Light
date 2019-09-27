@@ -498,6 +498,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     bool all_args_internalized = true;
     bool variable_declaration = false;
     u32 function_flags = 0;
+    bool variadic = false;
 
     if(lexer_peek(lexer)->type != ')') {
         arguments = array_new(Light_Ast*);
@@ -518,7 +519,6 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 
             Light_Type* arg_type = 0;
 
-            bool variadic = false;
             // TODO(psv): refactor token to be ...
             if(lexer_peek(parser->lexer)->type == '.') {
                 *error |= parser_require_and_eat(parser, '.');
@@ -568,8 +568,6 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
         ReturnIfError();
 	}
 
-    Light_Type* proc_type = type_new_function(args_types, return_type, args_count, all_args_internalized, function_flags);
-
     Light_Ast* body = 0;
     u32 flags = 0;
     Light_Token* external_library_name = 0;
@@ -598,8 +596,12 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 
             *error |= parser_require_and_eat(parser, ';');
             ReturnIfError();
+
+            function_flags |= TYPE_FUNCTION_STDCALL;
         }
     }
+
+    Light_Type* proc_type = type_new_function(args_types, return_type, args_count, all_args_internalized, function_flags);
 
     if(lexer_peek(lexer)->type == ';') {
         // Variable with procedure type
@@ -610,6 +612,10 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     if(!(flags & DECL_PROC_FLAG_EXTERN)) {
         body = parse_comm_block(parser, args_scope, error);
         ReturnIfError();
+    }
+
+    if(variadic) {
+        flags |= DECL_PROC_FLAG_VARIADIC;
     }
 
     Light_Ast* result = ast_new_decl_procedure(scope, name, body, return_type, args_scope, arguments, args_count, flags);

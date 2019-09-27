@@ -210,13 +210,19 @@ emit_typed_procedure_declaration(catstring* buffer, Light_Ast* decl) {
         catsprint_token(buffer, decl->decl_proc.name);
     }
 
+    bool variadic = decl->decl_proc.flags & DECL_PROC_FLAG_VARIADIC;
+    bool external = (decl->decl_proc.flags & DECL_PROC_FLAG_EXTERN);
+
     // end (arguments)
     catsprint(buffer, ")(");
-    for(int i = 0; i < decl->decl_proc.argument_count; ++i) {
+    for(int i = 0; i < decl->decl_proc.argument_count - ((variadic && external) ? 1 : 0); ++i) {
         if(i > 0) catsprint(buffer, ", ");
-
+        
         emit_typed_declaration(buffer, decl->decl_proc.arguments[i]->decl_variable.type, 
             decl->decl_proc.arguments[i]->decl_variable.name, 0);
+    }
+    if(variadic && external) {
+        catsprint(buffer, ", ...");
     }
     catsprint(buffer, ")");
     emit_type_end(buffer, type->function.return_type);
@@ -495,9 +501,7 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
             emit_typed_declaration(&after, node->type, &name, 0);
 
             if(node->expr_literal_array.raw_data) {
-                //node->expr_literal_array.data
-                //catsprint(&after, " = %s+;\n", node->expr_literal_array.data_length_bytes, node->expr_literal_array.data);
-                catsprint(&after, " = %s*;\n", node->expr_literal_array.data_length_bytes, node->expr_literal_array.data);
+                catsprint(&after, " = \"%s*\";\n", node->expr_literal_array.data_length_bytes - 2, node->expr_literal_array.data + 1);
             } else {
                 catsprint(&after, " = {");
                 for(u64 i = 0; i < array_length(node->expr_literal_array.array_exprs); ++i) {
@@ -1068,15 +1072,6 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, Light_Scope
             emit_declaration(&decls, ast[i], 0);
         }
     }
-
-#if 0
-    // User type table struct declarations
-    catstring type_table_definitions_path = {0};
-    catsprint(&type_table_definitions_path, "%s../src/backend/user_type_table.h\0", compiler_path);
-    catstring type_table_definitions = catstring_new_from_file(type_table_definitions_path.data);
-
-    catstring_append(&decls, &type_table_definitions);
-#endif
 
     // Emit type table
     catsprint(&decls, "\n// Type table\n\n");

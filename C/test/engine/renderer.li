@@ -326,12 +326,6 @@ quad_new : (position : vec2, width : r32, height : r32, color : vec4) -> Quad_2D
 	return q;
 }
 
-Vertex struct {
-	position      : vec3;
-	texture_coord : vec2;
-	normal        : vec3;
-}
-
 Cube_3D struct {
 	vao : u32;
 	vbo : u32;

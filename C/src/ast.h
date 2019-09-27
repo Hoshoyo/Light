@@ -300,9 +300,10 @@ typedef struct {
 } Light_Ast_Decl_Variable;
 
 typedef enum {
-    DECL_PROC_FLAG_FOREIGN = (1 << 0),
-    DECL_PROC_FLAG_MAIN    = (1 << 1),
-	DECL_PROC_FLAG_EXTERN  = (1 << 2),
+    DECL_PROC_FLAG_FOREIGN  = (1 << 0),
+    DECL_PROC_FLAG_MAIN     = (1 << 1),
+	DECL_PROC_FLAG_EXTERN   = (1 << 2),
+	DECL_PROC_FLAG_VARIADIC = (1 << 3),
 } Light_Decl_Procedure_Flags;
 
 typedef struct {
@@ -493,6 +494,7 @@ typedef struct {
 
 typedef enum {
 	TYPE_FUNCTION_VARIADIC = (1 << 0),
+	TYPE_FUNCTION_STDCALL = (1 << 1),
 } Light_Type_Function_Flags;
 typedef struct {
     struct Light_Type_t*  return_type;

@@ -379,6 +379,11 @@ token_next(Light_Lexer* lexer) {
             r.flags |= TOKEN_FLAG_LITERAL;
             at++;	// skip "
             for (; *at && *at != '`'; ++at) {
+                if(*at == '\n') {
+                    lexer->column = 0;
+                    lexer->line++;
+                }
+                    
                 if(*at == '\\' && at[1] == '`') {
                     at += 2; // skip \ and `
                 }
@@ -392,6 +397,10 @@ token_next(Light_Lexer* lexer) {
 			at++;	// skip "
 
 			for (; *at && *at != '"'; ++at) {
+                if(*at == '\n') {
+                    lexer->column = 0;
+                    lexer->line++;
+                }
 				if (*at == 0) {
 					break;
 				} else if (*at == '\\') {

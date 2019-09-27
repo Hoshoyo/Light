@@ -474,6 +474,7 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
             }
         }
 
+        bool all_fields_checked = true;
         // Type is already inferred, only need to check
         for(s32 i = 0; i < struct_type->struct_info.fields_count; ++i) {
             if(named) {
@@ -486,7 +487,11 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
             } else {
                 Light_Ast* field = expr->expr_literal_struct.struct_exprs[i];
                 Light_Type* expr_type = type_infer_expression(field, error);
-                if(!expr_type) continue;
+                // TODO(psv):
+                if(!expr_type) {
+                    all_fields_checked = false;
+                    continue;
+                }
                 Light_Type* field_type = struct_type->struct_info.fields[i]->decl_variable.type;
                 expr_type = type_infer_propagate(field_type, field, error);
                 if(!type_check_equality(expr_type, field_type)) {
@@ -498,6 +503,10 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
                     fprintf(stderr, "'\n");
                 }
             }
+        }
+        if(!all_fields_checked) {
+            expr->type = 0;
+            return 0;
         }
         expr->type = decl->decl_typedef.type_referenced;
     } else {
@@ -522,6 +531,9 @@ type_infer_expr_literal_struct(Light_Ast* expr, u32* error) {
 static Light_Type*
 type_infer_expr_literal_array(Light_Ast* lexpr, u32* error) {
     assert(lexpr->kind == AST_EXPRESSION_LITERAL_ARRAY);
+    if(lexpr->id == 724) {
+        int xx = 0;
+    }
 
     lexpr->flags |= AST_FLAG_EXPRESSION_LVALUE;
 
@@ -815,6 +827,7 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
     }
     
     bool variadic = (caller_type->function.flags & TYPE_FUNCTION_VARIADIC) != 0;
+    bool stdcall = (caller_type->function.flags & TYPE_FUNCTION_STDCALL) != 0;
 
     if(expr->expr_proc_call.arg_count < caller_type->function.arguments_count) {
         if(!variadic || (variadic && expr->expr_proc_call.arg_count < (caller_type->function.arguments_count - 1)))  {
@@ -860,13 +873,11 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
     }
 
     if(variadic) {
-
         // Transform the trailing arguments into an array literal.
         int count_trailing_exprs = expr->expr_proc_call.arg_count - (caller_type->function.arguments_count - 1);
         assert(count_trailing_exprs >= 0);
 
         if(count_trailing_exprs > 0) {
-
             // When variadic, propagate each argument after the not variadic
             // arguments.
             for(s32 i = 0; i < expr->expr_proc_call.arg_count; ++i) {
@@ -887,10 +898,20 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
 
                 //array_push(trailing_exprs, arg);
             }
+        }
 
-            if(!all_arguments_internalized) {
-                return 0;
-            }
+        if(!all_arguments_internalized) {
+            return 0;
+        }
+    }
+
+    if(variadic && !stdcall) {
+
+        // Transform the trailing arguments into an array literal.
+        int count_trailing_exprs = expr->expr_proc_call.arg_count - (caller_type->function.arguments_count - 1);
+        assert(count_trailing_exprs >= 0);
+
+        if(count_trailing_exprs > 0) {
 
             // User type value token
             Light_Token* user_type_value = token_new_identifier_from_string("User_Type_Value", sizeof("User_Type_Value") -1);

@@ -22,9 +22,9 @@ stat struct {
 
 malloc: (size: u64) -> ^void #extern("C");
 
-write: (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
+//write: (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
 read: (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
-open: (pathname : ^u8, flags : s32) -> s32 #extern("C");
+open: (pathname : ^u8, flags : s32, args : ...) -> s32 #extern("C");
 fstat : (fd : s32, buf : ^stat) -> s32 #extern("C");
 close: (fd : s32) -> s32 #extern("C");
 
@@ -35,7 +35,7 @@ O_CREAT  : s32 : 100;
 
 read_entire_file : (filename : string, allocator : (u64)->^void) -> string {
     result : string;
-    descriptor := open(filename.data, O_RDONLY);
+    descriptor := open(filename.data, O_RDONLY, 0);
 
     if descriptor == -1 {
         return result;
@@ -59,4 +59,19 @@ read_entire_file : (filename : string, allocator : (u64)->^void) -> string {
     result.data = memory -> ^u8;
 
     return result;
+}
+
+write_file : (filename : string, buffer : ^void, buffer_size : u64) -> bool {
+    descriptor := open(filename.data, O_WRONLY|O_CREAT, 420);
+
+    if descriptor == -1 {
+        return false;
+    }
+
+    written := write(descriptor, buffer, buffer_size);
+
+    if written != 0 {
+        return true;
+    }
+    return false;
 }
