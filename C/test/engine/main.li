@@ -188,6 +188,34 @@ Object_Binary struct {
 	data : ^u8;
 }
 
+vert_shader := "#version 330 core
+
+layout (location = 0) in vec4 vertex_position;
+layout (location = 1) in vec4 vertex_normal;
+layout (location = 2) in vec2 texture_coords;
+layout (location = 3) in vec4 vertex_tangent;
+
+uniform mat4 model_matrix;
+uniform mat4 view_matrix;
+uniform mat4 projection_matrix;
+
+void main()
+{
+	gl_Position = projection_matrix * view_matrix * vertex_position;
+	//gl_Position = vertex_position;
+}";
+
+frag_shader := "#version 330 core
+
+out vec4 final_color;
+
+uniform vec4 color;
+
+void main()
+{
+	final_color = vec4(1.0, 1.0, 1.0, 1.0);
+}";
+
 main : () -> s32 {
     window_info : Window_Info;
 	if !init_opengl(&window_info) {
@@ -197,29 +225,45 @@ main : () -> s32 {
     hogl_init_extensions();
     render_context_init();
 
-	file_data := read_entire_file("/home/hoshoyo/dev/c/playground/sphere.bin", malloc).data -> ^Object_Binary;
-	mesh := create_simple_mesh(&file_data.data -> ^Vertex, file_data.vertices_count, 
-		(((&file_data.data -> ^u8) + file_data.vertices_size_bytes) -> ^u32), file_data.indices_count);
-	
-/*
-	Camera_Common struct {
-		position          : vec4;
-		near_plane        : r32;
-		far_plane         : r32;
-		fov               : r32;
-		view_matrix       : mat4;
-		projection_matrix : mat4;
-	}
-*/
+	//file_data := read_entire_file("/home/hoshoyo/dev/c/playground/sphere.bin", malloc).data -> ^Object_Binary;
+	//mesh := create_simple_mesh(&file_data.data -> ^Vertex, file_data.vertices_count, 
+	//	(((&file_data.data -> ^u8) + file_data.vertices_size_bytes) -> ^u32), file_data.indices_count);
+	verts := 
+	[
+		Vertex:{
+			vec4:{-1.0, -1.0, 0.0, 1.0}, vec4:{0.0, 1.0, 0.0, 1.0},
+			vec2:{0.0, 0.0}, vec4:{0.0, 0.0, 0.0, 0.0}
+		},
+		Vertex:{
+			vec4:{1.0, -1.0, 0.0, 1.0}, vec4:{0.0, 1.0, 0.0, 1.0},
+			vec2:{0.0, 0.0}, vec4:{0.0, 0.0, 0.0, 0.0}
+		},
+		Vertex:{
+			vec4:{0.0, 1.0, 0.0, 1.0}, vec4:{0.0, 1.0, 0.0, 1.0},
+			vec2:{0.0, 0.0}, vec4:{0.0, 0.0, 0.0, 0.0}
+		}
+	];
+	inds :[3]u32= [
+		0, 1, 2
+	];
+	mesh := create_simple_mesh(verts -> ^Vertex, 3, inds -> ^u32, 3);
 
     screen_width : s32;
 	screen_height : s32;
+
+	shader := shader_load(vert_shader, frag_shader);
+	//print("Shader loaded with id: %\n", shader);
+
+	camera : Quaternion_Camera;
+	camera_quat_init(&camera, 
+		vec4:{0.0, 0.0, 1.0, 1.0},
+		0.1, 100.0, 90.0, 16.0/9.0);
 
 	screen_size(&window_info, &screen_width, &screen_height);
 
 	while true
     {
-		glClearColor(126.0 / 255.0, 192.0 / 255.0, 238.0 / 255.0, 1.0);
+		glClearColor(0.0, 0.0, 0.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
 
         width : s32;
@@ -231,10 +275,14 @@ main : () -> s32 {
 
         glViewport(0,0, width, height);
 
+		mesh_render(&mesh, shader, &camera.c);
+		/*
+
         quad := quad_new(vec2:{0.0, 0.0}, 100.0, 100.0, vec4:{1.0, 0.0, 0.0, 1.0});
         render_quad_immediate(&quad);
 
         render_immediate_flush();
+		*/
 
 		glXSwapBuffers (window_info.display, window_info.window_handle);
 		usleep(1000);

@@ -43,6 +43,8 @@ type_check_equality(Light_Type* t1, Light_Type* t2) {
         t2root = type_alias_root(t2);
     }
 
+    if(!t1root || !t2root) return false;
+
     if(t1root->kind == TYPE_KIND_PRIMITIVE && t2root->kind == TYPE_KIND_PRIMITIVE) {
         return t1root == t2root;
     }

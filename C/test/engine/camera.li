@@ -1,3 +1,12 @@
+Camera_Common struct {
+	position          : vec4;
+	near_plane        : r32;
+	far_plane         : r32;
+	fov               : r32;
+	view_matrix       : mat4;
+	projection_matrix : mat4;
+}
+
 Quaternion_Camera struct {
 	c : Camera_Common;
 	rotation : Quaternion;
@@ -21,7 +30,7 @@ camera_quat_recalculate_view_matrix:(camera : ^Quaternion_Camera) {
 	camera.c.view_matrix = mat4_mul(rotation, trans);
 }
 
-camera_recalculate_projection_matrix:(camera : ^Camera_Common, width : s32, height : s32)
+camera_recalculate_projection_matrix:(camera : ^Camera_Common, aspect_ratio : r32)
 {
     // ---------------------------------------------------------
 
@@ -29,7 +38,7 @@ camera_recalculate_projection_matrix:(camera : ^Camera_Common, width : s32, heig
 	far := camera.far_plane;
 	top := fabsf(near) * atanf(DEGTORAD(camera.fov) / 2.0);
 	bottom := -top;
-	right := top * (width -> r32 / height -> r32);
+	right := top * aspect_ratio;
 	left := -right;
 
 	P := mat4:
@@ -55,7 +64,7 @@ camera_recalculate_projection_matrix:(camera : ^Camera_Common, width : s32, heig
 	camera.projection_matrix = mat4_scalar_product(-1.0, &MP);
 }
 
-camera_quat_init:(camera : ^Quaternion_Camera, position : vec4, near_plane : r32, far_plane : r32, fov : r32, window_width : s32, window_height : s32) {
+camera_quat_init:(camera : ^Quaternion_Camera, position : vec4, near_plane : r32, far_plane : r32, fov : r32, aspect_ratio : r32) {
 	//assert(position.w == 1.0f);
 	camera.c.position = position;
 	camera.c.near_plane = near_plane;
@@ -65,7 +74,7 @@ camera_quat_init:(camera : ^Quaternion_Camera, position : vec4, near_plane : r32
 	camera.yrotation = Quaternion:{ 0.0, 0.0, 0.0, 1.0 };
 
 	camera_quat_recalculate_view_matrix(camera);
-	camera_recalculate_projection_matrix(&camera.c, window_width, window_height);
+	camera_recalculate_projection_matrix(&camera.c, aspect_ratio);
 }
 
 camera_quat_rotate_x:(camera : ^Quaternion_Camera, x_difference : r32) {
@@ -116,4 +125,51 @@ camera_quat_move_right:(camera : ^Quaternion_Camera, amount : r32) {
 	camera.c.position = vec4_add(vec4:{ right.x, right.y, right.z, 0.0 }, camera.c.position);
 
 	camera_quat_recalculate_view_matrix(camera);
+}
+
+
+camera_quat_set_position:(camera : ^Quaternion_Camera, position : vec4) {
+	camera.c.position = position;
+	camera_quat_recalculate_view_matrix(camera);
+}
+
+camera_quat_set_near_plane:(camera : ^Quaternion_Camera, near_plane : r32, aspect_ratio : r32) {
+	camera.c.near_plane = near_plane;
+	camera_recalculate_projection_matrix(&camera.c, aspect_ratio);
+}
+
+camera_quat_set_far_plane:(camera : ^Quaternion_Camera, far_plane : r32, aspect_ratio : r32) {
+	camera.c.far_plane = far_plane;
+	camera_recalculate_projection_matrix(&camera.c, aspect_ratio);
+}
+
+camera_quat_set_fov:(camera : ^Quaternion_Camera, fov : r32, aspect_ratio : r32) {
+	camera.c.fov = fov;
+	camera_recalculate_projection_matrix(&camera.c, aspect_ratio);
+}
+
+camera_quat_force_matrix_recalculation:(camera : ^Quaternion_Camera, aspect_ratio : r32) {
+	camera_quat_recalculate_view_matrix(camera);
+	camera_recalculate_projection_matrix(&camera.c, aspect_ratio);
+}
+
+camera_quat_get_x_axis:(camera : ^Quaternion_Camera) -> vec4 {
+	q := quaternion_product(&camera.rotation, &camera.yrotation);
+	right := quaternion_get_right(&q);
+	right = vec3_normalize(right);
+	return vec4:{right.x, right.y, right.z, 0.0};
+}
+
+camera_quat_get_y_axis:(camera : ^Quaternion_Camera) -> vec4 {
+	q := quaternion_product(&camera.rotation, &camera.yrotation);
+	up := quaternion_get_up(&q);
+	up = vec3_normalize(up);
+	return vec4:{up.x, up.y, up.z, 0.0};
+}
+
+camera_quat_get_z_axis:(camera : ^Quaternion_Camera) -> vec4 {
+	q := quaternion_product(&camera.rotation, &camera.yrotation);
+	forward := quaternion_get_forward(&q);
+	forward = vec3_normalize(forward);
+	return vec4:{forward.x, forward.y, forward.z, 0.0};
 }

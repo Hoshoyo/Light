@@ -510,8 +510,9 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
                     if(expr->kind == AST_EXPRESSION_LITERAL_ARRAY) {
                         catsprint(&after, "{0}");
                         // TODO(psv): alignment and padding are important here
-                        catsprint(&epilogue, "__memory_copy(_lit_array_%d + %l, _lit_array_%d, %l);\n", 
-                            node->id, i * node->type->size_bits / 8, expr->id, expr->type->size_bits / 8);
+                        u64 size_element_bytes = node->type->array_info.array_of->size_bits / 8;
+                        catsprint(&epilogue, "__memory_copy((u8*)_lit_array_%d + %l, _lit_array_%d, %l);\n", 
+                            node->id, i * size_element_bytes, expr->id, expr->type->size_bits / 8);
                         // emit anyway, but discard the rvalue since were are memcopying
                         emit_expression(literal_decls, &discard, expr);
                     } else {
@@ -681,13 +682,24 @@ emit_command(catstring* buffer, Light_Ast* node) {
         } break;
         
         case AST_COMMAND_ASSIGNMENT:{
-            catstring c = {0};
-            if(node->comm_assignment.lvalue) {
-                emit_expression(buffer, &c, node->comm_assignment.lvalue);
-                catsprint(&c, " = ");
-            }
-            emit_expression(buffer, &c, node->comm_assignment.rvalue);
+            bool arraytype = type_alias_root(node->comm_assignment.rvalue->type)->kind == TYPE_KIND_ARRAY;
 
+            catstring c = {0};
+            if(arraytype) {
+                assert(node->comm_assignment.lvalue);
+                catsprint(&c, "__memory_copy(");
+                emit_expression(buffer, &c, node->comm_assignment.lvalue);
+                catsprint(&c, ", ");
+                emit_expression(buffer, &c, node->comm_assignment.rvalue);
+                catsprint(&c, ", %l)", node->comm_assignment.rvalue->type->size_bits / 8);
+            } else {
+                if(node->comm_assignment.lvalue) {
+                    emit_expression(buffer, &c, node->comm_assignment.lvalue);
+                    catsprint(&c, " = ");
+                }
+                emit_expression(buffer, &c, node->comm_assignment.rvalue);
+
+            }
             catstring_append(buffer, &c);
             catsprint(buffer, ";\n");
         } break;

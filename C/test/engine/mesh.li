@@ -29,6 +29,9 @@ create_simple_mesh:(vertices : ^Vertex, vertex_count : s32, indices : ^u32, inde
     EBO : GLuint;
     VAO : GLuint;
 
+	mesh.index_count = index_count -> u32;
+	mesh.vertex_count = vertex_count -> u32;
+
 	glGenVertexArrays(1, &VAO);
 	glGenBuffers(1, &VBO);
 	glGenBuffers(1, &EBO);
@@ -65,15 +68,6 @@ create_simple_mesh:(vertices : ^Vertex, vertex_count : s32, indices : ^u32, inde
 	mesh.EBO = EBO;
 
 	return mesh;
-}
-
-Camera_Common struct {
-	position          : vec4;
-	near_plane        : r32;
-	far_plane         : r32;
-	fov               : r32;
-	view_matrix       : mat4;
-	projection_matrix : mat4;
 }
 
 mesh_render:(m : ^Mesh, shader : u32, camera : ^Camera_Common) {
