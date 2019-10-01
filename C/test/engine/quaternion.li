@@ -10,10 +10,10 @@ Quaternion struct {
 quaternion_new:(axis: vec3, angle_deg: r32) -> Quaternion {
     if vec3_length(axis) != 0.0
         axis = vec3_normalize(axis);
-    sang := sinf(DEGTORAD(angle) / 2.0);
+    sang := sinf(DEGTORAD(angle_deg) / 2.0);
 
     quat : Quaternion;
-    quat.w = cosf(DEGTORAD(angle / 2.0));
+    quat.w = cosf(DEGTORAD(angle_deg / 2.0));
     quat.x = axis.x * sang;
     quat.y = axis.y * sang;
     quat.z = axis.z * sang;

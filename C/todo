@@ -6,6 +6,7 @@ size_of struct with only a character is 4
 enum reflecting
 function returning wrong type causes circular dependencies
 incomplete struct literals
+implement #type_value and #type
 
 
 // done

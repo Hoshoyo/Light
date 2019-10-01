@@ -10,6 +10,7 @@
 #import "mesh.li"
 #import "quaternion.li"
 #import "camera.li"
+#import "input.li"
 
 Window_Info struct {
     width         : s32;
@@ -21,6 +22,33 @@ Window_Info struct {
     ctx           : GLXContext;
     cmap          : Colormap;
 }
+
+x11_allmasks := 
+  KeyPressMask
+| KeyReleaseMask
+| ButtonPressMask
+| ButtonReleaseMask
+| EnterWindowMask
+| LeaveWindowMask
+| PointerMotionMask
+//| PointerMotionHintMask // disable this to receive all position events
+| Button1MotionMask
+| Button2MotionMask
+| Button3MotionMask
+| Button4MotionMask
+| Button5MotionMask
+| ButtonMotionMask
+| KeymapStateMask
+| ExposureMask
+| VisibilityChangeMask
+| StructureNotifyMask
+//| ResizeRedirectMask
+| SubstructureNotifyMask
+| SubstructureRedirectMask
+| FocusChangeMask
+| PropertyChangeMask
+| ColormapChangeMask
+| OwnerGrabButtonMask;
 
 init_opengl : (info : ^Window_Info) -> bool {
     display := XOpenDisplay(null);
@@ -118,6 +146,8 @@ init_opengl : (info : ^Window_Info) -> bool {
 		return false;
 	}
 
+	XSelectInput(display, win, x11_allmasks);
+
 	XFree(vi);
 
 	XStoreName(display, win, "GL 3.0 Window\0".data);
@@ -188,34 +218,6 @@ Object_Binary struct {
 	data : ^u8;
 }
 
-vert_shader := "#version 330 core
-
-layout (location = 0) in vec4 vertex_position;
-layout (location = 1) in vec4 vertex_normal;
-layout (location = 2) in vec2 texture_coords;
-layout (location = 3) in vec4 vertex_tangent;
-
-uniform mat4 model_matrix;
-uniform mat4 view_matrix;
-uniform mat4 projection_matrix;
-
-void main()
-{
-	gl_Position = projection_matrix * view_matrix * vertex_position;
-	//gl_Position = vertex_position;
-}";
-
-frag_shader := "#version 330 core
-
-out vec4 final_color;
-
-uniform vec4 color;
-
-void main()
-{
-	final_color = vec4(1.0, 1.0, 1.0, 1.0);
-}";
-
 main : () -> s32 {
     window_info : Window_Info;
 	if !init_opengl(&window_info) {
@@ -225,59 +227,50 @@ main : () -> s32 {
     hogl_init_extensions();
     render_context_init();
 
-	//file_data := read_entire_file("/home/hoshoyo/dev/c/playground/sphere.bin", malloc).data -> ^Object_Binary;
-	//mesh := create_simple_mesh(&file_data.data -> ^Vertex, file_data.vertices_count, 
-	//	(((&file_data.data -> ^u8) + file_data.vertices_size_bytes) -> ^u32), file_data.indices_count);
-	verts := 
-	[
-		Vertex:{
-			vec4:{-1.0, -1.0, 0.0, 1.0}, vec4:{0.0, 1.0, 0.0, 1.0},
-			vec2:{0.0, 0.0}, vec4:{0.0, 0.0, 0.0, 0.0}
-		},
-		Vertex:{
-			vec4:{1.0, -1.0, 0.0, 1.0}, vec4:{0.0, 1.0, 0.0, 1.0},
-			vec2:{0.0, 0.0}, vec4:{0.0, 0.0, 0.0, 0.0}
-		},
-		Vertex:{
-			vec4:{0.0, 1.0, 0.0, 1.0}, vec4:{0.0, 1.0, 0.0, 1.0},
-			vec2:{0.0, 0.0}, vec4:{0.0, 0.0, 0.0, 0.0}
-		}
-	];
-	inds :[3]u32= [
-		0, 1, 2
-	];
-	mesh := create_simple_mesh(verts -> ^Vertex, 3, inds -> ^u32, 3);
+	shader := shader_load(vert_shader, frag_shader);
+	glUseProgram(shader);
 
+	file_data := read_entire_file("/home/hoshoyo/dev/squiggly/res/models/apartment.bin", malloc).data -> ^Object_Binary;
+	mesh := create_simple_mesh(&file_data.data -> ^Vertex, file_data.vertices_count, 
+		(((&file_data.data -> ^u8) + file_data.vertices_size_bytes) -> ^u32), file_data.indices_count);
+
+	// Screen
     screen_width : s32;
 	screen_height : s32;
-
-	shader := shader_load(vert_shader, frag_shader);
-	//print("Shader loaded with id: %\n", shader);
-
-	camera : Quaternion_Camera;
-	camera_quat_init(&camera, 
-		vec4:{0.0, 0.0, 1.0, 1.0},
-		0.1, 100.0, 90.0, 16.0/9.0);
-
 	screen_size(&window_info, &screen_width, &screen_height);
 
+	// Window
+	width : s32;
+	height : s32;
+	window_size(&window_info, &width, &height);
+
+	camera : Quaternion_Camera;
+	camera_quat_init(&camera, vec4:{0.0, 0.0, 0.0, 1.0}, 0.1, 100.0, 90.0, width -> r32 / height -> r32);
+	print("aspect: %\n", width -> r32 / height -> r32);
+
+	glEnable(GL_DEPTH_TEST);
+	glViewport(0,0, width, height);
+	
 	while true
     {
-		glClearColor(0.0, 0.0, 0.0, 1.0);
-		glClear(GL_COLOR_BUFFER_BIT);
+		xev : XEvent;
+		while XCheckWindowEvent(window_info.display, window_info.window_handle, x11_allmasks -> s32, &xev)
+		{
+			event := input_x11_process_event(&xev);
+			if event.type != EVENT_NOP {
+				input_handle(&event, &camera);
+			}
+		}
 
-        width : s32;
-        height : s32;
-        window_size(&window_info, &width, &height);
 
-        wnd_ctx.width = width;
-        wnd_ctx.height = height;
+		glClearColor(0.7, 0.7, 0.8, 1.0);
+		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-        glViewport(0,0, width, height);
-
+		camera_quat_update(&camera, 1.0/60.0);
+		
 		mesh_render(&mesh, shader, &camera.c);
-		/*
 
+		/*
         quad := quad_new(vec2:{0.0, 0.0}, 100.0, 100.0, vec4:{1.0, 0.0, 0.0, 1.0});
         render_quad_immediate(&quad);
 

@@ -347,7 +347,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                         field->decl_variable.assignment->type = 
                             type_infer_propagate(field_type, field->decl_variable.assignment, error);
                         if(!type_check_equality(field_type, field->decl_variable.assignment->type)) {
-                            // Type does not match the assignment
+                            // Type does not maalignmenttch the assignment
                             type_error(error, field->decl_variable.name, 
                                 "type mismatch in struct field declaration. '");
                             ast_print_type(field->decl_variable.assignment->type, LIGHT_AST_PRINT_STDERR, 0);
@@ -385,14 +385,13 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                         s64 delta = align_delta(offset_bytes, alignment);
                         delta *= 8; // delta in bits
                         offset_bits += delta;
-                        field_type_size_bits += delta;
-                        offset_bits += delta;
+                        //field_type_size_bits += delta;
                     }
                 }
                 array_push(type->struct_info.offset_bits, offset_bits);
 
                 offset_bits += field_type_size_bits;
-                if (i == 0 || alignment == 0) {
+                if (struct_alignment_bytes < alignment) {
                     struct_alignment_bytes = alignment;
                 }
             }

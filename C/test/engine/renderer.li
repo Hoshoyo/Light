@@ -326,84 +326,50 @@ quad_new : (position : vec2, width : r32, height : r32, color : vec4) -> Quad_2D
 	return q;
 }
 
-Cube_3D struct {
-	vao : u32;
-	vbo : u32;
-	ebo : u32;
-	index_count : s32;
-}
 
-/*
-#import "../objloader.li"
+// 3D
 
-cube_new : () -> Cube_3D {
-	result : Cube_3D;
-	obj : Object;
-	load_cube(&obj);
-	result.index_count = obj.indices.length -> s32;
+vert_shader := "#version 330 core
 
-	// Buffers setup for rendering
-	glGenVertexArrays(1, &result.vao);
-	glBindVertexArray(result.vao);
-	glGenBuffers(1, &result.vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, result.vbo);
-	glBufferData(GL_ARRAY_BUFFER, obj.vertices.length * #size_of Vertex, obj.vertices.data, GL_STATIC_DRAW);
-	
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-	glEnableVertexAttribArray(2);
+layout (location = 0) in vec4 vertex_position;
+layout (location = 1) in vec4 vertex_normal;
+layout (location = 2) in vec2 texture_coords;
+layout (location = 3) in vec4 vertex_tangent;
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE -> u8, #size_of Vertex, null);
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE -> u8, #size_of Vertex, &(null).texture_coord);
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE -> u8, #size_of Vertex, &(null).normal);
-	//glDisableVertexAttribArray(0);
-	//glDisableVertexAttribArray(1);
-	//glDisableVertexAttribArray(2);
+uniform mat4 model_matrix = mat4(1.0);
+uniform mat4 view_matrix;
+uniform mat4 projection_matrix;
 
-	glGenBuffers(1, &result.ebo);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, result.ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, obj.indices.length * #size_of u32, obj.indices.data, GL_STATIC_DRAW);
+out vec3 o_position;
+out vec4 o_normal;
 
-	assert(valid_glid(result.vao));
-	assert(valid_glid(result.vbo));
-	return result;
-}
-*/
-angle := 0.0;
-pos := 0.0;
+void main()
+{
+	gl_Position = projection_matrix * view_matrix * vertex_position;
+	//gl_Position = vertex_position;
+	o_position = vec3(model_matrix * vertex_position);
+	o_normal = model_matrix * vertex_normal;
+}";
 
-render_cube : (cube : Cube_3D) {
-	if !imm_ctx.valid return;
+frag_shader := "#version 330 core
 
-	glUseProgram(imm_ctx.shader_3D);
-	glClear(GL_DEPTH_BUFFER_BIT);
-	glEnable(GL_DEPTH_TEST);
-	
-	glBindVertexArray(cube.vao);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube.ebo);
+out vec4 final_color;
+in vec3 o_position;
+in vec4 o_normal;
 
-	aspect := wnd_ctx.width -> r32 / wnd_ctx.height -> r32;
-	projection := perspective(70.0, aspect, 0.5, 100.0);
-	translation := translate(sinf(pos), 0.0, 0.0);
-	rotation := rotate(vec3:{0.0, 1.0, 0.0}, angle);
-	scale := mat4_identity();
-	scale.m[0][0] = 0.5;
-	scale.m[1][1] = 0.5;
-	scale.m[2][2] = 0.5;
-	rotation = mat4_mul(rotation, scale);
-	rotation = mat4_mul(translation, rotation);
-	view := look_at(vec3:{10.0, 10.0, 10.0}, vec3:{0.0, 0.0, 0.0}, vec3:{0.0, 1.0, 0.0});
-	glUniformMatrix4fv(imm_ctx.shader_3D_projection_matrix_location, 1, GL_FALSE -> u8, projection.m -> ^r32);
-	glUniformMatrix4fv(imm_ctx.shader_3D_view_matrix_location, 1, GL_FALSE -> u8, view.m -> ^r32);
-	glUniformMatrix4fv(imm_ctx.shader_3D_model_matrix_location, 1, GL_TRUE -> u8, rotation.m -> ^r32);
+uniform vec4 color;
 
-	angle += 0.01;
-	//pos += 0.1;
+void main()
+{
+	vec4 color = vec4(0.5, 0.5, 0.5, 1.0);
 
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-	glEnableVertexAttribArray(2);
+	vec3 light_pos = vec3(100.0, 100.0, 100.0);
 
-	glDrawElements(GL_TRIANGLES, cube.index_count, GL_UNSIGNED_INT, null);
+	vec3 norm = normalize(vec3(o_normal));
+	vec3 lightDir = normalize(light_pos - o_position);
 
-}
+	float diff = max(dot(norm, lightDir), 0.0);
+
+	final_color = diff * color;
+	//final_color = vec4(1.0, 0.0, 0.0, 1.0);
+}";

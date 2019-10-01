@@ -76,7 +76,7 @@ mesh_render:(m : ^Mesh, shader : u32, camera : ^Camera_Common) {
     view_matrix_location := glGetUniformLocation(shader, "view_matrix\0".data -> ^GLchar);
     projection_matrix_location := glGetUniformLocation(shader, "projection_matrix\0".data -> ^GLchar);
 	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE -> GLboolean, camera.view_matrix.m -> ^GLfloat);
-    glUniformMatrix4fv(projection_matrix_location, 1, GL_TRUE -> GLboolean, camera.projection_matrix.m -> ^GLfloat);
+    glUniformMatrix4fv(projection_matrix_location, 1, GL_FALSE -> GLboolean, camera.projection_matrix.m -> ^GLfloat);
     glDrawElements(GL_TRIANGLES, m.index_count -> GLsizei, GL_UNSIGNED_INT, null);
     glUseProgram(0);
     glBindVertexArray(0);

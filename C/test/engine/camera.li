@@ -3,6 +3,7 @@ Camera_Common struct {
 	near_plane        : r32;
 	far_plane         : r32;
 	fov               : r32;
+	aspect_ratio      : r32;
 	view_matrix       : mat4;
 	projection_matrix : mat4;
 }
@@ -40,6 +41,7 @@ camera_recalculate_projection_matrix:(camera : ^Camera_Common, aspect_ratio : r3
 	bottom := -top;
 	right := top * aspect_ratio;
 	left := -right;
+	//print("% % % % % % %\n", aspect_ratio, near, far, top, bottom, right, left);
 
 	P := mat4:
     {
@@ -61,6 +63,7 @@ camera_recalculate_projection_matrix:(camera : ^Camera_Common, aspect_ratio : r3
 
 	// Need to transpose when sending to shader
 	MP := mat4_mul(M, P);
+
 	camera.projection_matrix = mat4_scalar_product(-1.0, &MP);
 }
 
@@ -74,7 +77,7 @@ camera_quat_init:(camera : ^Quaternion_Camera, position : vec4, near_plane : r32
 	camera.yrotation = Quaternion:{ 0.0, 0.0, 0.0, 1.0 };
 
 	camera_quat_recalculate_view_matrix(camera);
-	camera_recalculate_projection_matrix(&camera.c, aspect_ratio);
+	camera.c.projection_matrix = perspective(fov, aspect_ratio, near_plane, far_plane);
 }
 
 camera_quat_rotate_x:(camera : ^Quaternion_Camera, x_difference : r32) {
@@ -172,4 +175,69 @@ camera_quat_get_z_axis:(camera : ^Quaternion_Camera) -> vec4 {
 	forward := quaternion_get_forward(&q);
 	forward = vec3_normalize(forward);
 	return vec4:{forward.x, forward.y, forward.z, 0.0};
+}
+
+key_state : [1024]bool;
+
+camera_quat_update:(active_camera : ^Quaternion_Camera, delta_time : r64) {
+	CAMERA_QUAT_MOVEMENT_SPEED_MODIFIER :: 10.0;
+	if (key_state['W'] || key_state['w']) {
+		camera_quat_move_forward(active_camera, CAMERA_QUAT_MOVEMENT_SPEED_MODIFIER * delta_time-> r32);
+		print("Active W\n");
+	}
+	else if (key_state['S'] || key_state['s']) {
+		camera_quat_move_forward(active_camera, -CAMERA_QUAT_MOVEMENT_SPEED_MODIFIER * delta_time-> r32);
+		print("Active S\n");
+	}
+	else if (key_state['A'] || key_state['a']) {
+		camera_quat_move_right(active_camera, -CAMERA_QUAT_MOVEMENT_SPEED_MODIFIER * delta_time-> r32);
+		print("Active A\n");
+	}
+	else if (key_state['D'] || key_state['d']) {
+		camera_quat_move_right(active_camera, CAMERA_QUAT_MOVEMENT_SPEED_MODIFIER * delta_time -> r32);
+		print("Active D\n");
+	}
+}
+
+x_pos_old_rotate : r64;
+y_pos_old_rotate : r64;
+x_pos_old_move : r64;
+y_pos_old_move : r64;
+x_pos_old_obj_trans : r64;
+y_pos_old_obj_trans : r64;
+rotate_camera : bool;
+move_camera : bool;
+reset_rotate : bool;
+reset_move : bool;
+
+handle_mouse_change:(x : r64, y : r64, active_camera : ^Quaternion_Camera)
+{
+	CAMERA_QUAT_ROTATION_SPEED :: 1.0;
+
+    if (rotate_camera)
+    {
+        if (!reset_rotate)
+        {
+            x_difference := x - x_pos_old_rotate;
+            y_difference := -y - y_pos_old_rotate;
+
+			camera_quat_rotate_x(active_camera, (x_difference -> r32) * CAMERA_QUAT_ROTATION_SPEED);
+			camera_quat_rotate_y(active_camera, (y_difference -> r32) * CAMERA_QUAT_ROTATION_SPEED);
+        }
+
+        reset_rotate = false;
+        x_pos_old_rotate = x;
+        y_pos_old_rotate = -y;
+    }
+    else
+        reset_rotate = true;
+
+    if (move_camera)
+    {
+        reset_move = false;
+        x_pos_old_move = x;
+        y_pos_old_move = -y;
+    }
+    else
+        reset_move = true;
 }

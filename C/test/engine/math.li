@@ -159,6 +159,7 @@ vec4_add:(l : vec4, r : vec4) -> vec4 {
     return vec4:{l.x + r.x, l.y + r.y, l.z + r.z, l.w + r.w};
 }
 
+// transpose must be false in OpenGL
 look_at:(position : vec3, target : vec3, world_up : vec3) -> mat4 {
     // 1. Position = known
     // 2. Calculate cameraDirection
@@ -192,6 +193,7 @@ look_at:(position : vec3, target : vec3, world_up : vec3) -> mat4 {
     return mat4_mul(translation, rotation); // Remember to read from right to left (first translation then rotation)
 }
 
+// transpose must be false in OpenGL
 perspective:(fovy : r32, aspect : r32, zNear : r32, zFar : r32) -> mat4 {
     result := mat4_identity();
 
