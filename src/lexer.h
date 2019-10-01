@@ -1,47 +1,43 @@
 #pragma once
-#include "util.h"
-#include "hash_table.h"
-#include "ast.h"
+#include <common.h>
+#include "utils/string_table.h"
 
-#define TOKEN_STR(T) (T)->value.length, (T)->value.data
-
-enum Token_Type
-{
+typedef enum {
 	TOKEN_END_OF_STREAM = 0,
-	TOKEN_UNKNOWN = 1,
 
 	// Symbols
-	TOKEN_SYMBOL_NOT = '!',				// 33
-	TOKEN_SYMBOL_POUND = '#',			// 35
-	TOKEN_SYMBOL_DOLLAR = '$',			// 36
-	TOKEN_SYMBOL_MOD = '%',				// 37
-	TOKEN_SYMBOL_AND = '&',				// 38
-	TOKEN_SYMBOL_OPEN_PAREN = '(',		// 40
-	TOKEN_SYMBOL_CLOSE_PAREN = ')',		// 41
-	TOKEN_SYMBOL_TIMES = '*',			// 42
-	TOKEN_SYMBOL_PLUS = '+',			// 43
-	TOKEN_SYMBOL_COMMA = ',',			// 44
-	TOKEN_SYMBOL_MINUS = '-',			// 45
-	TOKEN_SYMBOL_DOT = '.',				// 46
-	TOKEN_SYMBOL_DIV = '/',				// 47
-	TOKEN_SYMBOL_COLON = ':',			// 58
-	TOKEN_SYMBOL_SEMICOLON = ';',		// 59
-	TOKEN_SYMBOL_LESS = '<',			// 60
-	TOKEN_SYMBOL_EQUAL = '=',			// 61
-	TOKEN_SYMBOL_GREATER = '>',			// 62
-	TOKEN_SYMBOL_INTERROGATION = '?',	// 63
-	TOKEN_SYMBOL_AT = '@',				// 64
-	TOKEN_SYMBOL_OPEN_BRACE = '{',		// 91
-	TOKEN_SYMBOL_CLOSE_BRACE = '}',		// 93
-	TOKEN_SYMBOL_CARAT = '^',			// 94
-	TOKEN_SYMBOL_BACK_TICK = '`',		// 96
-	TOKEN_SYMBOL_OPEN_BRACKET = '[',	// 123
-	TOKEN_SYMBOL_PIPE = '|',			// 124
-	TOKEN_SYMBOL_CLOSE_BRACKET = ']',	// 125
-	TOKEN_SYMBOL_TILDE = '~',			// 126
+	TOKEN_SYMBOL_NOT             = '!', // 33
+	TOKEN_SYMBOL_POUND           = '#', // 35
+	TOKEN_SYMBOL_DOLLAR          = '$', // 36
+	TOKEN_SYMBOL_MOD             = '%', // 37
+	TOKEN_SYMBOL_AND             = '&', // 38
+	TOKEN_SYMBOL_OPEN_PAREN      = '(', // 40
+	TOKEN_SYMBOL_CLOSE_PAREN     = ')', // 41
+	TOKEN_SYMBOL_TIMES           = '*', // 42
+	TOKEN_SYMBOL_PLUS            = '+', // 43
+	TOKEN_SYMBOL_COMMA           = ',', // 44
+	TOKEN_SYMBOL_MINUS           = '-', // 45
+	TOKEN_SYMBOL_DOT             = '.', // 46
+	TOKEN_SYMBOL_DIV             = '/', // 47
+	TOKEN_SYMBOL_COLON           = ':', // 58
+	TOKEN_SYMBOL_SEMICOLON       = ';', // 59
+	TOKEN_SYMBOL_LESS            = '<', // 60
+	TOKEN_SYMBOL_EQUAL           = '=', // 61
+	TOKEN_SYMBOL_GREATER         = '>', // 62
+	TOKEN_SYMBOL_INTERROGATION   = '?', // 63
+	TOKEN_SYMBOL_AT              = '@', // 64
+	TOKEN_SYMBOL_OPEN_BRACE      = '{', // 91
+	TOKEN_SYMBOL_CLOSE_BRACE     = '}', // 93 ' // stop being confused @vscode
+	TOKEN_SYMBOL_CARAT           = '^', // 94
+	TOKEN_SYMBOL_BACK_TICK       = '`', // 96
+	TOKEN_SYMBOL_OPEN_BRACKET    = '[', // 123
+	TOKEN_SYMBOL_PIPE            = '|', // 124
+	TOKEN_SYMBOL_CLOSE_BRACKET   = ']', // 125
+	TOKEN_SYMBOL_TILDE           = '~', // 126
 
 	// Literal tokens
-	TOKEN_LITERAL_INT = 127,
+	TOKEN_LITERAL_DEC_INT            = 127,
+    TOKEN_LITERAL_DEC_UINT,
 	TOKEN_LITERAL_HEX_INT,
 	TOKEN_LITERAL_BIN_INT,
 	TOKEN_LITERAL_FLOAT,
@@ -53,9 +49,8 @@ enum Token_Type
 	TOKEN_IDENTIFIER,
 
 	// Operation tokens
-	TOKEN_SYMBOL,
 	TOKEN_ARROW,
-	TOKEN_EQUAL_COMPARISON,
+	TOKEN_EQUAL_EQUAL,
 	TOKEN_LESS_EQUAL,
 	TOKEN_GREATER_EQUAL,
 	TOKEN_NOT_EQUAL,
@@ -102,108 +97,77 @@ enum Token_Type
 	TOKEN_KEYWORD_ENUM,
 	TOKEN_KEYWORD_STRUCT,
 	TOKEN_KEYWORD_UNION,
-	TOKEN_KEYWORD_ARRAY,
 	TOKEN_KEYWORD_NULL,
-};
+} Light_Token_Type;
 
-const u32 TOKEN_FLAG_RESERVED_WORD = FLAG(0);
-const u32 TOKEN_FLAG_NUMERIC_LITERAL = FLAG(1);
-const u32 TOKEN_FLAG_LITERAL = FLAG(2);
-const u32 TOKEN_FLAG_BINARY_OPERATOR = FLAG(3);
-const u32 TOKEN_FLAG_UNARY_OPERATOR = FLAG(4);
-const u32 TOKEN_FLAG_UNARY_PREFIXED = FLAG(5);
-const u32 TOKEN_FLAG_UNARY_POSTFIXED = FLAG(6);
-const u32 TOKEN_FLAG_PRIMITIVE_TYPE = FLAG(7);
-const u32 TOKEN_FLAG_ASSIGNMENT_OPERATOR = FLAG(8);
-const u32 TOKEN_FLAG_INTEGER_LITERAL = FLAG(9);
+typedef enum {
+    TOKEN_FLAG_KEYWORD             = (1 << 0),
+    TOKEN_FLAG_TYPE_KEYWORD        = (1 << 1),
+    TOKEN_FLAG_ASSIGNMENT_OPERATOR = (1 << 2),
+    TOKEN_FLAG_BINARY_OPERATOR     = (1 << 3),
+    TOKEN_FLAG_UNARY_OPERATOR      = (1 << 4),
+	TOKEN_FLAG_INTEGER_LITERAL     = (1 << 5),
+	TOKEN_FLAG_LITERAL             = (1 << 6),
+} Light_Token_Flag;
 
-enum Lexer_Error {
-	LEXER_OK = 0,
-	LEXER_ERROR_FATAL,
-	LEXER_ERROR_WARNING,
-	LEXER_ERROR_INTERNAL_COMPILER_ERROR,
-};
+typedef struct {
+    Light_Token_Type type;
+    s32              line;
+    s32              column;
+    u8*              data;
+    s32              length;
+    u32              flags;
+	char*            filepath;
+} Light_Token;
 
-struct Token {
-	Token_Type type;
+typedef enum {
+	LIGHT_LEXER_PRINT_TOKENS = (1 << 0),
+} Light_Lexer_Flags;
 
-	s32 line;
-	s32 column;
-	s32 offset_in_file;
-	s32 real_string_length;
-	u32 flags = 0;
+typedef struct {
+    const char*  filename;
+	char*        filepath;
+	char*        filepath_absolute;
 
-	string filename;
-	string value;
-};
+    s32          line;
+    s32          column;
+    s32          index;
+    Light_Token* tokens;
+    u8*          stream;
+    u64          stream_size_bytes;
 
-struct Lexer
-{
-	string filename;
-	string filepath;
-	string path;
-	s64    file_size = 0;
-	char*  filedata  = 0;
+    String_Table  keyword_table;
+    bool          keyword_table_initialized;
+} Light_Lexer;
 
-	s64    token_count = 0;
-	s64    line_count  = 1;
+typedef enum {
+	LIGHT_SPECIAL_IDENT_MAIN,
+	LIGHT_SPECIAL_IDENT_FOREIGN,
+	LIGHT_SPECIAL_IDENT_ASSERT,
+	LIGHT_SPECIAL_IDENT_STRING,
+	LIGHT_SPECIAL_IDENT_ARRAY,
+	LIGHT_SPECIAL_IDENT_IMPORT,
+	LIGHT_SPECIAL_IDENT_SIZEOF,
+	LIGHT_SPECIAL_IDENT_TYPEOF,
+	LIGHT_SPECIAL_IDENT_TYPEVALUE,
+	LIGHT_SPECIAL_IDENT_END,
+	LIGHT_SPECIAL_IDENT_RUN,
+	LIGHT_SPECIAL_IDENT_EXTERN,
 
-	s64    current_token = 0;
-	s64    current_line  = 0;
-	s64    current_col   = 0;
-	Token* token_array   = 0;
+	LIGHT_SPECIAL_IDENT_COUNT,
+} Light_Special_Identifiers;
 
-	Lexer_Error start_internal(const char* data);
-	Lexer_Error start(const char* filename, Token* location = 0);
+Light_Token* lexer_file(Light_Lexer* lexer, const char* filename, u32 flags);
+Light_Token* lexer_cstr(Light_Lexer* lexer, char* str, s32 length, u32 flags);
+Light_Token* lexer_next(Light_Lexer* lexer);
+Light_Token* lexer_peek(Light_Lexer* lexer);
+Light_Token* lexer_peek_n(Light_Lexer* lexer, s32 n);
+void         lexer_rewind(Light_Lexer* lexer, s32 count);
+void         lexer_free(Light_Lexer* lexer);
+const char*  lexer_internalize_identifier(const char* data, int length);
 
-	void rewind();
-	Token* peek_token();
-	Token* peek_token(int advance);
-	Token_Type peek_token_type();
-	Token_Type peek_token_type(int advance);
-	Token* eat_token();
-	Token* eat_token(int advance);
-	Token* last_token();
+const char*  token_type_to_str(Light_Token_Type token_type);
 
-	char* get_token_string(Token_Type);
+Light_Token* token_new_identifier_from_string(const char* str, int length);
 
-	s32 report_lexer_error(char* msg, ...);
-	s32 report_lexer_error(Token* location, char* msg, ...);
-	s32 report_error_location(Token* tok);
-
-	void lex_file();
-	bool read_token(char** at);
-
-	static void init();
-};
-
-struct Keyword {
-	string word;
-	Token_Type token_type;
-	u32 flags;
-};
-
-enum Compiler_Tags {
-	COMPILER_TAG_FOREIGN = 0,
-	COMPILER_TAG_MAIN_PROC = 1,
-	COMPILER_TAG_STRING = 2,
-	COMPILER_TAG_IMPORT = 3,
-	COMPILER_TAG_END = 4,
-	COMPILER_TAG_TYPEDEF = 5,
-	COMPILER_TAG_SIZEOF = 6,
-	COMPILER_TAG_TYPEOF = 7,
-	COMPILER_TAG_RUN = 8,
-};
-extern string compiler_tags[];
-
-void internalize_identifier(string* str);
-
-Operator_Unary  token_to_unary_op(Token* t);
-Operator_Binary token_to_binary_op(Token* t);
-
-u64 literal_integer_to_u64(Token* t);
-r64 literal_float_to_r64(Token* t);
-bool literal_bool_to_bool(Token* t);
-u64 literal_char_to_u64(Token* t);
-
-extern s32 global_lexer_line_count;
+extern string light_special_idents_table[LIGHT_SPECIAL_IDENT_COUNT];

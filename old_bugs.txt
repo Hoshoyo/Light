@@ -1,8 +1,0 @@
-
-- this causes warning in the c backend and crashes the compiler if string is not declared
-- 07/05/2018
-- fixed as to 12/05/2018
-main :: () -> s32 {
-	a := "Hello".data;
-	return cast(s32)a;
-}

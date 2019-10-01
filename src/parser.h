@@ -1,105 +1,38 @@
-#pragma once
-#include "util.h"
+#include <common.h>
 #include "ast.h"
 #include "lexer.h"
-#include "memory.h"
-#include "file_table.h"
+#include "utils/catstring.h"
 
-enum Parser_Error {
-	PARSER_OK = 0,
-	PARSER_ERROR_FATAL,
-	PARSER_ERROR_WARNING,
-	PARSER_INTERNAL_COMPILER_ERROR,
-};
+typedef enum {
+    PARSER_OK            = 0,
+    PARSER_ERROR_FATAL   = (1 << 0),
+    PARSER_ERROR_WARNING = (1 << 1),
+} Light_Parser_Error;
 
-struct Parser {
-	Lexer* lexer;
-	Scope* global_scope;
-	Ast**  top_level;
+typedef struct Light_Parser_t{
+    Light_Lexer* lexer;
+    Light_Scope* scope_global;
 
-	Token** current_foreign = 0;
+    Light_Ast**  top_level;
 
-	Parser(Lexer* lexer, Scope* global_scope) : lexer(lexer), global_scope(global_scope) {}
+    String_Table parse_queue;
+    string*      parse_queue_array;
+} Light_Parser;
 
-	Ast** parse_top_level();
+// General
+Light_Ast** parse_top_level(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, u32* error);
+void        parse_init(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, const char* compiler_path, u64 compiler_path_size, const char* main_file);
 
-	void parse_directive(Scope* scope);
-	Ast* parse_directive_expression(Scope* scope);
+// Type
+Light_Type* parse_type(Light_Parser* parser, Light_Scope* scope, u32* error);
 
-	// String data
-	Ast* data_global_string_push(Token* s);
+// Declaration
+Light_Ast* parse_declaration(Light_Parser* parser, Light_Scope* scope, bool require_semicolon, u32* error);
 
-	// Type parsing
-	Type_Instance* parse_type();
-	Type_Instance* parse_type_primitive();
-	Type_Instance* parse_type_pointer();
-	Type_Instance* parse_type_struct(Token* name);
-	Type_Instance* parse_type_array();
-	Type_Instance* parse_type_function();
-	Type_Instance* parse_type_alias(Token* name);
+// Command
+Light_Ast* parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require_semicolon);
 
-	// Declaration parsing
-	Ast* parse_declaration(Scope* scope);
-	Ast* parse_decl_proc(Token* name, Scope* scope);
-	Ast* parse_decl_variable(Token* name, Scope* scope);
-	Ast* parse_decl_variable(Token* name, Scope* scope, Type_Instance* type);
-	Ast* parse_decl_struct(Token* name, Scope* scope);
-	Ast* parse_decl_union(Token* name, Scope* scope);
-	Ast* parse_decl_enum(Token* name, Scope* scope, Type_Instance* hint);
-	Ast* parse_decl_constant(Token* name, Scope* scope, Type_Instance* type);
-	Ast* parse_decl_typedef(Token* name, Scope* scope);
+// Expression
+Light_Ast* parse_expression(Light_Parser* parser, Light_Scope* scope, u32* error);
 
-	// Expression parsing
-	Ast* parse_expression(Scope* scope);
-	Ast* parse_expression_precedence1(Scope* scope);
-	Ast* parse_expression_precedence2(Scope* scope);
-	Ast* parse_expression_precedence3(Scope* scope);
-	Ast* parse_expression_precedence4(Scope* scope);
-	Ast* parse_expression_precedence5(Scope* scope);
-	Ast* parse_expression_precedence6(Scope* scope);
-	Ast* parse_expression_precedence7(Scope* scope);
-	Ast* parse_expression_precedence8(Scope* scope);
-	Ast* parse_expression_precedence9(Scope* scope);
-	Ast* parse_expression_precedence10(Scope* scope);
-	Ast* parse_expression_left_dot(Scope* scope);
-
-	Ast* parse_expr_literal_struct(Token* name, Scope* scope);
-	Ast* parse_expr_literal_array(Scope* scope);
-	Ast* parse_expr_literal(Scope* scope);
-
-	// Expression auxiliary
-	Precedence unary_op_precedence_level(Operator_Unary unop, bool prefixed);
-	Precedence binary_op_precedence_level(Operator_Binary bo);
-
-	// Command parsing
-	Ast** parse_command_comma_list(Scope* scope);
-	Ast*  parse_command(Scope* scope, bool eat_semicolon = true);
-	Ast*  parse_comm_block(Scope* scope, Ast* creator);
-	Ast*  parse_comm_if(Scope* scope);
-	Ast*  parse_comm_for(Scope* scope);
-	Ast*  parse_comm_while(Scope* scope);
-	Ast*  parse_comm_break(Scope* scope);
-	Ast*  parse_comm_continue(Scope* scope);
-	Ast*  parse_comm_return(Scope* scope);
-	Ast*  parse_comm_variable_assignment(Scope* scope);
-
-	// Error report
-	void   report_fatal_error(Token* error_token, char* msg, ...);
-	void   report_syntax_error(Token* error_token, char* msg, ...);
-	void   report_error_location(Token* tok);
-	Token* require_and_eat(Token_Type t);
-	Token* require_and_eat(char c);
-
-	static void init();
-};
-
-struct Parse_Queue {
-	char**  queue_main;
-	Token** queue_imports;	// array of filenames (fullpath) of files to be parsed
-	Ast***  files_toplevels;
-};
-extern string* g_lib_table;
-
-Ast** parse_files_in_queue(Scope* global_scope);
-void queue_file_for_parsing(Token* token);
-void queue_file_for_parsing(char* filename);
+// Directives

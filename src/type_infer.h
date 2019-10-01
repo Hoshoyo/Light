@@ -1,21 +1,12 @@
 #pragma once
+#include <common.h>
 #include "type.h"
-#include "type_table.h"
-#include "ast.h"
-#include "decl_check.h"
-#include "error.h"
+#include "top_typecheck.h"
 
-const u32 TYPE_INFER_REPORT_UNDECLARED = FLAG(0);
-const u32 TYPE_INFER_LVALUE = FLAG(1);
-Type_Instance* infer_from_expression(Ast* expr, Type_Error* error, u32 flags);
+Light_Type* type_alias_root(Light_Type* type);
 
-Type_Instance* infer_from_binary_expression(Ast* expr, Type_Error* error, u32 flags);
-Type_Instance* infer_from_literal_expression(Ast* expr, Type_Error* error, u32 flags);
-Type_Instance* infer_from_procedure_call(Ast* expr, Type_Error* error, u32 flags);
-Type_Instance* infer_from_unary_expression(Ast* expr, Type_Error* error, u32 flags);
-Type_Instance* infer_from_variable_expression(Ast* expr, Type_Error* error, u32 flags);
+Light_Type* type_infer_expression(Light_Ast* expr, u32* error);
+Light_Type* type_infer_propagate(Light_Type* type, Light_Ast* expr, u32* error);
+Light_Ast*  type_infer_decl_from_name(Light_Scope* scope, Light_Token* name);
+Light_Ast*  find_enum_field_decl(Light_Scope* scope, Light_Token* ident, u32* error);
 
-Type_Instance* type_check_expr(Type_Instance* check_against, Ast* expr, Type_Error* error);
-Type_Error type_propagate(Type_Instance* strong, Ast* expr);
-
-Type_Error     type_update_weak(Ast* expr, Type_Instance* strong);

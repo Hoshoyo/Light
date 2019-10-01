@@ -1,0 +1,4 @@
+*
+!test/engine
+!*.li
+!.gitignore

@@ -1,4 +1,0 @@
-print :: (fmt : string, ...args) -> s64;
-
-args : []Type_Info
-

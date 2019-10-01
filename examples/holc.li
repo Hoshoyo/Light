@@ -1,9 +1,0 @@
-#import "./examples/windows/print.li"
-
-main :: () -> s32 {
-	
-	foo := GetCommandLineA();
-	print_cstr(foo);
-
-	return 0;
-}

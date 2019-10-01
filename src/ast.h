@@ -1,28 +1,22 @@
 #pragma once
-#include "symbol_table.h"
+#include <stdint.h>
+#include "lexer.h"
 
-#define SITE_FROM_TOKEN(T) {(T)->filename, (T)->line, (T)->column }
-
-enum Ast_NodeType {
+typedef enum {
 	AST_UNKNOWN = 0,
-	
-	// Data
-	AST_DATA,
 
 	// Declarations
 	AST_DECL_PROCEDURE,
 	AST_DECL_VARIABLE,
-	AST_DECL_STRUCT,
-	AST_DECL_ENUM,
-	AST_DECL_UNION,
 	AST_DECL_CONSTANT,
 	AST_DECL_TYPEDEF,
 
 	// Commands
 	AST_COMMAND_BLOCK,
-	AST_COMMAND_VARIABLE_ASSIGNMENT,
+	AST_COMMAND_ASSIGNMENT,
 	AST_COMMAND_IF,
 	AST_COMMAND_FOR,
+	AST_COMMAND_WHILE,
 	AST_COMMAND_BREAK,
 	AST_COMMAND_CONTINUE,
 	AST_COMMAND_RETURN,
@@ -30,30 +24,29 @@ enum Ast_NodeType {
 	// Expressions
 	AST_EXPRESSION_BINARY,
 	AST_EXPRESSION_UNARY,
-	AST_EXPRESSION_LITERAL,
+	AST_EXPRESSION_LITERAL_PRIMITIVE,
+	AST_EXPRESSION_LITERAL_ARRAY,
+	AST_EXPRESSION_LITERAL_STRUCT,
 	AST_EXPRESSION_VARIABLE,
 	AST_EXPRESSION_PROCEDURE_CALL,
+	AST_EXPRESSION_DOT,
 	AST_EXPRESSION_DIRECTIVE,
+	AST_EXPRESSION_COMPILER_GENERATED,
+} Light_Ast_Type;
 
-};
-
-enum Literal_Type {
+typedef enum {
 	LITERAL_UNKNOWN = 0,
-
-	LITERAL_SINT,
-	LITERAL_UINT,
+	LITERAL_DEC_SINT,
+	LITERAL_DEC_UINT,
 	LITERAL_HEX_INT,
 	LITERAL_BIN_INT,
 	LITERAL_FLOAT,
 	LITERAL_BOOL,
 	LITERAL_CHAR,
 	LITERAL_POINTER,
+} Light_Literal_Type;
 
-	LITERAL_STRUCT,
-	LITERAL_ARRAY,
-};
-
-enum Operator_Unary {
+typedef enum {
 	OP_UNARY_UNKNOWN = 0,
 	
 	OP_UNARY_PLUS,
@@ -62,11 +55,10 @@ enum Operator_Unary {
 	OP_UNARY_ADDRESSOF,
 	OP_UNARY_BITWISE_NOT,
 	OP_UNARY_CAST,
-
 	OP_UNARY_LOGIC_NOT,
-};
+} Light_Operator_Unary;
 
-enum Operator_Binary {
+typedef enum {
 	OP_BINARY_UNKNOWN = 0,
 
 	OP_BINARY_PLUS,			// +
@@ -90,355 +82,529 @@ enum Operator_Binary {
 	OP_BINARY_LOGIC_AND,	// &&
 	OP_BINARY_LOGIC_OR,		// ||
 
-	OP_BINARY_DOT,			 // .
 	OP_BINARY_VECTOR_ACCESS, // []
-};
+} Light_Operator_Binary;
 
-enum Data_Type {
-	GLOBAL_STRING,
-};
+// -------------- ----- ----------------
+// -------------- Scope ----------------
+// -------------- ----- ----------------
+typedef enum {
+    SCOPE_PROCEDURE_ARGUMENTS = (1 << 0),
+    SCOPE_PROCEDURE_BODY      = (1 << 1),
+    SCOPE_STRUCTURE           = (1 << 2),
+    SCOPE_UNION               = (1 << 3),
+    SCOPE_ENUM                = (1 << 4),
+    SCOPE_FILESCOPE           = (1 << 5),
+    SCOPE_BLOCK               = (1 << 6),
+    SCOPE_LOOP                = (1 << 7),
+} Light_Scope_Flags;
 
-enum Precedence {
-	PRECEDENCE_0 = 0,	//
-	PRECEDENCE_1 = 1,	//	 || &&
-	PRECEDENCE_2 = 2,	//	 == >= <= != > <
-	PRECEDENCE_3 = 3,	//	 ^ | & >> <<
-	PRECEDENCE_4 = 4,	//	 + -
-	PRECEDENCE_5 = 5,	//	 * / %
-	PRECEDENCE_6 = 6,	//	 &(addressof) ~ 
-	PRECEDENCE_7 = 7,	//	 *(dereference)	cast !
-	PRECEDENCE_8 = 8,	//   []
-	PRECEDENCE_9 = 9,	//	 .
-	PRECEDENCE_MAX,		//   lit, variables, proc_calls
-};
-
-struct Symbol_Table;
-struct Ast;
-struct Token;
-struct Type_Instance;
-
-const u32 SCOPE_PROCEDURE_ARGUMENTS = FLAG(0);
-const u32 SCOPE_PROCEDURE_BODY      = FLAG(1);
-const u32 SCOPE_STRUCTURE           = FLAG(2);
-const u32 SCOPE_UNION               = FLAG(3);
-const u32 SCOPE_ENUM                = FLAG(4);
-const u32 SCOPE_FILESCOPE           = FLAG(5);
-const u32 SCOPE_BLOCK               = FLAG(6);
-const u32 SCOPE_LOOP                = FLAG(7);
-struct Scope {
-	s32           id;
-	s32           level;
-	s32           decl_count;
-	u32           flags;
-	s32           stack_allocation_offset;
-	s32           stack_current_offset;
-	Symbol_Table  symb_table;
-	Scope*        parent;
+typedef struct Light_Scope_t {
+	struct Light_Scope_t* parent;
+	struct Light_Ast_t**  decls;
 	union {
-		Ast*   creator_node;
-		string filename;
+		struct Light_Ast_t*   creator_node;
+		struct Light_Type_t*  creator_type;
 	};
-};
 
-struct Site {
-	string filename;
-	s32    line;
-	s32    column;
-};
+	uint32_t          flags;
+	int32_t           id;
+	int32_t           level;
+	int32_t           decl_count;
 
-// ----------------------------------------
-// ------------ Declarations --------------
-// ----------------------------------------
+	struct Symbol_Table_t*      symb_table;
 
-const u32 DECL_PROC_FLAG_FOREIGN = FLAG(0);
-const u32 DECL_PROC_FLAG_MAIN = FLAG(1);
-struct Ast_Decl_Procedure {
-	Token*         name;
-	Ast**          arguments;		// DECL_VARIABLE
-	Ast*           body;			// COMMAND_BLOCK
-	Type_Instance* type_return;
-	Type_Instance* type_procedure;
-	Scope*         arguments_scope;
+    // Necessary data for code generation
+	int32_t           stack_allocation_offset;
+	int32_t           stack_current_offset;
+} Light_Scope;
 
-	Site   site;
+// -------------- ----- ----------------
+// --------------  Ast  ----------------
+// -------------- ----- ----------------
 
-	u32    flags;
-	s32    arguments_count;
+typedef enum {
+	STORAGE_CLASS_REGISTER = 0,
+    STORAGE_CLASS_STACK,
+    STORAGE_CLASS_DATA_SEGMENT,
+} Light_Storage_Class;
 
-	u64*   proc_runtime_address;
+// Expressions
+typedef struct {
+	struct Light_Ast_t* left;
+	Light_Token*        identifier;
+} Light_Ast_Expr_Dot;
+
+typedef struct {
+	struct Light_Ast_t*   left;
+	struct Light_Ast_t*   right;
+	Light_Token*          token_op;
+	Light_Operator_Binary op;
+} Light_Ast_Expr_Binary;
+
+typedef struct {
+	struct Light_Ast_t*  operand;
+	Light_Token*         token_op;
+	struct Light_Type_t* type_to_cast;
+	Light_Operator_Unary op;
+	uint32_t             flags;
+} Light_Ast_Expr_Unary;
+
+typedef struct {
+	Light_Token*        token;
+	Light_Literal_Type  type;
+	uint32_t            flags;
+	Light_Storage_Class storage_class;
+	union {
+		uint8_t  value_u8;
+		uint16_t value_u16;
+		uint32_t value_u32;
+		uint64_t value_u64;
+		int8_t   value_s8;
+		int16_t  value_s16;
+		int32_t  value_s32;
+		int64_t  value_s64;
+		float    value_r32;
+		double   value_r64;
+		bool     value_bool;
+	};
+} Light_Ast_Expr_Literal_Primitive;
+
+typedef struct  {
+	Light_Token*         token_array;
+	struct Light_Ast_t** array_exprs;
+	struct Light_Type_t* array_strong_type;
+	u8*                  data;
+	uint64_t             data_length_bytes;
+	bool                 raw_data;
+	Light_Storage_Class  storage_class;
+} Light_Ast_Expr_Literal_Array;
+
+typedef struct {
+	Light_Token*         name;
+	Light_Token*         token_struct;
+	Light_Scope*         struct_scope;		// Only relevant in nameless structs
+	bool                 named;
+	union {
+		struct Light_Ast_t** struct_exprs;
+		struct Light_Ast_t** struct_decls;
+	};
+	Light_Storage_Class  storage_class;
+} Light_Ast_Expr_Literal_Struct;
+
+typedef struct {
+	Light_Token*        name;
+	struct Light_Ast_t* decl;
+} Light_Ast_Expr_Variable;
+
+typedef enum {
+	CALLING_CONVENTION_LIGHT,
+	CALLING_CONVENTION_C,
+} Light_Calling_Convention;
+
+typedef struct {
+	struct Light_Ast_t*      caller_expr;
+	struct Light_Ast_t**     args;
+	int32_t                  arg_count;
+	Light_Token*             token;
+} Light_Ast_Expr_Proc_Call;
+
+typedef enum {
+	EXPR_DIRECTIVE_SIZEOF,	  // #size_of type
+	EXPR_DIRECTIVE_TYPEOF,    // #type_of expr
+	EXPR_DIRECTIVE_TYPEVALUE, // #type_value type
+	EXPR_DIRECTIVE_RUN,		  // #run expr
+	EXPR_DIRECTIVE_COMPILE,   // #compile `string`
+} Light_Expr_Directive_Type;
+
+typedef struct {
+	Light_Expr_Directive_Type type;
+	Light_Token*              directive_token;
+	union {
+		struct Light_Ast_t*  expr;
+		struct Light_Type_t* type_expr;
+	};
+} Light_Ast_Expr_Directive;
+
+// Commands
+typedef struct {
+	struct Light_Ast_t** commands;
+	struct Light_Ast_t** defer_stack;
+	Light_Scope*         block_scope;
+	int32_t              command_count;
+} Light_Ast_Comm_Block;
+
+typedef struct {
+	struct Light_Ast_t* lvalue;	// Must be an expression
+	struct Light_Ast_t* rvalue;	// Must be an expression
+	Light_Token*        op_token;
+} Light_Ast_Comm_Assignment;
+
+typedef struct {
+	struct Light_Ast_t* condition;	// Must be a (boolean) expression
+	struct Light_Ast_t* body_true;	// Must be a command
+	struct Light_Ast_t* body_false;	// Must be a command
+	Light_Token*        if_token;
+} Light_Ast_Comm_If;
+
+typedef struct {
+	struct Light_Ast_t* condition;		// Must be a (boolean) expression
+	struct Light_Ast_t* body;			// Must be a command
+	Light_Token*        while_token;
+} Light_Ast_Comm_While;
+
+typedef struct {
+	struct Light_Ast_t*  condition;		// Must be a (boolean) expression
+	struct Light_Ast_t*  body;			// Must be a command
+	struct Light_Ast_t** prologue;		// Array of commands
+	struct Light_Ast_t** epilogue;		// Array of commands
+	Light_Scope*         for_scope;
+	Light_Token*         for_token;
+} Light_Ast_Comm_For;
+
+typedef struct {
+	struct Light_Ast_t*   level;	    // Must be an int literal [0, MAX_INT]
+	s64                   level_value;
+	bool                  level_evaluated;
+	Light_Token*          token_break;
+} Light_Ast_Comm_Break;
+typedef struct {
+	struct Light_Ast_t*   level;
+	s64                   level_value;
+	bool                  level_evaluated;
+	Light_Token*          token_continue;
+} Light_Ast_Comm_Continue;
+typedef struct {
+	struct Light_Ast_t* expression;		// Must be an expression
+	Light_Token*        token_return;
+} Light_Ast_Comm_Return;
+
+// Declarations
+typedef enum {
+    DECL_VARIABLE_FLAG_EXPORTED     = (1 << 0),
+    DECL_VARIABLE_FLAG_STRUCT_FIELD = (1 << 1),
+	DECL_VARIABLE_FLAG_UNION_FIELD  = (1 << 2),
+	DECL_VARIABLE_FLAG_RESOLVED     = (1 << 3),
+} Light_Decl_Variable_Flags;
+
+typedef struct {
+    Light_Token*         name;
+	struct Light_Ast_t*  assignment;		// Must be Expression
+    Light_Storage_Class  storage_class;
+	struct Light_Type_t* type;
+
+	uint32_t flags;
+	int32_t  alignment_bytes;
+	int32_t  stack_offset; // Offset from Stack base
+	int32_t  field_index;  // Only relevant when DECL_VARIABLE_FLAG_STRUCT_FIELD is set
+} Light_Ast_Decl_Variable;
+
+typedef enum {
+    DECL_PROC_FLAG_FOREIGN  = (1 << 0),
+    DECL_PROC_FLAG_MAIN     = (1 << 1),
+	DECL_PROC_FLAG_EXTERN   = (1 << 2),
+	DECL_PROC_FLAG_VARIADIC = (1 << 3),
+} Light_Decl_Procedure_Flags;
+
+typedef struct {
+	Light_Token*              name;
+	struct Light_Ast_t**      arguments;       // Must be DECL_VARIABLE
+	struct Light_Ast_t*       body;			   // Must be a Light_Command_Block
+	struct Light_Type_t*      return_type;     // Type of the procedure return
+	struct Light_Type_t*      proc_type;       // Type of the procedure
+	Light_Scope*              arguments_scope;
+
+	uint32_t           flags;
+	int32_t            argument_count;
 	
-	Token* extern_library_name;
-};
+	Light_Token*       extern_library_name;
+} Light_Ast_Decl_Procedure;
 
-const u32 DECL_VARIABLE_STACK = FLAG(0);
-const u32 DECL_VARIABLE_DATA_SEGMENT = FLAG(1);
-const u32 DECL_VARIABLE_STRUCT_FIELD = FLAG(2);
-struct Ast_Decl_Variable {
-	Token*         name;
-	Ast*           assignment;		// EXPRESSION
-	Type_Instance* variable_type;
+typedef struct {
+	Light_Token*         name;
+	struct Light_Ast_t*  value;
+	struct Light_Type_t* type_info;
 
-	Site site;
+	uint32_t flags;
+} Light_Ast_Decl_Constant;
 
-	u32 flags;
-	s32 size_bytes;
-	s32 alignment;
-	u32 temporary_register;
-	s32 stack_offset;
-	s32 field_index;
-};
+typedef struct {
+	Light_Token*          name;
+	struct Light_Type_t*  type_referenced;
+} Light_Ast_Decl_Typedef;
 
-const u32 STRUCT_FLAG_PACKED = FLAG(1);
-struct Ast_Decl_Struct {
-	Token*         name;
-	Ast**          fields;			// DECL_VARIABLE
-	Type_Instance* type_info;
-	Scope*         struct_scope;
-
-	Site site;
-
-	u32 flags;
-	s32 fields_count;
-	s32 alignment;
-	s64 size_bytes;
-};
-struct Ast_Decl_Union {
-	Token* name;
-	Ast** fields;
-	Type_Instance* type_info;
-	Scope* union_scope;
-
-	Site site;
-
-	u32 flags;
-	s32 fields_count;
-	s32 alignment;
-	s64 size_bytes;
-};
-
-struct Ast_Decl_Enum {
-	Token*         name;
-	Ast**          fields;			// DECL_CONSTANT
-	Type_Instance* type_hint;
-	Scope*         enum_scope;
-
-	Site site;
-
-	u32 flags;
-	s32 fields_count;
-};
-struct Ast_Decl_Constant {
-	Token*         name;
-	Ast*           value;		// LITERAL | CONSTANT
-	Type_Instance* type_info;
-
-	Site site;
-
-	u32 flags;
-};
-
-struct Ast_Decl_Typedef {
-	Token*         name;
-	Type_Instance* type;
-
-	Site site;
-};
-
-// ----------------------------------------
-// -------------- Commands ----------------
-// ----------------------------------------
-
-struct Ast_Comm_Block {
-	Ast**  commands;	// COMMANDS
-	Scope* block_scope;
-	Ast*   creator;
-	s32    command_count;
-};
-struct Ast_Comm_VariableAssign {
-	Ast*   lvalue;	// EXPRESSION
-	Ast*   rvalue;	// EXPRESSION
-};
-struct Ast_Comm_If {
-	Ast* condition;		// EXPRESSION (boolean)
-	Ast* body_true;		// COMMAND
-	Ast* body_false;	// COMMAND
-};
-struct Ast_Comm_For {
-	Ast* condition;		// EXPRESSION (boolean)
-	Ast* body;			// COMMAND
-	s64  id;
-	s64  deferred_commands;
-};
-struct Ast_Comm_Break {
-	Ast*   level;			// INT LITERAL [0, MAX_INT]
-	Token* token_break;
-};
-struct Ast_Comm_Continue {
-	Token* token_continue;
-};
-struct Ast_Comm_Return {
-	Ast*   expression;	// EXPRESSION
-	Token* token_return;
-};
-
-// ----------------------------------------
-// ------------- Expressions --------------
-// ----------------------------------------
-
-struct Ast_Expr_Binary {
-	Ast* left;
-	Ast* right;
-	Token*          token_op;
-	Operator_Binary op;
-};
-
-const u32 UNARY_EXPR_FLAG_PREFIXED  = FLAG(0);
-const u32 UNARY_EXPR_FLAG_POSTFIXED = FLAG(1);
-struct Ast_Expr_Unary {
-	Ast*           operand;
-	Token*         token_op;
-	Operator_Unary op;
-	Type_Instance* type_to_cast;
-	u32            flags;
-};
-
-const u32 LITERAL_FLAG_STRING = FLAG(0);
-struct Ast_Expr_Literal {
-	Token*       token;
-	Literal_Type type;
-	u32 flags;
-	union {
-		u64 value_u64;
-		s64 value_s64;
-
-		r32 value_r32;
-		r64 value_r64;
-
-		bool value_bool;
-
-		Ast**  struct_exprs;
-		struct {
-			Ast** array_exprs;
-			Type_Instance* array_strong_type;
-		};
-	};
-};
-
-struct Ast_Expr_Variable {
-	Token* name;
-	Ast*   decl;
-};
-struct Ast_Expr_ProcCall {
-	Ast*   caller;
-	Ast**  args;		// EXPRESSIONS
-	s32    args_count;
-};
-
-struct Ast_Data {
-	Data_Type type;
-	u8*       data;
-	s64       length_bytes;
-	Token*    location;
-	Type_Instance* data_type;
-	s32       id;
-};
-
-enum Expr_Directive_Type {
-	EXPR_DIRECTIVE_SIZEOF,	// #sizeof type
-	EXPR_DIRECTIVE_TYPEOF,  // #typeof expr
-	EXPR_DIRECTIVE_RUN,		// #run expr
-};
-struct Ast_Expr_Directive {
-	Expr_Directive_Type type;
-	Token* token;
-	union {
-		Ast*           expr;
-		Type_Instance* type_expr;
-	};
-};
-
-const u32 AST_FLAG_IS_DECLARATION = FLAG(0);
-const u32 AST_FLAG_IS_COMMAND     = FLAG(1);
-const u32 AST_FLAG_IS_EXPRESSION  = FLAG(2);
-const u32 AST_FLAG_IS_DATA        = FLAG(3);
-const u32 AST_FLAG_QUEUED         = FLAG(4);
-const u32 AST_FLAG_LVALUE         = FLAG(5);
-const u32 AST_FLAG_ENUM_ACCESSOR  = FLAG(6);
-const u32 AST_FLAG_IS_DIRECTIVE   = FLAG(7);
-const u32 AST_FLAG_LEFT_ASSIGN    = FLAG(8);
-//const u32 AST_FLAG_FAILED_TYPE_CHECK = FLAG(6);
-
-struct Ast {
-	Ast_NodeType   node_type;
-	Type_Instance* type_return;
-	Scope*         scope;
+typedef struct {
+	struct Light_Ast_t** inside_nodes_true;
+	struct Light_Ast_t** inside_nodes_false;
 	
-	s64 infer_queue_index;
-	u32 flags;
+	bool evaluated;
+	bool evaluated_to_bool_value;
+} Light_Ast_Directive_Static_If;
 
+typedef struct {
+	struct Light_Ast_t** inside_decls;
+} Light_Ast_Directive_Foreign;
+
+typedef struct {
+	Light_Token*         literal_string;
+	struct Light_Ast_t*  result_node;
+} Light_Ast_Directive_Compile;
+
+typedef struct {
+	Light_Token* import_string;
+	bool         is_relative_path;
+	const char*  absolute_path;
+} Light_Ast_Directive_Import;
+
+typedef enum {
+	COMPILER_GENERATED_TYPE_VALUE_POINTER,
+	COMPILER_GENERATED_USER_TYPE_INFO_POINTER,	// Pointer to the ^User_Type_Info entry in the table
+	COMPILER_GENERATED_POINTER_TO_TYPE_INFO,	// Pointer to the information corresponding to an specific type
+} Light_Compiler_Generated_Kind;
+
+typedef struct {
+	Light_Compiler_Generated_Kind kind;
 	union {
-		Ast_Decl_Procedure      decl_procedure;
-		Ast_Decl_Variable       decl_variable;
-		Ast_Decl_Struct         decl_struct;
-		Ast_Decl_Union			decl_union;
-		Ast_Decl_Enum           decl_enum;
-		Ast_Decl_Constant       decl_constant;
-		Ast_Decl_Typedef		decl_typedef;
-
-		Ast_Comm_Block          comm_block;
-		Ast_Comm_VariableAssign comm_var_assign;
-		Ast_Comm_If             comm_if;
-		Ast_Comm_For            comm_for;
-		Ast_Comm_Break          comm_break;
-		Ast_Comm_Continue		comm_continue;
-		Ast_Comm_Return         comm_return;
-
-		Ast_Expr_Binary         expr_binary;
-		Ast_Expr_Unary          expr_unary;
-		Ast_Expr_Literal        expr_literal;
-		Ast_Expr_Variable       expr_variable;
-		Ast_Expr_ProcCall       expr_proc_call;
-
-		Ast_Expr_Directive      expr_directive;
-
-		Ast_Data                data_global;
+		struct Light_Type_t* type_value;
 	};
+} Light_Ast_Expr_Compiler_Generated;
 
-	s32 unique_id;
-};
+typedef enum {
+    AST_FLAG_EXPRESSION   = (1 << 0),
+    AST_FLAG_COMMAND      = (1 << 1),
+    AST_FLAG_DECLARATION  = (1 << 2),
+	AST_FLAG_DIRECTIVE    = (1 << 3),
+	AST_FLAG_INFER_QUEUED = (1 << 4),
+	AST_FLAG_ALLOW_BASE_ENUM = (1 << 5), // This flags allows type inference to not error out if a variable with enum type is seen
+	AST_FLAG_EXPRESSION_LVALUE = (1 << 6),
+} Light_Ast_Flags;
 
-Scope* scope_create(Ast* creator, Scope* parent, u32 flags);
+typedef struct Light_Ast_t {
+    Light_Ast_Type kind;
 
-Ast* ast_create_expr_sizeof(Type_Instance* type, Scope* scope, Token* directive_token);
-Ast* ast_create_expr_typeof(Ast* expr, Scope* scope, Token* directive_token);
-Ast* ast_create_expr_run(Scope* scope, Token* directive_token, Ast* expr);
+    int32_t  id;
+	int32_t  infer_queue_index;
+    uint32_t flags;
 
-Ast* ast_create_data(Data_Type type, Scope* scope, Token* location, u8* data, s64 length_bytes, Type_Instance* data_type);
+    struct Light_Type_t* type;
+    Light_Scope*         scope_at;
 
-Ast* ast_create_decl_proc(Token* name, Scope* scope, Scope* arguments_scope, Type_Instance* ptype, Ast** arguments, Ast* body, Type_Instance* type_return, u32 flags, s32 arguments_count);
-Ast* ast_create_decl_variable(Token* name, Scope* scope, Ast* assignment, Type_Instance* var_type, u32 flags);
-Ast* ast_create_decl_struct(Token* name, Scope* scope, Scope* struct_scope, Type_Instance* stype, Ast** fields, u32 flags, s32 field_count);
-Ast* ast_create_decl_union(Token* name, Scope* scope, Scope* union_scope, Type_Instance* utype, Ast** fields, u32 flags, s32 field_count);
-Ast* ast_create_decl_enum(Token* name, Scope* scope, Scope* enum_scope, Ast** fields, Type_Instance* type_hint, u32 flags, s32 field_count);
-Ast* ast_create_decl_constant(Token* name, Scope* scope, Ast* value, Type_Instance* type, u32 flags);
-Ast* ast_create_decl_typedef(Token* name, Scope* scope, Type_Instance* type);
+    union {
+		// Declarations
+        Light_Ast_Decl_Procedure decl_proc;
+        Light_Ast_Decl_Variable  decl_variable;
+		Light_Ast_Decl_Constant  decl_constant;
+		Light_Ast_Decl_Typedef   decl_typedef;
 
-Ast* ast_create_expr_variable(Token* name, Scope* scope, Type_Instance* type);
-Ast* ast_create_expr_literal(Scope* scope, Literal_Type literal_type, Token* token, u32 flags, Type_Instance* type);
-Ast* ast_create_expr_binary(Scope* scope, Ast* left, Ast* right, Operator_Binary op, Token* token_op);
-Ast* ast_create_expr_proc_call(Scope* scope, Ast* caller, Ast** arguments, s32 args_count);
-Ast* ast_create_expr_unary(Scope* scope, Ast* operand, Operator_Unary op, Token* token_op, Type_Instance* type_to_cast, u32 flags);
+		// Commands
+		Light_Ast_Comm_Assignment comm_assignment;
+		Light_Ast_Comm_Block      comm_block;
+		Light_Ast_Comm_Break      comm_break;
+		Light_Ast_Comm_Continue   comm_continue;
+		Light_Ast_Comm_Return     comm_return;
+		Light_Ast_Comm_For        comm_for;
+		Light_Ast_Comm_If         comm_if;
+		Light_Ast_Comm_While      comm_while;
 
-Ast* ast_create_comm_block(Scope* parent_scope, Scope* block_scope, Ast** commands, Ast* creator, s32 command_count);
-Ast* ast_create_comm_if(Scope* scope, Ast* condition, Ast* command_true, Ast* command_false);
-Ast* ast_create_comm_for(Scope* scope, Ast* condition, Ast* body, s64 deferred_commands);
-Ast* ast_create_comm_break(Scope* scope, Ast* lit, Token* token);
-Ast* ast_create_comm_continue(Scope* scope, Token* token);
-Ast* ast_create_comm_return(Scope* scope, Ast* expr, Token* token);
-Ast* ast_create_comm_variable_assignment(Scope* scope, Ast* lvalue, Ast* rvalue);
+		// Expressions
+		Light_Ast_Expr_Binary             expr_binary;
+		Light_Ast_Expr_Unary              expr_unary;
+		Light_Ast_Expr_Literal_Primitive  expr_literal_primitive;
+		Light_Ast_Expr_Literal_Array      expr_literal_array;
+		Light_Ast_Expr_Literal_Struct     expr_literal_struct;
+		Light_Ast_Expr_Variable           expr_variable;
+		Light_Ast_Expr_Proc_Call          expr_proc_call;
+		Light_Ast_Expr_Directive          expr_directive;
+		Light_Ast_Expr_Dot                expr_dot;
+		Light_Ast_Expr_Compiler_Generated expr_compiler_generated;
 
-char* binop_op_to_string(Operator_Binary binop);
-void DEBUG_print_node(FILE* out, Ast* node);
-void DEBUG_print_ast(FILE* out, Ast** ast, bool print_ts);
-int  DEBUG_print_type(FILE* out, Type_Instance* type, bool short_ = true);
-int  DEBUG_print_type_detailed(FILE* out, Type_Instance* type);
+		// Directives
+		Light_Ast_Directive_Foreign   directive_foreign;
+		Light_Ast_Directive_Static_If directive_static_if;
+		Light_Ast_Directive_Compile   directive_compile;
+    };
+} Light_Ast;
+
+// -------------- ------- ----------------
+// --------------  Types  ----------------
+// -------------- ------- ----------------
+
+typedef enum {
+    TYPE_KIND_NONE = 0,
+    TYPE_KIND_PRIMITIVE,
+    TYPE_KIND_POINTER,
+    TYPE_KIND_STRUCT,
+    TYPE_KIND_UNION,
+    TYPE_KIND_ARRAY,
+    TYPE_KIND_FUNCTION,
+	TYPE_KIND_ENUM,
+    TYPE_KIND_ALIAS,
+	TYPE_KIND_DIRECTIVE,
+} Light_Type_Kind;
+
+typedef enum {
+    TYPE_PRIMITIVE_VOID = 0,
+    TYPE_PRIMITIVE_S8,
+    TYPE_PRIMITIVE_S16,
+    TYPE_PRIMITIVE_S32,
+    TYPE_PRIMITIVE_S64,
+    TYPE_PRIMITIVE_U8,
+    TYPE_PRIMITIVE_U16,
+    TYPE_PRIMITIVE_U32,
+    TYPE_PRIMITIVE_U64,
+    TYPE_PRIMITIVE_R32,
+    TYPE_PRIMITIVE_R64,
+    TYPE_PRIMITIVE_BOOL,
+
+    TYPE_PRIMITIVE_COUNT,
+} Light_Type_Primitive;
+
+typedef struct {
+    struct Light_Type_t* array_of;
+	bool                 dimension_evaluated;
+	uint64_t             dimension;
+	Light_Token*         token_array;
+	union {
+		struct Light_Ast_t*   const_expr;
+	};
+} Light_Type_Array;
+
+typedef enum {
+    LIGHT_STRUCT_FLAG_PACKED = (1 << 0),
+} Light_Struct_Flags;
+
+typedef struct {
+	Light_Ast**   fields;			// Must be AST_DECL_VARIABLE
+	Light_Scope*  struct_scope;
+	int64_t*      offset_bits;
+	uint32_t      flags;
+	int32_t       size_bits;
+	int32_t       fields_count;
+	int32_t       alignment_bytes;
+} Light_Type_Struct;
+
+typedef struct {
+	Light_Ast**   fields;
+	Light_Scope*  union_scope;
+	uint32_t      flags;
+	int32_t       size_bits;
+	int32_t       fields_count;
+	int32_t       alignment_bytes;
+} Light_Type_Union;
+
+typedef enum {
+	TYPE_FUNCTION_VARIADIC = (1 << 0),
+	TYPE_FUNCTION_STDCALL = (1 << 1),
+} Light_Type_Function_Flags;
+typedef struct {
+    struct Light_Type_t*  return_type;
+	struct Light_Type_t** arguments_type;
+    struct {
+	    char**   arguments_names;
+        int32_t* arguments_names_length;
+    };
+	int32_t      arguments_count;
+	uint32_t     flags;
+} Light_Type_Function;
+
+typedef struct {
+	struct Light_Type_t*  type_hint;
+	Light_Scope*          enum_scope;
+	Light_Ast**           fields;			// Must be CONSTANT_DECL
+	s32                   field_count;
+	uint32_t              flags;
+	int64_t*              evaluated_values;
+} Light_Type_Enum;
+
+typedef struct {
+    Light_Token* name;
+	Light_Scope*          scope;
+    struct Light_Type_t*  alias_to;
+} Light_Type_Alias;
+
+typedef enum {
+    TYPE_FLAG_WEAK          = (1 << 1),
+    TYPE_FLAG_INTERNALIZED  = (1 << 2),
+    TYPE_FLAG_SIZE_RESOLVED = (1 << 3),
+	TYPE_FLAG_UNRESOLVED    = (1 << 4),
+	TYPE_FLAG_IN_TYPE_ARRAY = (1 << 5),
+} Light_Type_Flags;
+
+typedef struct Light_Type_t{
+    Light_Type_Kind kind;
+    uint32_t        flags;
+	uint32_t        type_table_index;
+    uint64_t        size_bits;
+
+    union {
+        Light_Type_Primitive primitive;
+        struct Light_Type_t* pointer_to;
+        Light_Type_Array     array_info;
+        Light_Type_Struct    struct_info;
+        Light_Type_Union     union_info;
+        Light_Type_Function  function;
+		Light_Type_Enum      enumerator;
+        Light_Type_Alias     alias;
+		Light_Ast*           directive;
+    };
+} Light_Type;
+
+// -------------- --------- ----------------
+// -------------- Functions ----------------
+// -------------- --------- ----------------
+
+// Scope
+Light_Scope* light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags);
+
+// Ast
+// Declarations
+Light_Ast* ast_new_decl_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name);
+Light_Ast* ast_new_decl_variable(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, Light_Storage_Class storage, u32 flags);
+Light_Ast* ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, u32 flags);
+Light_Ast* ast_new_decl_procedure(Light_Scope* scope, Light_Token* name, Light_Ast* body, Light_Type* return_type, Light_Scope* args_scope, Light_Ast** args, s32 args_count, u32 flags);
+
+// Commands
+Light_Ast* ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, Light_Scope* block_scope);
+Light_Ast* ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false, Light_Token* if_token);
+Light_Ast* ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Light_Token* while_token);
+Light_Ast* ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* condition, Light_Ast* body, Light_Ast** prologue, Light_Ast** epilogue, Light_Token* for_token);
+Light_Ast* ast_new_comm_break(Light_Scope* scope, Light_Token* break_keyword, Light_Ast* level);
+Light_Ast* ast_new_comm_continue(Light_Scope* scope, Light_Token* continue_keyword, Light_Ast* level);
+Light_Ast* ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_token);
+Light_Ast* ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue, Light_Token* op_token);
+
+// Expressions
+Light_Ast* ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token);
+Light_Ast* ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val);
+Light_Ast* ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val);
+Light_Ast* ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs);
+Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named, Light_Scope* struct_scope);
+Light_Ast* ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op);
+Light_Ast* ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op);
+Light_Ast* ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier);
+Light_Ast* ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count, Light_Token* op);
+Light_Ast* ast_new_expr_variable(Light_Scope* scope, Light_Token* name);
+Light_Ast* ast_new_expr_directive(Light_Scope* scope, Light_Expr_Directive_Type directive_type, Light_Token* token, Light_Ast* expr, Light_Type* type);
+Light_Ast* ast_new_expr_compiler_generated(Light_Scope* scope, Light_Compiler_Generated_Kind kind);
+
+// Special expressions
+Light_Ast* ast_new_user_value_struct_literal(Light_Scope* scope, Light_Ast* expression);
+
+// Utils
+bool literal_primitive_evaluate(Light_Ast* p);
+
+// -------------- --------- ----------------
+// --------------   Print   ----------------
+// -------------- --------- ----------------
+
+typedef enum {
+	LIGHT_AST_PRINT_STDOUT = (1 << 0),
+	LIGHT_AST_PRINT_STDERR = (1 << 1),
+	LIGHT_AST_PRINT_BUFFER = (1 << 2),
+	LIGHT_AST_PRINT_EXPR_TYPES = (1 << 3),
+} Light_Ast_Print_Flags;
+
+s32 ast_print_node(Light_Ast* node, u32 flags, s32 indent_level);
+s32 ast_print_type(Light_Type* type, u32 flags, s32 indent_level);
+s32 ast_print_expression(Light_Ast* expr, u32 flags, s32 indent_level);
+s32 ast_print(Light_Ast** ast, u32 flags, s32 indent_level);
