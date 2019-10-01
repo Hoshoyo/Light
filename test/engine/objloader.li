@@ -1,0 +1,448 @@
+#import "linux/print.li"
+#import "../standard_library/hash_table.li"
+#import "../standard_library/dynamic_array.li"
+
+exit :: (status : s32) -> void #foreign("c");
+
+Tokenizer :: struct {
+    stream : string;
+    line   : s32;
+    column : s32;
+    index  : s32;
+}
+
+Token :: struct {
+    type   : Token_Type;
+    data   : string;
+    line   : s32;
+    column : s32;
+}
+
+Token_Type :: enum {
+    TOKEN_IDENTIFIER : 1,
+    TOKEN_LITERAL_FLOAT : 2,
+    TOKEN_SYMBOL : 3,
+    TOKEN_COMMENT : 4,
+    TOKEN_EOF : 5
+}
+
+is_white_space :: (c : u8) -> bool {
+    return c == '\n' || c == ' ' || c == '\v' || c == '\t' || c == '\r';
+}
+
+is_letter :: (c : u8) -> bool {
+    return c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z';
+}
+
+is_number :: (c : u8) -> bool {
+    return c >= '0' && c <= '9';
+}
+
+token_next :: (tokenizer : ^Tokenizer) -> Token {
+    result : Token;
+    stream := tokenizer.stream.data;
+    index  := tokenizer.index;
+
+    while is_white_space(stream[index]) {
+        if stream[index] == '\n' {
+            tokenizer.line += 1;
+            tokenizer.column = 0;
+        } else {
+            tokenizer.column += 1;
+        }
+        index += 1;
+    }
+    
+    result.data.capacity = -1;
+
+    if is_letter(stream[index]) {
+        start := index;
+        while is_letter(stream[index]) || is_number(stream[index]) || stream[index] == '_' {
+            index += 1;
+            tokenizer.column += 1;
+        }
+        result.type = Token_Type.TOKEN_IDENTIFIER;
+        result.data.length = [s64](index - start);
+        result.data.data = stream + start;
+    } else if is_number(stream[index]) {
+        start := index;
+        while is_number(stream[index]) {
+            index += 1;
+        }
+        if stream[index] == '.' {
+            index += 1;
+            while is_number(stream[index]) {
+                index += 1;
+            }
+        }
+
+        result.type = Token_Type.TOKEN_LITERAL_FLOAT;
+        result.data.length = [s64](index - start);
+        result.data.data = stream + start;
+    } else if stream[index] == 0 {
+        result.type = Token_Type.TOKEN_EOF;
+        result.data.length = 1;
+        result.data.data = stream;
+    } else if stream[index] == '#' {
+        start := index;
+        while stream[index] != '\n' {
+            index += 1;
+            if stream[index] == 0
+                break;
+        }
+        result.type = Token_Type.TOKEN_COMMENT;
+        result.data.length = [s64](index - start);
+        result.data.data = stream + start;
+    } else {
+        result.type = Token_Type.TOKEN_SYMBOL;
+        result.data.length = 1;
+        result.data.data = stream + index;
+        index += 1;
+    }
+
+    result.line = tokenizer.line;
+    result.column = tokenizer.column;
+    tokenizer.index = index;
+    return result;
+}
+
+string_equal :: (s1 : string, s2 : string) -> bool {
+    if s1.length != s2.length return false;
+    for i := 0; i < s1.length; i += 1 {
+        if s1.data[i] != s2.data[i] return false;
+    }
+    return true;
+}
+
+syntax_error :: (err : string, token : Token) -> s32 {
+    print_s32(token.line);
+    print_string(":");
+    print_s32(token.column);
+    print_string(": Syntax Error:");
+    print_string(err);
+    return -1;
+}
+
+str_to_s64 :: (str : string) -> s64 {
+    result : s64;
+    tenths : s64 = 1;
+
+    for i := str.length - 1; i >= 0; i -= 1, tenths *= 10 {
+        result += ([s64]str.data[i] - 0x30) * tenths;
+    }
+    print_string("string = ");
+    print_string(str);
+    print_string(" -> s64 = ");
+    print_s64(result);
+    print_string("\n");
+    return result;
+}
+
+parse_s32 :: (tokenizer : ^Tokenizer, out_int : ^s32) -> s32 {
+    i : s64;
+    r := parse_s64(tokenizer, &i);
+    *out_int = [s32]i;
+    return r;
+}
+
+parse_s64 :: (tokenizer : ^Tokenizer, out_int : ^s64) -> s32 {
+    token := token_next(tokenizer);
+    sign := 1;
+
+    if token.type == Token_Type.TOKEN_SYMBOL && token.data.data[0] == '-' {
+        sign = -1;
+        token = token_next(tokenizer);
+    }
+    if token.type != Token_Type.TOKEN_LITERAL_FLOAT {
+        return syntax_error("expected integer", token);
+    }
+
+    result := str_to_s64(token.data);
+    *out_int = result * sign;
+    return 0;
+}
+
+parse_float :: (tokenizer : ^Tokenizer, out_r32 : ^r32) -> s32 {
+    token := token_next(tokenizer);
+
+    sign := 1.0;
+
+    if token.type == Token_Type.TOKEN_SYMBOL && token.data.data[0] == '-' {
+        sign = -1.0;
+        token = token_next(tokenizer);
+    }
+    if token.type != Token_Type.TOKEN_LITERAL_FLOAT {
+        return syntax_error("expected float token", token);
+    }
+
+    result := 0.0;
+	tenths := 1.0;
+	frac_tenths := 0.1;
+    point_index := 0;
+    text := token.data.data;
+
+    while text[point_index] != '.' {
+        point_index += 1;
+    }
+
+	for i := point_index - 1; i >= 0; i -= 1, tenths *= 10.0 {
+        result += [r32](text[i] - 0x30) * tenths;
+    }
+    for i := point_index + 1; i < token.data.length; i += 1, frac_tenths *= 0.1 {
+        result += [r32](text[i] - 0x30) * frac_tenths;
+    }
+
+    *out_r32 = result * sign;
+    return 0;
+}
+
+expect_symbol :: (tokenizer : ^Tokenizer, symbol : u8) -> s32 {
+    token := token_next(tokenizer);
+
+    if token.type != Token_Type.TOKEN_SYMBOL || token.data.data[0] != symbol {
+        return syntax_error("expected symbol ", token);
+    }
+
+    return 0;
+}
+
+Object :: struct {
+    name : string;
+    vertices: Dynamic_Array;
+    indices : Dynamic_Array;
+}
+/*
+vec3 :: struct {
+    x : r32;
+    y : r32;
+    z : r32;
+}
+
+vec2 :: struct {
+    x : r32;
+    y : r32;
+}
+*/
+ivec3 :: struct {
+    x : s32;
+    y : s32;
+    z : s32;
+}
+
+load_cube :: (res : ^Object) -> s32 {
+    iv : ivec3;
+    fv3 : vec3;
+    fv2 : vec2;
+    idx : u64;
+    ida : u32;
+    v3d : Vertex;
+    table := hash_table_create(#typeof iv);
+    
+    index_array := dynamic_array_create(#typeof idx);
+    index_array_i := dynamic_array_create(#typeof ida);
+    position_array := dynamic_array_create(#typeof fv3);
+    texcoord_array := dynamic_array_create(#typeof fv2);
+    normals_array := dynamic_array_create(#typeof fv3);
+    vertices_array := dynamic_array_create(#typeof v3d);
+    aux_index_array := dynamic_array_create(#typeof idx);
+    triangle_count : u64 = 0;
+
+    result := read_entire_file("/home/hoshoyo/dev/squiggly/res/models/plane.obj", memory_alloc);
+
+    if result.length == 0 {
+        print_string("could not load file\n");
+    }
+
+    tokenizer: Tokenizer;
+    tokenizer.stream = result;
+
+    while true {
+        token := token_next(&tokenizer);
+
+        //print_token(token);
+
+        if token.type == Token_Type.TOKEN_COMMENT continue;
+
+        if token.type == Token_Type.TOKEN_IDENTIFIER {
+            if string_equal(token.data, "mtllib") {
+                // mtllib ignore result of this for now
+                material_name := token_next(&tokenizer);
+                if material_name.type != Token_Type.TOKEN_IDENTIFIER {
+                    return syntax_error("Expected material name.\n", token);
+                }
+                dot := token_next(&tokenizer);
+                if dot.type == Token_Type.TOKEN_SYMBOL {
+                    material_extension := token_next(&tokenizer);
+                    if material_extension.type != Token_Type.TOKEN_IDENTIFIER {
+                        return syntax_error("Expected extension for material.\n", material_extension);
+                    }
+                }
+            } else if string_equal(token.data, "o") {
+                // name of the object
+                object_name := token_next(&tokenizer);
+                if object_name.type != Token_Type.TOKEN_IDENTIFIER {
+                    return syntax_error("Expected object name.\n", object_name);
+                }
+                //loaded_object.name = object_name.data;
+            } else if string_equal(token.data, "g") {
+                // name of the object
+                object_name := token_next(&tokenizer);
+                if object_name.type != Token_Type.TOKEN_IDENTIFIER {
+                    return syntax_error("Expected object name.\n", object_name);
+                }
+                //loaded_object.name = object_name.data;
+            } else if string_equal(token.data, "v") {
+                // vertice
+                v : vec3;
+                parse_float(&tokenizer, &v.x);
+                parse_float(&tokenizer, &v.y);
+                parse_float(&tokenizer, &v.z);
+
+                dynamic_array_push(&position_array, &v);
+                print_vec3(v);
+            } else if string_equal(token.data, "vt") {
+                // texture coordinate
+                v : vec2;
+                parse_float(&tokenizer, &v.x);
+                parse_float(&tokenizer, &v.y);
+                
+                dynamic_array_push(&texcoord_array, &v);
+                //print_vec2(v);
+            } else if string_equal(token.data, "vn") {
+                // normals
+                v : vec3;
+                parse_float(&tokenizer, &v.x);
+                parse_float(&tokenizer, &v.y);
+                parse_float(&tokenizer, &v.z);
+
+                dynamic_array_push(&normals_array, &v);
+                //print_vec3(v);
+            } else if string_equal(token.data, "s") {
+                v : s64;
+                parse_s64(&tokenizer, &v);
+                //print_s64(v);
+            } else if string_equal(token.data, "f") {
+                // face / triangle
+                face : [3]ivec3;
+                for f := 0; f < 3; f += 1 {
+                    // int / int / int
+                    err := parse_s32(&tokenizer, &face[f].x);
+                    if err != 0 return -1;
+                    expect_symbol(&tokenizer, '/');
+                    err = parse_s32(&tokenizer, &face[f].y);
+                    if err != 0 return -1;
+                    expect_symbol(&tokenizer, '/');
+                    err = parse_s32(&tokenizer, &face[f].z);
+                    if err != 0 return -1;
+
+                    index : u64;
+                    if !hash_table_entry_exist(table, &face[f], #sizeof ivec3, &index) {
+                        vecmem := [^ivec3]memory_alloc(#sizeof ivec3);
+                        memory_copy(vecmem, &face[f], #sizeof ivec3);
+                        index = hash_table_push(table, vecmem, #sizeof ivec3);
+                        table.entries[index].extra = triangle_count;
+                        dynamic_array_push(&aux_index_array, &index);
+                        triangle_count += 1;
+                    }
+                    dynamic_array_push(&index_array, &index);
+                }
+            }
+        }
+
+        if token.type == Token_Type.TOKEN_EOF {
+            break;
+        }
+    }
+
+    for i := 0; i < index_array.length; i += 1 {
+        hash_table_index := *([^u64]index_array.data + i);
+
+        entry := table.entries[hash_table_index];
+        ii : u32 = [u32]entry.extra;
+        print_string("index: ");
+        print_u32(ii);
+        print_string("\n");
+
+        dynamic_array_push(&index_array_i, &ii);
+    }
+
+    print_string("Aux array length: ");
+    print_s64(aux_index_array.length);
+    print_string("\n");
+    for i := 0; i < aux_index_array.length; i += 1 {
+        hash_table_index := *([^u64]aux_index_array.data + i);
+        entry := table.entries[hash_table_index];
+        vecs := [^ivec3]entry.data;
+
+        vertex := Vertex:{
+            *([^vec3]position_array.data + (vecs.x - 1)),
+            *([^vec2]texcoord_array.data + (vecs.y - 1)),
+            *([^vec3]normals_array.data + (vecs.z - 1))
+        };
+
+        print_vec3(vertex.position);
+        print_vec2(vertex.texture_coord);
+        print_vec3(vertex.normal);
+        print_string("\n");
+
+        dynamic_array_push(&vertices_array, &vertex);
+    }
+    // TODO: release all unused arrays
+
+    res.vertices = vertices_array;
+    res.indices = index_array_i;
+
+    return 0;
+}
+
+print_ivec3 :: (v : ivec3) {
+    print_string("{");
+    print_s32(v.x);
+    print_string(", ");
+    print_s32(v.y);
+    print_string(", ");
+    print_s32(v.z);
+    print_string("}");
+}
+
+print_vec3 :: (v : vec3) {
+    print_string("{");
+    print_r32(v.x);
+    print_string(", ");
+    print_r32(v.y);
+    print_string(", ");
+    print_r32(v.z);
+    print_string("}");
+}
+
+print_vec2 :: (v : vec2) {
+    print_string("{");
+    print_r32(v.x);
+    print_string(", ");
+    print_r32(v.y);
+    print_string("}");
+}
+
+print_token :: (t : Token) -> void {
+    print_s32(t.line + 1);
+    print_string(":");
+    print_s32(t.column);
+    print_string(": ");
+
+    if t.type == Token_Type.TOKEN_IDENTIFIER {
+        print_string("Identifier: ");
+        print_string(t.data);
+    } else if t.type == Token_Type.TOKEN_LITERAL_FLOAT {
+        print_string("Float: ");
+        print_string(t.data);
+    } else if t.type == Token_Type.TOKEN_SYMBOL {
+        print_string("Symbol: ");
+        print_string(t.data);
+    } else if t.type == Token_Type.TOKEN_EOF {
+        print_string("EOF");
+    } else if t.type == Token_Type.TOKEN_COMMENT {
+        print_string("Comment: ");
+        print_string(t.data);
+    }
+    print_string("\n");
+}

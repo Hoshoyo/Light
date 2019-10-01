@@ -1,0 +1,39 @@
+// GLX
+
+GLX_X_RENDERABLE : u32 : 0x8012;
+GLX_DRAWABLE_TYPE : u32 : 0x8010;
+GLX_RENDER_TYPE : u32 : 0x8011;
+GLX_RGBA_BIT : u32 : 0x1;
+GLX_X_VISUAL_TYPE : u32 : 0x22;
+GLX_TRUE_COLOR : u32 : 0x8002;
+GLX_RED_SIZE : u32 : 8;
+GLX_GREEN_SIZE : u32 : 9;
+GLX_BLUE_SIZE : u32 : 10;
+GLX_ALPHA_SIZE : u32 : 11;
+GLX_DEPTH_SIZE : u32 : 12;
+GLX_STENCIL_SIZE : u32 : 13;
+GLX_DOUBLEBUFFER : u32 : 5;
+GLX_WINDOW_BIT : u32 : 1;
+GLX_SAMPLE_BUFFERS : s32 : 100000;
+GLX_SAMPLES : s32 : 100001;
+True : u32 : 1;
+
+GLX_CONTEXT_MAJOR_VERSION_ARB : s32 : 0x2091;
+GLX_CONTEXT_MINOR_VERSION_ARB : s32 : 0x2092;
+GLX_CONTEXT_FLAGS_ARB : s32 : 0x2094;
+GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB : s32 : 0x00000002;
+
+glXChooseFBConfig : (dpy : ^Display, screen : s32, attrib_list : ^u32, nelements : ^s32) -> ^GLXFBConfig #extern("C");
+glXGetVisualFromFBConfig : (dpy : ^Display, config : GLXFBConfig) -> ^XVisualInfo #extern("C");
+glXGetFBConfigAttrib : (dpy : ^Display, config : GLXFBConfig, attribute : s32, value : ^s32) -> s32 #extern("C");
+glXGetProcAddressARB : (name : ^u8) -> ^void #extern("C");
+glXIsDirect : (display : ^Display, ctx : GLXContext) -> bool #extern("C");
+glXQueryVersion : (dpy : ^Display, major : ^s32, minor : ^s32) -> bool #extern("C");
+
+
+// Normal GL
+
+glEnable : (cap : u32) -> void #extern("GL");
+glClear : (mask : u32) -> void #extern("GL");
+glClearColor : (r : r32, g : r32, b : r32, a : r32) -> void #extern("GL");
+glViewport : (x : s32, y : s32, width : s32, height : s32) -> void #extern("GL");

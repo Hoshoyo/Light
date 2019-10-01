@@ -1,0 +1,83 @@
+Vertex struct {
+	position : vec4;
+	normal : vec4;
+	tex_coords : vec2;
+	tangent : vec4;
+}
+
+Mesh_BS_Info struct {
+	radius : r32;
+	center : vec4;
+}
+
+Mesh struct {
+	resource_id : u32;
+    VAO : u32;
+    VBO : u32;
+    EBO : u32;
+    vertex_count : u32;
+    index_count : u32;
+	vertex_stored : bool;
+	vertices : ^Vertex;
+	indices : ^u32;
+	bsi : Mesh_BS_Info;
+}
+
+create_simple_mesh:(vertices : ^Vertex, vertex_count : s32, indices : ^u32, index_count : s32) -> Mesh {
+    mesh : Mesh;
+    VBO : GLuint;
+    EBO : GLuint;
+    VAO : GLuint;
+
+	mesh.index_count = index_count -> u32;
+	mesh.vertex_count = vertex_count -> u32;
+
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
+
+	glBindVertexArray(VAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, (vertex_count * #size_of Vertex -> s32) -> GLsizeiptr, null, GL_STATIC_DRAW);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, (vertex_count * #size_of Vertex -> s32) -> GLsizeiptr, vertices -> ^GLvoid);
+
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE -> GLboolean, (14 * #size_of GLfloat) -> GLsizei, (0 * #size_of GLfloat) -> ^GLvoid);
+	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE -> GLboolean, (14 * #size_of GLfloat) -> GLsizei, (4 * #size_of GLfloat) -> ^GLvoid);
+	glEnableVertexAttribArray(1);
+
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE -> GLboolean, (14 * #size_of GLfloat) -> GLsizei, (8 * #size_of GLfloat) -> ^GLvoid);
+	glEnableVertexAttribArray(2);
+
+	glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE -> GLboolean, (14 * #size_of GLfloat) -> GLsizei, (10 * #size_of GLfloat) -> ^GLvoid);
+	glEnableVertexAttribArray(3);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (index_count * #size_of u32 -> s32) -> GLsizeiptr, null, GL_STATIC_DRAW);
+	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, (index_count * #size_of u32 -> s32) -> GLsizeiptr, indices -> ^GLvoid);
+
+	glBindVertexArray(0);
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	mesh.VAO = VAO;
+	mesh.VBO = VBO;
+	mesh.EBO = EBO;
+
+	return mesh;
+}
+
+mesh_render:(m : ^Mesh, shader : u32, camera : ^Camera_Common) {
+    glBindVertexArray(m.VAO);
+    glUseProgram(shader);
+    view_matrix_location := glGetUniformLocation(shader, "view_matrix\0".data -> ^GLchar);
+    projection_matrix_location := glGetUniformLocation(shader, "projection_matrix\0".data -> ^GLchar);
+	glUniformMatrix4fv(view_matrix_location, 1, GL_TRUE -> GLboolean, camera.view_matrix.m -> ^GLfloat);
+    glUniformMatrix4fv(projection_matrix_location, 1, GL_FALSE -> GLboolean, camera.projection_matrix.m -> ^GLfloat);
+    glDrawElements(GL_TRIANGLES, m.index_count -> GLsizei, GL_UNSIGNED_INT, null);
+    glUseProgram(0);
+    glBindVertexArray(0);
+}
