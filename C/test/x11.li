@@ -477,7 +477,6 @@ XAnyEvent struct {
 	window     : u64;
 }
 
-
 XEvent struct {
 	type              : s32;
 	xany              : XAnyEvent;
@@ -622,6 +621,10 @@ XStoreName : (display : ^Display, w : u64, window_name : ^u8) -> s32 #extern("X1
 XDestroyWindow : (display : ^Display, w : u64) -> s32 #extern("X11");
 XCloseDisplay : (display : ^Display) -> s32 #extern("X11");
 XGetWindowAttributes : (dpy : ^Display, win : u64, window_attribs_return : ^XWindowAttributes) -> s32 #extern("X11");
+XCheckWindowEvent:(display : ^Display, w : Window, event_mask : s32, event_return : ^XEvent) -> bool #extern("X11");
+XLookupKeysym:(key_event : ^XKeyEvent, index : s32) -> u32 #extern("X11");
+XQueryPointer:(display : ^Display, w : Window, root_return : ^Window, child_return : ^Window,
+	root_x_return : ^s32, root_y_return : ^s32, win_x_return : ^s32, win_y_return : ^s32, mask_return : ^u32) -> bool #extern("X11");
 
 glXChooseVisual : (dpy : ^Display, screen : s32, attrib_list : ^s32) -> ^XVisualInfo #extern("GL");
 glXCreateContext : (dpy : ^Display, vis : ^XVisualInfo, share_list : ^void, direct : s32) -> ^void #extern("GL");
