@@ -9,11 +9,11 @@ The language is currently under development and is very unstable.
 * [x] Simple language core
 * [x] Type inference
 * [x] Runtime type information
-* [-] Compile time execution of code
-* [-] Code AST modification
-* [-] Meta-programming support
-* [-] Code introspection
-* [-] Embedded build system support
+* [ ] Compile time execution of code
+* [ ] Code AST modification
+* [ ] Meta-programming support
+* [ ] Code introspection
+* [ ] Embedded build system support
 
 ## Example
 ```go
