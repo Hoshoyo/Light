@@ -6,13 +6,14 @@ The light programming language focuses on simplicity, while offering the maximum
 The language is currently under development and is very unstable.
 
 ## Planned Features
-* Simple language core
-* Type inference
-* Compile time execution of code
-* Code AST modification
-* Meta-programming support
-* Code introspection
-* Embedded build system support
+* [x] Simple language core
+* [x] Type inference
+* [x] Runtime type information
+* [-] Compile time execution of code
+* [-] Code AST modification
+* [-] Meta-programming support
+* [-] Code introspection
+* [-] Embedded build system support
 
 ## Example
 ```go
@@ -24,7 +25,7 @@ main :: () -> s32 {
 
 ```
 
-You can find more examples in the `examples` directory.
+You can find more examples in the `test` directory.
 
 ## Build
 
@@ -33,8 +34,9 @@ You can find more examples in the `examples` directory.
 * Dependencies: `nasm` and `gcc`.
   - To install dependencies on Ubuntu run: sudo apt-get install nasm.
 * To build run `make` at the root directory.
-* The executable is build at `bin/gcc/light`
+* The executable is build at `bin/light`
 
 ### Windows
 
-Dependencies: Visual Studio 2017. (masm and cl)
+* Currently unavailable.
+* Dependencies: Visual Studio 2017. (masm and cl)
