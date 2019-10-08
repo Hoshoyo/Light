@@ -1,8 +1,4 @@
-timespec struct {
-    tv_sec  : s64;          /* Seconds.  */
-    tv_nsec : s64;          /* Nanoseconds.  */
-}
-
+#import "os.li"
 stat struct {
     st_dev     : u64;   /* ID of device containing file */
     st_ino     : u64;   /* inode number */
@@ -22,11 +18,15 @@ stat struct {
 
 malloc: (size: u64) -> ^void #extern("C");
 
-//write: (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
+write: (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
 read: (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
 open: (pathname : ^u8, flags : s32, args : ...) -> s32 #extern("C");
 fstat : (fd : s32, buf : ^stat) -> s32 #extern("C");
 close: (fd : s32) -> s32 #extern("C");
+
+STDIN_FILENO  : s32 :	0;	/* Standard input.  */
+STDOUT_FILENO : s32 :	1;	/* Standard output.  */
+STDERR_FILENO : s32 :	2;	/* Standard error output.  */
 
 O_RDONLY : s32 : 0;
 O_WRONLY : s32 : 1;

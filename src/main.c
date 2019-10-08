@@ -30,16 +30,22 @@ int main(int argc, char** argv) {
     Light_Parser parser = {0};
     Light_Scope  global_scope = {0};
 
+    initialize_global_identifiers_table();
+
     u32 parser_error = 0;
     parse_init(&parser, &lexer, &global_scope, compiler_path, compiler_path_size, argv[1]);
 
     Light_Ast** ast = 0;
 
     double parse_start = os_time_us();
+    double lexing_elapsed = 0.0;
     // Parse all other files included in the main file
     while(array_length(parser.parse_queue_array) > 0) {
         Light_Lexer lexer = {0};
+        double lexer_start = os_time_us();
         Light_Token* tokens = lexer_file(&lexer, parser.parse_queue_array[0].data, 0);
+        lexing_elapsed += (os_time_us() - lexer_start) / 1000.0;
+
         if(tokens == 0) {
             // File does not exist
             return 1;
@@ -64,6 +70,7 @@ int main(int argc, char** argv) {
     
 #if 0
     ast_print(ast, LIGHT_AST_PRINT_STDOUT|LIGHT_AST_PRINT_EXPR_TYPES, 0);
+    //ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     type_table_print();
 #endif
 
@@ -81,6 +88,7 @@ int main(int argc, char** argv) {
     double gcc_elapsed = (os_time_us() - gcc_start) / 1000.0;
 
     printf("- elapsed time:\n\n");
+    printf("  lexing:          %.2f ms\n", lexing_elapsed);
     printf("  parse:           %.2f ms\n", parse_elapsed);
     printf("  type check:      %.2f ms\n", tcheck_elapsed);
     printf("  code generation: %.2f ms\n", generate_elapsed);
@@ -94,7 +102,7 @@ int main(int argc, char** argv) {
 
     light_vm_debug_dump_code(stdout, state.vmstate);
 
-    light_vm_execute(state.vmstate, 0, 0);
+    light_vm_execute(state.vmstate, 0, 1);
     light_vm_debug_dump_registers(stdout, state.vmstate, LVM_PRINT_FLOATING_POINT_REGISTERS|LVM_PRINT_DECIMAL);
 #endif
 

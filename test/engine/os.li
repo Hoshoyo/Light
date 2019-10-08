@@ -1,3 +1,0 @@
-sleep : (sec : s32) -> u32 #extern("C");
-usleep : (usec : u32) -> s32 #extern("C");
-exit : (code : s32) -> void #extern("C");

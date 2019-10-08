@@ -1,0 +1,34 @@
+sleep : (sec : s32) -> u32 #extern("C");
+usleep : (usec : u32) -> s32 #extern("C");
+exit : (code : s32) -> void #extern("C");
+clock_gettime : (clk_id : s32, tp : ^timespec) -> s32 #extern("C");
+
+/*
+ * The IDs of the various system clocks (for POSIX.1b interval timers):
+ */
+CLOCK_REALTIME           :: 0;
+CLOCK_MONOTONIC          :: 1;
+CLOCK_PROCESS_CPUTIME_ID :: 2;
+CLOCK_THREAD_CPUTIME_ID  :: 3;
+CLOCK_MONOTONIC_RAW      :: 4;
+CLOCK_REALTIME_COARSE    :: 5;
+CLOCK_MONOTONIC_COARSE   :: 6;
+CLOCK_BOOTTIME           :: 7;
+CLOCK_REALTIME_ALARM     :: 8;
+CLOCK_BOOTTIME_ALARM     :: 9;
+CLOCK_SGI_CYCLE          :: 10;	/* Hardware specific */
+CLOCK_TAI                :: 11;
+
+/* POSIX.1b structure for a time value.  This is like a `struct timeval' but
+   has nanoseconds instead of microseconds.  */
+timespec struct {
+    tv_sec  : u64;	/* Seconds.  */
+    tv_nsec : u64;	/* Nanoseconds.  */
+}
+
+os_time_us:() -> r64 {
+    t_spec : timespec;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &t_spec);
+    res := t_spec.tv_nsec + 1000000000 * t_spec.tv_sec;
+    return (res -> r64) / 1000.0;
+}

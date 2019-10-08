@@ -165,6 +165,7 @@ Light_Token* lexer_peek_n(Light_Lexer* lexer, s32 n);
 void         lexer_rewind(Light_Lexer* lexer, s32 count);
 void         lexer_free(Light_Lexer* lexer);
 const char*  lexer_internalize_identifier(const char* data, int length);
+void         initialize_global_identifiers_table();
 
 const char*  token_type_to_str(Light_Token_Type token_type);
 

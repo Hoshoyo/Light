@@ -8,7 +8,7 @@
 
 string light_special_idents_table[LIGHT_SPECIAL_IDENT_COUNT] = {0};
 
-static void
+void
 initialize_global_identifiers_table() {
     if(global_identifiers_table.entries_capacity == 0) {
         string_table_new(&global_identifiers_table, 1024 * 1024);
@@ -549,58 +549,64 @@ token_print(Light_Token t) {
 static void
 lexer_eat_whitespace(Light_Lexer* lexer) {
     int multiline_level = 0;
-    while(true) {
+    bool running = true;
+    while(running) 
+    {
         u8 c = lexer->stream[lexer->index];
-        if (c == ' ' ||
-		    c == '\t' ||
-		    c == '\v' ||
-		    c == '\f' ||
-		    c == '\r') 
-        {
-            lexer->index++;
-            lexer->column++;
-        } else if(c == '\n') {
-            lexer->index++;
-            lexer->line++;
-            lexer->column = 0;
-        } else {
-            if(c == '/' && lexer->stream[lexer->index + 1] == '/') {
-                // single line comment
-                lexer->index += 2;
-				while (lexer->stream[lexer->index] != '\n') {
-                    if(!lexer->stream[lexer->index]) {
-                        lexer->index--;
-                        break;
-                    }
-					lexer->index++;
-				}
-                lexer->line++;
+        switch(c) {
+            case ' ': case '\t': case '\v': case '\f': case '\r':
                 lexer->index++;
+                lexer->column++;
+            break;
+            case '\n':
+                lexer->index++;
+                lexer->line++;
                 lexer->column = 0;
-            } else if(c == '/' && lexer->stream[lexer->index + 1] == '*') {
-                // multi line comment
-                lexer->index += 2;
-                multiline_level++;
-                u8* at = lexer->stream + lexer->index;
-                while(true) {
-                    if(*at == '*' && at[1] == '/') {
-                        multiline_level--;
-                        if(multiline_level == 0) break;
+            break;
+            case '/':{
+                u8 next_token = lexer->stream[lexer->index + 1];
+                if(next_token == '/') {
+                    // single line comment
+                    lexer->index += 2;
+                    while (lexer->stream[lexer->index] != '\n') {
+                        if(!lexer->stream[lexer->index]) {
+                            lexer->index--;
+                            break;
+                        }
+                        lexer->index++;
                     }
-                    if(*at == '/' && at[1] == '*') {
-                        multiline_level++;
+                    lexer->line++;
+                    lexer->index++;
+                    lexer->column = 0;
+                } else if(next_token == '*') {
+                    // multi line comment
+                    lexer->index += 2;
+                    multiline_level++;
+                    u8* at = lexer->stream + lexer->index;
+                    while(true) {
+                        if(*at == '*' && at[1] == '/') {
+                            multiline_level--;
+                            if(multiline_level == 0) break;
+                        }
+                        if(*at == '/' && at[1] == '*') {
+                            multiline_level++;
+                        }
+                        if(*at == '\n') {
+                            lexer->line++;
+                            lexer->column = 0;
+                        }
+                        ++at;
+                        ++lexer->index;
                     }
-                    if(*at == '\n') {
-                        lexer->line++;
-                        lexer->column = 0;
-                    }
-                    ++at;
-                    ++lexer->index;
+                    lexer->index += 2;
+                } else {
+                    running = false;
+                    break;
                 }
-                lexer->index += 2;
-            } else {
-                break;
-            }
+            } break;
+            default: 
+                running = false;
+            break;
         }
     }
 }
@@ -672,7 +678,6 @@ lexer_file(Light_Lexer* lexer, const char* filename, u32 flags) {
 
 Light_Token* 
 lexer_cstr(Light_Lexer* lexer, char* str, s32 length, u32 flags) {
-    initialize_global_identifiers_table();
     lexer_internalize_keywords(lexer);
 
     lexer->stream = (u8*)str;

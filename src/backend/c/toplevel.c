@@ -655,9 +655,13 @@ emit_variable_assignment_top_level(catstring* buffer, catstring* top_level, Ligh
 static void
 emit_command(catstring* buffer, Light_Ast* node) {
     switch(node->kind){
-        case AST_DECL_VARIABLE:
+        case AST_DECL_VARIABLE:{
             emit_declaration(buffer, node, EMIT_DECLARATION_DEFAULT_VALUE);
-            break;
+            if(node->decl_variable.assignment) {
+                emit_variable_assignment(buffer, node->decl_variable.name, node->decl_variable.assignment);
+                catsprint(buffer, ";\n");
+            }
+        } break;
         case AST_COMMAND_BLOCK:{
             catsprint(buffer, "{\n");
 
@@ -675,6 +679,8 @@ emit_command(catstring* buffer, Light_Ast* node) {
                             n->decl_variable.assignment);
                         catsprint(buffer, ";\n");
                     }
+                } else if(n->kind == AST_DECL_PROCEDURE) {
+                    emit_declaration(buffer, node->comm_block.commands[i], EMIT_FLAG_TREAT_AS_FUNCTION_TYPE);
                 }
             }
             
@@ -779,7 +785,11 @@ emit_command(catstring* buffer, Light_Ast* node) {
 
             catsprint(buffer, "while(");
             // TODO(psv): literal_declarations
-            emit_expression(0, buffer, node->comm_for.condition);
+            if(node->comm_for.condition) {
+                emit_expression(0, buffer, node->comm_for.condition);
+            } else {
+                catsprint(buffer, "true");    
+            }
             catsprint(buffer, ")");
 
             catsprint(buffer, "{");

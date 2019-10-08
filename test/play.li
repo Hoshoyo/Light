@@ -1,99 +1,33 @@
-foo struct {
-    a : s32;
-    b : r32;
-}
+#import "../modules/print.li"
 
-string struct {
-	capacity : u64;
-	length   : u64;
-	data     : ^u8;
-}
+/*
+Smallest multiple
 
-memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("C");
+Problem 5
+2520 is the smallest number that can be divided by each of the numbers from 1 to 10 without any remainder.
 
-write : (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
-print_string : (str : string) -> s64{
-	return write(1, str.data -> ^void, str.length -> u64);
-}
-print_string_l : (str : ^u8, len : s64) -> s64 {
-	return write(1, str -> ^void, len -> u64);
-}
+What is the smallest positive number that is evenly divisible by all of the numbers from 1 to 20?
+*/
 
-s32_to_str : (val : s32, buffer : [16]u8) -> s64 {
-    b : [16]u8;
-    sum : s32;
-
-    if val == 0 {
-        buffer[0] = '0';
-        return 1;
+is_divisible_by:(val : s32, from : s32, to : s32) -> bool {
+    for k := from; k <= to; k += 1 {
+        if val % k == 0 return true;
     }
-
-    if val < 0 {
-        val = -val;
-        buffer[0] = '-' -> u8;
-        sum = 1;
-    }
-    auxbuffer := &b[16];
-    start := auxbuffer + sum;
-
-    while val != 0 {
-        rem := val % 10;
-        val /= 10;
-        *auxbuffer = '0' + rem -> u8;
-        auxbuffer -= 1;
-    }
-
-    size := start - auxbuffer;
-    memcpy((&buffer[sum]) -> ^void, (auxbuffer + 1) -> ^void, size -> u64);
-    return size;
-}
-
-r32_to_str : (v : r32, buffer : [32]u8) -> s64 {
-    l :s64= 0;
-    if v < 0.0 {
-        buffer[l] = '-';
-        l += 1;
-        v = -v;
-    }
-
-    l += s32_to_str(v -> s32, (buffer -> ^u8 + l) -> [16]u8);
-    precision := 6;
-
-    fractional_part := v - (v -> s32) -> r32;
-
-    buffer[l] = '.';
-    l += 1;
-
-    if fractional_part == 0.0 {
-        buffer[l] = '0';
-        l += 1;
-        return l;
-    }
-
-    while precision > 0 && fractional_part > 0.0 {
-        fractional_part *= 10.0;
-        buffer[l] = fractional_part -> u8 + '0';
-        fractional_part = fractional_part - (fractional_part -> s32) -> r32;
-        l += 1;
-        precision -= 1;
-    }
-    return l;
-}
-
-transform : (value : ^foo) {
-    value.a = 3;
-    value.b = 2.2;
+    return false;
 }
 
 main : () -> s32 {
-    x : foo;
-    a : ^s32;
-    transform(&x);
 
-    buffer : [32]u8;
-    len := r32_to_str(x.b, buffer);
+    result := 0;
 
-    print_string_l(buffer -> ^u8, len);
+    for i := 0; ; i += 1 {
+        if is_divisible_by(i, 1, 20) {
+            result = i;
+            break;
+        }
+    }
 
-    return len -> s32;
+    print("%\n", result);
+
+    return result;
 }

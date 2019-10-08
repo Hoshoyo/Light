@@ -180,7 +180,7 @@ camera_quat_get_z_axis:(camera : ^Quaternion_Camera) -> vec4 {
 key_state : [1024]bool;
 
 camera_quat_update:(active_camera : ^Quaternion_Camera, delta_time : r64) {
-	CAMERA_QUAT_MOVEMENT_SPEED_MODIFIER :: 10.0;
+	CAMERA_QUAT_MOVEMENT_SPEED_MODIFIER :: 40.0;
 	if (key_state['W'] || key_state['w']) {
 		camera_quat_move_forward(active_camera, CAMERA_QUAT_MOVEMENT_SPEED_MODIFIER * delta_time-> r32);
 		print("Active W\n");
@@ -212,7 +212,7 @@ reset_move : bool;
 
 handle_mouse_change:(x : r64, y : r64, active_camera : ^Quaternion_Camera)
 {
-	CAMERA_QUAT_ROTATION_SPEED :: 1.0;
+	CAMERA_QUAT_ROTATION_SPEED :: 20.0 / 60.0;
 
     if (rotate_camera)
     {

@@ -1,10 +1,6 @@
+#import "io.li"
 // System calls
-write : (fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
 memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("C");
-
-STDIN_FILENO  :s32:	0;	/* Standard input.  */
-STDOUT_FILENO :s32:	1;	/* Standard output.  */
-STDERR_FILENO :s32:	2;	/* Standard error output.  */
 
 // Print generic
 

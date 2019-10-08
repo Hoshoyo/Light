@@ -1,0 +1,197 @@
+Window_Info struct {
+    width         : s32;
+    height        : s32;
+    display       : ^Display;
+    window_handle : u64;
+    vi            : ^XVisualInfo;
+    swa           : XSetWindowAttributes;
+    ctx           : GLXContext;
+    cmap          : Colormap;
+}
+
+x11_allmasks := 
+  KeyPressMask
+| KeyReleaseMask
+| ButtonPressMask
+| ButtonReleaseMask
+| EnterWindowMask
+| LeaveWindowMask
+| PointerMotionMask
+//| PointerMotionHintMask // disable this to receive all position events
+| Button1MotionMask
+| Button2MotionMask
+| Button3MotionMask
+| Button4MotionMask
+| Button5MotionMask
+| ButtonMotionMask
+| KeymapStateMask
+| ExposureMask
+| VisibilityChangeMask
+| StructureNotifyMask
+//| ResizeRedirectMask
+| SubstructureNotifyMask
+| SubstructureRedirectMask
+| FocusChangeMask
+| PropertyChangeMask
+| ColormapChangeMask
+| OwnerGrabButtonMask;
+
+init_opengl : (info : ^Window_Info) -> bool {
+    display := XOpenDisplay(null);
+	if display == null {
+		print("Could not open display\n");
+		return false;
+	}
+    info.display = display;
+
+	visual_attribs := [
+		GLX_X_RENDERABLE, True,
+		GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
+		GLX_RENDER_TYPE, GLX_RGBA_BIT,
+		GLX_X_VISUAL_TYPE, GLX_TRUE_COLOR,
+		GLX_RED_SIZE, 8,
+		GLX_GREEN_SIZE, 8,
+		GLX_BLUE_SIZE, 8,
+		GLX_ALPHA_SIZE, 8,
+		GLX_DEPTH_SIZE, 24,
+		GLX_STENCIL_SIZE, 8,
+		GLX_DOUBLEBUFFER, True,
+		0
+	];
+
+	glx_minor : s32;
+	glx_major : s32;
+
+	if !glXQueryVersion(display, &glx_major, &glx_minor) || ((glx_major == 1) && (glx_minor < 3)) || (glx_major < 1){
+		print("invalid glx version!\n");
+		return false;
+	}
+	
+	// Getting framebuffer config
+	fbcount : s32;
+	fbc := glXChooseFBConfig(display, DefaultScreen(display), visual_attribs->^u32, &fbcount);
+
+	if fbc == null {
+		print("Failed to get framebuffer configuration\n");
+		return false;
+	}
+
+	best_fbc : s32 = -1;
+	worst_fbc : s32 = -1;
+	best_num_samp : s32 = -1;
+	worst_num_samp : s32 = 999;
+
+	for i := 0; i < fbcount; i += 1 {
+		vi := glXGetVisualFromFBConfig(display, fbc[i]);
+		if vi != null {
+			samp_buf : s32;
+			samples : s32;
+			glXGetFBConfigAttrib(display, fbc[i], GLX_SAMPLE_BUFFERS, &samp_buf);
+			glXGetFBConfigAttrib(display, fbc[i], GLX_SAMPLES       , &samples);
+
+            print("Matching fbconfig % visual ID %: SAMPLE_BUFFERS = %, SAMPLES = %\n", i, vi.visualid -> u32, samp_buf, samples);
+
+			if best_fbc < 0 || samp_buf != 0 && samples > best_num_samp {
+				best_fbc = i;
+				best_num_samp = samples;
+			}
+			if worst_fbc < 0 || samp_buf == 0 || samples < worst_num_samp {
+				worst_fbc = i;
+				worst_num_samp = samples;
+			}
+		}
+		XFree(vi);
+	}
+
+	bestFbc := fbc[best_fbc];
+	XFree(fbc);
+
+	vi := glXGetVisualFromFBConfig(display, bestFbc);
+
+    print("Chosen visual ID = %\n", vi.visualid -> u32);
+
+	swa : XSetWindowAttributes;
+	cmap : Colormap;
+
+	cmap = XCreateColormap(display, RootWindow(display, vi.screen), vi.visual, 0);
+	swa.colormap = cmap;
+	swa.background_pixmap = 0;
+	swa.border_pixel      = 0;
+	swa.event_mask        = StructureNotifyMask;
+	//info.cmap = cmap;
+
+	print("Creating window\n");
+	win := XCreateWindow(display, RootWindow(display, vi.screen),
+			0, 0, 800, 600, 0, vi.depth, InputOutput, vi.visual,
+			CWBorderPixel|CWColormap|CWEventMask, &swa);
+
+	info.window_handle = win;
+
+	if win == 0 {
+		print("Failed to create window.\n");
+		return false;
+	}
+
+	XSelectInput(display, win, x11_allmasks);
+
+	XFree(vi);
+
+	XStoreName(display, win, "GL 3.0 Window\0".data);
+
+	print("Mapping window\n");
+	XMapWindow(display, win);
+
+	glXCreateContextAttribsARB := glXGetProcAddressARB("glXCreateContextAttribsARB".data) -> (^Display, GLXFBConfig, GLXContext, bool, ^s32) -> GLXContext;
+	ctx : GLXContext;
+
+	ctxErrorHandler : (^Display, ^XErrorEvent) -> s32;
+	XSetErrorHandler(ctxErrorHandler);
+
+	context_attribs := [
+        GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
+        GLX_CONTEXT_MINOR_VERSION_ARB, 3,
+        GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+        //GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+        0
+	];
+
+	ctx = glXCreateContextAttribsARB(display, bestFbc, null, true, context_attribs -> ^s32);
+	info.ctx = ctx;
+
+	XSync(display, false);
+
+	glXMakeCurrent(display, win, ctx);
+
+	// Verifying that context is a direct context
+	if (!glXIsDirect(display, ctx)) {
+		print( "Indirect GLX rendering context obtained\n" );
+	} else {
+		print( "Direct GLX rendering context obtained\n" );
+	}
+
+	return true;
+}
+
+release_opengl:(info : ^Window_Info) -> s32 {
+    glXMakeCurrent(info.display, 0, null);
+    glXDestroyContext(info.display, info.ctx);
+
+    XDestroyWindow(info.display, info.window_handle);
+    XFreeColormap(info.display, info.cmap);
+    XCloseDisplay(info.display);
+}
+
+window_size : (info : ^Window_Info, width : ^s32, height : ^s32) {
+    attribs : XWindowAttributes;
+    XGetWindowAttributes(info.display, info.window_handle, &attribs);
+
+    *width = attribs.width;
+    *height = attribs.height;
+}
+
+screen_size : (info : ^Window_Info, width : ^s32, height : ^s32) {
+	scr := DefaultScreen(info.display);
+	screen := info.display.screens[scr];
+	*width = screen.width;
+	*height = screen.height;
+}

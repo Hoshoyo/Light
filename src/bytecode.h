@@ -39,6 +39,6 @@ Light_VM_Instruction_Info bytecode_gen_internal_decl(Bytecode_State* state, Ligh
 Light_VM_Instruction_Info bytecode_gen_decl(Bytecode_State* state, Light_Ast* decl);
 
 Light_VM_Instruction_Info bytecode_gen_comm(Bytecode_State* state, Light_Ast* comm);
-Light_VM_Instruction_Info bytecode_gen_expr(Bytecode_State* state, Light_Ast* expr, Light_Register reg);
+Light_VM_Instruction_Info bytecode_gen_expr(Bytecode_State* state, Light_Ast* expr, Light_Register* out_reg);
 
 Bytecode_State bytecode_gen_ast(Light_Ast** ast);

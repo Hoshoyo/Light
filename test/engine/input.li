@@ -60,7 +60,7 @@ EVENT_STATUS_HANDLED   :: 0;
 EVENT_STATUS_UNHANDLED :: 1;
 
 Event_Handle_Status s32;
-input_handle:(e : ^Event, active_camera : ^Quaternion_Camera) -> Event_Handle_Status
+input_handle:(e : ^Event, active_camera : ^Quaternion_Camera, win_width : ^s32, win_height : ^s32) -> Event_Handle_Status
 {
 	status := EVENT_STATUS_UNHANDLED;
 
@@ -83,6 +83,8 @@ input_handle:(e : ^Event, active_camera : ^Quaternion_Camera) -> Event_Handle_St
             width := e.window.width;
             height := e.window.height;
             glViewport(0,0, width, height);
+            if win_width != null { *win_width = width; }
+            if win_height != null { *win_height = height; }
 
             camera := active_camera.c;
             camera.aspect_ratio = (width -> r32) / (height -> r32);

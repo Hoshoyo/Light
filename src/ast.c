@@ -673,6 +673,7 @@ ast_print_expr_proc_call(Light_Ast* expr, u32 flags, s32 indent_level) {
     length += ast_print_expression(expr->expr_proc_call.caller_expr, flags, indent_level);
     length += fprintf(out, "(");
     for(s32 i = 0; i < expr->expr_proc_call.arg_count; ++i) {
+        if (i > 0) length += fprintf(out, ", ");
         length += ast_print_expression(expr->expr_proc_call.args[i], flags, indent_level);
     }
     length += fprintf(out, ")");
@@ -716,6 +717,10 @@ ast_print_expression(Light_Ast* expr, u32 flags, s32 indent_level) {
         length += fprintf(out, ">");
     }
 
+    if(expr->flags & AST_FLAG_EXPRESSION_LVALUE) {
+        fprintf(out, "%s", ColorBlue);
+    }
+
     switch(expr->kind) {
         case AST_EXPRESSION_BINARY:
             length += ast_print_expr_binary(expr, flags, indent_level);
@@ -748,6 +753,7 @@ ast_print_expression(Light_Ast* expr, u32 flags, s32 indent_level) {
     }
 
     //length += fprintf(out, ")");
+    fprintf(out, "%s", ColorReset);
 
     return length;
 }
@@ -862,6 +868,7 @@ ast_print_node(Light_Ast* node, u32 flags, s32 indent_level) {
         case AST_COMMAND_IF:{
             length += fprintf(out, "if ");
             length += ast_print_expression(node->comm_if.condition, flags, indent_level);
+            length += fprintf(out, " ");
             length += ast_print_node(node->comm_if.body_true, flags, indent_level);
             if(node->comm_if.body_false) {
                 length += fprintf(out, " else ");
