@@ -141,7 +141,7 @@ top_typecheck(Light_Ast** top_level, Light_Scope* global_scope) {
             break;
 
         if(array_length(global_infer_queue) == starting_length) {
-            type_error(&error, 0, "circular dependencies\n");
+            type_error((u32*)&error, 0, "circular dependencies\n");
             break;
         }
         starting_length = array_length(global_infer_queue);

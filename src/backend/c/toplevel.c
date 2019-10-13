@@ -1130,7 +1130,12 @@ backend_c_generate_top_level(Light_Ast** ast, Type_Table type_table, Light_Scope
 void 
 backend_c_compile_with_gcc(Light_Ast** ast, const char* filename, const char* working_directory) {
     char command_buffer[2048] = {0};
+    #if defined(__linux__)
     sprintf(command_buffer, "gcc -g %s%s.c -o %s%s -lX11 -lGL -lm", 
         working_directory, filename, working_directory, filename);
+    #elif defined(_WIN32) || defined(_WIN64)
+    sprintf(command_buffer, "gcc -g %s%s.c -o %s%s.exe", 
+        working_directory, filename, working_directory, filename);
+    #endif
     system(command_buffer);
 }

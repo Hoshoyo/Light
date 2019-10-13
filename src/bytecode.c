@@ -68,6 +68,8 @@ register_name(Light_Register reg) {
         } break;
         default: assert(0); break;
     }
+
+    return "";
 }
 
 static const char*
