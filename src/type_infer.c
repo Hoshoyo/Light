@@ -386,9 +386,6 @@ type_infer_propagate(Light_Type* type, Light_Ast* expr, u32* error) {
 static Light_Type*
 type_infer_expr_variable(Light_Ast* expr, u32* error) {
     assert(expr->kind == AST_EXPRESSION_VARIABLE);
-    if(expr->id == 552) {
-        int x = 0;
-    }
     Light_Ast* decl = type_infer_decl_from_name(expr->scope_at, expr->expr_variable.name);
     if(!decl) {
         type_error_undeclared_identifier(error, expr->expr_variable.name);
@@ -932,8 +929,10 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
                 Light_Ast** arr_exprs = array_new(Light_Ast*);
                 array_push(arr_exprs, arg);
 
-                Light_Ast* arr = ast_new_expr_literal_array(arg->scope_at, 0, arr_exprs);
-                Light_Ast* addr = ast_new_expr_unary(arg->scope_at, arr, 0, OP_UNARY_ADDRESSOF);
+                Light_Ast* arr = ast_new_expr_literal_array(arg->scope_at, 0, arr_exprs, (Lexical_Range){0});
+                arr->flags |= AST_FLAG_COMPILER_GENERATED;
+                Light_Ast* addr = ast_new_expr_unary(arg->scope_at, arr, 0, OP_UNARY_ADDRESSOF, (Lexical_Range){0});
+                addr->flags |= AST_FLAG_COMPILER_GENERATED;
 
                 Light_Ast** struct_exprs = array_new(Light_Ast*);
                 array_push(struct_exprs, addr);
@@ -941,8 +940,9 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
                 ptr_user_info->expr_compiler_generated.type_value = arg->type;
                 array_push(struct_exprs, ptr_user_info);
 
-                Light_Ast* arg_struct_literal = ast_new_expr_literal_struct(arg->scope_at, user_type_value, user_type_value, struct_exprs, false, 0);
+                Light_Ast* arg_struct_literal = ast_new_expr_literal_struct(arg->scope_at, user_type_value, user_type_value, struct_exprs, false, 0, (Lexical_Range){0});
                 array_push(trailing_exprs, arg_struct_literal);
+                arg_struct_literal->flags |= AST_FLAG_COMPILER_GENERATED;
 
                 arg_struct_literal->type = type_infer_expression(arg_struct_literal, error);
                 if(!arg_struct_literal->type || !(arg_struct_literal->type->flags & TYPE_FLAG_INTERNALIZED)) {
@@ -960,12 +960,17 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
             
             Light_Ast** struct_exprs = array_new(Light_Ast*);
 
-            Light_Ast* capacity_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs);
-            Light_Ast* length_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs);
+            Light_Ast* capacity_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs, (Lexical_Range){0});
+            Light_Ast* length_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs, (Lexical_Range){0});
             Light_Ast* type_info_expr = ast_new_expr_compiler_generated(expr->scope_at, COMPILER_GENERATED_USER_TYPE_INFO_POINTER);
-            Light_Ast* trailing_array_literal = ast_new_expr_literal_array(expr->scope_at, 0, trailing_exprs);
-            Light_Ast* array_cast = ast_new_expr_unary(expr->scope_at, trailing_array_literal, 0, OP_UNARY_CAST);
+            Light_Ast* trailing_array_literal = ast_new_expr_literal_array(expr->scope_at, 0, trailing_exprs, (Lexical_Range){0});
+            Light_Ast* array_cast = ast_new_expr_unary(expr->scope_at, trailing_array_literal, 0, OP_UNARY_CAST, (Lexical_Range){0});
             array_cast->expr_unary.type_to_cast = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
+
+            capacity_expr->flags |= AST_FLAG_COMPILER_GENERATED;
+            length_expr->flags |= AST_FLAG_COMPILER_GENERATED;
+            trailing_array_literal->flags |= AST_FLAG_COMPILER_GENERATED;
+            array_cast->flags |= AST_FLAG_COMPILER_GENERATED;
 
             array_push(struct_exprs, capacity_expr);
             array_push(struct_exprs, length_expr);
@@ -977,10 +982,12 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
                 light_special_idents_table[LIGHT_SPECIAL_IDENT_ARRAY].length);
 
             Light_Ast* struct_literal = ast_new_expr_literal_struct(expr->scope_at, 
-                arr_token, 0, struct_exprs, false, 0);
+                arr_token, 0, struct_exprs, false, 0, (Lexical_Range){0});
+            struct_literal->flags |= AST_FLAG_COMPILER_GENERATED;
 
             Light_Ast* addr_of_struct_literal = ast_new_expr_unary(expr->scope_at, struct_literal, 
-                0, OP_UNARY_ADDRESSOF);
+                0, OP_UNARY_ADDRESSOF, (Lexical_Range){0});
+            addr_of_struct_literal->flags |= AST_FLAG_COMPILER_GENERATED;
 
             expr->expr_proc_call.arg_count -= count_trailing_exprs;
             expr->expr_proc_call.arg_count++;
@@ -995,7 +1002,8 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
             // Insert a null as second argument to call
             // to avoid zero arguments passed to a variadic function
             if(all_arguments_internalized) {
-                Light_Ast* nullexpr = ast_new_expr_literal_primitive(expr->scope_at, 0);
+                Light_Ast* nullexpr = ast_new_expr_literal_primitive(expr->scope_at, 0, (Lexical_Range){0});
+                nullexpr->flags |= AST_FLAG_COMPILER_GENERATED;
                 nullexpr->expr_literal_primitive.type = LITERAL_POINTER;
                 nullexpr->type = type_infer_expression(nullexpr, error);
                 if(!expr->expr_proc_call.args) {

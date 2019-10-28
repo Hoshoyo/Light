@@ -103,10 +103,11 @@ parse_comm_block(Light_Parser* parser, Light_Scope* scope, u32* error) {
 
     *error |= parser_require_and_eat(parser, '{');
     ReturnIfError();
+    Light_Token* first = lexer_peek_n(lexer, -1);
 	
 	if (lexer_peek(lexer)->type == '}') {
-		lexer_next(lexer); // eat '{'
-		return ast_new_comm_block(scope, 0, 0, 0);
+		Light_Token* last = lexer_next(lexer); // eat '{'
+		return ast_new_comm_block(scope, 0, 0, 0, (Lexical_Range){first, last});
 	}
 
 	Light_Ast** commands = array_new(Light_Ast*);
@@ -129,9 +130,9 @@ parse_comm_block(Light_Parser* parser, Light_Scope* scope, u32* error) {
 			break;
 	}
 
-	lexer_next(lexer); // eat '}'
+	Light_Token* last = lexer_next(lexer); // eat '}'
 
-	Light_Ast* result = ast_new_comm_block(scope, commands, command_count, block_scope);
+	Light_Ast* result = ast_new_comm_block(scope, commands, command_count, block_scope, (Lexical_Range){first, last});
 	result->comm_block.block_scope->creator_node = result;
 
 	return result;
@@ -160,7 +161,8 @@ parse_comm_if(Light_Parser* parser, Light_Scope* scope, u32* error) {
         command_false = parse_command(parser, scope, error, true);
         ReturnIfError();
 	}
-	return ast_new_comm_if(scope, condition, command_true, command_false, if_token);
+    Lexical_Range lrange = {if_token, lexer_peek_n(parser->lexer, -1)};
+	return ast_new_comm_if(scope, condition, command_true, command_false, if_token, lrange);
 }
 
 static Light_Ast*
@@ -182,9 +184,10 @@ parse_comm_while(Light_Parser* parser, Light_Scope* scope, u32* error) {
         Light_Scope* while_scope = light_scope_new(0, scope, SCOPE_LOOP);
         Light_Ast** while_commands = array_new(Light_Ast*);
         array_push(while_commands, body);
-        body = ast_new_comm_block(scope, while_commands, 1, while_scope);
+
+        body = ast_new_comm_block(scope, while_commands, 1, while_scope, body->lexical_range);
     }
-	return ast_new_comm_while(scope, condition, body, while_token);
+	return ast_new_comm_while(scope, condition, body, while_token, (Lexical_Range){while_token, body->lexical_range.end});
 }
 
 static Light_Ast** 
@@ -254,7 +257,8 @@ parse_comm_for(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Ast* body = parse_command(parser, for_scope, error, true);
     ReturnIfError();
     
-    Light_Ast* result = ast_new_comm_for(scope, for_scope, condition, body, prologue, epilogue, for_token);
+    Lexical_Range lrange = {for_token, body->lexical_range.end};
+    Light_Ast* result = ast_new_comm_for(scope, for_scope, condition, body, prologue, epilogue, for_token, lrange);
     for_scope->creator_node = result;
 
     return result;
@@ -272,16 +276,20 @@ parse_comm_break(Light_Parser* parser, Light_Scope* scope, u32* error) {
         case '#': assert(0); break; // TODO(psv): directive
         case TOKEN_LITERAL_DEC_INT:
         case TOKEN_LITERAL_BIN_INT:
-        case TOKEN_LITERAL_HEX_INT:
-            lexer_next(parser->lexer); // integer
-            lit = ast_new_expr_literal_primitive(scope, next);
-            break;
+        case TOKEN_LITERAL_HEX_INT: {
+            Light_Token* toki = lexer_next(parser->lexer); // integer
+            lit = ast_new_expr_literal_primitive(scope, next, (Lexical_Range){toki, toki});
+        } break;
         case ';': break;
         default:
             *error |= parser_error_fatal(parser, next, "break expects either a positive integer literal or no argument, given '%.*s' instead\n", TOKEN_STR(next));
             return 0;
     }
-	return ast_new_comm_break(scope, break_token, lit);
+    Lexical_Range lrange = {break_token};
+    if(lit) {
+        lrange.end = lit->lexical_range.end;
+    }
+	return ast_new_comm_break(scope, break_token, lit, lrange);
 }
 
 static Light_Ast*
@@ -296,16 +304,20 @@ parse_comm_continue(Light_Parser* parser, Light_Scope* scope, u32* error) {
         case '#': assert(0); break; // TODO(psv): directive
         case TOKEN_LITERAL_DEC_INT:
         case TOKEN_LITERAL_BIN_INT:
-        case TOKEN_LITERAL_HEX_INT:
-            lexer_next(parser->lexer); // eat integer
-            lit = ast_new_expr_literal_primitive(scope, next);
-            break;
+        case TOKEN_LITERAL_HEX_INT: {
+            Light_Token* toki = lexer_next(parser->lexer); // eat integer
+            lit = ast_new_expr_literal_primitive(scope, next, (Lexical_Range){toki, toki});
+        } break;
         case ';': break;
         default:
             *error |= parser_error_fatal(parser, next, "break expects either a positive integer literal or no argument, given '%.*s' instead\n", TOKEN_STR(next));
             return 0;
     }
-	return ast_new_comm_continue(scope, continue_token, lit);
+    Lexical_Range lrange = {continue_token, continue_token};
+    if(lit) {
+        lrange.end = lit->lexical_range.end;
+    }
+	return ast_new_comm_continue(scope, continue_token, lit, lrange);
 }
 
 static Light_Ast*
@@ -314,10 +326,13 @@ parse_comm_return(Light_Parser* parser, Light_Scope* scope, u32* error) {
     ReturnIfError();
     Light_Token* return_token = lexer_peek_n(parser->lexer, -1);
 
+    Lexical_Range lrange = (Lexical_Range){return_token, return_token};
 	Light_Ast* expr = 0;
-	if (lexer_peek(parser->lexer)->type != ';')
+	if (lexer_peek(parser->lexer)->type != ';'){
 		expr = parse_expression(parser, scope, error);
-	return ast_new_comm_return(scope, expr, return_token);
+        lrange.end = expr->lexical_range.end;
+    }
+	return ast_new_comm_return(scope, expr, return_token, lrange);
 }
 
 static Light_Ast*
@@ -353,10 +368,11 @@ parse_comm_assignment(Light_Parser* parser, Light_Scope* scope, u32* error) {
 
     if(binop != OP_BINARY_UNKNOWN) {
         // Syntax sugar, transform a += b into a = a + b
-        rvalue = ast_new_expr_binary(scope, lvalue, rvalue, op, binop);
+        rvalue = ast_new_expr_binary(scope, lvalue, rvalue, op, binop, rvalue->lexical_range);
     }
 
-    return ast_new_comm_assignment(scope, lvalue, rvalue, op);
+    Lexical_Range lrange = (Lexical_Range){lvalue->lexical_range.start, rvalue->lexical_range.end};
+    return ast_new_comm_assignment(scope, lvalue, rvalue, op, lrange);
 }
 
 Light_Ast*
@@ -409,7 +425,7 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 			} else if (t->type == '(') {
 				// Syntatic sugar void proc call
 				Light_Ast* pcall = parse_expression(parser, scope, error);
-                command = ast_new_comm_assignment(scope, 0, pcall, next);
+                command = ast_new_comm_assignment(scope, 0, pcall, next, (Lexical_Range){next, pcall->lexical_range.end});
             } else if(t->type == '[') {
                 command = parse_comm_assignment(parser, scope, error);
             } else {
@@ -477,7 +493,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
         ReturnIfError();
 
         // This is in fact a variable declaration of procedure type.
-        Light_Ast* decl_var = ast_new_decl_variable(scope, name, function_type, 0, STORAGE_CLASS_DATA_SEGMENT, 0);
+        Light_Ast* decl_var = ast_new_decl_variable(scope, name, function_type, 0, STORAGE_CLASS_DATA_SEGMENT, 0, (Lexical_Range){name, name});
 
         if(scope->level == 0) {
             // global scope
@@ -605,7 +621,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 
     if(lexer_peek(lexer)->type == ';') {
         // Variable with procedure type
-        Light_Ast* decl_var = ast_new_decl_variable(scope, name, proc_type, 0, STORAGE_CLASS_DATA_SEGMENT, 0);
+        Light_Ast* decl_var = ast_new_decl_variable(scope, name, proc_type, 0, STORAGE_CLASS_DATA_SEGMENT, 0, (Lexical_Range){name, name});
         return decl_var;
     }
 
@@ -618,7 +634,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
         flags |= DECL_PROC_FLAG_VARIADIC;
     }
 
-    Light_Ast* result = ast_new_decl_procedure(scope, name, body, return_type, args_scope, arguments, args_count, flags);
+    Light_Ast* result = ast_new_decl_procedure(scope, name, body, return_type, args_scope, arguments, args_count, flags, (Lexical_Range){0});
     result->decl_proc.proc_type = proc_type;
     result->decl_proc.extern_library_name = external_library_name;
     args_scope->creator_node = result;
@@ -627,6 +643,9 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
         body->comm_block.block_scope->creator_node = result;
         body->comm_block.block_scope->flags |= SCOPE_PROCEDURE_BODY;
     }
+
+    result->lexical_range.start = name;
+    result->lexical_range.end = lexer_peek_n(parser->lexer, -1);
 
     return result;
 }
@@ -660,7 +679,8 @@ parse_decl_variable(Light_Parser* parser, Light_Token* name, Light_Type* type, L
         ReturnIfError();
     }
 
-    return ast_new_decl_variable(scope, name, type, expr, STORAGE_CLASS_STACK, 0);
+    Lexical_Range lrange = {name, lexer_peek_n(lexer, -1)};
+    return ast_new_decl_variable(scope, name, type, expr, STORAGE_CLASS_STACK, 0, lrange);
 }
 
 static void
@@ -767,7 +787,7 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, bool require_semicol
             case ';': {
                 if(require_semicolon) lexer_next(lexer); // eat ';'
                 // variable declaration without expression assignment
-                result = ast_new_decl_variable(scope, name, decl_type, 0, STORAGE_CLASS_STACK, 0);
+                result = ast_new_decl_variable(scope, name, decl_type, 0, STORAGE_CLASS_STACK, 0, (Lexical_Range){0});
             } break;
             case ':':
                 lexer_next(lexer); // eat ':'
@@ -779,7 +799,7 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, bool require_semicol
                     *error |= parser_require_and_eat(parser, ';');
                     ReturnIfError();
                 }
-                result = ast_new_decl_constant(scope, name, decl_type, expr, 0);
+                result = ast_new_decl_constant(scope, name, decl_type, expr, 0, (Lexical_Range){0});
             }break;
             case '=': {
                 lexer_next(lexer); // eat '='
@@ -790,7 +810,7 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, bool require_semicol
                     *error |= parser_require_and_eat(parser, ';');
                     ReturnIfError();
                 }
-                result = ast_new_decl_variable(scope, name, decl_type, expr, STORAGE_CLASS_STACK, 0);
+                result = ast_new_decl_variable(scope, name, decl_type, expr, STORAGE_CLASS_STACK, 0, (Lexical_Range){0});
             }break;
         }
     } else {
@@ -803,8 +823,11 @@ parse_declaration(Light_Parser* parser, Light_Scope* scope, bool require_semicol
             *error |= parser_require_and_eat(parser, ';');
         }
         type = type_new_alias(scope, name, type);
-        result = ast_new_decl_typedef(scope, type, name);
+        result = ast_new_decl_typedef(scope, type, name, (Lexical_Range){0});
     }
+
+    result->lexical_range.start = name;
+    result->lexical_range.end = lexer_peek_n(lexer, -1);
 
     return result;
 }
@@ -865,7 +888,7 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
         case TOKEN_LITERAL_FLOAT:
         case TOKEN_LITERAL_CHAR:
         case TOKEN_KEYWORD_NULL:
-            result = ast_new_expr_literal_primitive(scope, first);
+            result = ast_new_expr_literal_primitive(scope, first, (Lexical_Range){first, first});
             break;
         case TOKEN_LITERAL_STRING: {
             // Convert string literal to struct string
@@ -880,23 +903,30 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
             string_token->data = (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_STRING].data;
             string_token->length = light_special_idents_table[LIGHT_SPECIAL_IDENT_STRING].length;
 
-            Light_Ast* arr = ast_new_expr_literal_array(scope, first, 0);
+            Light_Ast* arr = ast_new_expr_literal_array(scope, first, 0, (Lexical_Range){0});
+            arr->flags |= AST_FLAG_COMPILER_GENERATED;
             arr->expr_literal_array.raw_data = true;
             arr->expr_literal_array.array_strong_type = 0;
             arr->expr_literal_array.data = first->data;
             arr->expr_literal_array.data_length_bytes = (u64)first->length;
 
-            Light_Ast* cast = ast_new_expr_unary(scope, arr, string_token, OP_UNARY_CAST);
+            Light_Ast* cast = ast_new_expr_unary(scope, arr, string_token, OP_UNARY_CAST, (Lexical_Range){0});
+            cast->flags |= AST_FLAG_COMPILER_GENERATED;
             cast->expr_unary.type_to_cast = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_U8));
 
-            result = ast_new_expr_literal_struct(scope, string_token, first, 0, false, 0);
+            result = ast_new_expr_literal_struct(scope, string_token, first, 0, false, 0, (Lexical_Range){0});
             result->expr_literal_struct.struct_exprs = array_new(Light_Ast*);
+            result->flags |= AST_FLAG_COMPILER_GENERATED;
 
             // length
             u64 len = first->length - 2;
-            array_push(result->expr_literal_struct.struct_exprs, ast_new_expr_literal_primitive_u64(scope, 0));
+            Light_Ast* ll0 = ast_new_expr_literal_primitive_u64(scope, 0, (Lexical_Range){0});
+            ll0->flags |= AST_FLAG_COMPILER_GENERATED;
+            array_push(result->expr_literal_struct.struct_exprs, ll0);
             // capacity
-            array_push(result->expr_literal_struct.struct_exprs, ast_new_expr_literal_primitive_u64(scope, len));
+            Light_Ast* ll1 = ast_new_expr_literal_primitive_u64(scope, len, (Lexical_Range){0});
+            ll1->flags |= AST_FLAG_COMPILER_GENERATED;
+            array_push(result->expr_literal_struct.struct_exprs, ll1);
             // data
             array_push(result->expr_literal_struct.struct_exprs, cast);
 
@@ -913,16 +943,22 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
 
 Light_Ast* 
 parse_expr_literal_struct(Light_Parser* parser, Light_Scope* scope, u32* error) {
+    Lexical_Range lrange = {0};
+
     Light_Token* name = 0;
     if(lexer_peek(parser->lexer)->type == TOKEN_IDENTIFIER) {
         name = lexer_next(parser->lexer);
         *error |= parser_require_and_eat(parser, ':');
         ReturnIfError();
+        lrange.start = name;
     }
 
 	*error |= parser_require_and_eat(parser, '{');
     ReturnIfError();
     Light_Token* struct_token = lexer_peek_n(parser->lexer, -1);
+    if (!lrange.start) {
+        lrange.start = struct_token;
+    }
 
     Light_Ast* result = 0;
     bool named = false;
@@ -976,22 +1012,30 @@ parse_expr_literal_struct(Light_Parser* parser, Light_Scope* scope, u32* error) 
         *error |= named_error;
         ReturnIfError();
         
-        result = ast_new_expr_literal_struct(scope, name, struct_token, exprs_or_decls, named, struct_scope);
+        result = ast_new_expr_literal_struct(scope, name, struct_token, exprs_or_decls, named, struct_scope, (Lexical_Range){0});
 	}
 
 	*error |= parser_require_and_eat(parser, '}');
     ReturnIfError();
+    lrange.end = lexer_peek_n(parser->lexer, -1);
 
-    if(!result) result = ast_new_expr_literal_struct(scope, name, struct_token, 0, false, 0);
+    if(!result) {
+        result = ast_new_expr_literal_struct(scope, name, struct_token, 0, false, 0, lrange);
+    } else {
+        result->lexical_range = lrange;
+    }
 
 	return result;
 }
 
 Light_Ast* 
 parse_expr_literal_array(Light_Parser* parser, Light_Scope* scope, u32* error) {
+    Lexical_Range lrange = {0};
+
     *error |= parser_require_and_eat(parser, '[');
     ReturnIfError();
     Light_Token* array_token = lexer_peek_n(parser->lexer, -1);
+    lrange.start = array_token;
 
     Light_Ast* result = 0;
     Light_Ast** exprs = array_new(Light_Ast*);
@@ -1010,8 +1054,9 @@ parse_expr_literal_array(Light_Parser* parser, Light_Scope* scope, u32* error) {
 
 	*error |= parser_require_and_eat(parser, ']');
     ReturnIfError();
+    lrange.end = lexer_peek_n(parser->lexer, -1);
 
-    result = ast_new_expr_literal_array(scope, array_token, exprs);
+    result = ast_new_expr_literal_array(scope, array_token, exprs, lrange);
 
 	return result;
 }
@@ -1019,7 +1064,7 @@ parse_expr_literal_array(Light_Parser* parser, Light_Scope* scope, u32* error) {
 Light_Ast*
 parse_expr_directive(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Lexer* lexer = parser->lexer;
-    lexer_next(lexer); // eat #
+    Light_Token* pound = lexer_next(lexer); // eat #
 
     Light_Token* directive = lexer_next(lexer);
 
@@ -1029,20 +1074,24 @@ parse_expr_directive(Light_Parser* parser, Light_Scope* scope, u32* error) {
         return 0;
     }
 
+    Lexical_Range lrange = {0};
+    lrange.start = pound;
     if(directive->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF].data) {
         Light_Ast* expression = parse_expression(parser, scope, error);
         ReturnIfError();
-        return ast_new_expr_directive(scope, EXPR_DIRECTIVE_TYPEOF, directive, expression, 0);
+        lrange.end = expression->lexical_range.end;
+        return ast_new_expr_directive(scope, EXPR_DIRECTIVE_TYPEOF, directive, expression, 0, lrange);
     } else if(directive->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEVALUE].data) {
         Light_Type* type = parse_type(parser, scope, error);
         ReturnIfError();
-        return ast_new_expr_directive(scope, EXPR_DIRECTIVE_TYPEVALUE, directive, 0, type);
+        lrange.end = directive;
+        return ast_new_expr_directive(scope, EXPR_DIRECTIVE_TYPEVALUE, directive, 0, type, lrange);
     } else if(directive->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_SIZEOF].data) {
         // can't have optional parantheses because of functional types
         Light_Type* type = parse_type(parser, scope, error);
         ReturnIfError();
-
-        return ast_new_expr_directive(scope, EXPR_DIRECTIVE_SIZEOF, directive, 0, type);
+        lrange.end = directive;
+        return ast_new_expr_directive(scope, EXPR_DIRECTIVE_SIZEOF, directive, 0, type, lrange);
     } else {
         *error |= parser_error_fatal(parser, directive, "invalid directive expression '%.*s'\n", TOKEN_STR(directive));
         ReturnIfError();
@@ -1071,7 +1120,8 @@ parse_expression_precedence10(Light_Parser* parser, Light_Scope* scope, u32* err
             return parse_expr_literal_struct(parser, scope, error);
         } else {
             lexer_next(parser->lexer); // eat identifier
-            return ast_new_expr_variable(scope, t);
+            Lexical_Range lrange = {t, t};
+            return ast_new_expr_variable(scope, t, lrange);
         }
 	} else if(t->type == '#') {
 		return parse_expr_directive(parser, scope, error);
@@ -1098,10 +1148,16 @@ Light_Ast* parse_expression_precedence9(Light_Parser* parser, Light_Scope* scope
 		if(op->type == '['){
 			lexer_next(parser->lexer);
 			Light_Ast* r = parse_expression(parser, scope, error);
-			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
             ReturnIfError();
+
 			*error |= parser_require_and_eat(parser, ']');
             ReturnIfError();
+            
+            Lexical_Range lrange = {0};
+            lrange.start = expr->lexical_range.start;
+            lrange.end = lexer_peek_n(parser->lexer, -1);
+			
+            expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op), lrange);
 		} else if(op->type == '(') {
 			// procedure call
 			Light_Ast**  arguments = 0;
@@ -1126,7 +1182,11 @@ Light_Ast* parse_expression_precedence9(Light_Parser* parser, Light_Scope* scope
 			*error |= parser_require_and_eat(parser, ')');
             ReturnIfError();
 
-			return ast_new_expr_proc_call(scope, expr, arguments, args_count, op);
+            Lexical_Range lrange = {0};
+            lrange.start = expr->lexical_range.start;
+            lrange.end = lexer_peek_n(parser->lexer, -1);
+
+			return ast_new_expr_proc_call(scope, expr, arguments, args_count, op, lrange);
 		} else {
 			break;
 		}
@@ -1147,15 +1207,24 @@ Light_Ast* parse_expression_precedence8(Light_Parser* parser, Light_Scope* scope
                 *error |= parser_error_fatal(parser, ident, "expected identifier after '.' operator, but got '%.*s'\n", TOKEN_STR(ident));
                 return 0;
             }
-            expr = ast_new_expr_dot(scope, expr, ident);
+            Lexical_Range dot_range = {0};
+            dot_range.start = expr->lexical_range.start;
+            dot_range.end = ident;
+            expr = ast_new_expr_dot(scope, expr, ident, dot_range);
 
             while(true) {
 				op = lexer_peek(parser->lexer);
 				if(op->type == '['){
 					lexer_next(parser->lexer);
 					Light_Ast* r = parse_expression(parser, scope, error);
-					expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
 					*error |= parser_require_and_eat(parser, ']');
+                    ReturnIfError();
+                    
+                    Lexical_Range lrange = {0};
+                    lrange.start = expr->lexical_range.start;
+                    lrange.end = lexer_peek_n(parser->lexer, -1);
+
+					expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op), lrange);
                     ReturnIfError();
 				} else {
 					break;
@@ -1174,7 +1243,10 @@ Light_Ast* parse_expression_precedence7(Light_Parser* parser, Light_Scope* scope
 		Light_Token* op = lexer_next(parser->lexer);
 		Light_Ast* operand = parse_expression_precedence7(parser, scope, error);
         ReturnIfError();
-		return ast_new_expr_unary(scope, operand, op, token_to_unary_op(op));
+        Lexical_Range lrange = {0};
+        lrange.start = op;
+        lrange.end = operand->lexical_range.end;
+		return ast_new_expr_unary(scope, operand, op, token_to_unary_op(op), lrange);
 	}
     return parse_expression_precedence8(parser, scope, error);
 }
@@ -1186,7 +1258,7 @@ Light_Ast* parse_expression_precedence6(Light_Parser* parser, Light_Scope* scope
         Light_Token* op_token = lexer_next(parser->lexer);
         Light_Type* type = parse_type(parser, scope, error);
         ReturnIfError();
-        expr = ast_new_expr_unary(scope, expr, op_token, OP_UNARY_CAST);
+        expr = ast_new_expr_unary(scope, expr, op_token, OP_UNARY_CAST, expr->lexical_range);
         expr->expr_unary.type_to_cast = type;
     }
     return expr;
@@ -1202,7 +1274,10 @@ Light_Ast* parse_expression_precedence5(Light_Parser* parser, Light_Scope* scope
 			lexer_next(parser->lexer);
 			Light_Ast* r = parse_expression_precedence6(parser, scope, error);
             ReturnIfError();
-			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
+            Lexical_Range lrange = {0};
+            lrange.start = expr->lexical_range.start;
+            lrange.end = r->lexical_range.end;
+			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op), lrange);
 		} else {
 			break;
 		}
@@ -1220,7 +1295,10 @@ Light_Ast* parse_expression_precedence4(Light_Parser* parser, Light_Scope* scope
 			lexer_next(parser->lexer);
 			Light_Ast* r = parse_expression_precedence5(parser, scope, error);
             ReturnIfError();
-			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
+            Lexical_Range lrange = {0};
+            lrange.start = expr->lexical_range.start;
+            lrange.end = r->lexical_range.end;
+			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op), lrange);
 		} else {
 			break;
 		}
@@ -1238,7 +1316,10 @@ Light_Ast* parse_expression_precedence3(Light_Parser* parser, Light_Scope* scope
 			lexer_next(parser->lexer);
 			Light_Ast* r = parse_expression_precedence4(parser, scope, error);
             ReturnIfError();
-			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op));
+            Lexical_Range lrange = {0};
+            lrange.start = expr->lexical_range.start;
+            lrange.end = r->lexical_range.end;
+			expr = ast_new_expr_binary(scope, expr, r, op, token_to_binary_op(op), lrange);
 		} else {
 			break;
 		}
@@ -1256,7 +1337,10 @@ Light_Ast* parse_expression_precedence2(Light_Parser* parser, Light_Scope* scope
 		Light_Token* op = lexer_next(parser->lexer);
 		Light_Ast* right = parse_expression_precedence2(parser, scope, error);
         ReturnIfError();
-		return ast_new_expr_binary(scope, expr, right, op, token_to_binary_op(op));
+        Lexical_Range lrange = {0};
+        lrange.start = expr->lexical_range.start;
+        lrange.end = right->lexical_range.end;
+		return ast_new_expr_binary(scope, expr, right, op, token_to_binary_op(op), lrange);
 	}
 	return expr;
 }
@@ -1269,7 +1353,10 @@ Light_Ast* parse_expression_precedence1(Light_Parser* parser, Light_Scope* scope
 		Light_Token* op = lexer_next(parser->lexer);
 		Light_Ast* right = parse_expression_precedence1(parser, scope, error);
         ReturnIfError();
-		return ast_new_expr_binary(scope, expr, right, op, token_to_binary_op(op));
+        Lexical_Range lrange = {0};
+        lrange.start = expr->lexical_range.start;
+        lrange.end = right->lexical_range.end;
+		return ast_new_expr_binary(scope, expr, right, op, token_to_binary_op(op), lrange);
 	}
 	return expr;
 }
@@ -1414,7 +1501,11 @@ parse_type_enum(Light_Parser* parser, Light_Scope* scope, u32* error) {
 
             enum_scope->decl_count++;
 
-            Light_Ast* field = ast_new_decl_constant(enum_scope, name, 0, field_value, 0);
+            Lexical_Range lrange = {0};
+            lrange.start = name;
+            lrange.end = (field_value) ? field_value->lexical_range.end : name;
+
+            Light_Ast* field = ast_new_decl_constant(enum_scope, name, 0, field_value, 0, lrange);
             array_push(fields, field);
 
             if(lexer_peek(parser->lexer)->type != ',') break;
@@ -1513,6 +1604,8 @@ Light_Type*
 parse_directive_typeof(Light_Parser* parser, Light_Scope* scope, u32* error) {
     *error |= parser_require_and_eat(parser, '#');
     ReturnIfError();
+    
+    Light_Token* first = lexer_peek_n(parser->lexer, -1);
 
     Light_Token* directive = lexer_next(parser->lexer);
     if(directive->type != TOKEN_IDENTIFIER || directive->data != (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_TYPEOF].data) {
@@ -1523,7 +1616,11 @@ parse_directive_typeof(Light_Parser* parser, Light_Scope* scope, u32* error) {
     Light_Ast* expr = parse_expression(parser, scope, error);
     ReturnIfError();
 
-    Light_Ast* expr_directive = ast_new_expr_directive(scope, EXPR_DIRECTIVE_TYPEOF, directive, expr, 0);
+    Lexical_Range lrange = {0};
+    lrange.start = first;
+    lrange.end = expr->lexical_range.end;
+
+    Light_Ast* expr_directive = ast_new_expr_directive(scope, EXPR_DIRECTIVE_TYPEOF, directive, expr, 0, lrange);
     ReturnIfError();
 
     return type_new_directive(expr_directive);

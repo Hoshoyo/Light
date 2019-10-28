@@ -535,9 +535,12 @@ type_value_expression(Light_Scope* scope, Light_Type* type) {
     // User_Type_Info:{kind, flags, type_size_bytes, description}
 
     Light_Ast** user_type_info_struct_exprs = array_new(Light_Ast*);
-    Light_Ast* user_type_info_kind = ast_new_expr_literal_primitive_u32(scope, TYPE_KIND_PRIMITIVE);
-    Light_Ast* user_type_info_flags = ast_new_expr_literal_primitive_u32(scope, 0);
-    Light_Ast* user_type_info_size_bytes = ast_new_expr_literal_primitive_u64(scope, type->size_bits / 8);
+    Light_Ast* user_type_info_kind = ast_new_expr_literal_primitive_u32(scope, TYPE_KIND_PRIMITIVE, (Lexical_Range){0});
+    Light_Ast* user_type_info_flags = ast_new_expr_literal_primitive_u32(scope, 0, (Lexical_Range){0});
+    Light_Ast* user_type_info_size_bytes = ast_new_expr_literal_primitive_u64(scope, type->size_bits / 8, (Lexical_Range){0});
+    user_type_info_kind->flags |= AST_FLAG_COMPILER_GENERATED;
+    user_type_info_flags->flags |= AST_FLAG_COMPILER_GENERATED;
+    user_type_info_size_bytes->flags |= AST_FLAG_COMPILER_GENERATED;
     array_push(user_type_info_struct_exprs, user_type_info_kind);
     array_push(user_type_info_struct_exprs, user_type_info_flags);
     array_push(user_type_info_struct_exprs, user_type_info_size_bytes);
@@ -551,7 +554,8 @@ type_value_expression(Light_Scope* scope, Light_Type* type) {
         scope, 
         user_type_info_token,
         user_type_info_token,
-        0, false, 0);
+        0, false, 0, (Lexical_Range){0});
+    type_info_struct_literal->flags |= AST_FLAG_COMPILER_GENERATED;
 
     switch(type->kind) {
         case TYPE_KIND_PRIMITIVE:{

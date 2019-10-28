@@ -377,7 +377,13 @@ typedef enum {
 	AST_FLAG_INFER_QUEUED = (1 << 4),
 	AST_FLAG_ALLOW_BASE_ENUM = (1 << 5), // This flags allows type inference to not error out if a variable with enum type is seen
 	AST_FLAG_EXPRESSION_LVALUE = (1 << 6),
+	AST_FLAG_COMPILER_GENERATED = (1 << 7),
 } Light_Ast_Flags;
+
+typedef struct Lexical_Range {
+	Light_Token* start;
+	Light_Token* end;
+} Lexical_Range;
 
 typedef struct Light_Ast_t {
     Light_Ast_Type kind;
@@ -388,6 +394,7 @@ typedef struct Light_Ast_t {
 
     struct Light_Type_t* type;
     Light_Scope*         scope_at;
+	Lexical_Range        lexical_range;
 
     union {
 		// Declarations
@@ -558,33 +565,33 @@ Light_Scope* light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint3
 
 // Ast
 // Declarations
-Light_Ast* ast_new_decl_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name);
-Light_Ast* ast_new_decl_variable(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, Light_Storage_Class storage, u32 flags);
-Light_Ast* ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, u32 flags);
-Light_Ast* ast_new_decl_procedure(Light_Scope* scope, Light_Token* name, Light_Ast* body, Light_Type* return_type, Light_Scope* args_scope, Light_Ast** args, s32 args_count, u32 flags);
+Light_Ast* ast_new_decl_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name, Lexical_Range lrange);
+Light_Ast* ast_new_decl_variable(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, Light_Storage_Class storage, u32 flags, Lexical_Range lrange);
+Light_Ast* ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, u32 flags, Lexical_Range lrange);
+Light_Ast* ast_new_decl_procedure(Light_Scope* scope, Light_Token* name, Light_Ast* body, Light_Type* return_type, Light_Scope* args_scope, Light_Ast** args, s32 args_count, u32 flags, Lexical_Range lrange);
 
 // Commands
-Light_Ast* ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, Light_Scope* block_scope);
-Light_Ast* ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false, Light_Token* if_token);
-Light_Ast* ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Light_Token* while_token);
-Light_Ast* ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* condition, Light_Ast* body, Light_Ast** prologue, Light_Ast** epilogue, Light_Token* for_token);
-Light_Ast* ast_new_comm_break(Light_Scope* scope, Light_Token* break_keyword, Light_Ast* level);
-Light_Ast* ast_new_comm_continue(Light_Scope* scope, Light_Token* continue_keyword, Light_Ast* level);
-Light_Ast* ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_token);
-Light_Ast* ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue, Light_Token* op_token);
+Light_Ast* ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, Light_Scope* block_scope, Lexical_Range lrange);
+Light_Ast* ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false, Light_Token* if_token, Lexical_Range lrange);
+Light_Ast* ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Light_Token* while_token, Lexical_Range lrange);
+Light_Ast* ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* condition, Light_Ast* body, Light_Ast** prologue, Light_Ast** epilogue, Light_Token* for_token, Lexical_Range lrange);
+Light_Ast* ast_new_comm_break(Light_Scope* scope, Light_Token* break_keyword, Light_Ast* level, Lexical_Range lrange);
+Light_Ast* ast_new_comm_continue(Light_Scope* scope, Light_Token* continue_keyword, Light_Ast* level, Lexical_Range lrange);
+Light_Ast* ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_token, Lexical_Range lrange);
+Light_Ast* ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue, Light_Token* op_token, Lexical_Range lrange);
 
 // Expressions
-Light_Ast* ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token);
-Light_Ast* ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val);
-Light_Ast* ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val);
-Light_Ast* ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs);
-Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named, Light_Scope* struct_scope);
-Light_Ast* ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op);
-Light_Ast* ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op);
-Light_Ast* ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier);
-Light_Ast* ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count, Light_Token* op);
-Light_Ast* ast_new_expr_variable(Light_Scope* scope, Light_Token* name);
-Light_Ast* ast_new_expr_directive(Light_Scope* scope, Light_Expr_Directive_Type directive_type, Light_Token* token, Light_Ast* expr, Light_Type* type);
+Light_Ast* ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named, Light_Scope* struct_scope, Lexical_Range lrange);
+Light_Ast* ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op, Lexical_Range lrange);
+Light_Ast* ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op, Lexical_Range lrange);
+Light_Ast* ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier, Lexical_Range lrange);
+Light_Ast* ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count, Light_Token* op, Lexical_Range lrange);
+Light_Ast* ast_new_expr_variable(Light_Scope* scope, Light_Token* name, Lexical_Range lrange);
+Light_Ast* ast_new_expr_directive(Light_Scope* scope, Light_Expr_Directive_Type directive_type, Light_Token* token, Light_Ast* expr, Light_Type* type, Lexical_Range lrange);
 Light_Ast* ast_new_expr_compiler_generated(Light_Scope* scope, Light_Compiler_Generated_Kind kind);
 
 // Special expressions

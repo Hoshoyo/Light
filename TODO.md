@@ -5,14 +5,16 @@
 - strings escape sequences in C backend are wrong
 - numeric literals better type inference
 - type max size now is 32bit
-- size_of struct with only a character is 4
 - enum reflecting
 - function returning wrong type causes circular dependencies
 - incomplete struct literals
 - implement #type_value and #type
+- implement all language in bytecode
 
 ## Done
 
+- lexical range
+- size_of struct with only a character is 4
 - internalization of pointers to aliases that are not declared do not cause an error
 - referencing a declared variable inside a for loop does not work
 - referencing main in a variable causes error since we renamed it to __light_main

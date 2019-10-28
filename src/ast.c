@@ -36,7 +36,7 @@ light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags) {
     return scope;
 }
 
-Light_Ast* ast_new_expr_directive(Light_Scope* scope, Light_Expr_Directive_Type directive_type, Light_Token* token, Light_Ast* expr, Light_Type* type) {
+Light_Ast* ast_new_expr_directive(Light_Scope* scope, Light_Expr_Directive_Type directive_type, Light_Token* token, Light_Ast* expr, Light_Type* type, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_DIRECTIVE;
@@ -44,6 +44,7 @@ Light_Ast* ast_new_expr_directive(Light_Scope* scope, Light_Expr_Directive_Type 
     result->type = 0;
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->expr_directive.directive_token = token;
     result->expr_directive.type = directive_type;
@@ -57,7 +58,7 @@ Light_Ast* ast_new_expr_directive(Light_Scope* scope, Light_Expr_Directive_Type 
 }
 
 Light_Ast* 
-ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier) {
+ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_DOT;
@@ -65,6 +66,7 @@ ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier) {
     result->type = 0;
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->expr_dot.left = left;
     result->expr_dot.identifier = identifier;
@@ -73,7 +75,7 @@ ast_new_expr_dot(Light_Scope* scope, Light_Ast* left, Light_Token* identifier) {
 }
 
 Light_Ast* 
-ast_new_expr_variable(Light_Scope* scope, Light_Token* name) {
+ast_new_expr_variable(Light_Scope* scope, Light_Token* name, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_VARIABLE;
@@ -81,6 +83,7 @@ ast_new_expr_variable(Light_Scope* scope, Light_Token* name) {
     result->type = 0;
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->expr_variable.name = name;
     result->expr_variable.decl = 0;
@@ -89,7 +92,7 @@ ast_new_expr_variable(Light_Scope* scope, Light_Token* name) {
 }
 
 Light_Ast* 
-ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count, Light_Token* op) {
+ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** arguments, s32 args_count, Light_Token* op, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_PROCEDURE_CALL;
@@ -97,6 +100,7 @@ ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** argume
     result->type = 0;
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->expr_proc_call.arg_count = args_count;
     result->expr_proc_call.args = arguments;
@@ -107,7 +111,7 @@ ast_new_expr_proc_call(Light_Scope* scope, Light_Ast* caller, Light_Ast** argume
 }
 
 Light_Ast* 
-ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op) {
+ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_UNARY;
@@ -115,6 +119,7 @@ ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token
     result->type = 0;
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     if(operand->type && operand->type->flags & TYPE_FLAG_INTERNALIZED) {
         switch(op){
@@ -150,7 +155,7 @@ ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token
 }
 
 Light_Ast* 
-ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op) {
+ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light_Token* op_token, Light_Operator_Binary op, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_BINARY;
@@ -158,6 +163,7 @@ ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light
     result->type = 0;
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->expr_binary.left = left;
     result->expr_binary.right = right;
@@ -168,7 +174,7 @@ ast_new_expr_binary(Light_Scope* scope, Light_Ast* left, Light_Ast* right, Light
 }
 
 Light_Ast* 
-ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named, Light_Scope* struct_scope) {
+ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named, Light_Scope* struct_scope, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_LITERAL_STRUCT;
@@ -176,6 +182,7 @@ ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* 
     result->type = 0;
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->expr_literal_struct.named = named;
     result->expr_literal_struct.struct_exprs = struct_exprs;
@@ -188,7 +195,7 @@ ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* 
 }
 
 Light_Ast*
-ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs) {
+ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_LITERAL_ARRAY;
@@ -196,6 +203,7 @@ ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** a
     result->type = 0;
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->expr_literal_array.token_array = token;
     result->expr_literal_array.array_exprs = array_exprs;
@@ -208,7 +216,7 @@ ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** a
 
 // TODO(psv): refactor to be more generic
 Light_Ast*
-ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val) {
+ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
@@ -216,6 +224,7 @@ ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val) {
     result->type = type_primitive_get(TYPE_PRIMITIVE_U32);
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->expr_literal_primitive.type = LITERAL_DEC_UINT;
     result->expr_literal_primitive.flags = 0;
@@ -227,7 +236,7 @@ ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val) {
 }
 
 Light_Ast*
-ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val) {
+ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
@@ -235,6 +244,7 @@ ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val) {
     result->type = type_primitive_get(TYPE_PRIMITIVE_U64);
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->expr_literal_primitive.type = LITERAL_DEC_UINT;
     result->expr_literal_primitive.flags = 0;
@@ -246,7 +256,7 @@ ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val) {
 }
 
 Light_Ast*
-ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token) {
+ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
@@ -254,6 +264,7 @@ ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token) {
     result->type = type_from_token(token);
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->expr_literal_primitive.flags = 0;
     result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
@@ -296,8 +307,9 @@ ast_new_expr_compiler_generated(Light_Scope* scope, Light_Compiler_Generated_Kin
     result->kind = AST_EXPRESSION_COMPILER_GENERATED;
     result->scope_at = scope;
     result->type = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
-    result->flags = AST_FLAG_EXPRESSION;
+    result->flags = AST_FLAG_EXPRESSION|AST_FLAG_COMPILER_GENERATED;
     result->id = ast_new_id();
+    result->lexical_range = (Lexical_Range){0};
 
     result->expr_compiler_generated.kind = kind;
 
@@ -305,7 +317,7 @@ ast_new_expr_compiler_generated(Light_Scope* scope, Light_Compiler_Generated_Kin
 }
 
 Light_Ast* 
-ast_new_decl_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name) {
+ast_new_decl_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_DECL_TYPEDEF;
@@ -313,6 +325,7 @@ ast_new_decl_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name) {
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_DECLARATION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->decl_typedef.name = name;
     result->decl_typedef.type_referenced = type;
@@ -321,7 +334,7 @@ ast_new_decl_typedef(Light_Scope* scope, Light_Type* type, Light_Token* name) {
 }
 
 Light_Ast* 
-ast_new_decl_variable(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, Light_Storage_Class storage, u32 flags) {
+ast_new_decl_variable(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, Light_Storage_Class storage, u32 flags, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_DECL_VARIABLE;
@@ -329,6 +342,7 @@ ast_new_decl_variable(Light_Scope* scope, Light_Token* name, Light_Type* type, L
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_DECLARATION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->decl_variable.name = name;
     result->decl_variable.flags = flags;
@@ -340,7 +354,7 @@ ast_new_decl_variable(Light_Scope* scope, Light_Token* name, Light_Type* type, L
 }
 
 Light_Ast* 
-ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, u32 flags) {
+ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, Light_Ast* expr, u32 flags, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_DECL_CONSTANT;
@@ -348,6 +362,7 @@ ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, L
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_DECLARATION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->decl_constant.name = name;
     result->decl_constant.flags = flags;
@@ -360,7 +375,7 @@ ast_new_decl_constant(Light_Scope* scope, Light_Token* name, Light_Type* type, L
 Light_Ast* 
 ast_new_decl_procedure(
     Light_Scope* scope, Light_Token* name, Light_Ast* body, Light_Type* return_type, 
-    Light_Scope* args_scope, Light_Ast** args, s32 args_count, u32 flags) 
+    Light_Scope* args_scope, Light_Ast** args, s32 args_count, u32 flags, Lexical_Range lrange) 
 {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
@@ -369,6 +384,7 @@ ast_new_decl_procedure(
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_DECLARATION;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->decl_proc.name = name;
     result->decl_proc.argument_count = args_count;
@@ -383,7 +399,7 @@ ast_new_decl_procedure(
 }
 
 Light_Ast* 
-ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue, Light_Token* op_token) {
+ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue, Light_Token* op_token, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_ASSIGNMENT;
@@ -391,6 +407,7 @@ ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue
     result->type = 0;
     result->flags = AST_FLAG_COMMAND;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->comm_assignment.lvalue = lvalue;
     result->comm_assignment.rvalue = rvalue;
@@ -400,7 +417,7 @@ ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_Ast* rvalue
 }
 
 Light_Ast* 
-ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, Light_Scope* block_scope) {
+ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, Light_Scope* block_scope, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_BLOCK;
@@ -408,6 +425,7 @@ ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, 
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_COMMAND;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->comm_block.block_scope = block_scope;
     result->comm_block.command_count = command_count;
@@ -418,7 +436,7 @@ ast_new_comm_block(Light_Scope* scope, Light_Ast** commands, s32 command_count, 
 }
 
 Light_Ast* 
-ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false, Light_Token* if_token) {
+ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Light_Ast* if_false, Light_Token* if_token, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_IF;
@@ -426,6 +444,7 @@ ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Li
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_COMMAND;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->comm_if.condition = condition;
     result->comm_if.body_true = if_true;
@@ -436,7 +455,7 @@ ast_new_comm_if(Light_Scope* scope, Light_Ast* condition, Light_Ast* if_true, Li
 }
 
 Light_Ast* 
-ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Light_Token* while_token) {
+ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Light_Token* while_token, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_WHILE;
@@ -444,6 +463,7 @@ ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Li
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_COMMAND;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->comm_while.condition = condition;
     result->comm_while.body = body;
@@ -455,7 +475,7 @@ ast_new_comm_while(Light_Scope* scope, Light_Ast* condition, Light_Ast* body, Li
 
 Light_Ast* 
 ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* condition, Light_Ast* body, 
-    Light_Ast** prologue, Light_Ast** epilogue, Light_Token* for_token) 
+    Light_Ast** prologue, Light_Ast** epilogue, Light_Token* for_token, Lexical_Range lrange) 
 {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
@@ -464,6 +484,7 @@ ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* conditio
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_COMMAND;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->comm_for.body = body;
     result->comm_for.condition = condition;
@@ -476,7 +497,7 @@ ast_new_comm_for(Light_Scope* scope, Light_Scope* for_scope, Light_Ast* conditio
 }
 
 Light_Ast* 
-ast_new_comm_break(Light_Scope* scope, Light_Token* break_keyword, Light_Ast* level) {
+ast_new_comm_break(Light_Scope* scope, Light_Token* break_keyword, Light_Ast* level, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_BREAK;
@@ -484,6 +505,7 @@ ast_new_comm_break(Light_Scope* scope, Light_Token* break_keyword, Light_Ast* le
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_COMMAND;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->comm_break.token_break = break_keyword;
     result->comm_break.level = level;
@@ -492,7 +514,7 @@ ast_new_comm_break(Light_Scope* scope, Light_Token* break_keyword, Light_Ast* le
 }
 
 Light_Ast* 
-ast_new_comm_continue(Light_Scope* scope, Light_Token* continue_keyword, Light_Ast* level) {
+ast_new_comm_continue(Light_Scope* scope, Light_Token* continue_keyword, Light_Ast* level, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_CONTINUE;
@@ -500,6 +522,7 @@ ast_new_comm_continue(Light_Scope* scope, Light_Token* continue_keyword, Light_A
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_COMMAND;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->comm_continue.token_continue = continue_keyword;
     result->comm_continue.level = level;
@@ -508,7 +531,7 @@ ast_new_comm_continue(Light_Scope* scope, Light_Token* continue_keyword, Light_A
 }
 
 Light_Ast* 
-ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_token) {
+ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_token, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_COMMAND_RETURN;
@@ -516,6 +539,7 @@ ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_tok
     result->type = type_primitive_get(TYPE_PRIMITIVE_VOID);
     result->flags = AST_FLAG_COMMAND;
     result->id = ast_new_id();
+    result->lexical_range = lrange;
 
     result->comm_return.expression = expr;
     result->comm_return.token_return = return_token;
