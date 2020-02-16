@@ -86,6 +86,11 @@ light_path_from_filename(const char* filename, uint64_t* size) {
 
 	size_t pathsize = fullpath_size - 1;
 	for (; pathsize >= 0; --pathsize) {
+#if defined(_WIN32) || defined (_WIN64)
+		if (fullpath[pathsize] == '\\') {
+			break;
+		}
+#endif
 		if (fullpath[pathsize] == '/') {
 			break;
 		}
@@ -100,6 +105,12 @@ light_filename_from_path(const char* path) {
 	size_t len = strlen(path);
 	size_t i = len - 1;
 	for (; i >= 0; --i) {
+#if defined (_WIN32) || defined(_WIN64)
+		if (path[i] == '\\') {
+			i++;
+			break;
+		}
+#endif
 		if (path[i] == '/') {
 			i++;
 			break;
@@ -111,9 +122,7 @@ light_filename_from_path(const char* path) {
 char*
 light_filepath_relative_to(const char* path, int path_length, const char* path_relative) {
 	catstring result = {0};
-
-#if defined(__linux__)
-	if(path[0] == '/') {
+	if (path[0] == '/') {
 		// absolute path
 		catsprint(&result, "%s+\0", path_length, path);
 	} else {
@@ -122,10 +131,6 @@ light_filepath_relative_to(const char* path, int path_length, const char* path_r
 
 	size_t size = 0;
 	const char* p = light_real_path(result.data, &size);
-#else
-#error os not supported
-#endif
-
 
 	catstring_free(&result);
 
