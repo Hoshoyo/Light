@@ -1,0 +1,9 @@
+---------------------------------------------------
+Command Assignment
+
+assignment
+{
+    t1 = gen_eval(left)
+    t2 = gen_eval(right)
+    [t1] = t2
+}

@@ -4,6 +4,14 @@ memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("C");
 
 // Print generic
 
+string_equal:(s1 : string, s2 : string) -> bool {
+    if s1.length != s2.length return false;
+    for i:u64=0; i < s1.length; i += 1 {
+        if s1.data[i] != s2.data[i] return false;
+    }
+    return true;
+}
+
 print_string:(s : string) -> u64 {
     write(STDOUT_FILENO, s.data, s.length);
 }
@@ -68,6 +76,33 @@ print_bytes:(v : ^u8, count : s32) -> u64 {
         print_string("0x");
         print_u8(v[i], 16);
     }
+}
+
+print_value_literal_string:(v : User_Type_Value) -> u64 {
+    val := v.value; // ^void
+    t := v.type;
+    s_type := t.description.struct_desc;
+    
+    res : string;
+
+    for i := 0; i < s_type.fields_count; i += 1 {
+        ftype := s_type.fields_types[i];
+        offset := s_type.fields_offsets_bits[i] / 8;
+        vv := val + offset;
+        type_val := User_Type_Value:{vv, ftype};
+
+        // length
+        if i == 1 {
+            l := *(vv -> ^u64);
+            res.length = l;
+        }
+
+        // data
+        if i == 2 {
+            res.data = *(vv -> ^^u8);
+        }
+    }
+    print_string(res);
 }
 
 print_value_literal_struct:(v : User_Type_Value) -> u64 {
@@ -173,10 +208,15 @@ print_value_literal:(v : User_Type_Value) -> u64 {
         print_value_literal_union(v);
     } else if t.kind == LIGHT_TYPE_KIND_ALIAS {
         if t.description.alias_desc.alias_to.kind == LIGHT_TYPE_KIND_STRUCT {
-            print_string(t.description.alias_desc.name);
-            print_string(":");
             s := User_Type_Value:{val, t.description.alias_desc.alias_to};
-            print_value_literal_struct(s);
+            ls := "string";
+            if string_equal(t.description.alias_desc.name, ls) {
+                print_value_literal_string(s);
+            } else {
+                print_string(t.description.alias_desc.name);
+                print_string(":");
+                print_value_literal_struct(s);
+            }
         } else {
             type_val := User_Type_Value:{val, t.description.alias_desc.alias_to};
             print_value_literal(type_val);

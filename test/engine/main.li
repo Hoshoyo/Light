@@ -33,7 +33,12 @@ main : () -> s32 {
 	shader := shader_load(vert_shader, frag_shader);
 	glUseProgram(shader);
 
-	file_data := read_entire_file("/home/hoshoyo/dev/squiggly/res/models/apartment.bin", malloc).data -> ^Object_Binary;
+	filename := "/home/hoshoyo/dev/playground/squiggly/models/house.bin";
+	file_data := read_entire_file(filename, malloc).data -> ^Object_Binary;
+	if file_data == null {
+		print("Error: could not open file %\n", filename);
+		return -1;
+	}
 	mesh := create_simple_mesh(&file_data.data -> ^Vertex, file_data.vertices_count, 
 		(((&file_data.data -> ^u8) + file_data.vertices_size_bytes) -> ^u32), file_data.indices_count);
 

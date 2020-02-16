@@ -615,3 +615,4 @@ s32 ast_print_node(Light_Ast* node, u32 flags, s32 indent_level);
 s32 ast_print_type(Light_Type* type, u32 flags, s32 indent_level);
 s32 ast_print_expression(Light_Ast* expr, u32 flags, s32 indent_level);
 s32 ast_print(Light_Ast** ast, u32 flags, s32 indent_level);
+s32 ast_print_binary_op(Light_Operator_Binary binop, u32 flags);

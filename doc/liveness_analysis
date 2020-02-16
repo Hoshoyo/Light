@@ -1,0 +1,18 @@
+A variable x is live at statement s if
+- There exists a statement s' that uses x
+- There is a path from s to s'
+- That path has no intervening assignment to x
+
+* Rule 1
+    x is live if it is live in one of the control paths
+* Rule 2
+    x is live before s if it is read by s
+* Rule 3
+    x is dead if there is a write to x and the rhs does not refer to x
+* Rule 4
+    x is the same liveness if a statement does not refer to it
+
+Algorithm
+    Let all L(...) = false initially
+    Repeat until all statements s satisfy rules 1-4
+    Pick s where one of 1-4 does not hold and update using the appropriate rule.

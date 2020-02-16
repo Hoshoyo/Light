@@ -8,6 +8,7 @@
 #include "top_typecheck.h"
 #include "bytecode.h"
 #include "backend/c/toplevel.h"
+#include "tac.h"
 #include <light_array.h>
 
 int main(int argc, char** argv) {
@@ -74,7 +75,7 @@ int main(int argc, char** argv) {
     type_table_print();
 #endif
 
-#if 1
+#if 0
     const char* outfile = light_extensionless_filename(light_filename_from_path(argv[1]));
 
     double generate_start = os_time_us();
@@ -95,6 +96,8 @@ int main(int argc, char** argv) {
     printf("  total:           %.2f ms\n", total_elapsed);
     printf("\n");
     printf("  gcc backend:     %.2f ms\n", gcc_elapsed);
+#else
+    tac_generate(ast);
 #endif
 
 #if 0

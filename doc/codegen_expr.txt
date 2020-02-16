@@ -1,0 +1,150 @@
+// Eliminate &* and *&
+
+// Lvalue is the runtime location of a value
+// Caddr is a compile time address of a variable
+
+gen_eval // dereferences lvalues
+gen_load
+---------------------------------------------------
+Expressions Binary
+
++ - * / % & | ^ << >>
+< > <= >= == !=
+&& ||
+{
+    // yields Rvalue
+    t1 = gen_eval(left)
+    t2 = gen_eval(right)
+    t3 = t1 op t2
+}
+
+[]
+{
+    // yields Lvalue
+    // foo[3 + 2]
+    t1 = gen_eval(left)
+    t2 = gen_eval(right)
+    t3 = t1 + #type_size(t1) * t2
+}
+
+---------------------------------------------------
+Expressions Unary
+
++ - ~ !
+{
+    // yields Rvalue
+    t1 = gen_eval(exp)
+    t2 = op t1
+}
+
+* // dereference operator
+if(expr is &)
+{
+    // do nothing
+}
+else
+{
+    // yields Lvalue
+    // *foo = 3
+    t1 = gen_eval(expr)
+    t2 = deref(t1)
+}
+
+& // address of operator
+{
+    // In <- Lvalue
+    // yields Caddr
+    t1 = gen_load(expr)
+    t2 = lea(t1)
+}
+
+->
+{
+    // convert appropriately
+}
+
+---------------------------------------------------
+Expressions variable
+
+foo
+{
+    [
+        // this is only for variable declaration
+        Caddr = allocate_in_stack_frame(#sizeof_type(foo))
+    ]
+    // yields Caddr
+    t1 = Caddr(foo)
+}
+
+---------------------------------------------------
+Expressions literal primitive
+
+prim
+{
+    t1 = gen_literal(expr)
+}
+
+---------------------------------------------------
+Expressions dot
+
+.
+{
+    // yields Lvalue
+    // left <- Lvalue or Caddr
+    // foo.bar
+    // foo[3].bar
+    t1 = gen_load(left)
+    t2 = offset(bar, #typeof(left))
+    t3 = t1 + t2
+}
+or when enum accessing
+{
+    // same as primitive literal
+}
+
+---------------------------------------------------
+Expressions literal array
+
+lit_array
+{
+    // yields Caddr
+    // [1,2,3,4]
+    [
+        Caddr = allocate_stack_frame(#sizeof_type(expr))
+        fill_with_default(Caddr, expr)
+    ]
+    t1 = Caddr(foo)
+}
+
+---------------------------------------------------
+Expressions literal struct
+
+lit_struct
+{
+    [
+        // initialization in the activation record
+        Caddr = allocate_stack_frame(#sizeof_type(expr))
+        fill_with_default(Caddr, expr)
+    ]
+    // yields Caddr
+    // foo = hello:{1,2}
+    // foo = &hello:{1,2}
+    // foo = hello:{1,2}.bar
+
+    t1 = Caddr(foo)
+}
+
+---------------------------------------------------
+Expressions procedure call
+
+call
+{
+    // foo(1,2,3)
+    // (getfoo())(1,2,3)
+    t1 = gen_load(left)
+    for each argument arg {
+        t2 = gen_eval(arg)
+        push(t2)
+    }
+    call left
+}

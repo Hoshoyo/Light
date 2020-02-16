@@ -649,13 +649,10 @@ ast_print_expr_literal_primitive(Light_Ast* expr, u32 flags, s32 indent_level) {
 }
 
 s32
-ast_print_expr_binary(Light_Ast* expr, u32 flags, s32 indent_level) {
-    assert(expr->kind == AST_EXPRESSION_BINARY);
+ast_print_binary_op(Light_Operator_Binary binop, u32 flags) {
     FILE* out = ast_file_from_flags(flags);
     s32 length = 0;
-
-    length += ast_print_expression(expr->expr_binary.left, flags, indent_level);
-    switch(expr->expr_binary.op) {
+    switch(binop) {
         case OP_BINARY_PLUS:    length += fprintf(out, " + "); break;
         case OP_BINARY_MINUS:   length += fprintf(out, " - "); break;
         case OP_BINARY_MULT:    length += fprintf(out, " * "); break;
@@ -680,6 +677,17 @@ ast_print_expr_binary(Light_Ast* expr, u32 flags, s32 indent_level) {
         case OP_BINARY_VECTOR_ACCESS: length += fprintf(out, "["); break;
         default: length += fprintf(out, "<invalid binary expr>"); break;
     }
+    return 0;
+}
+
+s32
+ast_print_expr_binary(Light_Ast* expr, u32 flags, s32 indent_level) {
+    assert(expr->kind == AST_EXPRESSION_BINARY);
+    FILE* out = ast_file_from_flags(flags);
+    s32 length = 0;
+
+    length += ast_print_expression(expr->expr_binary.left, flags, indent_level);
+    length += ast_print_binary_op(expr->expr_binary.op, flags);
     length += ast_print_expression(expr->expr_binary.right, flags, indent_level);
     if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS) {
         length += fprintf(out, "]");

@@ -1,23 +1,7 @@
 //#import "test.li"
 
-string struct {
-	capacity : u64;
-	length   : u64;
-	data     : ^u8;
-}
-
-write :(fd : s32, buf : ^void, count : u64) -> s64 #extern("C");
-
-vec2 struct {
-	x : r32;
-	y : ^[4]r32;
-}
-
 main : () -> s32 {
-	//b := "Hello";
-	//write(1, b.data->^void, b.length);
-
-	a : vec2 = vec2:{1.0, &[2.0, 3.0, 4.0, 5.0]};
-
-	return a.y -> s32;
+	a := 3;
+	a = 4 + 2 * a;
+	return 0;
 }
