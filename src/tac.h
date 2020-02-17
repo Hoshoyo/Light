@@ -6,9 +6,12 @@ typedef enum {
     TAC_EXPRESSION_BINARY_INT,
     TAC_EXPRESSION_BINARY_FLOAT,
     TAC_EXPRESSION_UNARY,
+    TAC_EXPRESSION_ASSIGN_INT,
+    TAC_EXPRESSION_ASSIGN_FLOAT,
 } Tac_Node_Kind;
 
 typedef enum {
+    TAC_ATOM_NONE = 0,
     TAC_ATOM_VARIABLE,
     TAC_ATOM_TEMPORARY,
     TAC_ATOM_CONSTANT_INTEGER,
@@ -39,11 +42,20 @@ typedef struct {
 
 typedef struct {
     Tac_Atom_Type type;
-    bool          indirect;
+    u32           flags;
+    bool          is_signed;
+    s32           byte_size;
+    s32           offset_multiplier;
     union {
         Tac_Constant_Integer const_int;
         Tac_Constant_Float const_float;
-        u64 variable_hash;
+        
+        // variable
+        struct {
+            u64 variable_hash;
+            Light_Token* variable;
+        };
+
         s64 temporary_number;
     };
 } Tac_Atom;
@@ -72,6 +84,18 @@ typedef struct {
 } Tac_Unary_Assign_Integer;
 
 typedef struct {
+    // a = 1
+    Tac_Atom left, e;
+    s32 size_bytes;
+} Tac_Simple_Assign_Integer;
+
+typedef struct {
+    // a = 1.0
+    Tac_Atom left, e;
+    s32 size_bytes;
+} Tac_Simple_Assign_Float;
+
+typedef struct {
     s32 byte_size;
     union {
         r32 val_r32;
@@ -92,9 +116,13 @@ typedef struct {
         Tac_Binary_Assign_Integer binop_int;
         Tac_Binary_Assign_Float binop_float;
         Tac_Unary_Assign_Integer unop;
+        Tac_Simple_Assign_Integer assign_int;
+        Tac_Simple_Assign_Float assign_float;
     };
 } Tac_Node;
 
 typedef struct {
     Tac_Node** nodes;
 } Tac_State;
+
+Tac_State tac_generate(Light_Ast** ast);
