@@ -15,7 +15,8 @@ int main(int argc, char** argv)
 	
 	{
 		//stream = emit_mov_test(stream);
-		stream = emit_arith_test(stream);
+		stream = emit_add_test(stream);
+		stream = emit_and_test(stream);
 	}
 
 	fwrite(code, 1, stream - code, out);

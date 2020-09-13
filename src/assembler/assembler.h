@@ -56,9 +56,21 @@ typedef enum  {
 	DIRECT = 3,
 } X64_Addressing_Mode;
 
+typedef enum {
+	ARITH_ADD = 0,
+	ARITH_OR = 1,
+	ARITH_ADC = 2,	// add with carry
+	ARITH_SBB = 3, 	// subtract with borrow
+	ARITH_AND = 4,
+	ARITH_SUB = 5,
+	ARITH_XOR = 6,
+	ARITH_CMP = 7,
+} X64_Arithmetic_Instr;
+
 // mov
 u8* emit_mov_mr_indirect(u8* stream, X64_Register dest, X64_Register src);
 u8* emit_mov_mr_direct(u8* stream, X64_Register dest, X64_Register src);
 
 u8* emit_mov_test(u8* stream);
-u8* emit_arith_test(u8* stream);
+u8* emit_add_test(u8* stream);
+u8* emit_and_test(u8* stream);

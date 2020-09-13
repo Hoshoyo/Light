@@ -8,11 +8,11 @@
 // rm  3 bits	= right side = src
 // reg 3 bits	= left  side = dest
 static u8 
-make_modrm(u8 mod, u8 rm, u8 reg) {
+make_modrm(u8 mod, u8 reg, u8 rm) {
 	assert(mod < 4);
 	assert(rm  < 8);
 	assert(reg < 8);
-	return (mod << 6) | (rm << 3) | reg;
+	return (mod << 6) | (reg << 3) | rm;
 }
 
 static u8
@@ -46,6 +46,13 @@ register_representation(X64_Register r)
 	if(r < R8B) return (r - AL);
 	if(r < SPL) return (r - R8B);
 	return (r - SPL + 4);
+}
+
+static bool
+register_equivalent(X64_Register r, X64_Register c)
+{
+	if(r <= R15W && c <= R15W) return register_representation(r) == register_representation(c);
+	return r == c;
 }
 
 static bool
