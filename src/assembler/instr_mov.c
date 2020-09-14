@@ -203,8 +203,27 @@ emit_mov_moffs(u8* stream, X64_Register src, uint64_t addr, bool invert)
 }
 
 u8*
+emit_lea(u8* stream, int bitsize, X64_Register dest, X64_Register src)
+{
+    assert(register_get_bitsize(dest) == bitsize);
+    stream = emit_opcode(stream, 0x8D, bitsize, src, dest);
+    *stream++ = make_modrm(INDIRECT, register_representation(dest), register_representation(src));
+    return stream;
+}
+
+u8*
 emit_mov_test(u8* stream)
 {
+#if 1
+    stream = emit_lea(stream, 16, AX, R8);
+    stream = emit_lea(stream, 16, DX, RBX);
+
+    stream = emit_lea(stream, 32, EAX, R8);
+    stream = emit_lea(stream, 32, EDX, RBX);
+
+    stream = emit_lea(stream, 64, RAX, R8);
+    stream = emit_lea(stream, 64, RDX, RBX);
+#endif
 #if 1
     stream = emit_mov_moffs(stream, AL, 0x123456789abcdef, false);
     stream = emit_mov_moffs(stream, AX, 0x123456789abcdef, false);

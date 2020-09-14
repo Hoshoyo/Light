@@ -107,3 +107,18 @@ emit_opcode(u8* stream, u8 opcode, int bitsize, X64_Register dest, X64_Register 
     *stream++ = opcode;
     return stream;
 }
+
+static u8*
+emit_displacement(X64_Addressing_Mode mode, u8* stream, u8 disp8, uint32_t disp32)
+{
+	if(mode == INDIRECT_BYTE_DISPLACED)
+        *stream++ = disp8;
+	else if(mode == INDIRECT_DWORD_DISPLACED)
+	{
+		*(uint32_t*)stream = disp32;
+		stream += sizeof(uint32_t);
+	}
+	return stream;
+}
+
+#define ASSEMBLER_BITSIZE 64
