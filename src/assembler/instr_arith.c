@@ -26,103 +26,67 @@
 #define XOR_RM8 0x32
 #define OR_RM8 0x0A
 
-static u8*
-emit_arith_mi(u8* stream, u8 opcode, int instr_digit, X64_Addressing_Mode mode, X64_Register dest, Int_Value value, u8 disp8, uint32_t disp32)
+u8*
+emit_arith_mi(Instr_Emit_Result* out_info, u8* stream, int instr_digit, X64_Addressing_Mode mode, X64_Register dest, Int_Value value, u8 disp8, uint32_t disp32)
 {
+    u8* start = stream;
+    s8 imm_offset = 0;
+    s8 disp_offset = 0;
+
+    u8 opcode = (register_get_bitsize(dest) == 8) ? ADD_IMM8 : ADD_IMM;
     int bitsize = register_get_bitsize(dest);
     stream = emit_opcode(stream, opcode, register_get_bitsize(dest), dest, dest);
     *stream++ = make_modrm(mode, instr_digit, register_representation(dest));
 
-    if(mode == INDIRECT_BYTE_DISPLACED)
-        *stream++ = disp8;
-    else if(mode == INDIRECT_DWORD_DISPLACED)
+    disp_offset = stream - start;
+    stream = emit_displacement(mode, stream, disp8, disp32);
+    if((stream - start) == disp_offset) disp_offset = -1;
+
+    imm_offset = stream - start;
+    stream = emit_int_value(stream, MIN(32, register_get_bitsize(dest)), value);
+    if((stream - start) == imm_offset) imm_offset = -1;
+
+    if(out_info)
     {
-        *(uint32_t*)stream = disp32;
-        stream += sizeof(uint32_t);
+        out_info->instr_byte_size = stream - start;
+        out_info->diplacement_offset = disp_offset;
+        out_info->immediate_offset = imm_offset;
     }
 
-    stream = emit_int_value(stream, MIN(32, register_get_bitsize(dest)), value);
     return stream;
-}
-
-// ADD MI
-u8*
-emit_arith_mi_direct(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, Int_Value value)
-{
-    return emit_arith_mi(stream, (register_get_bitsize(dest) == 8) ? ADD_IMM8 : ADD_IMM, instr, DIRECT, dest, value, 0, 0);
-}
-
-u8*
-emit_arith_mi_indirect(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, Int_Value value)
-{
-    assert(register_get_bitsize(dest) == 64);
-    return emit_arith_mi(stream, (register_get_bitsize(dest) == 8) ? ADD_IMM8 : ADD_IMM, instr, INDIRECT, dest, value, 0, 0);
-}
-
-u8*
-emit_arith_mi_indirect_byte_displaced(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, Int_Value value, u8 displacement)
-{
-    assert(register_get_bitsize(dest) == 64);
-    return emit_arith_mi(stream, (register_get_bitsize(dest) == 8) ? ADD_IMM8 : ADD_IMM, instr, INDIRECT_BYTE_DISPLACED, dest, value, displacement, 0);
-}
-
-u8*
-emit_arith_mi_indirect_dword_displaced(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, Int_Value value, uint32_t displacement)
-{
-    assert(register_get_bitsize(dest) == 64);
-    return emit_arith_mi(stream, (register_get_bitsize(dest) == 8) ? ADD_IMM8 : ADD_IMM, instr, INDIRECT_DWORD_DISPLACED, dest, value, 0, displacement);
 }
 
 // *******************************
-
-static u8*
-emit_arith_mi_imm(u8* stream, u8 opcode, int instr_digit, X64_Register dest, s8 value, X64_Addressing_Mode mode, u8 displ8, uint32_t displ32)
-{
-    int bitsize = register_get_bitsize(dest);
-    assert(bitsize > 8 && "add mi signed does not support 8 bits reg destination");
-    stream = emit_opcode(stream, ADDS_IMM8, register_get_bitsize(dest), dest, dest);
-    *stream++ = make_modrm(mode, instr_digit, register_representation(dest));
-    if(mode == INDIRECT_BYTE_DISPLACED)
-        *stream++ = displ8;
-    else if(mode == INDIRECT_DWORD_DISPLACED)
-    {
-        *(uint32_t*)stream = displ32;
-        stream += sizeof(uint32_t);
-    }
-
-    *stream++ = value;
-    return stream;
-}
 
 // ADD IMM8 SEXT
 // Add immediate 8bit signed extended value to register
 // Example: add rax, 0x12
 u8*
-emit_arith_mi_signed_ext(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, s8 value)
+emit_arith_mi_imm8_sext(Instr_Emit_Result* out_info, u8* stream, int instr_digit, X64_Register dest, s8 value, X64_Addressing_Mode mode, u8 displ8, uint32_t displ32)
 {
-    return emit_arith_mi_imm(stream, ADDS_IMM8, instr, dest, value, DIRECT, 0, 0);
-}
+    u8* start = stream;
+    s8 imm_offset = 0;
+    s8 disp_offset = 0;
 
-// Add immediate 8bit signed extended value to register indirect
-// Example: add [rax], 0x12
-u8*
-emit_arith_mi_signed_ext_indirect(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, s8 value)
-{
-    return emit_arith_mi_imm(stream, ADDS_IMM8, instr, dest, value, INDIRECT, 0, 0);
-}
+    int bitsize = register_get_bitsize(dest);
+    assert(bitsize > 8 && "add mi signed does not support 8 bits reg destination");
+    stream = emit_opcode(stream, ADDS_IMM8, register_get_bitsize(dest), dest, dest);
+    *stream++ = make_modrm(mode, instr_digit, register_representation(dest));
 
-// Example: add [rax+0x34], 0x12
-u8*
-emit_arith_mi_signed_ext_indirect_byte_displaced(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, s8 value, u8 displacement)
-{
-    return emit_arith_mi_imm(stream, ADDS_IMM8, instr, dest, value, INDIRECT_BYTE_DISPLACED, displacement, 0);
-}
+    disp_offset = stream - start;
+    stream = emit_displacement(mode, stream, displ8, displ32);
+    if((stream - start) == disp_offset) disp_offset = -1;
 
-// Example: add [rax+0x12345678], 0x12
-u8*
-emit_arith_mi_signed_ext_indirect_dword_displaced(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, s8 value, uint32_t displacement)
-{
-    return emit_arith_mi_imm(stream, ADDS_IMM8, instr, dest, value, INDIRECT_DWORD_DISPLACED, 0, displacement);
+    imm_offset = stream - start;
+    *stream++ = value;
+
+    if(out_info)
+    {
+        out_info->instr_byte_size = stream - start;
+        out_info->immediate_offset = imm_offset;
+        out_info->diplacement_offset = disp_offset;
+    }
+    return stream;
 }
 
 // ****************************************
@@ -131,8 +95,11 @@ emit_arith_mi_signed_ext_indirect_dword_displaced(X64_Arithmetic_Instr instr, u8
 
 // Add register to register
 static u8*
-emit_arith_reg(u8* stream, u8 opcode, X64_Register dest, X64_Register src, X64_Addressing_Mode mode, u8 disp8, uint32_t disp32)
+emit_arith_reg(Instr_Emit_Result* out_info, u8* stream, u8 opcode, X64_Register dest, X64_Register src, X64_Addressing_Mode mode, u8 disp8, uint32_t disp32)
 {
+    u8* start = stream;
+    s8 disp_offset = 0;
+
     int bitsize = register_get_bitsize(src);
     stream = emit_opcode(stream, opcode, bitsize, dest, src);
     *stream++ = make_modrm(mode, register_representation(src), register_representation(dest));
@@ -140,12 +107,15 @@ emit_arith_reg(u8* stream, u8 opcode, X64_Register dest, X64_Register src, X64_A
     if(mode != DIRECT && register_equivalent(dest, RSP))
         *stream++ = register_representation(dest);
 
-    if(mode == INDIRECT_BYTE_DISPLACED)
-        *stream++ = disp8;
-    else if(mode == INDIRECT_DWORD_DISPLACED)
+    disp_offset = stream - start;
+    stream = emit_displacement(mode, stream, disp8, disp32);
+    if((stream - start) == disp_offset) disp_offset = -1;
+
+    if(out_info)
     {
-        *(uint32_t*)stream = disp32;
-        stream += sizeof(uint32_t);
+        out_info->instr_byte_size = stream - start;
+        out_info->immediate_offset = -1;
+        out_info->diplacement_offset = disp_offset;
     }
 
     return stream;
@@ -191,216 +161,18 @@ rm_opcode(X64_Arithmetic_Instr instr, int bitsize)
     return opcode;
 }
 
-static u8*
-emit_arith_mr(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src, X64_Addressing_Mode mode, u8 disp8, uint32_t disp32)
+u8*
+emit_arith_mr(Instr_Emit_Result* out_info, X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src, X64_Addressing_Mode mode, u8 disp8, uint32_t disp32)
 {
     u8 opcode = mr_opcode(instr, register_get_bitsize(src));
-    return emit_arith_reg(stream, opcode, dest, src, mode, disp8, disp32);
+    return emit_arith_reg(out_info, stream, opcode, dest, src, mode, disp8, disp32);
 }
 
-static u8*
-emit_arith_rm(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src, X64_Addressing_Mode mode, u8 disp8, uint32_t disp32)
+u8*
+emit_arith_rm(Instr_Emit_Result* out_info, X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src, X64_Addressing_Mode mode, u8 disp8, uint32_t disp32)
 {
     u8 opcode = rm_opcode(instr, register_get_bitsize(dest));
-    return emit_arith_reg(stream, opcode, dest, src, mode, disp8, disp32);
-}
-
-u8*
-emit_arith_mr_direct(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src)
-{
-    assert(register_get_bitsize(dest) == register_get_bitsize(src));
-    return emit_arith_mr(instr, stream, dest, src, DIRECT, 0, 0);
-}
-
-u8*
-emit_arith_mr_indirect(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src)
-{
-    assert(register_get_bitsize(dest) == 64);
-    return emit_arith_mr(instr, stream, dest, src, INDIRECT, 0, 0);
-}
-
-u8*
-emit_arith_mr_indirect_byte_displaced(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src, u8 displacement)
-{
-    assert(register_get_bitsize(dest) == 64);
-    return emit_arith_mr(instr, stream, dest, src, INDIRECT_BYTE_DISPLACED, displacement, 0);
-}
-
-u8*
-emit_arith_mr_indirect_dword_displaced(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src, uint32_t displacement)
-{
-    assert(register_get_bitsize(dest) == 64);
-    return emit_arith_mr(instr, stream, dest, src, INDIRECT_DWORD_DISPLACED, 0, displacement);
-}
-
-u8*
-emit_arith_rm_direct(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src)
-{
-    assert(register_get_bitsize(src) == register_get_bitsize(dest));
-    return emit_arith_rm(instr, stream, src, dest, DIRECT, 0, 0);
-}
-
-u8*
-emit_arith_rm_indirect(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src)
-{
-    assert(register_get_bitsize(src) == 64);
-    return emit_arith_rm(instr, stream, src, dest, INDIRECT, 0, 0);
-}
-
-u8*
-emit_arith_rm_indirect_byte_displaced(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src, u8 value)
-{
-    assert(register_get_bitsize(src) == 64);
-    return emit_arith_rm(instr, stream, src, dest, INDIRECT_BYTE_DISPLACED, value, 0);
-}
-
-u8*
-emit_arith_rm_indirect_dword_displaced(X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src, uint32_t value)
-{
-    assert(register_get_bitsize(src) == 64);
-    return emit_arith_rm(instr, stream, src, dest, INDIRECT_DWORD_DISPLACED, 0, value);
-}
-
-u8*
-emit_add_test(u8* stream)
-{
-    X64_Arithmetic_Instr instr = ARITH_ADD;
-#if 0
-    stream = emit_arith_rm_direct(instr, stream, RAX, RBX);
-    stream = emit_arith_rm_direct(instr, stream, EAX, EBX);
-    stream = emit_arith_rm_direct(instr, stream, AX, BX);
-    stream = emit_arith_rm_direct(instr, stream, AL, BL);
-
-    stream = emit_arith_rm_direct(instr, stream, R8, RBX);
-    stream = emit_arith_rm_direct(instr, stream, R8D, EBX);
-    stream = emit_arith_rm_direct(instr, stream, R8W, BX);
-    stream = emit_arith_rm_direct(instr, stream, R8B, BL);
-
-    stream = emit_arith_rm_direct(instr, stream, RSP, RBX);
-    stream = emit_arith_rm_direct(instr, stream, ESP, EBX);
-    stream = emit_arith_rm_direct(instr, stream, SP, BX);
-    stream = emit_arith_rm_direct(instr, stream, SPL, BL);
-
-    stream = emit_arith_rm_indirect(instr, stream, RBX, RAX);
-    stream = emit_arith_rm_indirect(instr, stream, EBX, RAX);
-    stream = emit_arith_rm_indirect(instr, stream, BX, RAX);
-    stream = emit_arith_rm_indirect(instr, stream, BL, RAX);
-
-    stream = emit_arith_rm_indirect(instr, stream, RBX, R8);
-    stream = emit_arith_rm_indirect(instr, stream, EBX, R8);
-    stream = emit_arith_rm_indirect(instr, stream, BX, R8);
-    stream = emit_arith_rm_indirect(instr, stream, BL, R8);
-
-    stream = emit_arith_rm_indirect(instr, stream, RBX, RSP);
-    stream = emit_arith_rm_indirect(instr, stream, EBX, RSP);
-    stream = emit_arith_rm_indirect(instr, stream, BX, RSP);
-    stream = emit_arith_rm_indirect(instr, stream, BL, RSP);
-
-    stream = emit_arith_rm_indirect_byte_displaced(instr, stream, RAX, RBX, 0x12);
-    stream = emit_arith_rm_indirect_byte_displaced(instr, stream, EAX, RBX, 0x12);
-    stream = emit_arith_rm_indirect_byte_displaced(instr, stream, AX, RBX, 0x12);
-    stream = emit_arith_rm_indirect_byte_displaced(instr, stream, AL, RBX, 0x12);
-
-    stream = emit_arith_rm_indirect_dword_displaced(instr, stream, R8, RBX, 0x12345678);
-    stream = emit_arith_rm_indirect_dword_displaced(instr, stream, R8D, RBX, 0x12345678);
-    stream = emit_arith_rm_indirect_dword_displaced(instr, stream, R8W, RBX, 0x12345678);
-    stream = emit_arith_rm_indirect_dword_displaced(instr, stream, R8B, RBX, 0x12345678);
-#endif
-#if 0
-    stream = emit_arith_mr_direct(instr, stream, RAX, RBX);
-    stream = emit_arith_mr_direct(instr, stream, EAX, EBX);
-    stream = emit_arith_mr_direct(instr, stream, AX, BX);
-    stream = emit_arith_mr_direct(instr, stream, AL, BL);
-
-    stream = emit_arith_mr_direct(instr, stream, R8, RBX);
-    stream = emit_arith_mr_direct(instr, stream, R8D, EBX);
-    stream = emit_arith_mr_direct(instr, stream, R8W, BX);
-    stream = emit_arith_mr_direct(instr, stream, R8B, BL);
-
-    stream = emit_arith_mr_direct(instr, stream, RSP, RBX);
-    stream = emit_arith_mr_direct(instr, stream, ESP, EBX);
-    stream = emit_arith_mr_direct(instr, stream, SP, BX);
-    stream = emit_arith_mr_direct(instr, stream, SPL, BL);
-    
-    stream = emit_arith_mr_indirect(instr, stream, RAX, RBX);
-    stream = emit_arith_mr_indirect(instr, stream, RAX, EBX);
-    stream = emit_arith_mr_indirect(instr, stream, RAX, BX);
-    stream = emit_arith_mr_indirect(instr, stream, RAX, BL);
-
-    stream = emit_arith_mr_indirect(instr, stream, R8, RBX);
-    stream = emit_arith_mr_indirect(instr, stream, R8, EBX);
-    stream = emit_arith_mr_indirect(instr, stream, R8, BX);
-    stream = emit_arith_mr_indirect(instr, stream, R8, BL);
-
-    stream = emit_arith_mr_indirect(instr, stream, RSP, RBX);
-    stream = emit_arith_mr_indirect(instr, stream, RSP, EBX);
-    stream = emit_arith_mr_indirect(instr, stream, RSP, BX);
-    stream = emit_arith_mr_indirect(instr, stream, RSP, BL);
-
-    stream = emit_arith_mr_indirect(instr, stream, RSP, R8);
-    stream = emit_arith_mr_indirect(instr, stream, RSP, R8D);
-    stream = emit_arith_mr_indirect(instr, stream, RSP, R8W);
-    stream = emit_arith_mr_indirect(instr, stream, RSP, R8B);
-#endif
-#if 0
-    stream = emit_arith_mi_direct(instr, stream, RAX, (Int_Value){.v64 = 0x12345678});
-    stream = emit_arith_mi_direct(instr, stream, RBX, (Int_Value){.v64 = 0x12345678});
-    stream = emit_arith_mi_direct(instr, stream, EAX, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_direct(instr, stream, EBX, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_direct(instr, stream, BX, (Int_Value){.v16 = 0x123});
-    stream = emit_arith_mi_direct(instr, stream, AX, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_direct(instr, stream, AL, (Int_Value){.v64 = 0x12});
-
-    stream = emit_arith_mi_indirect(instr, stream, RAX, (Int_Value){.v64 = 0x12345678});
-    stream = emit_arith_mi_indirect(instr, stream, R8, (Int_Value){.v64 = 0x12345678});
-    stream = emit_arith_mi_indirect(instr, stream, RAX, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_indirect(instr, stream, R8, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_indirect(instr, stream, RBX, (Int_Value){.v16 = 0x123});
-    stream = emit_arith_mi_indirect(instr, stream, RAX, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_indirect(instr, stream, RAX, (Int_Value){.v64 = 0x12});
-    stream = emit_arith_mi_indirect(instr, stream, R9, (Int_Value){.v64 = 0x12});
-
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x12345678}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, R8, (Int_Value){.v64 = 0x12345678}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x123}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, R8, (Int_Value){.v64 = 0x123}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, RBX, (Int_Value){.v16 = 0x123}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x123}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x12}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, R9, (Int_Value){.v64 = 0x12}, 0x13);
-
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x12345678}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, R8, (Int_Value){.v64 = 0x12345678}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x123}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, R8, (Int_Value){.v64 = 0x123}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, RBX, (Int_Value){.v16 = 0x123}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x123}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x12}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, R9, (Int_Value){.v64 = 0x12}, 0x12345678);
-#endif
-#if 1
-    stream = emit_arith_mi_signed_ext(instr, stream, RBX, 0x12);
-    stream = emit_arith_mi_signed_ext(instr, stream, EBX, 0x12);
-    stream = emit_arith_mi_signed_ext(instr, stream, BX, 0x12);
-
-    stream = emit_arith_mi_signed_ext(instr, stream, RSP, 0x12);
-    stream = emit_arith_mi_signed_ext(instr, stream, RBP, 0x12);
-    stream = emit_arith_mi_signed_ext(instr, stream, SI, 0x12);
-    stream = emit_arith_mi_signed_ext(instr, stream, DI, 0x12);
-
-    stream = emit_arith_mi_signed_ext_indirect(instr, stream, RBX, 0x12);
-    stream = emit_arith_mi_signed_ext_indirect(instr, stream, EBX, 0x12);
-    stream = emit_arith_mi_signed_ext_indirect(instr, stream, BX, 0x12);
-
-    stream = emit_arith_mi_signed_ext_indirect_byte_displaced(instr, stream, RBX, 0x12, 0x45);
-    stream = emit_arith_mi_signed_ext_indirect_byte_displaced(instr, stream, EBX, 0x12, 0x45);
-    stream = emit_arith_mi_signed_ext_indirect_byte_displaced(instr, stream, BX, 0x12, 0x45);
-
-    stream = emit_arith_mi_signed_ext_indirect_dword_displaced(instr, stream, RBX, 0x12, 0x12345678);
-    stream = emit_arith_mi_signed_ext_indirect_dword_displaced(instr, stream, EBX, 0x12, 0x12345678);
-    stream = emit_arith_mi_signed_ext_indirect_dword_displaced(instr, stream, BX, 0x12, 0x12345678);
-#endif
-    return stream;
+    return emit_arith_reg(out_info, stream, opcode, dest, src, mode, disp8, disp32);
 }
 
 u8*
@@ -408,62 +180,62 @@ emit_and_test(u8* stream)
 {
     X64_Arithmetic_Instr instr = ARITH_CMP;
 #if 1
-    stream = emit_arith_mi_direct(instr, stream, RAX, (Int_Value){.v64 = 0x12345678});
-    stream = emit_arith_mi_direct(instr, stream, RBX, (Int_Value){.v64 = 0x12345678});
-    stream = emit_arith_mi_direct(instr, stream, EAX, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_direct(instr, stream, EBX, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_direct(instr, stream, BX, (Int_Value){.v16 = 0x123});
-    stream = emit_arith_mi_direct(instr, stream, AX, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_direct(instr, stream, AL, (Int_Value){.v64 = 0x12});
+    stream = emit_arith_mi(0, stream, instr, DIRECT, RAX, (Int_Value){.v64 = 0x12345678}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, DIRECT, RBX, (Int_Value){.v64 = 0x12345678}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, DIRECT, EAX, (Int_Value){.v64 = 0x123}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, DIRECT, EBX, (Int_Value){.v64 = 0x123}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, DIRECT, BX, (Int_Value){.v16 = 0x123}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, DIRECT, AX, (Int_Value){.v64 = 0x123}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, DIRECT, AL, (Int_Value){.v64 = 0x12}, 0, 0);
 
-    stream = emit_arith_mi_indirect(instr, stream, RAX, (Int_Value){.v64 = 0x12345678});
-    stream = emit_arith_mi_indirect(instr, stream, R8, (Int_Value){.v64 = 0x12345678});
-    stream = emit_arith_mi_indirect(instr, stream, RAX, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_indirect(instr, stream, R8, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_indirect(instr, stream, RBX, (Int_Value){.v16 = 0x123});
-    stream = emit_arith_mi_indirect(instr, stream, RAX, (Int_Value){.v64 = 0x123});
-    stream = emit_arith_mi_indirect(instr, stream, RAX, (Int_Value){.v64 = 0x12});
-    stream = emit_arith_mi_indirect(instr, stream, R9, (Int_Value){.v64 = 0x12});
+    stream = emit_arith_mi(0, stream, instr, INDIRECT, RAX, (Int_Value){.v64 = 0x12345678}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT, R8, (Int_Value){.v64 = 0x12345678}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT, RAX, (Int_Value){.v64 = 0x123}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT, R8, (Int_Value){.v64 = 0x123}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT, RBX, (Int_Value){.v16 = 0x123}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT, RAX, (Int_Value){.v64 = 0x123}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT, RAX, (Int_Value){.v64 = 0x12}, 0, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT, R9, (Int_Value){.v64 = 0x12}, 0, 0);
 
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x12345678}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, R8, (Int_Value){.v64 = 0x12345678}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x123}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, R8, (Int_Value){.v64 = 0x123}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, RBX, (Int_Value){.v16 = 0x123}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x123}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x12}, 0x13);
-    stream = emit_arith_mi_indirect_byte_displaced(instr, stream, R9, (Int_Value){.v64 = 0x12}, 0x13);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_BYTE_DISPLACED, RAX, (Int_Value){.v64 = 0x12345678}, 0x13, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_BYTE_DISPLACED, R8, (Int_Value){.v64 = 0x12345678}, 0x13, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_BYTE_DISPLACED, RAX, (Int_Value){.v64 = 0x123}, 0x13, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_BYTE_DISPLACED, R8, (Int_Value){.v64 = 0x123}, 0x13, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_BYTE_DISPLACED, RBX, (Int_Value){.v16 = 0x123}, 0x13, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_BYTE_DISPLACED, RAX, (Int_Value){.v64 = 0x123}, 0x13, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_BYTE_DISPLACED, RAX, (Int_Value){.v64 = 0x12}, 0x13, 0);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_BYTE_DISPLACED, R9, (Int_Value){.v64 = 0x12}, 0x13, 0);
 
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x12345678}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, R8, (Int_Value){.v64 = 0x12345678}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x123}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, R8, (Int_Value){.v64 = 0x123}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, RBX, (Int_Value){.v16 = 0x123}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x123}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, RAX, (Int_Value){.v64 = 0x12}, 0x12345678);
-    stream = emit_arith_mi_indirect_dword_displaced(instr, stream, R9, (Int_Value){.v64 = 0x12}, 0x12345678);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_DWORD_DISPLACED, RAX, (Int_Value){.v64 = 0x12345678}, 0, 0x12345678);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_DWORD_DISPLACED, R8, (Int_Value){.v64 = 0x12345678}, 0, 0x12345678);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_DWORD_DISPLACED, RAX, (Int_Value){.v64 = 0x123}, 0, 0x12345678);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_DWORD_DISPLACED, R8, (Int_Value){.v64 = 0x123}, 0, 0x12345678);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_DWORD_DISPLACED, RBX, (Int_Value){.v16 = 0x123}, 0, 0x12345678);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_DWORD_DISPLACED, RAX, (Int_Value){.v64 = 0x123}, 0, 0x12345678);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_DWORD_DISPLACED, RAX, (Int_Value){.v64 = 0x12}, 0, 0x12345678);
+    stream = emit_arith_mi(0, stream, instr, INDIRECT_DWORD_DISPLACED, R9, (Int_Value){.v64 = 0x12}, 0, 0x12345678);
 #endif
 #if 1
-    stream = emit_arith_mi_signed_ext(instr, stream, RBX, 0x12);
-    stream = emit_arith_mi_signed_ext(instr, stream, EBX, 0x12);
-    stream = emit_arith_mi_signed_ext(instr, stream, BX, 0x12);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, RBX, 0x12, DIRECT, 0, 0);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, EBX, 0x12, DIRECT, 0, 0);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, BX, 0x12, DIRECT, 0, 0);
 
-    stream = emit_arith_mi_signed_ext(instr, stream, RSP, 0x12);
-    stream = emit_arith_mi_signed_ext(instr, stream, RBP, 0x12);
-    stream = emit_arith_mi_signed_ext(instr, stream, SI, 0x12);
-    stream = emit_arith_mi_signed_ext(instr, stream, DI, 0x12);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, RSP, 0x12, DIRECT, 0, 0);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, RBP, 0x12, DIRECT, 0, 0);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, SI, 0x12, DIRECT, 0, 0);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, DI, 0x12, DIRECT, 0, 0);
 
-    stream = emit_arith_mi_signed_ext_indirect(instr, stream, RBX, 0x12);
-    stream = emit_arith_mi_signed_ext_indirect(instr, stream, EBX, 0x12);
-    stream = emit_arith_mi_signed_ext_indirect(instr, stream, BX, 0x12);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, RBX, 0x12, INDIRECT, 0, 0);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, EBX, 0x12, INDIRECT, 0, 0);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, BX, 0x12, INDIRECT, 0, 0);
 
-    stream = emit_arith_mi_signed_ext_indirect_byte_displaced(instr, stream, RBX, 0x12, 0x45);
-    stream = emit_arith_mi_signed_ext_indirect_byte_displaced(instr, stream, EBX, 0x12, 0x45);
-    stream = emit_arith_mi_signed_ext_indirect_byte_displaced(instr, stream, BX, 0x12, 0x45);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, RBX, 0x12, INDIRECT_BYTE_DISPLACED, 0x45, 0);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, EBX, 0x12, INDIRECT_BYTE_DISPLACED, 0x45, 0);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, BX, 0x12, INDIRECT_BYTE_DISPLACED, 0x45, 0);
 
-    stream = emit_arith_mi_signed_ext_indirect_dword_displaced(instr, stream, RBX, 0x12, 0x12345678);
-    stream = emit_arith_mi_signed_ext_indirect_dword_displaced(instr, stream, EBX, 0x12, 0x12345678);
-    stream = emit_arith_mi_signed_ext_indirect_dword_displaced(instr, stream, BX, 0x12, 0x12345678);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, RBX, 0x12, INDIRECT_DWORD_DISPLACED, 0, 0x12345678);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, EBX, 0x12, INDIRECT_DWORD_DISPLACED, 0, 0x12345678);
+    stream = emit_arith_mi_imm8_sext(0, stream, instr, BX, 0x12, INDIRECT_DWORD_DISPLACED, 0, 0x12345678);
 #endif
     return stream;
 }

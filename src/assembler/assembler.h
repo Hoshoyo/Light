@@ -61,6 +61,13 @@ typedef enum  {
 } X64_Addressing_Mode;
 
 typedef enum {
+	MOV_MR8 = 0x88,
+	MOV_MR = 0x89,
+	MOV_RM8 = 0x8A,
+	MOV_RM = 0x8B,
+} X64_Mov_Instr;
+
+typedef enum {
 	ARITH_ADD = 0,
 	ARITH_OR = 1,
 	ARITH_ADC = 2,	// add with carry
@@ -152,10 +159,52 @@ typedef enum {
 	SAR = 7
 } X64_Shift_Instruction;
 
-// mov
-u8* emit_mov_mr_indirect(u8* stream, X64_Register dest, X64_Register src);
-u8* emit_mov_mr_direct(u8* stream, X64_Register dest, X64_Register src);
+typedef struct {
+	s8 instr_byte_size;
+	s8 diplacement_offset;
+	s8 immediate_offset;
+} Instr_Emit_Result;
 
+// mov
+u8* emit_mov_reg(Instr_Emit_Result* out_info, u8* stream, X64_Mov_Instr opcode, X64_Addressing_Mode mode, int bitsize, X64_Register dest, X64_Register src, u8 disp8, uint32_t disp32);
+u8* emit_mov_indirect_sib(Instr_Emit_Result* out_info, u8* stream, u8 opcode, X64_Register src, u8 scale, X64_Register index, X64_Register base_reg);
+u8* emit_mov_rm_indirect_sib(Instr_Emit_Result* out_info, u8* stream, X64_Register src, u8 scale, X64_Register index, X64_Register base_reg);
+u8* emit_mov_mr_indirect_sib(Instr_Emit_Result* out_info, u8* stream, X64_Register src, u8 scale, X64_Register index, X64_Register base_reg);
+u8* emit_mov_oi(Instr_Emit_Result* out_info, u8* stream, X64_Register dest, Int_Value value);
+u8* emit_mov_mi(Instr_Emit_Result* out_info, u8* stream, X64_Register dest, Int_Value value);
+u8* emit_mov_moffs(Instr_Emit_Result* out_info, u8* stream, X64_Register src, uint64_t addr, bool invert);
+
+//lea
+u8* emit_lea(Instr_Emit_Result* out_info, u8* stream, int bitsize, X64_Register dest, X64_Register src);
+
+// arithmetic
+u8* emit_arith_mi(Instr_Emit_Result* out_info, u8* stream, int instr_digit, X64_Addressing_Mode mode, X64_Register dest, Int_Value value, u8 disp8, uint32_t disp32);
+u8* emit_arith_mi_imm8_sext(Instr_Emit_Result* out_info, u8* stream, int instr_digit, X64_Register dest, s8 value, X64_Addressing_Mode mode, u8 displ8, uint32_t displ32);
+u8* emit_arith_mr(Instr_Emit_Result* out_info, X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src, X64_Addressing_Mode mode, u8 disp8, uint32_t disp32);
+u8* emit_arith_rm(Instr_Emit_Result* out_info, X64_Arithmetic_Instr instr, u8* stream, X64_Register dest, X64_Register src, X64_Addressing_Mode mode, u8 disp8, uint32_t disp32);
+
+// float
+u8* emit_movs_reg_to_mem(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_XMM_Register src, X64_Register dst, bool single_precision, u8 disp8, uint32_t disp32);
+u8* emit_movs_mem_to_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_XMM_Register dest, X64_Register src, bool single_precision, u8 disp8, uint32_t disp32);
+u8* emit_movs_direct(Instr_Emit_Result* out_info, u8* stream, X64_XMM_Register dest, X64_XMM_Register src, bool single_precision);
+u8* emit_arith_sse(Instr_Emit_Result* out_info, u8* stream, X64_XMM_Arithmetic_Instr instr, X64_XMM_Register dest, X64_XMM_Register src, bool single_precision);
+u8* emit_cmp_sse(Instr_Emit_Result* out_info, u8* stream, X64_SSE_Compare_Flag flag, X64_XMM_Register r1, X64_XMM_Register r2);
+u8* emit_cvt(Instr_Emit_Result* out_info, u8* stream, X64_SSE_Convert_Instr instr, X64_Addressing_Mode mode, u8 src, u8 dest, u8 disp8, uint32_t disp32, bool single_prec);
+
+// mul/div
+u8* emit_mul(Instr_Emit_Result* out_info, u8* stream, int bitsize, X64_Multiplicative_Instr instr, X64_Register reg, X64_Addressing_Mode mode, u8 disp8, uint32_t disp32);
+
+// shift
+u8* emit_shift_reg(Instr_Emit_Result* out_info, u8* stream, int bitsize, X64_Shift_Instruction instr, X64_Addressing_Mode mode, X64_Register reg, u8 disp8, uint32_t disp32);
+u8* emit_shift_imm8(Instr_Emit_Result* out_info, u8* stream, int bitsize, X64_Shift_Instruction instr ,X64_Addressing_Mode mode, X64_Register reg, u8 imm, u8 disp8, uint32_t disp32);
+
+// jmp
+u8* emit_jmp_cond_short(Instr_Emit_Result* out_info, u8* stream, X64_Jump_Conditional_Short opcode, u8 offset);
+u8* emit_jmp_rel_unconditional(Instr_Emit_Result* out_info, u8* stream, int bitsize, Int_Value offset);
+u8* emit_jmp_reg_unconditional(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_Register reg, u8 disp8, uint32_t disp32);
+u8* emit_call_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_Register reg, u8 disp8, uint32_t disp32);
+
+// tests
 u8* emit_mov_test(u8* stream);
 u8* emit_add_test(u8* stream);
 u8* emit_and_test(u8* stream);
