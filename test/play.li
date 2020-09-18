@@ -1,7 +1,37 @@
-#import "../modules/print.li"
+//#import "../modules/print.li"
 
+Foo struct {
+    a : s32;
+    b : s32;
+}
 
 main : () -> s32 {
-    a := #type_value s32;
+    ptrptr : ^^s32;
+    ptr : ^s32;
+    i : s32;
+    foo : Foo;
+
+    a := *ptr;
+    b := *(*ptrptr);
+    c := &*(*ptrptr);
+    d := *&i;
+
+    e := &*(ptr + 3);    // ^int lvalue -> ^int rvalue -> int lvalue -> ^int rvalue
+    // *(*(ptr + 3));  // ^int lvalue -> ^int rvalue -> int lvalue -> error
+    //&(i + 3);       // int lvalue -> int rvalue -> error
+
+    f := &(ptr[3]);      // ^int lvalue -> int lvalue -> ^int rvalue
+    g := *&(ptr[3]);     // ^int lvalue -> int lvalue -> ^int rvalue -> int lvalue
+
+    h := foo.a;          // Foo lvalue -> int lvalue
+
+    i = 3;          // int lvalue = int rvalue
+    ptr = &i;       // ^int lvalue = ^int rvalue
+    *(ptr + 3) = 2; // int lvalue = int rvalue
+
+    j := *(&i -> ^Foo);      // int lvalue -> ^int rvalue -> ^Foo rvalue -> Foo lvalue
+
+    k := ptr[4];
+
     return 0;
 }

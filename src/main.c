@@ -69,10 +69,10 @@ int main(int argc, char** argv) {
     }
     double tcheck_elapsed = (os_time_us() - tcheck_start) / 1000.0;
     
-#if 0
-    ast_print(ast, LIGHT_AST_PRINT_STDOUT|LIGHT_AST_PRINT_EXPR_TYPES, 0);
+#if 1
+    ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
-    type_table_print();
+    //type_table_print();
 #endif
 
 #if 0
@@ -97,7 +97,7 @@ int main(int argc, char** argv) {
     printf("\n");
     printf("  gcc backend:     %.2f ms\n", gcc_elapsed);
 #else
-    tac_generate(ast);
+    //tac_generate(ast);
 #endif
 
 #if 0

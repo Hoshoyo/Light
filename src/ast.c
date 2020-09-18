@@ -671,8 +671,8 @@ ast_print_binary_op(Light_Operator_Binary binop, u32 flags) {
         case OP_BINARY_EQUAL:       length += fprintf(out, " == "); break;
         case OP_BINARY_NOT_EQUAL:   length += fprintf(out, " != "); break;
 
-        case OP_BINARY_LOGIC_AND:   length += fprintf(out, "&&"); break;
-        case OP_BINARY_LOGIC_OR:    length += fprintf(out, "||"); break;
+        case OP_BINARY_LOGIC_AND:   length += fprintf(out, " && "); break;
+        case OP_BINARY_LOGIC_OR:    length += fprintf(out, " || "); break;
 
         case OP_BINARY_VECTOR_ACCESS: length += fprintf(out, "["); break;
         default: length += fprintf(out, "<invalid binary expr>"); break;
@@ -751,7 +751,10 @@ ast_print_expression(Light_Ast* expr, u32 flags, s32 indent_level) {
 
     if(expr->flags & AST_FLAG_EXPRESSION_LVALUE) {
         fprintf(out, "%s", ColorBlue);
+    } else {
+        fprintf(out, "%s", ColorMagenta);
     }
+    length += fprintf(out, "(");
 
     switch(expr->kind) {
         case AST_EXPRESSION_BINARY:
@@ -782,6 +785,12 @@ ast_print_expression(Light_Ast* expr, u32 flags, s32 indent_level) {
             length += fprintf(out, ".%.*s", TOKEN_STR(expr->expr_dot.identifier));
             break;
         default: length += fprintf(out, "<invalid expression>"); break;
+    }
+
+    if(expr->flags & AST_FLAG_EXPRESSION_LVALUE) {
+        fprintf(out, "%s)", ColorBlue);
+    } else {
+        fprintf(out, "%s)", ColorMagenta);
     }
 
     //length += fprintf(out, ")");
@@ -935,7 +944,7 @@ ast_print_type(Light_Type* type, u32 flags, s32 indent_level) {
     if(!type) {
         return 0;
     }
-#define PRINT_TYPE_COLORS 1
+#define PRINT_TYPE_COLORS 0
 #if PRINT_TYPE_COLORS
     const char* color = 0;
     if(type->flags & TYPE_FLAG_INTERNALIZED) {
