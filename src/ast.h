@@ -285,6 +285,8 @@ typedef enum {
     DECL_VARIABLE_FLAG_STRUCT_FIELD = (1 << 1),
 	DECL_VARIABLE_FLAG_UNION_FIELD  = (1 << 2),
 	DECL_VARIABLE_FLAG_RESOLVED     = (1 << 3),
+
+	DECL_VARIABLE_FLAG_LOADED       = (1 << 4), // whether is loaded in a temporary already
 } Light_Decl_Variable_Flags;
 
 typedef struct {
@@ -295,7 +297,9 @@ typedef struct {
 
 	uint32_t flags;
 	int32_t  alignment_bytes;
+	int32_t  stack_index;  // Index from stack base
 	int32_t  stack_offset; // Offset from Stack base
+	int32_t  ir_temporary; // temporary index in the IR code
 	int32_t  field_index;  // Only relevant when DECL_VARIABLE_FLAG_STRUCT_FIELD is set
 } Light_Ast_Decl_Variable;
 

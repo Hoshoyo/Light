@@ -8,8 +8,8 @@
 #include "top_typecheck.h"
 #include "bytecode.h"
 #include "backend/c/toplevel.h"
-#include "tac.h"
 #include <light_array.h>
+#include "ir.h"
 
 int main(int argc, char** argv) {
     double start = os_time_us();
@@ -69,10 +69,14 @@ int main(int argc, char** argv) {
     }
     double tcheck_elapsed = (os_time_us() - tcheck_start) / 1000.0;
     
-#if 1
+#if 0
     ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //type_table_print();
+#endif
+
+#if 1
+    ir_generate(ast);
 #endif
 
 #if 0
