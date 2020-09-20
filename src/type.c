@@ -139,7 +139,7 @@ type_new_primitive(Light_Type_Primitive p) {
     return type_internalize(result);
 }
 
-static uint32_t
+uint32_t
 type_pointer_size_bits() {
     return 64;
 }
