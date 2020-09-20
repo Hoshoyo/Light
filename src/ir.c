@@ -39,7 +39,7 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
         decl->decl_variable.stack_offset = gen->ar.offset;
         gen->ar.offset += (decl->decl_variable.type->size_bits / 8);
 
-#if PRINT_VARIABLE_INFO
+#if PRINT_VARIABLE_INFO || 1
         fprintf(stdout, "variable[SP+%d] %.*s => ", decl->decl_variable.stack_offset,
             decl->decl_constant.name->length, decl->decl_constant.name->data);
         if(type_primitive_float(decl->decl_variable.type))
@@ -48,6 +48,38 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
             fprintf(stdout, "t%d\n", decl->decl_variable.ir_temporary);
 #endif
     }
+}
+
+static int
+ir_gen_cvt_to_r32(IR_Generator* gen, Light_Ast* expr, int op_temp)
+{
+    Light_Type* op_type = expr->expr_unary.operand->type;
+    // u8, u16, u32, u64, s8, s16, s32, s64, r64
+    // TODO(psv): implement
+}
+
+int
+ir_gen_expr_unary_cast(IR_Generator* gen, Light_Ast* expr, int op_temp, bool load)
+{
+    Light_Ast* operand = expr->expr_unary.operand;
+    Light_Type* tcast = type_alias_root(expr->expr_unary.type_to_cast);
+    
+    if(tcast->kind == TYPE_KIND_POINTER)
+    {
+        // int  -> ^T => do nothing
+        // ^S   -> ^T => do nothing
+        // []V  -> ^T => do nothing
+    }
+    else if(tcast->kind == TYPE_KIND_PRIMITIVE)
+    {
+        // TODO(psv): implement
+        switch(tcast->primitive)
+        {
+            case TYPE_PRIMITIVE_R32: return ir_gen_cvt_to_r32(gen, expr, op_temp);
+            default: break;
+        }
+    }
+    return op_temp;
 }
 
 int
@@ -90,7 +122,7 @@ ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load)
         } break;
 
         case OP_UNARY_CAST: {
-            // TODO(psv): implement
+            t2 = ir_gen_expr_unary_cast(gen, expr, t1, load);
         } break;
 
         default: break;
@@ -99,7 +131,7 @@ ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load)
 }
 
 int
-ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr)
+ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
 {
     int t1 = ir_gen_expr(gen, expr->expr_binary.left, true);
     int t2 = ir_gen_expr(gen, expr->expr_binary.right, true);
@@ -128,6 +160,13 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr)
         default: break; // TODO(psv): implement
     }
     iri_emit_arith(gen, instr_type, t1, t2, t3, (IR_Value){0}, byte_size);
+    
+    if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS && load)
+    {
+        int t4 = ir_new_reg(gen, expr->type);
+        iri_emit_load(gen, t3, t4, (IR_Value){0}, expr->type->size_bits / 8, type_primitive_float(expr->type));
+        return t4;
+    }
 
     return t3;
 }
@@ -156,7 +195,7 @@ ir_gen_expr_lit_prim(IR_Generator* gen, Light_Ast* expr)
         t = ir_new_tempf(gen);
     else
         t = ir_new_temp(gen);
-    iri_emit_load(gen, -1, t, value, iri_value_byte_size(value), type_primitive_float(expr->type));
+    iri_emit_mov(gen, -1, t, value, iri_value_byte_size(value), type_primitive_float(expr->type));
 
     return t;
 }
@@ -199,7 +238,7 @@ ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load)
     {
         case AST_EXPRESSION_LITERAL_PRIMITIVE: return ir_gen_expr_lit_prim(gen, expr);
         case AST_EXPRESSION_VARIABLE:          return ir_gen_expr_variable(gen, expr, load);
-        case AST_EXPRESSION_BINARY:            return ir_gen_expr_binary(gen, expr);
+        case AST_EXPRESSION_BINARY:            return ir_gen_expr_binary(gen, expr, load);
         case AST_EXPRESSION_UNARY:             return ir_gen_expr_unary(gen, expr, load);
         default: break;
     }

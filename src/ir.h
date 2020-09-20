@@ -30,10 +30,10 @@ typedef enum {
     IR_NEGF,                // negf tf1 -> tf2
 
     // convert instructions
-    IR_CVT_S32_R32,         // cvtdw2s t -> tf
-    IR_CVT_R32_S32,         // cvts2dw tf -> t
-    IR_CVT_R32_R64,         // cvts2dd tf1 -> tf2
-    IR_CVT_R64_R32,         // cvtdd2s tf1 -> tf2
+    IR_CVT_S32_R32,         // cvtsi2ss t -> tf
+    IR_CVT_R32_S32,         // cvtss2si tf -> t
+    IR_CVT_R32_R64,         // cvtss2ds tf1 -> tf2
+    IR_CVT_R64_R32,         // cvtds2ss tf1 -> tf2
 
 } IR_Instruction_Type;
 
