@@ -5,7 +5,12 @@
 #include "type.h"
 #include "ir.h"
 
-int ir_gen_expr(IR_Generator* gen, Light_Ast* expr);
+int ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load);
+
+static int
+ir_new_reg(IR_Generator* gen, Light_Type* type) {
+    return (type_primitive_float(type)) ? gen->temp_float++ : gen->temp_int++;
+}
 
 static int
 ir_new_temp(IR_Generator* gen) {
@@ -26,41 +31,61 @@ void
 ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
 {
     if(decl->kind == AST_DECL_VARIABLE) {
-        decl->decl_variable.ir_temporary = ir_new_temp(gen);
+        if(decl->type->size_bits <= type_pointer_size_bits())
+            decl->decl_variable.ir_temporary = ir_new_reg(gen, decl->type);
+        else
+            decl->decl_variable.ir_temporary = IR_REG_NONE;
         decl->decl_variable.stack_index = gen->ar.index++;
         decl->decl_variable.stack_offset = gen->ar.offset;
         gen->ar.offset += (decl->decl_variable.type->size_bits / 8);
+
+#if PRINT_VARIABLE_INFO
+        fprintf(stdout, "variable[SP+%d] %.*s => ", decl->decl_variable.stack_offset,
+            decl->decl_constant.name->length, decl->decl_constant.name->data);
+        if(type_primitive_float(decl->decl_variable.type))
+            fprintf(stdout, "tf%d\n", decl->decl_variable.ir_temporary);
+        else
+            fprintf(stdout, "t%d\n", decl->decl_variable.ir_temporary);
+#endif
     }
 }
 
 int
-ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr)
+ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load)
 {
     bool lval = expr->flags & AST_FLAG_EXPRESSION_LVALUE;
 
-    int t1 = ir_gen_expr(gen, expr->expr_unary.operand);
-    int t2 = ir_new_temp(gen);
-
-    if ((expr->expr_unary.operand->flags & AST_FLAG_EXPRESSION_LVALUE) && expr->expr_unary.op != OP_UNARY_ADDRESSOF)
-        iri_emit_load(gen, t1, t2, (IR_Value) { 0 }, expr->type->size_bits / 8);
+    // when the operand is a variable and the op is address of,
+    // the expression address must be loaded, instead of value
+    int t1 = ir_gen_expr(gen, expr->expr_unary.operand, (expr->expr_unary.op != OP_UNARY_ADDRESSOF));
+    int t2 = t1;
 
     switch(expr->expr_unary.op)
     {
         case OP_UNARY_DEREFERENCE: {
             // only perform a dereference when it is an lvalue
+            if(load)
+            {
+                t2 = ir_new_reg(gen, expr->type);
+                iri_emit_load(gen, t1, t2, (IR_Value){0}, expr->type->size_bits / 8, type_primitive_float(expr->type));
+            }
         } break;
 
-        case OP_UNARY_PLUS:
-        case OP_UNARY_ADDRESSOF: // nothing need to be done
+        case OP_UNARY_ADDRESSOF:
             break;
         
+        case OP_UNARY_PLUS:
+            break;
         case OP_UNARY_MINUS: {
-            iri_emit_neg(gen, t1, t2, expr->type->size_bits / 8);
+            t2 = ir_new_reg(gen, expr->type);
+            iri_emit_neg(gen, t1, t2, expr->type->size_bits / 8, type_primitive_float(expr->type));
         } break;
         case OP_UNARY_BITWISE_NOT: {
+            t2 = ir_new_reg(gen, expr->type);
             iri_emit_not(gen, t1, t2, expr->type->size_bits / 8);
         } break;
         case OP_UNARY_LOGIC_NOT: {
+            t2 = ir_new_reg(gen, expr->type);
             iri_emit_logic_not(gen, t1, t2, expr->type->size_bits / 8);
         } break;
 
@@ -76,33 +101,30 @@ ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr)
 int
 ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr)
 {
-    int t1 = ir_gen_expr(gen, expr->expr_binary.left);
-    int t2 = ir_gen_expr(gen, expr->expr_binary.right);
-    int t3 = ir_new_temp(gen);
+    int t1 = ir_gen_expr(gen, expr->expr_binary.left, true);
+    int t2 = ir_gen_expr(gen, expr->expr_binary.right, true);
+    int t3 = ir_new_reg(gen, expr->type);
 
-    if(expr->expr_binary.left->flags & AST_FLAG_EXPRESSION_LVALUE)
-        iri_emit_load(gen, t1, t1, (IR_Value){0}, (int)type_pointer_size_bits() / 8);
-    if(expr->expr_binary.right->flags & AST_FLAG_EXPRESSION_LVALUE)
-        iri_emit_load(gen, t2, t2, (IR_Value){0}, (int)type_pointer_size_bits() / 8);
+    bool fp = type_primitive_float(expr->type);
 
     int byte_size = ((expr->expr_binary.left->flags & AST_FLAG_EXPRESSION_LVALUE)) ? 
         ((int)type_pointer_size_bits() / 8) : (expr->type->size_bits / 8);
 
     IR_Instruction_Type instr_type = IR_NONE;
     switch(expr->expr_binary.op) {
-        case OP_BINARY_PLUS:      instr_type = IR_ADD; break;
-        case OP_BINARY_MINUS:     instr_type = IR_SUB; break;
-        case OP_BINARY_MULT:      instr_type = IR_MUL; break;
-        case OP_BINARY_DIV:       instr_type = IR_DIV; break;
-        case OP_BINARY_MOD:       instr_type = IR_MOD; break;
-        case OP_BINARY_AND:       instr_type = IR_AND; break;
-        case OP_BINARY_OR:        instr_type = IR_OR; break;
-        case OP_BINARY_XOR:       instr_type = IR_XOR; break;
-        case OP_BINARY_SHL:       instr_type = IR_SHL; break;
-        case OP_BINARY_SHR:       instr_type = IR_SHR; break;
-        case OP_BINARY_LOGIC_AND: instr_type = IR_LAND; break;
-        case OP_BINARY_LOGIC_OR:  instr_type = IR_LOR; break;
-        case OP_BINARY_VECTOR_ACCESS: instr_type = IR_ADD; break;
+        case OP_BINARY_PLUS:            instr_type = (fp) ? IR_ADDF : IR_ADD; break;
+        case OP_BINARY_MINUS:           instr_type = (fp) ? IR_SUBF : IR_SUB; break;
+        case OP_BINARY_MULT:            instr_type = (fp) ? IR_MULF : IR_MUL; break;
+        case OP_BINARY_DIV:             instr_type = (fp) ? IR_DIVF : IR_DIV; break;
+        case OP_BINARY_MOD:             instr_type = IR_MOD; break;
+        case OP_BINARY_AND:             instr_type = IR_AND; break;
+        case OP_BINARY_OR:              instr_type = IR_OR; break;
+        case OP_BINARY_XOR:             instr_type = IR_XOR; break;
+        case OP_BINARY_SHL:             instr_type = IR_SHL; break;
+        case OP_BINARY_SHR:             instr_type = IR_SHR; break;
+        case OP_BINARY_LOGIC_AND:       instr_type = IR_LAND; break;
+        case OP_BINARY_LOGIC_OR:        instr_type = IR_LOR; break;
+        case OP_BINARY_VECTOR_ACCESS:   instr_type = IR_ADD; break;
         default: break; // TODO(psv): implement
     }
     iri_emit_arith(gen, instr_type, t1, t2, t3, (IR_Value){0}, byte_size);
@@ -113,7 +135,6 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr)
 int
 ir_gen_expr_lit_prim(IR_Generator* gen, Light_Ast* expr)
 {
-    int t = ir_new_temp(gen);
     IR_Value value = {0};
     value.v_u64 = expr->expr_literal_primitive.value_u64; // this forced any type to be inside the union correctly
     switch(expr->type->primitive) {
@@ -130,37 +151,56 @@ ir_gen_expr_lit_prim(IR_Generator* gen, Light_Ast* expr)
         case TYPE_PRIMITIVE_BOOL: value.type = IR_VALUE_U8; break;
         default: break;
     }
-    iri_emit_load(gen, -1, t, value, iri_value_byte_size(value));
+    int t = IR_REG_NONE;
+    if(type_primitive_float(expr->type))
+        t = ir_new_tempf(gen);
+    else
+        t = ir_new_temp(gen);
+    iri_emit_load(gen, -1, t, value, iri_value_byte_size(value), type_primitive_float(expr->type));
 
     return t;
 }
 
 int
-ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr)
+ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load)
 {
+    int t = IR_REG_NONE;
     Light_Ast_Decl_Variable* decl = &expr->expr_variable.decl->decl_variable;
 
     // if it is not loaded in a temporary, then load it
-    if(!(decl->flags & DECL_VARIABLE_FLAG_LOADED))
+    if(load && !(decl->flags & DECL_VARIABLE_FLAG_LOADED))
     {
         // LOAD SP+imm -> t
-        iri_emit_load(gen, IR_REG_STACK_PTR, decl->ir_temporary, 
+        t = decl->ir_temporary;
+        iri_emit_load(gen, IR_REG_STACK_PTR, t, 
             (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
-            decl->type->size_bits / 8);
+            expr->type->size_bits / 8, type_primitive_float(expr->type));
         decl->flags |= DECL_VARIABLE_FLAG_LOADED;
     }
-    return decl->ir_temporary;
+    else if(load)
+    {
+        t = decl->ir_temporary;
+    }
+    else
+    {
+        // LEA
+        t = ir_new_temp(gen);
+        iri_emit_lea(gen, IR_REG_STACK_PTR, decl->ir_temporary, 
+            (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
+            (int)type_pointer_size_bits() / 8);
+    }
+    return t;
 }
 
 int
-ir_gen_expr(IR_Generator* gen, Light_Ast* expr)
+ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load)
 {
     switch(expr->kind)
     {
         case AST_EXPRESSION_LITERAL_PRIMITIVE: return ir_gen_expr_lit_prim(gen, expr);
-        case AST_EXPRESSION_VARIABLE:          return ir_gen_expr_variable(gen, expr);
+        case AST_EXPRESSION_VARIABLE:          return ir_gen_expr_variable(gen, expr, load);
         case AST_EXPRESSION_BINARY:            return ir_gen_expr_binary(gen, expr);
-        case AST_EXPRESSION_UNARY:             return ir_gen_expr_unary(gen, expr);
+        case AST_EXPRESSION_UNARY:             return ir_gen_expr_unary(gen, expr, load);
         default: break;
     }
     return -1;
@@ -169,10 +209,26 @@ ir_gen_expr(IR_Generator* gen, Light_Ast* expr)
 void
 ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
 {
-    int t1 = ir_gen_expr(gen, comm->lvalue);
-    int t2 = ir_gen_expr(gen, comm->rvalue);
+    int byte_size = comm->rvalue->type->size_bits / 8;
+    int t2 = ir_gen_expr(gen, comm->rvalue, true);
+#if 0
+    // Store into memory
     // STORE t2 -> t1
-    iri_emit_store(gen, t2, t1, (IR_Value){0}, comm->rvalue->type->size_bits / 8);
+    iri_emit_store(gen, t2, t1, (IR_Value){0}, comm->rvalue->type->size_bits / 8, type_primitive_float(comm->rvalue));
+#else
+    if(comm->lvalue->kind == AST_EXPRESSION_VARIABLE)
+    {
+        Light_Ast* var_decl = comm->lvalue->expr_variable.decl;
+        iri_emit_mov(gen, t2, var_decl->decl_variable.ir_temporary, (IR_Value){0},
+            byte_size, type_primitive_float(comm->rvalue->type));
+    }
+    else
+    {
+        int t1 = ir_gen_expr(gen, comm->lvalue, false);
+        iri_emit_store(gen, t2, t1, (IR_Value){0}, byte_size, type_primitive_float(comm->rvalue->type));
+    }
+#endif
+
 }
 
 void
