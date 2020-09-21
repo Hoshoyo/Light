@@ -20,3 +20,13 @@ typedef double r64;
 
 #define true 1
 #define false 0
+
+#if defined(_WIN32) || defined(_WIN64)
+#define PRINTF_U64 "%llu"
+#define PRINTF_S64 "%lld"
+#define PRINTF_X64 "%llx"
+#elif defined(__linux__)
+#define PRINTF_U64 "%lu"
+#define PRINTF_S64 "%ld"
+#define PRINTF_X64 "%lx"
+#endif

@@ -1029,7 +1029,7 @@ ast_print_type(Light_Type* type, u32 flags, s32 indent_level) {
                     length += ast_print_expression(type->enumerator.fields[i]->decl_constant.value, flags, indent_level+1);
                 }
                 #endif
-                length += fprintf(out, " :: %ld", type->enumerator.evaluated_values[i]);
+                length += fprintf(out, " :: " PRINTF_S64, type->enumerator.evaluated_values[i]);
             }
             length += fprintf(out, "%s }", color);
         } break;

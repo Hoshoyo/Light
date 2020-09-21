@@ -320,6 +320,7 @@ typedef struct {
 
 	uint32_t           flags;
 	int32_t            argument_count;
+	int32_t            ir_instr_index;
 	
 	Light_Token*       extern_library_name;
 } Light_Ast_Decl_Procedure;
