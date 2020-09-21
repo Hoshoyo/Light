@@ -62,6 +62,7 @@ typedef enum {
     IR_RET,     // ret
     IR_PUSH,    // push t
 
+    IR_COPY,    // copy t1, imm -> t2
 } IR_Instruction_Type;
 
 typedef enum {
@@ -151,6 +152,7 @@ void iri_emit_jrnz(IR_Generator* gen, IR_Reg t1, IR_Value imm, int byte_size);
 void iri_emit_call(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size);
 void iri_emit_push(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size);
 void iri_emit_ret(IR_Generator* gen);
+void iri_emit_copy(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size);
 
 int  iri_value_byte_size(IR_Value value);
 void iri_print_instructions(IR_Generator* gen);

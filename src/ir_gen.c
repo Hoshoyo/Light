@@ -156,6 +156,13 @@ iri_emit_push(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size)
     array_push(gen->instructions, inst);
 }
 
+void
+iri_emit_copy(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size)
+{
+    IR_Instruction inst = iri_new(IR_COPY, t1, IR_REG_NONE, t2, imm, byte_size);
+    array_push(gen->instructions, inst);
+}
+
 int
 iri_current_instr_index(IR_Generator* gen)
 {
@@ -506,6 +513,14 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
         } break;
         case IR_RET: {
             fprintf(out, "RET ");
+        } break;
+        case IR_COPY: {
+            fprintf(out, "COPY ");
+            iri_print_register(out, instr->t1, false);
+            fprintf(out, ", ");
+            iri_print_value(out, instr->imm);
+            fprintf(out, " -> ");
+            iri_print_register(out, instr->t3, false);
         } break;
 
         case IR_CVT_SI_R32:

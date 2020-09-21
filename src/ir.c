@@ -29,6 +29,18 @@ ir_new_tempf(IR_Generator* gen) {
 // *****************************************************
 
 void
+ir_gen_load(IR_Generator* gen, Light_Ast* expr, IR_Reg src, IR_Reg dst)
+{
+    Light_Type* type = type_alias_root(expr->type);
+    if(type->kind == TYPE_KIND_PRIMITIVE)
+        iri_emit_load(gen, src, dst, (IR_Value){0}, type->size_bits / 8, type_primitive_float(type));
+    else
+    {
+        // TODO(psv): bigger types
+    }
+}
+
+void
 ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
 {
     if(decl->kind == AST_DECL_VARIABLE) {
@@ -442,10 +454,11 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
     IR_Reg t = ir_gen_expr(gen, expr->expr_dot.left, false);
     Light_Type* ltype = type_alias_root(expr->expr_dot.left->type);
 
-    IR_Reg tres = ir_new_temp(gen);
-    int32_t offset = 0;
+    IR_Reg tres = IR_REG_NONE;
     if(ltype->kind == TYPE_KIND_STRUCT)
     {
+        int32_t offset = 0;
+        tres = ir_new_temp(gen);
         for(int i = 0; i < ltype->struct_info.fields_count; ++i)
         {
             if(ltype->struct_info.fields[i]->decl_variable.name->data == expr->expr_dot.identifier->data)
@@ -458,15 +471,22 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
     }
     else if(ltype->kind == TYPE_KIND_UNION)
     {
-        // TODO(psv): implement
+        // nothing need to be done, since offset in the union is always 0
+        tres = t;
+    }
+    else
+    {
+        // TODO(psv): enum offset
     }
 
     if(load)
     {
         IR_Reg r = ir_new_reg(gen, expr->type);
+        assert(type_alias_root(expr->type)->kind == TYPE_KIND_PRIMITIVE);
         iri_emit_load(gen, tres, r, (IR_Value){0}, expr->type->size_bits / 8, type_primitive_float(expr->type));
+        return r;
     }
-    return t;
+    return tres;
 }
 
 IR_Reg
@@ -554,22 +574,33 @@ void
 ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
 {
     int byte_size = comm->rvalue->type->size_bits / 8;
-    IR_Reg t2 = ir_gen_expr(gen, comm->rvalue, true);
+    Light_Type* rvalue_type = type_alias_root(comm->rvalue->type);
+    bool primitive_type = rvalue_type->kind == TYPE_KIND_PRIMITIVE;
+
+    IR_Reg t2 = ir_gen_expr(gen, comm->rvalue, primitive_type);
 
     const bool always_store = true;
 
-    if(comm->lvalue->kind == AST_EXPRESSION_VARIABLE && !always_store)
+    if(primitive_type || rvalue_type->kind == TYPE_KIND_FUNCTION || rvalue_type->kind == TYPE_KIND_POINTER)
     {
-        Light_Ast* var_decl = comm->lvalue->expr_variable.decl;
-        iri_emit_mov(gen, t2, var_decl->decl_variable.ir_temporary, (IR_Value){0},
-            byte_size, type_primitive_float(comm->rvalue->type));
+        if(comm->lvalue->kind == AST_EXPRESSION_VARIABLE && !always_store)
+        {
+            Light_Ast* var_decl = comm->lvalue->expr_variable.decl;
+            iri_emit_mov(gen, t2, var_decl->decl_variable.ir_temporary, (IR_Value){0},
+                byte_size, type_primitive_float(comm->rvalue->type));
+        }
+        else
+        {
+            IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);
+            iri_emit_store(gen, t2, t1, (IR_Value){0}, byte_size, type_primitive_float(comm->rvalue->type));
+        }
     }
     else
     {
         IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);
-        iri_emit_store(gen, t2, t1, (IR_Value){0}, byte_size, type_primitive_float(comm->rvalue->type));
+        iri_emit_copy(gen, t2, t1, (IR_Value){.type = IR_VALUE_U32, .v_u32 = byte_size}, 
+            type_pointer_size_bits() / 8);
     }
-
 }
 
 void

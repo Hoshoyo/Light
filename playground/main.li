@@ -1,11 +1,16 @@
+bar struct {
+    a : s32;
+    b : s32;
+    c : s64;
+}
 foo struct {
     x : s32;
-    y : s32;
+    y : bar;
 }
 
 main : () -> s32 {
     a : foo;
-    b : s32;
-    b = a.y;
+    b : ^bar;
+    b = &a.y;
     return 0;
 }
