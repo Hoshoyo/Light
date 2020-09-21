@@ -197,6 +197,7 @@ iri_print_register(FILE* out, IR_Reg reg, bool fp)
     {
         case IR_REG_PROC_RET:  fprintf(out, "r0"); break;
         case IR_REG_STACK_PTR: fprintf(out, "sp"); break;
+        case IR_REG_STACK_BASE: fprintf(out, "sb"); break;
         case IR_REG_NONE:      fprintf(out, "invalid"); break;
         default: {
             fprintf(out, (fp) ? "tf%d":"t%d", reg); 

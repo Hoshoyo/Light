@@ -41,7 +41,7 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
         gen->ar.offset += (decl->decl_variable.type->size_bits / 8);
 
 #if PRINT_VARIABLE_INFO || 1
-        fprintf(stdout, "variable[SP+%d] %.*s => ", decl->decl_variable.stack_offset,
+        fprintf(stdout, "variable[SB+%d] %.*s => ", decl->decl_variable.stack_offset,
             decl->decl_constant.name->length, decl->decl_constant.name->data);
         if(type_primitive_float(decl->decl_variable.type))
             fprintf(stdout, "tf%d\n", decl->decl_variable.ir_temporary);
@@ -110,12 +110,19 @@ ir_gen_cvt_to_bool(IR_Generator* gen, Light_Ast* expr, int op_temp)
 {
     Light_Type* op_type = expr->expr_unary.operand->type;
     Light_Type* cast_type = expr->expr_unary.type_to_cast;
+    if(type_alias_root(op_type) == type_alias_root(cast_type))
+        return op_temp;
 
-    if(op_type->size_bits != cast_type->size_bits)
-    {
-        // TODO(psv): implement once has conditional move
-    }
-    return 0;
+    IR_Reg t = ir_new_temp(gen);
+    // zero register out since when false the value must be 0
+    iri_emit_arith(gen, IR_XOR, t, t, t, (IR_Value){0}, cast_type->size_bits / 8);
+
+    iri_emit_cmp(gen, op_temp, IR_REG_NONE, (IR_Value){.type = IR_VALUE_U8, .v_u8 = 0}, op_type->size_bits / 8, false);
+
+    // mov 1 if the value is different from 0
+    iri_emit_cmov(gen, IR_CMOVNE, t, IR_REG_NONE, (IR_Value){.type = IR_VALUE_U8, .v_u8 = 1}, cast_type->size_bits / 8);
+
+    return t;
 }
 
 IR_Reg
@@ -387,9 +394,9 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load)
         // if it is not loaded in a temporary, then load it
         if(load && !(decl->flags & DECL_VARIABLE_FLAG_LOADED))
         {
-            // LOAD SP+imm -> t
+            // LOAD SB+imm -> t
             t = decl->ir_temporary;
-            iri_emit_load(gen, IR_REG_STACK_PTR, t, 
+            iri_emit_load(gen, IR_REG_STACK_BASE, t, 
                 (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
                 expr->type->size_bits / 8, type_primitive_float(expr->type));
             decl->flags |= DECL_VARIABLE_FLAG_LOADED;
@@ -402,7 +409,7 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load)
         {
             // LEA
             t = ir_new_temp(gen);
-            iri_emit_lea(gen, IR_REG_STACK_PTR, t, 
+            iri_emit_lea(gen, IR_REG_STACK_BASE, t, 
                 (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
                 (int)type_pointer_size_bits() / 8);
         }
@@ -430,6 +437,39 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load)
 }
 
 IR_Reg
+ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
+{
+    IR_Reg t = ir_gen_expr(gen, expr->expr_dot.left, false);
+    Light_Type* ltype = type_alias_root(expr->expr_dot.left->type);
+
+    IR_Reg tres = ir_new_temp(gen);
+    int32_t offset = 0;
+    if(ltype->kind == TYPE_KIND_STRUCT)
+    {
+        for(int i = 0; i < ltype->struct_info.fields_count; ++i)
+        {
+            if(ltype->struct_info.fields[i]->decl_variable.name->data == expr->expr_dot.identifier->data)
+            {
+                offset = (int32_t)(ltype->struct_info.offset_bits[i] / 8);
+                break;
+            }
+        }
+        iri_emit_arith(gen, IR_ADD, t, IR_REG_NONE, tres, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, type_pointer_size_bits() / 8);
+    }
+    else if(ltype->kind == TYPE_KIND_UNION)
+    {
+        // TODO(psv): implement
+    }
+
+    if(load)
+    {
+        IR_Reg r = ir_new_reg(gen, expr->type);
+        iri_emit_load(gen, tres, r, (IR_Value){0}, expr->type->size_bits / 8, type_primitive_float(expr->type));
+    }
+    return t;
+}
+
+IR_Reg
 ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load)
 {
     switch(expr->kind)
@@ -439,6 +479,7 @@ ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load)
         case AST_EXPRESSION_BINARY:            return ir_gen_expr_binary(gen, expr, load);
         case AST_EXPRESSION_UNARY:             return ir_gen_expr_unary(gen, expr, load);
         case AST_EXPRESSION_PROCEDURE_CALL:    return ir_gen_expr_proc_call(gen, expr, load);
+        case AST_EXPRESSION_DOT:               return ir_gen_expr_dot(gen, expr, load);
         default: break;
     }
     return IR_REG_NONE;
@@ -584,7 +625,21 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
 {
     Light_Ast* body = proc->decl_proc.body;
 
+    // setup arguments in the stack
     proc->decl_proc.ir_instr_index = iri_current_instr_index(gen);
+
+    // TODO(psv): consider alignment
+    int stack_offset = 0;
+    for(int i = 0; i < proc->decl_proc.argument_count; ++i)
+    {
+        Light_Ast* arg = proc->decl_proc.arguments[i];
+        ir_gen_decl(gen, arg);
+        arg->decl_variable.ir_temporary = ir_new_reg(gen, arg->decl_variable.type);
+        arg->decl_variable.stack_index = -1 - i;
+        arg->decl_variable.stack_offset = stack_offset - arg->decl_variable.type->size_bits / 8;
+        stack_offset -= (arg->decl_variable.type->size_bits / 8);
+    }
+
     ir_gen_comm_block(gen, proc->decl_proc.body);
 }
 

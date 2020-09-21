@@ -3,8 +3,9 @@
 #include "ast.h"
 
 typedef enum {
-    IR_REG_INSTR_PTR = -3,
-    IR_REG_STACK_PTR = -2,
+    IR_REG_INSTR_PTR = -4,
+    IR_REG_STACK_PTR = -3,
+    IR_REG_STACK_BASE = -2,
     IR_REG_NONE = -1,
     IR_REG_PROC_RET = 0,
 } IR_Reg;
