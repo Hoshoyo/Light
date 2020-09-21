@@ -490,6 +490,82 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
 }
 
 IR_Reg
+ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr)
+{
+    int size_bytes = expr->type->size_bits / 8;
+    // alocate bytes in the stack for it
+    iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR,
+        (IR_Value){.type = IR_VALUE_S32, .v_s32 = size_bytes}, type_pointer_size_bits() / 8);
+    
+    for(int i = 0, offset = 0; i < array_length(expr->expr_literal_struct.struct_exprs); ++i)
+    {
+        Light_Ast* e = expr->expr_literal_struct.struct_exprs[i];
+        IR_Reg expt = ir_gen_expr(gen, e, true);
+        if(e->flags & AST_FLAG_EXPRESSION_LVALUE)
+        {
+            iri_emit_copy(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
+        }
+        else
+        {
+            iri_emit_store(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8,
+                type_primitive_float(e->type));
+        }
+        offset = expr->type->struct_info.offset_bits[i];
+    }
+
+    IR_Reg t = ir_new_temp(gen);
+    iri_emit_lea(gen, IR_REG_STACK_PTR, t, (IR_Value){0}, type_pointer_size_bits() / 8);
+    return t;
+}
+
+IR_Reg
+ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr)
+{
+    int size_bytes = (expr->type->size_bits / 8);
+    // alocate bytes in the stack for it
+    iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR,
+        (IR_Value){.type = IR_VALUE_S32, .v_s32 = size_bytes}, type_pointer_size_bits() / 8);
+
+    if(expr->expr_literal_array.raw_data)
+    {
+        // raw data
+        // TODO(psv): optimize to store 4 or more bytes at a time
+        IR_Reg t1 = ir_new_temp(gen);
+        for(int i = 0; i < expr->expr_literal_array.data_length_bytes; ++i)
+        {
+            iri_emit_mov(gen, IR_REG_NONE, t1, (IR_Value){.type = IR_VALUE_U8, .v_u8 = expr->expr_literal_array.data[i]},
+                8, false);
+            iri_emit_store(gen, t1, IR_REG_STACK_PTR, 
+                (IR_Value){.type = IR_VALUE_S32, .v_s32 = i}, 1, false);
+        }
+    }
+    else
+    {
+        // expressions array
+        for(int i = 0, offset = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i)
+        {
+            Light_Ast* e = expr->expr_literal_array.array_exprs[i];
+            IR_Reg expt = ir_gen_expr(gen, e, true);
+            if(e->flags & AST_FLAG_EXPRESSION_LVALUE)
+            {
+                iri_emit_copy(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
+            }
+            else
+            {
+                iri_emit_store(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8,
+                    type_primitive_float(e->type));
+            }
+
+            offset += (e->type->size_bits / 8);
+        }
+    }
+
+    IR_Reg t = ir_new_temp(gen);
+    iri_emit_lea(gen, IR_REG_STACK_PTR, t, (IR_Value){0}, type_pointer_size_bits() / 8);
+    return t;
+}
+
+IR_Reg
 ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load)
 {
     switch(expr->kind)
@@ -500,6 +576,8 @@ ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load)
         case AST_EXPRESSION_UNARY:             return ir_gen_expr_unary(gen, expr, load);
         case AST_EXPRESSION_PROCEDURE_CALL:    return ir_gen_expr_proc_call(gen, expr, load);
         case AST_EXPRESSION_DOT:               return ir_gen_expr_dot(gen, expr, load);
+        case AST_EXPRESSION_LITERAL_ARRAY:     return ir_gen_expr_lit_array(gen, expr);
+        case AST_EXPRESSION_LITERAL_STRUCT:    return ir_gen_expr_lit_struct(gen, expr);
         default: break;
     }
     return IR_REG_NONE;
@@ -571,6 +649,32 @@ ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
 }
 
 void
+ir_gen_decl_assignment(IR_Generator* gen, Light_Ast* decl)
+{
+    assert(decl->kind == AST_DECL_VARIABLE);
+    Light_Ast* expr = decl->decl_variable.assignment;
+    int byte_size = expr->type->size_bits / 8;
+    Light_Type* rvalue_type = type_alias_root(expr->type);
+    bool primitive_type = rvalue_type->kind == TYPE_KIND_PRIMITIVE;
+
+    IR_Reg t2 = ir_gen_expr(gen, expr, primitive_type);
+
+
+    IR_Value stack_offset = (IR_Value){.type = IR_VALUE_S32, .v_s32 = decl->decl_variable.stack_offset};
+    if(primitive_type || rvalue_type->kind == TYPE_KIND_FUNCTION || rvalue_type->kind == TYPE_KIND_POINTER)
+    {
+        iri_emit_store(gen, t2, IR_REG_STACK_BASE, stack_offset, byte_size, type_primitive_float(rvalue_type));
+    }
+    else
+    {
+        IR_Reg t1 = ir_new_reg(gen, rvalue_type);
+        iri_emit_lea(gen, IR_REG_STACK_BASE, t1, stack_offset, type_pointer_size_bits() / 8);
+        iri_emit_copy(gen, t2, t1, (IR_Value){.type = IR_VALUE_U32, .v_u32 = byte_size}, 
+            type_pointer_size_bits() / 8);
+    }
+}
+
+void
 ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
 {
     int byte_size = comm->rvalue->type->size_bits / 8;
@@ -606,13 +710,27 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
 void
 ir_gen_comm_block(IR_Generator* gen, Light_Ast* body)
 {
+    // decls
+    for(int i = 0; i < body->comm_block.command_count; ++i) {
+        Light_Ast* comm = body->comm_block.commands[i];
+        if(comm->flags & AST_FLAG_DECLARATION)
+            ir_gen_decl(gen, comm);
+    }
+
+    // commands
     for(int i = 0; i < body->comm_block.command_count; ++i) {
         Light_Ast* comm = body->comm_block.commands[i];
         if(comm->flags & AST_FLAG_COMMAND)
             ir_gen_comm(gen, comm);
-        else if(comm->flags & AST_FLAG_DECLARATION)
-            ir_gen_decl(gen, comm);
+        if(comm->flags & AST_FLAG_DECLARATION)
+        {
+            if(comm->kind == AST_DECL_VARIABLE && comm->decl_variable.assignment)
+            {
+                ir_gen_decl_assignment(gen, comm);
+            }
+        }
     }
+
 }
 
 void
