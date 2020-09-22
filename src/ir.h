@@ -127,6 +127,8 @@ typedef struct {
     IR_Reg temp_int;
     IR_Reg temp_float;
 
+    int* loop_start_labels;
+    int* loop_end_labels;
     IR_Decl_To_Patch* decl_patch;  // at the end, iterate through all these indexes and fill the instruction with the proc address
 } IR_Generator;
 

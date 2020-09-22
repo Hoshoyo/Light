@@ -426,6 +426,10 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load)
                 (int)type_pointer_size_bits() / 8);
         }
     }
+    else if (vdecl->kind == AST_DECL_CONSTANT)
+    {
+        t = ir_gen_expr(gen, vdecl->decl_constant.value, load);
+    }
 
     return t;
 }
@@ -451,8 +455,23 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load)
 IR_Reg
 ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
 {
-    IR_Reg t = ir_gen_expr(gen, expr->expr_dot.left, false);
     Light_Type* ltype = type_alias_root(expr->expr_dot.left->type);
+
+    if(ltype->kind == TYPE_KIND_ENUM)
+    {
+        for (int i = 0; i < array_length(ltype->enumerator.fields); ++i)
+        {
+            if(ltype->enumerator.fields[i]->decl_variable.name->data == expr->expr_dot.identifier->data)
+            {
+                IR_Reg t1 = ir_new_temp(gen);
+                iri_emit_mov(gen, IR_REG_NONE, t1, 
+                    (IR_Value){.type = IR_VALUE_S32, .v_s32 = (s32)ltype->enumerator.evaluated_values[i]}, 32, false);
+                return t1;
+            }
+        }
+    }
+
+    IR_Reg t = ir_gen_expr(gen, expr->expr_dot.left, false);
 
     IR_Reg tres = IR_REG_NONE;
     if(ltype->kind == TYPE_KIND_STRUCT)
@@ -474,10 +493,6 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
         // nothing need to be done, since offset in the union is always 0
         tres = t;
     }
-    else
-    {
-        // TODO(psv): enum offset
-    }
 
     if(load)
     {
@@ -497,7 +512,10 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr)
     iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR,
         (IR_Value){.type = IR_VALUE_S32, .v_s32 = size_bytes}, type_pointer_size_bits() / 8);
     
-    for(int i = 0, offset = 0; i < array_length(expr->expr_literal_struct.struct_exprs); ++i)
+    Light_Type* struct_type = type_alias_root(expr->type);
+    for(int i = 0, offset = 0;
+        i < array_length(expr->expr_literal_struct.struct_exprs);
+        ++i, offset = struct_type->struct_info.offset_bits[i] / 8)
     {
         Light_Ast* e = expr->expr_literal_struct.struct_exprs[i];
         IR_Reg expt = ir_gen_expr(gen, e, true);
@@ -510,7 +528,6 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr)
             iri_emit_store(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8,
                 type_primitive_float(e->type));
         }
-        offset = expr->type->struct_info.offset_bits[i];
     }
 
     IR_Reg t = ir_new_temp(gen);
@@ -531,7 +548,8 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr)
         // raw data
         // TODO(psv): optimize to store 4 or more bytes at a time
         IR_Reg t1 = ir_new_temp(gen);
-        for(int i = 0; i < expr->expr_literal_array.data_length_bytes; ++i)
+        // skip " and leave " out
+        for(int i = 1; i < expr->expr_literal_array.data_length_bytes - 1; ++i)
         {
             iri_emit_mov(gen, IR_REG_NONE, t1, (IR_Value){.type = IR_VALUE_U8, .v_u8 = expr->expr_literal_array.data[i]},
                 8, false);
@@ -625,6 +643,8 @@ void
 ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
 {
     int while_start_index = iri_current_instr_index(gen);
+    array_push(gen->loop_start_labels, while_start_index);
+
     // while(condition)
     IR_Reg cond_temp = ir_gen_expr(gen, stmt->comm_while.condition, true);
 
@@ -655,7 +675,7 @@ ir_gen_decl_assignment(IR_Generator* gen, Light_Ast* decl)
     Light_Ast* expr = decl->decl_variable.assignment;
     int byte_size = expr->type->size_bits / 8;
     Light_Type* rvalue_type = type_alias_root(expr->type);
-    bool primitive_type = rvalue_type->kind == TYPE_KIND_PRIMITIVE;
+    bool primitive_type = rvalue_type->kind == TYPE_KIND_PRIMITIVE || rvalue_type->kind == TYPE_KIND_ENUM;
 
     IR_Reg t2 = ir_gen_expr(gen, expr, primitive_type);
 
@@ -807,6 +827,8 @@ void ir_generate(Light_Ast** ast) {
     IR_Generator gen = {0};
     gen.instructions = array_new(IR_Instruction);
     gen.decl_patch = array_new(IR_Decl_To_Patch);
+    gen.loop_start_labels = array_new(int);
+    gen.loop_end_labels = array_new(int);
     gen.temp_int = 1;   // temp 0 is reserved for proc call return value
     gen.temp_float = 1; // temp 0 is reserved for proc call return value
     gen.ar.index = 0;

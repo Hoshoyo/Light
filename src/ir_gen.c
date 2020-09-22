@@ -195,6 +195,14 @@ iri_print_value(FILE* out, IR_Value value)
         case IR_VALUE_R64:  fprintf(out, "%f", value.v_r64); break;
         default: break;
     }
+    if(value.type == IR_VALUE_U8 || value.type == IR_VALUE_S8)
+    {
+        if((value.v_u8 >= 'a' && value.v_u8 <= 'z') || (value.v_u8 >= 'A' && value.v_u8 <= 'Z')
+            || (value.v_u8 >= '0' && value.v_u8 <= '9'))
+        {
+            fprintf(out, " ('%c')", value.v_u8);
+        }
+    }
 }
 
 void
