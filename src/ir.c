@@ -7,6 +7,7 @@
 
 int ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load);
 void ir_gen_comm(IR_Generator* gen, Light_Ast* comm);
+void ir_gen_commands(IR_Generator* gen, Light_Ast** commands, int comm_count);
 
 static int
 ir_new_reg(IR_Generator* gen, Light_Type* type) {
@@ -586,19 +587,22 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr)
 IR_Reg
 ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load)
 {
+    IR_Reg res = IR_REG_NONE;
+
     switch(expr->kind)
     {
-        case AST_EXPRESSION_LITERAL_PRIMITIVE: return ir_gen_expr_lit_prim(gen, expr);
-        case AST_EXPRESSION_VARIABLE:          return ir_gen_expr_variable(gen, expr, load);
-        case AST_EXPRESSION_BINARY:            return ir_gen_expr_binary(gen, expr, load);
-        case AST_EXPRESSION_UNARY:             return ir_gen_expr_unary(gen, expr, load);
-        case AST_EXPRESSION_PROCEDURE_CALL:    return ir_gen_expr_proc_call(gen, expr, load);
-        case AST_EXPRESSION_DOT:               return ir_gen_expr_dot(gen, expr, load);
-        case AST_EXPRESSION_LITERAL_ARRAY:     return ir_gen_expr_lit_array(gen, expr);
-        case AST_EXPRESSION_LITERAL_STRUCT:    return ir_gen_expr_lit_struct(gen, expr);
+        case AST_EXPRESSION_LITERAL_PRIMITIVE: res =  ir_gen_expr_lit_prim(gen, expr); break;
+        case AST_EXPRESSION_VARIABLE:          res =  ir_gen_expr_variable(gen, expr, load); break;
+        case AST_EXPRESSION_BINARY:            res =  ir_gen_expr_binary(gen, expr, load); break;
+        case AST_EXPRESSION_UNARY:             res =  ir_gen_expr_unary(gen, expr, load); break;
+        case AST_EXPRESSION_PROCEDURE_CALL:    res =  ir_gen_expr_proc_call(gen, expr, load); break;
+        case AST_EXPRESSION_DOT:               res =  ir_gen_expr_dot(gen, expr, load); break;
+        case AST_EXPRESSION_LITERAL_ARRAY:     res =  ir_gen_expr_lit_array(gen, expr); break;
+        case AST_EXPRESSION_LITERAL_STRUCT:    res =  ir_gen_expr_lit_struct(gen, expr); break;
         default: break;
     }
-    return IR_REG_NONE;
+
+    return res;
 }
 
 void
@@ -639,6 +643,38 @@ ir_gen_comm_if(IR_Generator* gen, Light_Ast* stmt)
     }
 }
 
+static void
+ir_patch_jumps(IR_Generator* gen, int current_index)
+{
+    for(int i = 0; i < array_length(gen->jmp_patch); ++i)
+    {
+        if(gen->jmp_patch[i].level == 0)
+        {
+            IR_Instruction* instr = iri_get_temp_instr_ptr(gen, gen->jmp_patch[i].index);
+            instr->imm.v_s32 = current_index - gen->jmp_patch[i].index;
+            array_remove(gen->jmp_patch, i);
+            i--;
+        }
+        else
+            gen->jmp_patch[i].level--;
+    }
+}
+
+static void
+ir_clear_start_labels_level(IR_Generator* gen)
+{
+    for(int i = 0; i < array_length(gen->loop_start_labels); ++i)
+    {
+        if(gen->loop_start_labels[i] > 0)
+            gen->loop_start_labels[i]--;
+        else
+        {
+            array_remove(gen->loop_start_labels, i);
+            i--;
+        }
+    }
+}
+
 void
 ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
 {
@@ -666,6 +702,56 @@ ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
     IR_Instruction* while_cond_instr = iri_get_temp_instr_ptr(gen, while_true_index);
     while_cond_instr->imm.type = IR_VALUE_S32;
     while_cond_instr->imm.v_s32 = end_index - while_true_index;
+
+    ir_clear_start_labels_level(gen);
+    ir_patch_jumps(gen, end_index);
+}
+
+void
+ir_gen_comm_for(IR_Generator* gen, Light_Ast* stmt)
+{
+    // generate prologue
+    ir_gen_commands(gen, stmt->comm_for.prologue, array_length(stmt->comm_for.prologue));
+    
+    // jump over epilogue
+    int jmp_over_ep_index = iri_current_instr_index(gen);
+    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = 0}, 32);
+
+    int for_start_index = iri_current_instr_index(gen);
+    array_push(gen->loop_start_labels, for_start_index);
+
+    // generate epilogue
+    ir_gen_commands(gen, stmt->comm_for.epilogue, array_length(stmt->comm_for.epilogue));
+
+    int cond_index = iri_current_instr_index(gen);
+
+    IR_Instruction* jmp_over_ep_index_instr = iri_get_temp_instr_ptr(gen, jmp_over_ep_index);
+    jmp_over_ep_index_instr->imm.v_s32 = cond_index - jmp_over_ep_index;
+
+    // for(condition)
+    IR_Reg cond_temp = ir_gen_expr(gen, stmt->comm_for.condition, true);
+
+    int for_true_index = iri_current_instr_index(gen);
+    // jrz t, 0 -> end
+    iri_emit_jrz(gen, cond_temp, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, 32);
+
+    if(stmt->comm_for.body)
+    {
+        ir_gen_comm(gen, stmt->comm_for.body);
+    }
+
+    // generate for jump to beginning
+    int jmp_start_index = iri_current_instr_index(gen);
+    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = for_start_index - jmp_start_index}, 32);
+
+    int end_index = iri_current_instr_index(gen);
+    // fill condition jump with the end address
+    IR_Instruction* while_cond_instr = iri_get_temp_instr_ptr(gen, for_true_index);
+    while_cond_instr->imm.type = IR_VALUE_S32;
+    while_cond_instr->imm.v_s32 = end_index - for_true_index;
+
+    ir_clear_start_labels_level(gen);
+    ir_patch_jumps(gen, end_index);
 }
 
 void
@@ -728,8 +814,35 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
 }
 
 void
+ir_gen_commands(IR_Generator* gen, Light_Ast** commands, int comm_count)
+{
+    // decls
+    for(int i = 0; i < comm_count; ++i) {
+        Light_Ast* comm = commands[i];
+        if(comm->flags & AST_FLAG_DECLARATION)
+            ir_gen_decl(gen, comm);
+    }
+
+    // commands
+    for(int i = 0; i < comm_count; ++i) {
+        Light_Ast* comm = commands[i];
+        if(comm->flags & AST_FLAG_COMMAND)
+            ir_gen_comm(gen, comm);
+        if(comm->flags & AST_FLAG_DECLARATION)
+        {
+            if(comm->kind == AST_DECL_VARIABLE && comm->decl_variable.assignment)
+            {
+                ir_gen_decl_assignment(gen, comm);
+            }
+        }
+    }
+}
+
+void
 ir_gen_comm_block(IR_Generator* gen, Light_Ast* body)
 {
+    ir_gen_commands(gen, body->comm_block.commands, body->comm_block.command_count);
+    #if 0
     // decls
     for(int i = 0; i < body->comm_block.command_count; ++i) {
         Light_Ast* comm = body->comm_block.commands[i];
@@ -750,7 +863,7 @@ ir_gen_comm_block(IR_Generator* gen, Light_Ast* body)
             }
         }
     }
-
+    #endif
 }
 
 void
@@ -767,8 +880,31 @@ ir_gen_comm_return(IR_Generator* gen, Light_Ast* comm)
 }
 
 void
+ir_gen_comm_continue(IR_Generator* gen, Light_Ast* comm)
+{
+    int lvl = (int)comm->comm_continue.level_value - 1;
+    int index = iri_current_instr_index(gen);
+
+    int diff = gen->loop_start_labels[array_length(gen->loop_start_labels) - 1 - lvl] - index;
+    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = diff}, 32);
+}
+
+void
+ir_gen_comm_break(IR_Generator* gen, Light_Ast* comm)
+{
+    int lvl = (int)comm->comm_break.level_value;
+    int index = iri_current_instr_index(gen);
+    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = 0}, 32);
+    IR_Instr_Jmp_Patch ijp = {0};
+    ijp.index = index;
+    ijp.level = lvl - 1;
+    array_push(gen->jmp_patch, ijp);
+}
+
+void
 ir_gen_comm(IR_Generator* gen, Light_Ast* comm)
 {
+    int start = iri_current_instr_index(gen);
     switch(comm->kind) {
         case AST_COMMAND_ASSIGNMENT: 
             ir_gen_comm_assignment(gen, &comm->comm_assignment);
@@ -782,11 +918,23 @@ ir_gen_comm(IR_Generator* gen, Light_Ast* comm)
         case AST_COMMAND_WHILE:
             ir_gen_comm_while(gen, comm);
             break;
+        case AST_COMMAND_FOR:
+            ir_gen_comm_for(gen, comm);
+            break;
         case AST_COMMAND_RETURN:
             ir_gen_comm_return(gen, comm);
             break;
+        case AST_COMMAND_BREAK:
+            ir_gen_comm_break(gen, comm);
+            break;
+        case AST_COMMAND_CONTINUE:
+            ir_gen_comm_continue(gen, comm);
+            break;
         default: break;
     }
+    int end = iri_current_instr_index(gen);
+    IR_Node_Range range = {comm, start, end};
+    array_push(gen->node_ranges, range);
 }
 
 void
@@ -827,8 +975,9 @@ void ir_generate(Light_Ast** ast) {
     IR_Generator gen = {0};
     gen.instructions = array_new(IR_Instruction);
     gen.decl_patch = array_new(IR_Decl_To_Patch);
+    gen.jmp_patch = array_new(IR_Instr_Jmp_Patch);
     gen.loop_start_labels = array_new(int);
-    gen.loop_end_labels = array_new(int);
+    gen.node_ranges = array_new(IR_Node_Range);
     gen.temp_int = 1;   // temp 0 is reserved for proc call return value
     gen.temp_float = 1; // temp 0 is reserved for proc call return value
     gen.ar.index = 0;

@@ -547,11 +547,33 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
     }
 }
 
+static int
+ir_node_range_comp(const void* n1, const void* n2)
+{
+    IR_Node_Range* nr1 = (IR_Node_Range*)n1;
+    IR_Node_Range* nr2 = (IR_Node_Range*)n2;
+    if(nr1->start_index < nr2->start_index) return -1;
+    else if(nr1->start_index > nr2->start_index) return 1;
+    return 0;
+}
+
 void
 iri_print_instructions(IR_Generator* gen)
 {
+    int nr_index = 0;
+    qsort(gen->node_ranges, array_length(gen->node_ranges), sizeof(*gen->node_ranges), ir_node_range_comp);
     for(int i = 0; i < array_length(gen->instructions); ++i)
     {
+#if 0
+        // Only use this with a function that only prints the command non recursively
+        if(nr_index < array_length(gen->node_ranges) && gen->node_ranges[nr_index].start_index == i)
+        {
+            ast_print_node(gen->node_ranges[nr_index].node, LIGHT_AST_PRINT_STDOUT, 0);
+            fprintf(stdout, ":\n");
+            nr_index++;
+        }
+#endif
+
         IR_Instruction* instr =  gen->instructions + i;
         fprintf(stdout, "%d: ", i);
         iri_print_instruction(stdout, instr);

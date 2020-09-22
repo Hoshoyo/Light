@@ -101,7 +101,6 @@ typedef struct {
     IR_Instruction_Type type;
     IR_Reg              t1, t2, t3;
     IR_Value            imm;
-
     union {
         int byte_size;
         struct {
@@ -122,14 +121,30 @@ typedef struct {
 } IR_Decl_To_Patch;
 
 typedef struct {
+    int level;
+    int index;
+} IR_Instr_Jmp_Patch;
+
+typedef struct {
+    Light_Ast* node;
+    int start_index;
+    int end_index;
+} IR_Node_Range;
+
+typedef struct {
     IR_Instruction*   instructions;
     IR_Activation_Rec ar;
     IR_Reg temp_int;
     IR_Reg temp_float;
 
+    // needed for break and continue
     int* loop_start_labels;
-    int* loop_end_labels;
+    IR_Instr_Jmp_Patch* jmp_patch;
+
+    // needed for procedure address patching
     IR_Decl_To_Patch* decl_patch;  // at the end, iterate through all these indexes and fill the instruction with the proc address
+
+    IR_Node_Range* node_ranges;
 } IR_Generator;
 
 void ir_generate(Light_Ast** ast);
