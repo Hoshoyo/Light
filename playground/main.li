@@ -3,8 +3,9 @@
 //    b : s32;
 //}
 main : () -> s32 {
-    for i := 0; i < 10; i += 1 {
-        
-    }
-    return 0;
+    a : s32;
+    b : s32;
+    b = a;
+
+    return a;
 }

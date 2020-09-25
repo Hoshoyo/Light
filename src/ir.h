@@ -131,6 +131,26 @@ typedef struct {
     int end_index;
 } IR_Node_Range;
 
+// register allocation
+typedef struct {
+    int  preg_mapped;
+    bool has_mem_address;
+    int  address;
+    int* uses;
+} IR_Virtual_Reg;
+
+typedef struct {
+    int  pfreg_mapped;
+    bool has_mem_address;
+    int  address;
+    int* uses;
+} IR_Virtual_FReg;
+
+typedef struct {
+    IR_Reg vreg;
+    int    next;
+} IR_Physical_Reg;
+
 typedef struct {
     IR_Instruction*   instructions;
     IR_Activation_Rec ar;
@@ -145,6 +165,9 @@ typedef struct {
     IR_Decl_To_Patch* decl_patch;  // at the end, iterate through all these indexes and fill the instruction with the proc address
 
     IR_Node_Range* node_ranges;
+    IR_Virtual_Reg*  vregs;
+    IR_Virtual_FReg* vfregs;
+    IR_Physical_Reg  pregs[2];
 } IR_Generator;
 
 void ir_generate(Light_Ast** ast);
