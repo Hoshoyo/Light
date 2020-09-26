@@ -6,7 +6,11 @@ main : () -> s32 {
     a : s32;
     b : s32;
     c : s32;
-    b = a + 2;
+    b = a + b * b / c;
 
     return a;
 }
+
+//foo : (a : s32) -> s32 {
+//    return a + 1;
+//}

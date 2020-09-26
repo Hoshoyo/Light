@@ -173,7 +173,7 @@ typedef struct {
     IR_Node_Range* node_ranges;
     IR_Virtual_Reg*  vregs;
     IR_Virtual_FReg* vfregs;
-    IR_Physical_Reg  pregs[2 + 1];
+    IR_Physical_Reg  pregs[8 + 1];
     IR_Instr_Insert* insertions;
 } IR_Generator;
 

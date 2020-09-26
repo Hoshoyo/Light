@@ -28,6 +28,22 @@ ir_new_tempf(IR_Generator* gen) {
     return gen->temp_float++;
 }
 
+// where addr is offset from stack
+static void
+ir_set_vreg_addr(IR_Generator* gen, IR_Reg reg, int addr, bool fp)
+{
+    if(fp)
+    {
+        gen->vfregs[reg].has_mem_address = true;
+        gen->vfregs[reg].address = addr;
+    }
+    else
+    {
+        gen->vregs[reg].has_mem_address = true;
+        gen->vregs[reg].address = addr;
+    }
+}
+
 static int
 ir_new_reg(IR_Generator* gen, Light_Type* type) {
     return (type_primitive_float(type)) ? ir_new_tempf(gen) : ir_new_temp(gen);
@@ -57,8 +73,16 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
     if(decl->kind == AST_DECL_VARIABLE) {
         if(decl->decl_variable.type->size_bits <= type_pointer_size_bits())
         {
-            decl->decl_variable.ir_temporary = ir_new_reg(gen, decl->type);
-            
+            IR_Reg temp = ir_new_reg(gen, decl->type);
+            decl->decl_variable.ir_temporary = temp;
+        }
+        else
+            decl->decl_variable.ir_temporary = IR_REG_NONE;
+        decl->decl_variable.stack_index = gen->ar.index--;
+        decl->decl_variable.stack_offset = gen->ar.offset;
+
+        if(decl->decl_variable.ir_temporary != IR_REG_NONE)
+        {
             if(type_primitive_float(decl->decl_variable.type))
             {
                 gen->vfregs[decl->decl_variable.ir_temporary].has_mem_address = true;
@@ -69,12 +93,10 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
                 gen->vregs[decl->decl_variable.ir_temporary].has_mem_address = true;
                 gen->vregs[decl->decl_variable.ir_temporary].address = decl->decl_variable.stack_offset;
             }
+            ir_set_vreg_addr(gen, decl->decl_variable.ir_temporary, gen->ar.offset, type_primitive_float(decl->decl_variable.type));
         }
-        else
-            decl->decl_variable.ir_temporary = IR_REG_NONE;
-        decl->decl_variable.stack_index = gen->ar.index++;
-        decl->decl_variable.stack_offset = gen->ar.offset;
-        gen->ar.offset += (decl->decl_variable.type->size_bits / 8);
+
+        gen->ar.offset -= (decl->decl_variable.type->size_bits / 8);
 
 #if PRINT_VARIABLE_INFO || 1
         fprintf(stdout, "variable[SB+%d] %.*s => ", decl->decl_variable.stack_offset,
@@ -975,9 +997,9 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
         Light_Ast* arg = proc->decl_proc.arguments[i];
         ir_gen_decl(gen, arg);
         arg->decl_variable.ir_temporary = ir_new_reg(gen, arg->decl_variable.type);
-        arg->decl_variable.stack_index = -1 - i;
-        arg->decl_variable.stack_offset = stack_offset - arg->decl_variable.type->size_bits / 8;
-        stack_offset -= (arg->decl_variable.type->size_bits / 8);
+        arg->decl_variable.stack_index = i + 2;
+        arg->decl_variable.stack_offset = stack_offset + arg->decl_variable.type->size_bits / 8;
+        stack_offset += (arg->decl_variable.type->size_bits / 8);
     }
 
     ir_gen_comm_block(gen, proc->decl_proc.body);
@@ -1005,8 +1027,8 @@ void ir_generate(Light_Ast** ast) {
     gen.node_ranges = array_new(IR_Node_Range);
     gen.temp_int = 1;   // temp 0 is reserved for proc call return value
     gen.temp_float = 1; // temp 0 is reserved for proc call return value
-    gen.ar.index = 0;
-    gen.ar.offset = 0;
+    gen.ar.index = -1;
+    gen.ar.offset = -(int)(type_pointer_size_bits() / 8);
     gen.vregs = array_new(IR_Virtual_Reg);
     IR_Virtual_Reg nvreg = {0};
     array_push(gen.vregs, nvreg);
@@ -1171,13 +1193,20 @@ ir_allocate_register(IR_Generator* gen)
         inst->ot3 = inst->t3;
         int p1 = ensure(gen, inst->t1, inst->byte_size, i);
         int p2 = ensure(gen, inst->t2, inst->byte_size, i);
+
+        // allocate physical register for operands
         if(!needed_after(gen, inst->t1, i))
             free_preg(gen, p1);
         if(!needed_after(gen, inst->t2, i))
             free_preg(gen, p2);
+
+        // alocate physical register for result
         int p3 = (inst->t3 > IR_REG_PROC_RET) ? reg_alloc(gen, inst->t3, inst->byte_size /* consider dst and src byte size */, i) : inst->t3;
+        
         // rewrite instruction to p1, p2 -> p3
         ir_rewrite_with_pregs(inst, p1, p2, p3);
+
+        // update next instruction index where each virtual register is used
         if(needed_after(gen, inst->t1, i))
             update_next(gen, inst->t1, p1, i);
         if(needed_after(gen, inst->t2, i))

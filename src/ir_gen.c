@@ -51,21 +51,20 @@ iri_emit_cvt(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, 
     inst.dst_byte_size = dst_byte_size;
 
     bool t1fp = false;
-    bool t2fp = false;
     switch(type)
     {
-        case IR_CVT_SI:         t1fp = false; t2fp = false; break;
-        case IR_CVT_UI:         t1fp = false; t2fp = false; break;
-        case IR_CVT_SI_R32:     t1fp = false; t2fp = true; break;
-        case IR_CVT_UI_R32:     t1fp = false; t2fp = true; break;
-        case IR_CVT_R32_I:      t1fp = true; t2fp = false; break;
-        case IR_CVT_R32_UI:     t1fp = true; t2fp = false; break;
-        case IR_CVT_SI_R64:     t1fp = false; t2fp = true; break;
-        case IR_CVT_UI_R64:     t1fp = false; t2fp = true; break;
-        case IR_CVT_R64_I:      t1fp = true; t2fp = false; break;
-        case IR_CVT_R64_UI:     t1fp = true; t2fp = false; break;
-        case IR_CVT_R32_R64:    t1fp = true; t2fp = true; break;
-        case IR_CVT_R64_R32:    t1fp = true; t2fp = true; break;
+        case IR_CVT_SI:         t1fp = false; break;
+        case IR_CVT_UI:         t1fp = false; break;
+        case IR_CVT_SI_R32:     t1fp = false; break;
+        case IR_CVT_UI_R32:     t1fp = false; break;
+        case IR_CVT_R32_I:      t1fp = true; break;
+        case IR_CVT_R32_UI:     t1fp = true; break;
+        case IR_CVT_SI_R64:     t1fp = false; break;
+        case IR_CVT_UI_R64:     t1fp = false; break;
+        case IR_CVT_R64_I:      t1fp = true; break;
+        case IR_CVT_R64_UI:     t1fp = true; break;
+        case IR_CVT_R32_R64:    t1fp = true; break;
+        case IR_CVT_R64_R32:    t1fp = true; break;
         default: break;
     }
     iri_update_reg_uses(gen, t1, t1fp);
