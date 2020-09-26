@@ -9,34 +9,28 @@ int ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load);
 void ir_gen_comm(IR_Generator* gen, Light_Ast* comm);
 void ir_gen_commands(IR_Generator* gen, Light_Ast** commands, int comm_count);
 
-static int
-ir_new_reg(IR_Generator* gen, Light_Type* type) {
-    return (type_primitive_float(type)) ? gen->temp_float++ : gen->temp_int++;
-}
-
-static void* realloc_debug(void* ptr, size_t size)
-{
-    return realloc(ptr, size);
-}
-
 static IR_Reg
 ir_new_temp(IR_Generator* gen) {
-    IR_Virtual_Reg vreg = {0};
-    vreg.uses = array_new(int);
+    IR_Virtual_Reg vreg = { 0 };
     vreg.has_mem_address = false;
-    //array_push(gen->vregs, vreg);
-    ((array_length(gen->vregs) == array_capacity(gen->vregs)) ? array_capacity(gen->vregs) = LIGHT_ARRAY_MAX(2 * array_length(gen->vregs), 2),
-        *((void**)&(gen->vregs)) = ((char*)realloc_debug(array_base(gen->vregs), sizeof(Dynamic_ArrayBase) + array_capacity(gen->vregs) * sizeof(*(gen->vregs))) + sizeof(Dynamic_ArrayBase)) : 0,
-        (gen->vregs)[array_length(gen->vregs)++] = (vreg));
+    vreg.preg_mapped = -1;
+    vreg.uses = array_new(int);
+    array_push(gen->vregs, vreg);
     return gen->temp_int++;
 }
 static IR_Reg
 ir_new_tempf(IR_Generator* gen) {
-    IR_Virtual_FReg vfreg = {0};
+    IR_Virtual_FReg vfreg = { 0 };
     vfreg.uses = array_new(int);
     vfreg.has_mem_address = false;
+    vfreg.pfreg_mapped = -1;
     array_push(gen->vfregs, vfreg);
     return gen->temp_float++;
+}
+
+static int
+ir_new_reg(IR_Generator* gen, Light_Type* type) {
+    return (type_primitive_float(type)) ? ir_new_tempf(gen) : ir_new_temp(gen);
 }
 
 // *****************************************************
@@ -1021,6 +1015,8 @@ void ir_generate(Light_Ast** ast) {
     array_push(gen.vfregs, nfvreg);
     for(int i = 0; i < sizeof(gen.pregs) / sizeof(*gen.pregs); ++i)
         gen.pregs[i].vreg = IR_REG_NONE;
+    gen.pregs[0].next = -100; // never pick the return value register
+    gen.insertions = array_new(IR_Instr_Insert);
 
     for(u64 i = 0; i < array_length(ast); ++i) {
         Light_Ast* n = ast[i];
@@ -1037,7 +1033,10 @@ void ir_generate(Light_Ast** ast) {
 
     ir_patch_proc_calls(&gen);
 
+    iri_print_instructions(&gen);
+
     ir_allocate_register(&gen);
+    fprintf(stdout, "\n");
 
     iri_print_instructions(&gen);
 }
@@ -1049,9 +1048,9 @@ void ir_generate(Light_Ast** ast) {
 static int
 next_preg(IR_Generator* gen)
 {
-    for(int i = 0; i < sizeof(gen->pregs) / sizeof(*gen->pregs); ++i)
+    for(int i = 1; i < sizeof(gen->pregs) / sizeof(*gen->pregs); ++i)
     {
-        if(gen->pregs[i].vreg != IR_REG_NONE)
+        if(gen->pregs[i].vreg == IR_REG_NONE)
             return i;
     }
     return -1;
@@ -1071,13 +1070,26 @@ best_preg(IR_Generator* gen)
 }
 
 static int
-reg_alloc(IR_Generator* gen, IR_Reg reg)
+reg_alloc(IR_Generator* gen, IR_Reg reg, int byte_size, int index)
 {
     int p = next_preg(gen);
     if(p == -1)
     {
         p = best_preg(gen);
         // emit store p -> vreg address
+        IR_Instruction store = iri_new(IR_STORE, p, IR_REG_STACK_BASE, IR_REG_NONE,
+            (IR_Value){.type = IR_VALUE_S32, .v_s32 = gen->vregs[reg].address}, byte_size);
+        store.ot1 = gen->pregs[p].vreg;
+        store.ot2 = reg;
+        IR_Instr_Insert insert = {
+            .index = index,
+            .inst = store
+        };
+        array_push(gen->insertions, insert);
+    }
+    if(gen->pregs[p].vreg != IR_REG_NONE)
+    {
+        gen->vregs[gen->pregs[p].vreg].preg_mapped = IR_REG_NONE;
     }
     gen->pregs[p].next = -1;
     gen->pregs[p].vreg = reg;
@@ -1086,16 +1098,25 @@ reg_alloc(IR_Generator* gen, IR_Reg reg)
 }
 
 static int
-ensure(IR_Generator* gen, IR_Reg reg)
+ensure(IR_Generator* gen, IR_Reg reg, int byte_size, int index)
 {
     int p = -1;
-    if(reg == IR_REG_NONE) return -1;
+    if(reg <= IR_REG_PROC_RET) return reg;
     if(gen->vregs[reg].preg_mapped != -1)
         p = gen->vregs[reg].preg_mapped;
     else
     {
-        p = reg_alloc(gen, reg);
+        p = reg_alloc(gen, reg, byte_size, index);
         // emit load from reg.addr -> p
+        IR_Instruction load = iri_new(IR_LOAD, IR_REG_STACK_BASE, IR_REG_NONE, p, 
+            (IR_Value){.type = IR_VALUE_S32, .v_s32 = gen->vregs[reg].address}, byte_size);
+        load.ot1 = reg;
+        load.ot3 = gen->pregs[p].vreg;
+        IR_Instr_Insert insert = {
+            .index = index,
+            .inst = load
+        };
+        array_push(gen->insertions, insert);
     }
     return p;
 }
@@ -1110,8 +1131,31 @@ free_preg(IR_Generator* gen, int pr)
 static bool
 needed_after(IR_Generator* gen, IR_Reg r, int index)
 {
-    int last_use = gen->vregs[r].uses[array_length(gen->vregs) - 1];
+    if (r <= IR_REG_PROC_RET) return true;
+    int last_use = gen->vregs[r].uses[array_length(gen->vregs[r].uses) - 1];
     return (last_use > index);
+}
+
+static void
+ir_rewrite_with_pregs(IR_Instruction* instr, int p1, int p2, int p3)
+{
+    if (instr->t1 != IR_REG_NONE) instr->t1 = p1;
+    if (instr->t2 != IR_REG_NONE) instr->t2 = p2;
+    if (instr->t3 != IR_REG_NONE) instr->t3 = p3;
+}
+
+static void
+update_next(IR_Generator* gen, IR_Reg treg, int preg, int index)
+{
+    if (preg <= IR_REG_PROC_RET) return;
+    for(int i = 0; i < array_length(gen->vregs[treg].uses); ++i)
+    {
+        if(gen->vregs[treg].uses[i] > index)
+        {
+            gen->pregs[preg].next = gen->vregs[treg].uses[i];
+            break;
+        }
+    }
 }
 
 void
@@ -1122,13 +1166,22 @@ ir_allocate_register(IR_Generator* gen)
     for(int i = 0; i < array_length(instructions); ++i)
     {
         IR_Instruction* inst = &instructions[i];
-        int p1 = ensure(gen, inst->t1);
-        int p2 = ensure(gen, inst->t2);
+        inst->ot1 = inst->t1;
+        inst->ot2 = inst->t2;
+        inst->ot3 = inst->t3;
+        int p1 = ensure(gen, inst->t1, inst->byte_size, i);
+        int p2 = ensure(gen, inst->t2, inst->byte_size, i);
         if(!needed_after(gen, inst->t1, i))
             free_preg(gen, p1);
         if(!needed_after(gen, inst->t2, i))
             free_preg(gen, p2);
-        int p3 = reg_alloc(gen, inst->t3);
+        int p3 = (inst->t3 > IR_REG_PROC_RET) ? reg_alloc(gen, inst->t3, inst->byte_size /* consider dst and src byte size */, i) : inst->t3;
         // rewrite instruction to p1, p2 -> p3
+        ir_rewrite_with_pregs(inst, p1, p2, p3);
+        if(needed_after(gen, inst->t1, i))
+            update_next(gen, inst->t1, p1, i);
+        if(needed_after(gen, inst->t2, i))
+            update_next(gen, inst->t2, p2, i);
+        update_next(gen, inst->t3, p3, i);
     }
 }

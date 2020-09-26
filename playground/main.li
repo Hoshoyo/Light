@@ -5,7 +5,8 @@
 main : () -> s32 {
     a : s32;
     b : s32;
-    b = a;
+    c : s32;
+    b = a + 2;
 
     return a;
 }

@@ -14,7 +14,7 @@ iri_value_byte_size(IR_Value value)
     return size[value.type];
 }
 
-static IR_Instruction
+IR_Instruction
 iri_new(IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm, int byte_size)
 {
     IR_Instruction inst = {0};
@@ -30,6 +30,7 @@ iri_new(IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm,
 static void
 iri_update_reg_uses(IR_Generator* gen, IR_Reg t, bool fp)
 {
+    if (t == IR_REG_NONE) return;
     if(fp)
     {
         if(t <= IR_REG_PROC_RET) return;
@@ -45,7 +46,7 @@ iri_update_reg_uses(IR_Generator* gen, IR_Reg t, bool fp)
 void
 iri_emit_cvt(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, int16_t src_byte_size, int16_t dst_byte_size)
 {
-    IR_Instruction inst = iri_new(type, t1, t2, -1, (IR_Value){0}, 0);
+    IR_Instruction inst = iri_new(type, t1, IR_REG_NONE, t2, (IR_Value){0}, 0);
     inst.src_byte_size = src_byte_size;
     inst.dst_byte_size = dst_byte_size;
 
@@ -74,7 +75,7 @@ iri_emit_cvt(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, 
 void
 iri_emit_lea(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size)
 {
-    IR_Instruction inst = iri_new(IR_LEA, t1, t2, IR_REG_NONE, imm, byte_size);
+    IR_Instruction inst = iri_new(IR_LEA, t1, IR_REG_NONE, t2, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
     array_push(gen->instructions, inst);
 }
@@ -82,7 +83,7 @@ iri_emit_lea(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_siz
 void
 iri_emit_mov(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size, bool fp)
 {
-    IR_Instruction inst = iri_new((fp) ? IR_MOVF : IR_MOV, t1, t2, IR_REG_NONE, imm, byte_size);
+    IR_Instruction inst = iri_new((fp) ? IR_MOVF : IR_MOV, t1, IR_REG_NONE, t2, imm, byte_size);
     iri_update_reg_uses(gen, t1, fp);
     array_push(gen->instructions, inst);
 }
@@ -91,7 +92,7 @@ iri_emit_mov(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_siz
 void
 iri_emit_load(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size, bool fp)
 {
-    IR_Instruction inst = iri_new((fp)? IR_LOADF : IR_LOAD, t1, t2, IR_REG_NONE, imm, byte_size);
+    IR_Instruction inst = iri_new((fp)? IR_LOADF : IR_LOAD, t1, IR_REG_NONE, t2, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
     array_push(gen->instructions, inst);
 }
@@ -124,7 +125,7 @@ iri_emit_arith(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2
 void
 iri_emit_logic_not(IR_Generator* gen, IR_Reg t1, IR_Reg t2, int byte_size)
 {
-    IR_Instruction inst = iri_new(IR_LNOT, t1, t2, IR_REG_NONE, (IR_Value){0}, byte_size);
+    IR_Instruction inst = iri_new(IR_LNOT, t1, IR_REG_NONE, t2, (IR_Value){0}, byte_size);
     iri_update_reg_uses(gen, t1, false);
     array_push(gen->instructions, inst);
 }
@@ -132,7 +133,7 @@ iri_emit_logic_not(IR_Generator* gen, IR_Reg t1, IR_Reg t2, int byte_size)
 void
 iri_emit_not(IR_Generator* gen, IR_Reg t1, IR_Reg t2, int byte_size)
 {
-    IR_Instruction inst = iri_new(IR_NOT, t1, t2, IR_REG_NONE, (IR_Value){0}, byte_size);
+    IR_Instruction inst = iri_new(IR_NOT, t1, IR_REG_NONE, t2, (IR_Value){0}, byte_size);
     iri_update_reg_uses(gen, t1, false);
     array_push(gen->instructions, inst);
 }
@@ -140,7 +141,7 @@ iri_emit_not(IR_Generator* gen, IR_Reg t1, IR_Reg t2, int byte_size)
 void
 iri_emit_neg(IR_Generator* gen, IR_Reg t1, IR_Reg t2, int byte_size, bool fp)
 {
-    IR_Instruction inst = iri_new((fp) ? IR_NEGF : IR_NEG, t1, t2, IR_REG_NONE, (IR_Value){0}, byte_size);
+    IR_Instruction inst = iri_new((fp) ? IR_NEGF : IR_NEG, t1, IR_REG_NONE, t2, (IR_Value){0}, byte_size);
     iri_update_reg_uses(gen, t1, fp);
     array_push(gen->instructions, inst);
 }
@@ -180,7 +181,7 @@ iri_emit_cmp(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_siz
 void
 iri_emit_cmov(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size)
 {
-    IR_Instruction inst = iri_new(type, t1, t2, IR_REG_NONE, imm, byte_size);
+    IR_Instruction inst = iri_new(type, t1, IR_REG_NONE, t2, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
     array_push(gen->instructions, inst);
 }
@@ -260,7 +261,7 @@ iri_print_value(FILE* out, IR_Value value)
 }
 
 void
-iri_print_register(FILE* out, IR_Reg reg, bool fp)
+iri_print_register(FILE* out, IR_Reg reg, IR_Reg original, bool fp)
 {
     switch(reg)
     {
@@ -269,7 +270,11 @@ iri_print_register(FILE* out, IR_Reg reg, bool fp)
         case IR_REG_STACK_BASE: fprintf(out, "sb"); break;
         case IR_REG_NONE:      fprintf(out, "invalid"); break;
         default: {
+            #if 0
+            fprintf(out, (fp) ? "tf%d (otf%d)":"t%d (ot%d)", reg, original); 
+            #else
             fprintf(out, (fp) ? "tf%d":"t%d", reg); 
+            #endif
         } break;
     }
 }
@@ -313,12 +318,12 @@ iri_print_instr_arith(FILE* out, IR_Instruction* instr)
         default: break;
     }
     iri_print_byte_size(out, instr->byte_size);
-    iri_print_register(out, instr->t1, fp);
+    iri_print_register(out, instr->t1, instr->ot1, fp);
     fprintf(out, ", ");
     if(instr->t2 == -1) iri_print_value(out, instr->imm);
-    else iri_print_register(out, instr->t2, fp);
+    else iri_print_register(out, instr->t2, instr->ot2, fp);
     fprintf(out, " -> ");
-    iri_print_register(out, instr->t3, fp);
+    iri_print_register(out, instr->t3, instr->ot3, fp);
 }
 
 void
@@ -340,14 +345,14 @@ iri_print_cmov(FILE* out, IR_Instruction* instr)
     }
     if(instr->t1 != IR_REG_NONE)
     {
-        iri_print_register(out, instr->t1, false);
+        iri_print_register(out, instr->t1, instr->ot1, false);
         if(instr->imm.type != IR_VALUE_NONE)
             fprintf(out, " + ");
     }
     if(instr->imm.type != IR_VALUE_NONE)
         iri_print_value(out, instr->imm);
     fprintf(out, " -> ");
-    iri_print_register(out, instr->t2, false);
+    iri_print_register(out, instr->t3, instr->ot3, false);
 }
 
 void
@@ -371,9 +376,9 @@ iri_print_cvt(FILE* out, IR_Instruction* instr)
         case IR_CVT_R64_R32:    fprintf(out, "CVTSD2SS "); t1fp = true; t2fp = true; break;
         default: break;
     }
-    iri_print_register(out, instr->t1, t1fp);
+    iri_print_register(out, instr->t1, instr->ot1, t1fp);
     fprintf(out, " -> ");
-    iri_print_register(out, instr->t2, t2fp);
+    iri_print_register(out, instr->t2, instr->ot2, t2fp);
 }
 
 void
@@ -386,79 +391,79 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
             iri_print_byte_size(out, instr->byte_size);
             if(instr->t1 != IR_REG_NONE)
             {
-                iri_print_register(out, instr->t1, false);
+                iri_print_register(out, instr->t1, instr->ot1, false);
                 if(instr->imm.type != IR_VALUE_NONE)
                     fprintf(out, " + ");
             }
             if(instr->imm.type != IR_VALUE_NONE)
                 iri_print_value(out, instr->imm);
             fprintf(out, " -> ");
-            iri_print_register(out, instr->t2, false);
+            iri_print_register(out, instr->t3, instr->ot3, false);
         } break;
         case IR_MOVF: {
             fprintf(out, "MOVF ");
             iri_print_byte_size(out, instr->byte_size);
             if(instr->t1 != IR_REG_NONE)
             {
-                iri_print_register(out, instr->t1, true);
+                iri_print_register(out, instr->t1, instr->ot1, true);
                 if(instr->imm.type != IR_VALUE_NONE)
                     fprintf(out, " + ");
             }
             if(instr->imm.type != IR_VALUE_NONE)
                 iri_print_value(out, instr->imm);
             fprintf(out, " -> ");
-            iri_print_register(out, instr->t2, true);
+            iri_print_register(out, instr->t3, instr->ot3, true);
         } break;
         case IR_MOV: {
             fprintf(out, "MOV ");
             iri_print_byte_size(out, instr->byte_size);
             if(instr->t1 != IR_REG_NONE)
             {
-                iri_print_register(out, instr->t1, false);
+                iri_print_register(out, instr->t1, instr->ot1, false);
                 if(instr->imm.type != IR_VALUE_NONE)
                     fprintf(out, " + ");
             }
             if(instr->imm.type != IR_VALUE_NONE)
                 iri_print_value(out, instr->imm);
             fprintf(out, " -> ");
-            iri_print_register(out, instr->t2, false);
+            iri_print_register(out, instr->t3, instr->ot3, false);
         } break;
         case IR_LOADF: {
             fprintf(out, "LOADF ");
             iri_print_byte_size(out, instr->byte_size);
             if(instr->t1 != IR_REG_NONE)
             {
-                iri_print_register(out, instr->t1, false);
+                iri_print_register(out, instr->t1, instr->ot1, false);
                 if(instr->imm.type != IR_VALUE_NONE)
                     fprintf(out, " + ");
             }
             if(instr->imm.type != IR_VALUE_NONE)
                 iri_print_value(out, instr->imm);
             fprintf(out, " -> ");
-            iri_print_register(out, instr->t2, true);
+            iri_print_register(out, instr->t3, instr->ot3, true);
         } break;
         case IR_LOAD: {
             fprintf(out, "LOAD ");
             iri_print_byte_size(out, instr->byte_size);
             if(instr->t1 != IR_REG_NONE)
             {
-                iri_print_register(out, instr->t1, false);
+                iri_print_register(out, instr->t1, instr->ot1, false);
                 if(instr->imm.type != IR_VALUE_NONE)
                     fprintf(out, " + ");
             }
             if(instr->imm.type != IR_VALUE_NONE)
                 iri_print_value(out, instr->imm);
             fprintf(out, " -> ");
-            iri_print_register(out, instr->t2, false);
+            iri_print_register(out, instr->t3, instr->ot3, false);
         } break;
         case IR_STORE: {
             fprintf(out, "STORE ");
             iri_print_byte_size(out, instr->byte_size);
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
             fprintf(out, " -> ");
             if(instr->t2 != IR_REG_NONE)
             {
-                iri_print_register(out, instr->t2, false);
+                iri_print_register(out, instr->t2, instr->ot2, false);
                 if(instr->imm.type != IR_VALUE_NONE)
                     fprintf(out, " + ");
             }
@@ -468,11 +473,11 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
         case IR_STOREF: {
             fprintf(out, "STOREF ");
             iri_print_byte_size(out, instr->byte_size);
-            iri_print_register(out, instr->t1, true);
+            iri_print_register(out, instr->t1, instr->ot1, true);
             fprintf(out, " -> ");
             if(instr->t2 != IR_REG_NONE)
             {
-                iri_print_register(out, instr->t2, false);
+                iri_print_register(out, instr->t3, instr->ot3, false);
                 if(instr->imm.type != IR_VALUE_NONE)
                     fprintf(out, " + ");
             }
@@ -490,37 +495,37 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
         } break;
         case IR_LNOT: {
             fprintf(out, "LNOT ");
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
             fprintf(out, " -> ");
-            iri_print_register(out, instr->t2, false);
+            iri_print_register(out, instr->t3, instr->ot3, false);
         } break;
         case IR_NOT: {
             fprintf(out, "NOT ");
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
             fprintf(out, " -> ");
-            iri_print_register(out, instr->t2, false);
+            iri_print_register(out, instr->t3, instr->ot3, false);
         } break;
         case IR_NEG: {
             fprintf(out, "NEG ");
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
             fprintf(out, " -> ");
-            iri_print_register(out, instr->t2, false);
+            iri_print_register(out, instr->t3, instr->ot3, false);
         } break;
         case IR_CVT_UI:{
             fprintf(out, "CVTUI ");
             iri_print_byte_size(out, instr->src_byte_size);
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
             fprintf(out, " -> ");
             iri_print_byte_size(out, instr->dst_byte_size);
-            iri_print_register(out, instr->t2, false);
+            iri_print_register(out, instr->t3, instr->ot3, false);
         } break;
         case IR_CVT_SI: {
             fprintf(out, "CVTSI ");
             iri_print_byte_size(out, instr->src_byte_size);
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
             fprintf(out, " -> ");
             iri_print_byte_size(out, instr->dst_byte_size);
-            iri_print_register(out, instr->t2, false);
+            iri_print_register(out, instr->t3, instr->ot3, false);
         } break;
         case IR_CMOVEQ: case IR_CMOVNE: case IR_CMOVGS: case IR_CMOVGES:
         case IR_CMOVLS: case IR_CMOVLES: case IR_CMOVGU: 
@@ -529,32 +534,32 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
             break;
         case IR_CMP: {
             fprintf(out, "CMP ");
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
             fprintf(out, ", ");
             if(instr->t2 != IR_REG_NONE)
-                iri_print_register(out, instr->t2, false);
+                iri_print_register(out, instr->t2, instr->ot2, false);
             else
                 iri_print_value(out, instr->imm);
         } break;
         case IR_CMPF: {
             fprintf(out, "CMPF ");
-            iri_print_register(out, instr->t1, true);
+            iri_print_register(out, instr->t1, instr->ot1, true);
             fprintf(out, ", ");
             if(instr->t2 != IR_REG_NONE)
-                iri_print_register(out, instr->t2, false);
+                iri_print_register(out, instr->t2, instr->ot2, false);
             else
                 iri_print_value(out, instr->imm);
         } break;
 
         case IR_JRZ: {
             fprintf(out, "JRZ ");
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
             fprintf(out, " -> ");
             iri_print_value(out, instr->imm);
         } break;
         case IR_JRNZ: {
             fprintf(out, "JRNZ ");
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
             fprintf(out, " -> ");
             iri_print_value(out, instr->imm);
         } break;
@@ -564,25 +569,25 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
         } break;
         case IR_CALL: {
             fprintf(out, "CALL ");
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
         } break;
         case IR_PUSH: {
             fprintf(out, "PUSH ");
             if(instr->t1 == IR_REG_NONE)
                 iri_print_value(out, instr->imm);
             else
-                iri_print_register(out, instr->t1, false);
+                iri_print_register(out, instr->t1, instr->ot1, false);
         } break;
         case IR_RET: {
             fprintf(out, "RET ");
         } break;
         case IR_COPY: {
             fprintf(out, "COPY ");
-            iri_print_register(out, instr->t1, false);
+            iri_print_register(out, instr->t1, instr->ot1, false);
             fprintf(out, ", ");
             iri_print_value(out, instr->imm);
             fprintf(out, " -> ");
-            iri_print_register(out, instr->t3, false);
+            iri_print_register(out, instr->t3, instr->ot3, false);
         } break;
 
         case IR_CVT_SI_R32:
@@ -616,7 +621,7 @@ iri_print_instructions(IR_Generator* gen)
 {
     int nr_index = 0;
     qsort(gen->node_ranges, array_length(gen->node_ranges), sizeof(*gen->node_ranges), ir_node_range_comp);
-    for(int i = 0; i < array_length(gen->instructions); ++i)
+    for(int i = 0, j = 0; i < array_length(gen->instructions); ++i)
     {
 #if 0
         // Only use this with a function that only prints the command non recursively
@@ -627,6 +632,12 @@ iri_print_instructions(IR_Generator* gen)
             nr_index++;
         }
 #endif
+        if(array_length(gen->insertions) > j && gen->insertions[j].index == i)
+        {
+            iri_print_instruction(stdout, &gen->insertions[j].inst);
+            fprintf(stdout, "\n");
+            j++;
+        }
 
         IR_Instruction* instr =  gen->instructions + i;
         fprintf(stdout, "%d: ", i);

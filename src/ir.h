@@ -108,6 +108,7 @@ typedef struct {
             int16_t dst_byte_size;
         };
     };
+    IR_Reg ot1, ot2, ot3;
 } IR_Instruction;
 
 typedef struct {
@@ -152,6 +153,11 @@ typedef struct {
 } IR_Physical_Reg;
 
 typedef struct {
+    IR_Instruction inst;
+    int index;
+} IR_Instr_Insert;
+
+typedef struct {
     IR_Instruction*   instructions;
     IR_Activation_Rec ar;
     IR_Reg temp_int;
@@ -167,7 +173,8 @@ typedef struct {
     IR_Node_Range* node_ranges;
     IR_Virtual_Reg*  vregs;
     IR_Virtual_FReg* vfregs;
-    IR_Physical_Reg  pregs[2];
+    IR_Physical_Reg  pregs[2 + 1];
+    IR_Instr_Insert* insertions;
 } IR_Generator;
 
 void ir_generate(Light_Ast** ast);
@@ -175,6 +182,7 @@ void ir_generate(Light_Ast** ast);
 int             iri_current_instr_index(IR_Generator* gen);
 IR_Instruction* iri_get_temp_instr_ptr(IR_Generator* gen, int index);   // @IMPORTANT cannot invoke any other iri functions while using this address
 
+IR_Instruction iri_new(IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm, int byte_size);
 void iri_emit_store(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size, bool fp);
 void iri_emit_load(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size, bool fp);
 void iri_emit_arith(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm, int byte_size);
