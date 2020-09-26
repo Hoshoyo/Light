@@ -109,30 +109,9 @@ typedef struct {
         };
     };
     IR_Reg ot1, ot2, ot3;
+    int activation_record_index;
 } IR_Instruction;
 
-typedef struct {
-    int index;
-    int offset; // also byte count at the end
-} IR_Activation_Rec;
-
-typedef struct {
-    int        instr_number;
-    Light_Ast* decl;
-} IR_Decl_To_Patch;
-
-typedef struct {
-    int level;
-    int index;
-} IR_Instr_Jmp_Patch;
-
-typedef struct {
-    Light_Ast* node;
-    int start_index;
-    int end_index;
-} IR_Node_Range;
-
-// register allocation
 typedef struct {
     int  preg_mapped;
     bool has_mem_address;
@@ -158,8 +137,37 @@ typedef struct {
 } IR_Instr_Insert;
 
 typedef struct {
-    IR_Instruction*   instructions;
-    IR_Activation_Rec ar;
+    int index;
+    int offset; // also byte count at the end
+
+    // Register allocation stuff
+    IR_Virtual_Reg*  vregs;
+    IR_Virtual_FReg* vfregs;
+    IR_Physical_Reg  pregs[8 + 1];
+    IR_Instr_Insert* insertions;
+} IR_Activation_Rec;
+
+typedef struct {
+    int        instr_number;
+    Light_Ast* decl;
+} IR_Decl_To_Patch;
+
+typedef struct {
+    int level;
+    int index;
+} IR_Instr_Jmp_Patch;
+
+typedef struct {
+    Light_Ast* node;
+    int start_index;
+    int end_index;
+} IR_Node_Range;
+
+typedef struct {
+    IR_Instruction*    instructions;
+    IR_Activation_Rec* ars; // the current is always the last
+
+    // needed for allocating temporaries
     IR_Reg temp_int;
     IR_Reg temp_float;
 
@@ -171,10 +179,6 @@ typedef struct {
     IR_Decl_To_Patch* decl_patch;  // at the end, iterate through all these indexes and fill the instruction with the proc address
 
     IR_Node_Range* node_ranges;
-    IR_Virtual_Reg*  vregs;
-    IR_Virtual_FReg* vfregs;
-    IR_Physical_Reg  pregs[8 + 1];
-    IR_Instr_Insert* insertions;
 } IR_Generator;
 
 void ir_generate(Light_Ast** ast);

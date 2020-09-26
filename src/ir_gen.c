@@ -30,16 +30,17 @@ iri_new(IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm,
 static void
 iri_update_reg_uses(IR_Generator* gen, IR_Reg t, bool fp)
 {
+    IR_Activation_Rec* ar = &gen->ars[array_length(gen->ars) - 1];
     if (t == IR_REG_NONE) return;
     if(fp)
     {
         if(t <= IR_REG_PROC_RET) return;
-        array_push(gen->vfregs[t].uses, array_length(gen->instructions));
+        array_push(ar->vfregs[t].uses, array_length(gen->instructions));
     }
     else
     {
         if(t <= IR_REG_PROC_RET) return;
-        array_push(gen->vregs[t].uses, array_length(gen->instructions));
+        array_push(ar->vregs[t].uses, array_length(gen->instructions));
     }
 }
 
@@ -68,6 +69,7 @@ iri_emit_cvt(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, 
         default: break;
     }
     iri_update_reg_uses(gen, t1, t1fp);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -76,6 +78,7 @@ iri_emit_lea(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_siz
 {
     IR_Instruction inst = iri_new(IR_LEA, t1, IR_REG_NONE, t2, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -84,6 +87,7 @@ iri_emit_mov(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_siz
 {
     IR_Instruction inst = iri_new((fp) ? IR_MOVF : IR_MOV, t1, IR_REG_NONE, t2, imm, byte_size);
     iri_update_reg_uses(gen, t1, fp);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -93,6 +97,7 @@ iri_emit_load(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_si
 {
     IR_Instruction inst = iri_new((fp)? IR_LOADF : IR_LOAD, t1, IR_REG_NONE, t2, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -105,6 +110,7 @@ iri_emit_store(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_s
     IR_Instruction inst = iri_new((fp) ? IR_STOREF : IR_STORE, t1, t2, IR_REG_NONE, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
     iri_update_reg_uses(gen, t2, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -118,6 +124,7 @@ iri_emit_arith(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2
     IR_Instruction inst = iri_new(type, t1, t2, t3, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
     iri_update_reg_uses(gen, t2, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -126,6 +133,7 @@ iri_emit_logic_not(IR_Generator* gen, IR_Reg t1, IR_Reg t2, int byte_size)
 {
     IR_Instruction inst = iri_new(IR_LNOT, t1, IR_REG_NONE, t2, (IR_Value){0}, byte_size);
     iri_update_reg_uses(gen, t1, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -134,6 +142,7 @@ iri_emit_not(IR_Generator* gen, IR_Reg t1, IR_Reg t2, int byte_size)
 {
     IR_Instruction inst = iri_new(IR_NOT, t1, IR_REG_NONE, t2, (IR_Value){0}, byte_size);
     iri_update_reg_uses(gen, t1, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -142,6 +151,7 @@ iri_emit_neg(IR_Generator* gen, IR_Reg t1, IR_Reg t2, int byte_size, bool fp)
 {
     IR_Instruction inst = iri_new((fp) ? IR_NEGF : IR_NEG, t1, IR_REG_NONE, t2, (IR_Value){0}, byte_size);
     iri_update_reg_uses(gen, t1, fp);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -150,6 +160,7 @@ iri_emit_jrz(IR_Generator* gen, IR_Reg t1, IR_Value imm, int byte_size)
 {
     IR_Instruction inst = iri_new(IR_JRZ, t1, IR_REG_NONE, IR_REG_NONE, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -158,6 +169,7 @@ iri_emit_jrnz(IR_Generator* gen, IR_Reg t1, IR_Value imm, int byte_size)
 {
     IR_Instruction inst = iri_new(IR_JRNZ, t1, IR_REG_NONE, IR_REG_NONE, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -165,6 +177,7 @@ void
 iri_emit_jr(IR_Generator* gen, IR_Value imm, int byte_size)
 {
     IR_Instruction inst = iri_new(IR_JR, IR_REG_NONE, IR_REG_NONE, IR_REG_NONE, imm, byte_size);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -174,6 +187,7 @@ iri_emit_cmp(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_siz
     IR_Instruction inst = iri_new((fp) ? IR_CMPF : IR_CMP, t1, t2, IR_REG_NONE, imm, byte_size);
     iri_update_reg_uses(gen, t1, fp);
     iri_update_reg_uses(gen, t2, fp);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -182,6 +196,7 @@ iri_emit_cmov(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2,
 {
     IR_Instruction inst = iri_new(type, t1, IR_REG_NONE, t2, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -190,6 +205,7 @@ iri_emit_call(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size)
 {
     IR_Instruction inst = iri_new(IR_CALL, t, IR_REG_NONE, IR_REG_NONE, imm, byte_size);
     iri_update_reg_uses(gen, t, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -197,6 +213,7 @@ void
 iri_emit_ret(IR_Generator* gen)
 {
     IR_Instruction inst = iri_new(IR_RET, IR_REG_NONE, IR_REG_NONE, IR_REG_NONE, (IR_Value){0}, 0);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -205,6 +222,7 @@ iri_emit_push(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size)
 {
     IR_Instruction inst = iri_new(IR_PUSH, t, IR_REG_NONE, IR_REG_NONE, imm, byte_size);
     iri_update_reg_uses(gen, t, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -214,6 +232,7 @@ iri_emit_copy(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_si
     IR_Instruction inst = iri_new(IR_COPY, t1, IR_REG_NONE, t2, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
     iri_update_reg_uses(gen, t2, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
@@ -631,12 +650,14 @@ iri_print_instructions(IR_Generator* gen)
             nr_index++;
         }
 #endif
+#if 0
         if(array_length(gen->insertions) > j && gen->insertions[j].index == i)
         {
             iri_print_instruction(stdout, &gen->insertions[j].inst);
             fprintf(stdout, "\n");
             j++;
         }
+#endif
 
         IR_Instruction* instr =  gen->instructions + i;
         fprintf(stdout, "%d: ", i);
