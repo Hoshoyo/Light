@@ -141,6 +141,9 @@ typedef struct {
     int offset; // also byte count at the end
 
     // Register allocation stuff
+    IR_Reg temp_int;
+    IR_Reg temp_float;
+
     IR_Virtual_Reg*  vregs;
     IR_Virtual_FReg* vfregs;
     IR_Physical_Reg  pregs[8 + 1];
@@ -166,10 +169,6 @@ typedef struct {
 typedef struct {
     IR_Instruction*    instructions;
     IR_Activation_Rec* ars; // the current is always the last
-
-    // needed for allocating temporaries
-    IR_Reg temp_int;
-    IR_Reg temp_float;
 
     // needed for break and continue
     int* loop_start_labels;

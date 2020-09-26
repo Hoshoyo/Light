@@ -27,7 +27,7 @@ ir_new_temp(IR_Generator* gen) {
 
     IR_Activation_Rec* ar = ir_get_current_ar(gen);
     array_push(ar->vregs, vreg);
-    return gen->temp_int++;
+    return ar->temp_int++;
 }
 static IR_Reg
 ir_new_tempf(IR_Generator* gen) {
@@ -38,7 +38,7 @@ ir_new_tempf(IR_Generator* gen) {
 
     IR_Activation_Rec* ar = ir_get_current_ar(gen);
     array_push(ar->vfregs, vfreg);
-    return gen->temp_float++;
+    return ar->temp_float++;
 }
 
 // where addr is offset from stack
@@ -1041,6 +1041,8 @@ ir_new_activation_record(IR_Generator* gen)
     IR_Activation_Rec ar = {0};
     ar.index = -1;
     ar.offset = -(int)(type_pointer_size_bits() / 8);
+    ar.temp_int = 1;   // temp 0 is reserved for proc call return value
+    ar.temp_float = 1; // temp 0 is reserved for proc call return value 
     
     // r0
     ar.vregs = array_new(IR_Virtual_Reg);
@@ -1068,8 +1070,6 @@ void ir_generate(Light_Ast** ast) {
     gen.jmp_patch = array_new(IR_Instr_Jmp_Patch);
     gen.loop_start_labels = array_new(int);
     gen.node_ranges = array_new(IR_Node_Range);
-    gen.temp_int = 1;   // temp 0 is reserved for proc call return value
-    gen.temp_float = 1; // temp 0 is reserved for proc call return value 
     gen.ars = array_new(IR_Activation_Rec);
 
     for(u64 i = 0; i < array_length(ast); ++i) {
