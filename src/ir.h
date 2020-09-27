@@ -108,6 +108,7 @@ typedef struct {
             int16_t dst_byte_size;
         };
     };
+    bool has_imm_index_offset;
     IR_Reg ot1, ot2, ot3;
     int activation_record_index;
     u8* binary_offset;

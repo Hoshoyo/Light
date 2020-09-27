@@ -437,6 +437,17 @@ x86_emit_cond_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
 }
 
 Instr_Emit_Result
+x86_emit_call(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->byte_size);
+
+    em->at = emit_call_reg(&info, em->at, DIRECT, rop1, 0, 0);
+
+    return info;
+}
+
+Instr_Emit_Result
 x86_emit_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
 {
     Instr_Emit_Result info = {0};
@@ -480,13 +491,15 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
         case IR_CMOVLS: case IR_CMOVLES: case IR_CMOVGU: case IR_CMOVGEU:
         case IR_CMOVLU: case IR_CMOVLEU:
             return x86_emit_cmov(em, instr);
+        case IR_CALL:
+            return x86_emit_call(em, instr);
         case IR_RET:
             return x86_emit_ret(em, instr);
         case IR_JRZ: case IR_JRNZ:
             return x86_emit_cond_rjmp(em, instr, index);
         case IR_JR:
             return x86_emit_rjmp(em, instr, index);
-        
+        default: break;
     }
     return (Instr_Emit_Result){0};
 }

@@ -120,6 +120,24 @@ emit_call_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode,
 }
 
 u8*
+emit_call_rel32(Instr_Emit_Result* out_info, u8* stream, int imm)
+{
+    u8* start = stream;
+    *stream++ = 0xe8;
+    s8 imm_offset = stream - start;
+    *(int*)stream = imm;
+    stream += sizeof(int);
+
+    if(out_info)
+    {
+        out_info->instr_byte_size = stream - start;
+        out_info->diplacement_offset = -1;
+        out_info->immediate_offset = imm_offset;
+    }
+    return stream;
+}
+
+u8*
 emit_push_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_Register reg, u8 disp8, uint32_t disp32)
 {
     u8* start = stream;
