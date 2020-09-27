@@ -13,6 +13,27 @@ jump_near_to_short(u8 opcode) {
 }
 
 u8*
+emit_jmp_cond_rel32(Instr_Emit_Result* out_info, u8* stream, X64_Jump_Conditional_Short opcode, int offset)
+{
+    u8* start = stream;
+    s8 imm_offset = 0;
+
+    *stream++ = 0x0f;
+    *stream++ = jump_short_to_near(opcode);
+    imm_offset = stream - start;
+    *(int*)stream = offset;
+    stream += sizeof(int);
+
+    if(out_info)
+    {
+        out_info->instr_byte_size = stream - start;
+        out_info->immediate_offset = imm_offset;
+        out_info->diplacement_offset = -1;
+    }
+    return stream;
+}
+
+u8*
 emit_jmp_cond_short(Instr_Emit_Result* out_info, u8* stream, X64_Jump_Conditional_Short opcode, u8 offset)
 {
     u8* start = stream;
@@ -153,6 +174,8 @@ emit_ret(Instr_Emit_Result* out_info, u8* stream, X64_Ret_Instruction opcode)
 u8*
 emit_jmp_cond_test(u8* stream)
 {
+    stream = emit_jmp_cond_rel32(0, stream, JZ, 0x12345678);
+#if 0
     stream = emit_jmp_reg_unconditional(0, stream, DIRECT, RBX, 0, 0);
     stream = emit_jmp_reg_unconditional(0, stream, INDIRECT, RBX, 0, 0);
     stream = emit_jmp_reg_unconditional(0, stream, INDIRECT_BYTE_DISPLACED, RBX, 0x12, 0);
@@ -162,6 +185,7 @@ emit_jmp_cond_test(u8* stream)
     stream = emit_call_reg(0, stream, INDIRECT, RBX, 0, 0);
     stream = emit_call_reg(0, stream, INDIRECT_BYTE_DISPLACED, RBX, 0x12, 0);
     stream = emit_call_reg(0, stream, INDIRECT_DWORD_DISPLACED, RBX, 0, 0x12345678);
+#endif
 #if 0
     stream = emit_jmp_rel_unconditional(0, stream, 8, (Int_Value){.v8 = 0x12});
     //stream = emit_jmp_rel_unconditional(0, stream, 16, (Int_Value){.v16 = 0x1234});  // 32 bit only

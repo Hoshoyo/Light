@@ -422,7 +422,27 @@ x86_emit_cond_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
     em->at = emit_arith_mi(&info, em->at, ARITH_CMP, DIRECT, rop1, (Int_Value){.v64 = 0}, 0, 0);
 
     u8* jmp_addr = em->at;
-    em->at = emit_jmp_cond_short(&info, em->at, (instr->type == IR_JRZ) ? JZ : JNZ, 0); // TODO(psv): calculate offset
+    em->at = emit_jmp_cond_rel32(&info, em->at, (instr->type == IR_JRZ) ? JZ : JNZ, 0);
+
+    X86_Patch patch = {0};
+    patch.issuer_addr = jmp_addr;
+    patch.addr = jmp_addr + info.immediate_offset;
+    patch.bytes = sizeof(int);
+    patch.rel_index_offset = instr->imm.v_s32;
+    patch.instr_byte_size = info.instr_byte_size;
+    patch.issuer_index = index;
+    array_push(em->relative_patches, patch);
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
+{
+    Instr_Emit_Result info = {0};
+
+    u8* jmp_addr = em->at;
+    em->at = emit_jmp_rel_unconditional(&info, em->at, instr->byte_size * 8, (Int_Value){0});
 
     X86_Patch patch = {0};
     patch.issuer_addr = jmp_addr;
@@ -464,6 +484,8 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
             return x86_emit_ret(em, instr);
         case IR_JRZ: case IR_JRNZ:
             return x86_emit_cond_rjmp(em, instr, index);
+        case IR_JR:
+            return x86_emit_rjmp(em, instr, index);
         
     }
     return (Instr_Emit_Result){0};

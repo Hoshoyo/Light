@@ -223,6 +223,7 @@ u8* emit_shift_imm8(Instr_Emit_Result* out_info, u8* stream, int bitsize, X64_Sh
 u8* emit_jmp_cond_short(Instr_Emit_Result* out_info, u8* stream, X64_Jump_Conditional_Short opcode, u8 offset);
 u8* emit_jmp_rel_unconditional(Instr_Emit_Result* out_info, u8* stream, int bitsize, Int_Value offset);
 u8* emit_jmp_reg_unconditional(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_Register reg, u8 disp8, uint32_t disp32);
+u8* emit_jmp_cond_rel32(Instr_Emit_Result* out_info, u8* stream, X64_Jump_Conditional_Short opcode, int offset);
 
 // call ret push pop
 u8* emit_call_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_Register reg, u8 disp8, uint32_t disp32);

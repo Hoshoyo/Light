@@ -121,4 +121,4 @@ emit_displacement(X64_Addressing_Mode mode, u8* stream, u8 disp8, uint32_t disp3
 	return stream;
 }
 
-#define ASSEMBLER_BITSIZE 64
+#define ASSEMBLER_BITSIZE 32

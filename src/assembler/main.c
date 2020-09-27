@@ -17,8 +17,8 @@ int main(int argc, char** argv)
 		//stream = emit_shl_test(stream);
 		//stream = emit_float_test(stream);
 		//stream = emit_test_mul(stream);
-		//stream = emit_jmp_cond_test(stream);
-		stream = emit_cmov_test(stream);
+		stream = emit_jmp_cond_test(stream);
+		//stream = emit_cmov_test(stream);
 	}
 
 	fwrite(code, 1, stream - code, out);

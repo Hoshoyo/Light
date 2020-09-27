@@ -1129,7 +1129,7 @@ reg_alloc(IR_Activation_Rec* ar, IR_Reg reg, int byte_size, int index)
     if(p == -1)
     {
         p = best_preg(ar);
-        // emit store p -> vreg address
+        // emit store p -> vreg address        
         IR_Instruction store = iri_new(IR_STORE, p, IR_REG_STACK_BASE, IR_REG_NONE,
             (IR_Value){.type = IR_VALUE_S32, .v_s32 = ar->vregs[reg].address}, byte_size);
         store.ot1 = ar->pregs[p].vreg;
@@ -1161,6 +1161,10 @@ ensure(IR_Activation_Rec* ar, IR_Reg reg, int byte_size, int index)
     {
         p = reg_alloc(ar, reg, byte_size, index);
         // emit load from reg.addr -> p
+        if(!ar->vregs[reg].has_mem_address)
+        {
+            // alocate an address for it
+        }
         IR_Instruction load = iri_new(IR_LOAD, IR_REG_STACK_BASE, IR_REG_NONE, p, 
             (IR_Value){.type = IR_VALUE_S32, .v_s32 = ar->vregs[reg].address}, byte_size);
         load.ot1 = reg;
