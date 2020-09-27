@@ -158,13 +158,14 @@ emit_mov_moffs(Instr_Emit_Result* out_info, u8* stream, X64_Register src, uint64
 }
 
 u8*
-emit_lea(Instr_Emit_Result* out_info, u8* stream, int bitsize, X64_Register dest, X64_Register src)
+emit_lea(Instr_Emit_Result* out_info, u8* stream, int bitsize, X64_Addressing_Mode mode, X64_Register dest, X64_Register src, u8 disp8, uint32_t disp32)
 {
     u8* start = stream;
 
     assert(register_get_bitsize(dest) == bitsize);
     stream = emit_opcode(stream, 0x8D, bitsize, src, dest);
-    *stream++ = make_modrm(INDIRECT, register_representation(dest), register_representation(src));
+    *stream++ = make_modrm(mode, register_representation(dest), register_representation(src));
+    stream = emit_displacement(mode, stream, disp8, disp32);
 
     if(out_info)
     {
@@ -239,7 +240,7 @@ emit_mov_test(u8* stream)
     stream = emit_mov_reg(0, stream, MOV_RM, INDIRECT_DWORD_DISPLACED, 64, RAX, RBX, 0, 0x12345678);
 #endif
 
-#if 1
+#if 0
     stream = emit_lea(0, stream, 16, AX, R8);
     stream = emit_lea(0, stream, 16, DX, RBX);
 

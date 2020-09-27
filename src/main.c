@@ -10,6 +10,7 @@
 #include "backend/c/toplevel.h"
 #include <light_array.h>
 #include "ir.h"
+#include "backend/x86/x86.h"
 
 int main(int argc, char** argv) {
     double start = os_time_us();
@@ -76,7 +77,9 @@ int main(int argc, char** argv) {
 #endif
 
 #if 1
-    ir_generate(ast);
+    IR_Generator irgen = {0};
+    ir_generate(&irgen, ast);
+    X86_generate(&irgen);
 #endif
 
 #if 0

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include "assembler.h"
 
+#if !defined(LIGHTMAIN)
+
 int main(int argc, char** argv)
 {
 	FILE* out = fopen("test.bin", "wb");
@@ -13,9 +15,10 @@ int main(int argc, char** argv)
 		//stream = emit_add_test(stream);
 		//stream = emit_and_test(stream);
 		//stream = emit_shl_test(stream);
-		stream = emit_float_test(stream);
+		//stream = emit_float_test(stream);
 		//stream = emit_test_mul(stream);
 		//stream = emit_jmp_cond_test(stream);
+		stream = emit_cmov_test(stream);
 	}
 
 	fwrite(code, 1, stream - code, out);
@@ -24,3 +27,5 @@ int main(int argc, char** argv)
 	system("ndisasm -b 64 test.bin");
     return 0;
 }
+
+#endif

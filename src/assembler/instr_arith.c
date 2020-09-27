@@ -27,7 +27,7 @@
 #define OR_RM8 0x0A
 
 u8*
-emit_arith_mi(Instr_Emit_Result* out_info, u8* stream, int instr_digit, X64_Addressing_Mode mode, X64_Register dest, Int_Value value, u8 disp8, uint32_t disp32)
+emit_arith_mi(Instr_Emit_Result* out_info, u8* stream, X64_Arithmetic_Instr instr_digit, X64_Addressing_Mode mode, X64_Register dest, Int_Value value, u8 disp8, uint32_t disp32)
 {
     u8* start = stream;
     s8 imm_offset = 0;

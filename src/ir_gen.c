@@ -639,8 +639,18 @@ iri_print_instructions(IR_Generator* gen)
 {
     int nr_index = 0;
     qsort(gen->node_ranges, array_length(gen->node_ranges), sizeof(*gen->node_ranges), ir_node_range_comp);
+
+    IR_Activation_Rec* ar = 0;
     for(int i = 0, j = 0; i < array_length(gen->instructions); ++i)
     {
+        IR_Instruction* instr =  gen->instructions + i;
+        IR_Activation_Rec* current_ar = &gen->ars[instr->activation_record_index];
+        if(ar != current_ar)
+        {
+            ar = current_ar;
+            j = 0;
+        }
+
 #if 0
         // Only use this with a function that only prints the command non recursively
         if(nr_index < array_length(gen->node_ranges) && gen->node_ranges[nr_index].start_index == i)
@@ -650,16 +660,15 @@ iri_print_instructions(IR_Generator* gen)
             nr_index++;
         }
 #endif
-#if 0
-        if(array_length(gen->insertions) > j && gen->insertions[j].index == i)
+#if 1
+        if(array_length(ar->insertions) > j && ar->insertions[j].index == i)
         {
-            iri_print_instruction(stdout, &gen->insertions[j].inst);
+            iri_print_instruction(stdout, &ar->insertions[j].inst);
             fprintf(stdout, "\n");
             j++;
         }
 #endif
 
-        IR_Instruction* instr =  gen->instructions + i;
         fprintf(stdout, "%d: ", i);
         iri_print_instruction(stdout, instr);
         fprintf(stdout, "\n");

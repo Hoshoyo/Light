@@ -99,6 +99,58 @@ emit_call_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode,
 }
 
 u8*
+emit_push_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_Register reg, u8 disp8, uint32_t disp32)
+{
+    u8* start = stream;
+    s8 disp_offset = 0;
+
+    // 4 = jmp, 0 = inc, 1 = dec, 2 = call, 6 = push
+    *stream++ = 0xff;
+    *stream++ = make_modrm(mode, 6, register_representation(reg));
+
+    disp_offset = stream - start;
+    stream = emit_displacement(mode, stream, disp8, disp32);
+    if((stream - start) == disp_offset) disp_offset = -1;
+
+    if(out_info)
+    {
+        out_info->instr_byte_size = stream - start;
+        out_info->diplacement_offset = disp_offset;
+        out_info->immediate_offset = -1;
+    }
+    return stream;
+}
+
+u8*
+emit_pop_reg(Instr_Emit_Result* out_info, u8* stream, X64_Register reg)
+{
+    u8* start = stream;
+    *stream++ = (0x58 | (register_representation(reg) & 0xf));
+
+    if(out_info)
+    {
+        out_info->instr_byte_size = stream - start;
+        out_info->diplacement_offset = -1;
+        out_info->immediate_offset = -1;
+    }
+    return stream;
+}
+
+u8*
+emit_ret(Instr_Emit_Result* out_info, u8* stream, X64_Ret_Instruction opcode)
+{
+    u8* start = stream;
+    *stream++ = opcode;
+    if(out_info)
+    {
+        out_info->instr_byte_size = stream - start;
+        out_info->diplacement_offset = -1;
+        out_info->immediate_offset = -1;
+    }
+    return stream;
+}
+
+u8*
 emit_jmp_cond_test(u8* stream)
 {
     stream = emit_jmp_reg_unconditional(0, stream, DIRECT, RBX, 0, 0);

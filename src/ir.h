@@ -110,6 +110,7 @@ typedef struct {
     };
     IR_Reg ot1, ot2, ot3;
     int activation_record_index;
+    u8* binary_offset;
 } IR_Instruction;
 
 typedef struct {
@@ -146,7 +147,7 @@ typedef struct {
 
     IR_Virtual_Reg*  vregs;
     IR_Virtual_FReg* vfregs;
-    IR_Physical_Reg  pregs[8 + 1];
+    IR_Physical_Reg  pregs[4 + 1];
     IR_Instr_Insert* insertions;
 } IR_Activation_Rec;
 
@@ -180,7 +181,7 @@ typedef struct {
     IR_Node_Range* node_ranges;
 } IR_Generator;
 
-void ir_generate(Light_Ast** ast);
+void ir_generate(IR_Generator* gen, Light_Ast** ast);
 
 int             iri_current_instr_index(IR_Generator* gen);
 IR_Instruction* iri_get_temp_instr_ptr(IR_Generator* gen, int index);   // @IMPORTANT cannot invoke any other iri functions while using this address

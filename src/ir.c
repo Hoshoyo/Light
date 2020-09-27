@@ -194,7 +194,7 @@ ir_gen_cvt_to_bool(IR_Generator* gen, Light_Ast* expr, int op_temp)
     iri_emit_cmp(gen, op_temp, IR_REG_NONE, (IR_Value){.type = IR_VALUE_U8, .v_u8 = 0}, op_type->size_bits / 8, false);
 
     // mov 1 if the value is different from 0
-    iri_emit_cmov(gen, IR_CMOVNE, t, IR_REG_NONE, (IR_Value){.type = IR_VALUE_U8, .v_u8 = 1}, cast_type->size_bits / 8);
+    iri_emit_cmov(gen, IR_CMOVNE, IR_REG_NONE, t, (IR_Value){.type = IR_VALUE_U8, .v_u8 = 1}, cast_type->size_bits / 8);
 
     return t;
 }
@@ -673,7 +673,7 @@ ir_gen_comm_if(IR_Generator* gen, Light_Ast* stmt)
 
     // jrz t, 0 -> else
     int if_true_index = iri_current_instr_index(gen);
-    iri_emit_jrz(gen, cond_temp, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, 32);    // TODO(psv): identify proper size
+    iri_emit_jrz(gen, cond_temp, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, 4);    // TODO(psv): identify proper size
 
     // generate true branch
     ir_gen_comm(gen, stmt->comm_if.body_true);
@@ -682,7 +682,7 @@ ir_gen_comm_if(IR_Generator* gen, Light_Ast* stmt)
     if(stmt->comm_if.body_false)
     {
         // jump over false clause first
-        iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, 32);
+        iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, 4);
     }
 
     int else_index = iri_current_instr_index(gen);
@@ -1063,20 +1063,19 @@ ir_new_activation_record(IR_Generator* gen)
     array_push(gen->ars, ar);
 }
 
-void ir_generate(Light_Ast** ast) {
-    IR_Generator gen = {0};
-    gen.instructions = array_new(IR_Instruction);
-    gen.decl_patch = array_new(IR_Decl_To_Patch);
-    gen.jmp_patch = array_new(IR_Instr_Jmp_Patch);
-    gen.loop_start_labels = array_new(int);
-    gen.node_ranges = array_new(IR_Node_Range);
-    gen.ars = array_new(IR_Activation_Rec);
+void ir_generate(IR_Generator* gen, Light_Ast** ast) {
+    gen->instructions = array_new(IR_Instruction);
+    gen->decl_patch = array_new(IR_Decl_To_Patch);
+    gen->jmp_patch = array_new(IR_Instr_Jmp_Patch);
+    gen->loop_start_labels = array_new(int);
+    gen->node_ranges = array_new(IR_Node_Range);
+    gen->ars = array_new(IR_Activation_Rec);
 
     for(u64 i = 0; i < array_length(ast); ++i) {
         Light_Ast* n = ast[i];
         switch(n->kind) {
             case AST_DECL_PROCEDURE: {
-                ir_gen_proc(&gen, n);
+                ir_gen_proc(gen, n);
             } break;
             case AST_DECL_VARIABLE: {
                 // TODO(psv): global variables in the data segment
@@ -1085,14 +1084,14 @@ void ir_generate(Light_Ast** ast) {
         }
     }
 
-    ir_patch_proc_calls(&gen);
+    ir_patch_proc_calls(gen);
 
-    iri_print_instructions(&gen);
+    iri_print_instructions(gen);
 
-    ir_allocate_register(&gen);
+    ir_allocate_register(gen);
     fprintf(stdout, "\n");
 
-    iri_print_instructions(&gen);
+    iri_print_instructions(gen);
 }
 
 // -----------------------------------
