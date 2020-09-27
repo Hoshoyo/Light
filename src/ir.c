@@ -376,7 +376,7 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
     IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true);
     IR_Reg t3 = ir_new_reg(gen, expr->type);
 
-    bool fp = type_primitive_float(expr->type);
+    bool fp = type_primitive_float(expr->expr_binary.left->type);
 
     int byte_size = expr->type->size_bits / 8;
 
@@ -861,7 +861,7 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
         }
         else
         {
-            IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);
+            IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);  
             iri_emit_store(gen, t2, t1, (IR_Value){0}, byte_size, type_primitive_float(comm->rvalue->type));
         }
     }
@@ -1029,7 +1029,7 @@ ir_patch_proc_calls(IR_Generator* gen)
     {
         IR_Decl_To_Patch dpatch = gen->decl_patch[i];
         IR_Instruction* instr = iri_get_temp_instr_ptr(gen, dpatch.instr_number);
-        instr->has_imm_index_offset = true;
+        instr->flags |= IIR_FLAG_HAS_IMM;
         instr->imm.v_u64 = dpatch.decl->decl_proc.ir_instr_index;
     }
 }
@@ -1058,6 +1058,10 @@ ir_new_activation_record(IR_Generator* gen)
     for(int i = 0; i < ARRAY_LENGTH(ar.pregs); ++i)
         ar.pregs[i].vreg = IR_REG_NONE;
     ar.pregs[0].next = -100; // never pick the return value register
+
+    for(int i = 0; i < ARRAY_LENGTH(ar.pfregs); ++i)
+        ar.pfregs[i].vreg = IR_REG_NONE;
+    ar.pfregs[0].next = -100; // never pick the return value register
 
     ar.insertions = array_new(IR_Instr_Insert);
 
@@ -1111,6 +1115,17 @@ next_preg(IR_Activation_Rec* ar)
 }
 
 static int
+next_preg_fp(IR_Activation_Rec* ar)
+{
+    for(int i = 1; i < ARRAY_LENGTH(ar->pfregs); ++i)
+    {
+        if(ar->pfregs[i].vreg == IR_REG_NONE)
+            return i;
+    }
+    return -1;
+}
+
+static int
 best_preg(IR_Activation_Rec* ar)
 {
     int p = -1;
@@ -1118,6 +1133,19 @@ best_preg(IR_Activation_Rec* ar)
     for(int i = 0; i < ARRAY_LENGTH(ar->pregs); ++i)
     {
         if(ar->pregs[i].next > max)
+            max = i;
+    }
+    return max;
+}
+
+static int
+best_preg_fp(IR_Activation_Rec* ar)
+{
+    int p = -1;
+    int max = -1;
+    for(int i = 0; i < ARRAY_LENGTH(ar->pfregs); ++i)
+    {
+        if(ar->pfregs[i].next > max)
             max = i;
     }
     return max;
@@ -1152,6 +1180,35 @@ reg_alloc(IR_Activation_Rec* ar, IR_Reg reg, int byte_size, int index)
 }
 
 static int
+reg_alloc_fp(IR_Activation_Rec* ar, IR_Reg freg, int byte_size, int index)
+{
+    int p = next_preg_fp(ar);
+    if(p == -1)
+    {
+        p = best_preg_fp(ar);
+        // emit store p -> vreg address        
+        IR_Instruction store = iri_new(IR_STOREF, p, IR_REG_STACK_BASE, IR_REG_NONE,
+            (IR_Value){.type = IR_VALUE_S32, .v_s32 = ar->vfregs[freg].address}, byte_size);
+        store.ot1 = ar->pfregs[p].vreg;
+        store.ot2 = freg;
+        IR_Instr_Insert insert = {
+            .index = index,
+            .inst = store
+        };
+        array_push(ar->insertions, insert);
+    }
+    if(ar->pfregs[p].vreg != IR_REG_NONE)
+    {
+        ar->vfregs[ar->pfregs[p].vreg].pfreg_mapped = IR_REG_NONE;
+    }
+    ar->pfregs[p].next = -1;
+    ar->pfregs[p].vreg = freg;
+    ar->vfregs[freg].pfreg_mapped = p;
+    return p;
+}
+
+
+static int
 ensure(IR_Activation_Rec* ar, IR_Reg reg, int byte_size, int index)
 {
     int p = -1;
@@ -1166,10 +1223,38 @@ ensure(IR_Activation_Rec* ar, IR_Reg reg, int byte_size, int index)
         {
             // alocate an address for it
         }
-        IR_Instruction load = iri_new(IR_LOAD, IR_REG_STACK_BASE, IR_REG_NONE, p, 
+        IR_Instruction load = iri_new(IR_LOADF, IR_REG_STACK_BASE, IR_REG_NONE, p, 
             (IR_Value){.type = IR_VALUE_S32, .v_s32 = ar->vregs[reg].address}, byte_size);
         load.ot1 = reg;
         load.ot3 = ar->pregs[p].vreg;
+        IR_Instr_Insert insert = {
+            .index = index,
+            .inst = load
+        };
+        array_push(ar->insertions, insert);
+    }
+    return p;
+}
+
+static int
+ensure_fp(IR_Activation_Rec* ar, IR_Reg freg, int byte_size, int index)
+{
+    int p = -1;
+    if(freg <= IR_REG_PROC_RET) return freg;
+    if(ar->vfregs[freg].pfreg_mapped != -1)
+        p = ar->vfregs[freg].pfreg_mapped;
+    else
+    {
+        p = reg_alloc_fp(ar, freg, byte_size, index);
+        // emit load from reg.addr -> p
+        if(!ar->vfregs[freg].has_mem_address)
+        {
+            // alocate an address for it
+        }
+        IR_Instruction load = iri_new(IR_LOAD, IR_REG_STACK_BASE, IR_REG_NONE, p, 
+            (IR_Value){.type = IR_VALUE_S32, .v_s32 = ar->vfregs[freg].address}, byte_size);
+        load.ot1 = freg;
+        load.ot3 = ar->pfregs[p].vreg;
         IR_Instr_Insert insert = {
             .index = index,
             .inst = load
@@ -1186,12 +1271,33 @@ free_preg(IR_Activation_Rec* ar, int pr)
     ar->pregs[pr].vreg = IR_REG_NONE;
 }
 
+static void
+free_pfreg(IR_Activation_Rec* ar, int pfr)
+{
+    ar->pfregs[pfr].next = 10000;
+    ar->pfregs[pfr].vreg = IR_REG_NONE;
+}
+
 static bool
-needed_after(IR_Activation_Rec* ar, IR_Reg r, int index)
+needed_after_int(IR_Activation_Rec* ar, IR_Reg r, int index)
 {
     if (r <= IR_REG_PROC_RET) return true;
     int last_use = ar->vregs[r].uses[array_length(ar->vregs[r].uses) - 1];
     return (last_use > index);
+}
+
+static bool
+needed_after_fp(IR_Activation_Rec* ar, IR_Reg rf, int index)
+{
+    if (rf <= IR_REG_PROC_RET) return true;
+    int last_use = ar->vfregs[rf].uses[array_length(ar->vfregs[rf].uses) - 1];
+    return (last_use > index);
+}
+
+static bool
+needed_after(IR_Activation_Rec* ar, IR_Reg r, int index, bool fp)
+{
+    return (fp) ? needed_after_fp(ar, r, index) : needed_after_int(ar, r, index);
 }
 
 static void
@@ -1203,7 +1309,7 @@ ir_rewrite_with_pregs(IR_Instruction* instr, int p1, int p2, int p3)
 }
 
 static void
-update_next(IR_Activation_Rec* ar, IR_Reg treg, int preg, int index)
+update_next_int(IR_Activation_Rec* ar, IR_Reg treg, int preg, int index)
 {
     if (preg <= IR_REG_PROC_RET) return;
     for(int i = 0; i < array_length(ar->vregs[treg].uses); ++i)
@@ -1216,6 +1322,66 @@ update_next(IR_Activation_Rec* ar, IR_Reg treg, int preg, int index)
     }
 }
 
+static void
+update_next_fp(IR_Activation_Rec* ar, IR_Reg tfreg, int pfreg, int index)
+{
+    if (pfreg <= IR_REG_PROC_RET) return;
+    for(int i = 0; i < array_length(ar->vfregs[tfreg].uses); ++i)
+    {
+        if(ar->vfregs[tfreg].uses[i] > index)
+        {
+            ar->pfregs[pfreg].next = ar->vfregs[tfreg].uses[i];
+            break;
+        }
+    }
+}
+
+static void
+update_next(IR_Activation_Rec* ar, IR_Reg treg, int preg, int index, bool fp)
+{
+    if(fp) update_next_fp(ar, treg, preg, index);
+    else   update_next_int(ar, treg, preg, index);
+}
+
+void
+ir_allocate_reg(IR_Generator* gen, IR_Instruction* inst, int i)
+{
+    IR_Activation_Rec* ar = &gen->ars[inst->activation_record_index];
+    inst->ot1 = inst->t1;
+    inst->ot2 = inst->t2;
+    inst->ot3 = inst->t3;
+
+    bool fp_operand1 = (inst->flags & IIR_FLAG_IS_FP_OPERAND1);
+    bool fp_operand2 = (inst->flags & IIR_FLAG_IS_FP_OPERAND2);
+    bool fp_dest = (inst->flags & IIR_FLAG_IS_FP_DEST);
+
+    int p1 = fp_operand1 ? ensure_fp(ar, inst->t1, inst->byte_size, i) : ensure(ar, inst->t1, inst->byte_size, i);
+    int p2 = fp_operand2 ? ensure_fp(ar, inst->t2, inst->byte_size, i) : ensure(ar, inst->t2, inst->byte_size, i);
+
+    // allocate physical register for operands
+    if(!needed_after(ar, inst->t1, i, fp_operand1))
+        free_preg(ar, p1);
+    if(!needed_after(ar, inst->t2, i, fp_operand2))
+        free_preg(ar, p2);
+
+    // alocate physical register for result
+    int p3 = -1;
+    if(fp_dest)
+        p3 = (inst->t3 > IR_REG_PROC_RET) ? reg_alloc_fp(ar, inst->t3, inst->byte_size, i) : inst->t3;
+    else
+        p3 = (inst->t3 > IR_REG_PROC_RET) ? reg_alloc(ar, inst->t3, inst->byte_size /* consider dst and src byte size */, i) : inst->t3;
+    
+    // rewrite instruction to p1, p2 -> p3
+    ir_rewrite_with_pregs(inst, p1, p2, p3);
+
+    // update next instruction index where each virtual register is used
+    if(needed_after(ar, inst->t1, i, fp_operand1))
+        update_next(ar, inst->t1, p1, i, fp_operand1);
+    if(needed_after(ar, inst->t2, i, fp_operand2))
+        update_next(ar, inst->t2, p2, i, fp_operand2);
+    update_next(ar, inst->t3, p3, i, fp_dest);
+}
+
 void
 ir_allocate_register(IR_Generator* gen)
 {
@@ -1224,30 +1390,6 @@ ir_allocate_register(IR_Generator* gen)
     for(int i = 0; i < array_length(instructions); ++i)
     {
         IR_Instruction* inst = &instructions[i];
-        IR_Activation_Rec* ar = &gen->ars[inst->activation_record_index];
-        inst->ot1 = inst->t1;
-        inst->ot2 = inst->t2;
-        inst->ot3 = inst->t3;
-        int p1 = ensure(ar, inst->t1, inst->byte_size, i);
-        int p2 = ensure(ar, inst->t2, inst->byte_size, i);
-
-        // allocate physical register for operands
-        if(!needed_after(ar, inst->t1, i))
-            free_preg(ar, p1);
-        if(!needed_after(ar, inst->t2, i))
-            free_preg(ar, p2);
-
-        // alocate physical register for result
-        int p3 = (inst->t3 > IR_REG_PROC_RET) ? reg_alloc(ar, inst->t3, inst->byte_size /* consider dst and src byte size */, i) : inst->t3;
-        
-        // rewrite instruction to p1, p2 -> p3
-        ir_rewrite_with_pregs(inst, p1, p2, p3);
-
-        // update next instruction index where each virtual register is used
-        if(needed_after(ar, inst->t1, i))
-            update_next(ar, inst->t1, p1, i);
-        if(needed_after(ar, inst->t2, i))
-            update_next(ar, inst->t2, p2, i);
-        update_next(ar, inst->t3, p3, i);
+        ir_allocate_reg(gen, inst, i);
     }
 }

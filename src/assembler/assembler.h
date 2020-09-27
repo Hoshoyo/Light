@@ -208,9 +208,11 @@ u8* emit_arith_rm(Instr_Emit_Result* out_info, X64_Arithmetic_Instr instr, u8* s
 u8* emit_movs_reg_to_mem(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_XMM_Register src, X64_Register dst, bool single_precision, u8 disp8, uint32_t disp32);
 u8* emit_movs_mem_to_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_XMM_Register dest, X64_Register src, bool single_precision, u8 disp8, uint32_t disp32);
 u8* emit_movs_direct(Instr_Emit_Result* out_info, u8* stream, X64_XMM_Register dest, X64_XMM_Register src, bool single_precision);
+u8* emit_movs_ds_to_reg(Instr_Emit_Result* out_info, u8* stream, X64_XMM_Register dest, bool single_precision, uint32_t ds_offset);
 u8* emit_arith_sse(Instr_Emit_Result* out_info, u8* stream, X64_XMM_Arithmetic_Instr instr, X64_XMM_Register dest, X64_XMM_Register src, bool single_precision);
 u8* emit_cmp_sse(Instr_Emit_Result* out_info, u8* stream, X64_SSE_Compare_Flag flag, X64_XMM_Register r1, X64_XMM_Register r2);
 u8* emit_cvt(Instr_Emit_Result* out_info, u8* stream, X64_SSE_Convert_Instr instr, X64_Addressing_Mode mode, u8 src, u8 dest, u8 disp8, uint32_t disp32, bool single_prec);
+u8* emit_comiss_sse(Instr_Emit_Result* out_info, u8* stream, X64_XMM_Register r1, X64_XMM_Register r2);
 
 // mul/div
 u8* emit_mul(Instr_Emit_Result* out_info, u8* stream, int bitsize, X64_Multiplicative_Instr instr, X64_Register reg, X64_Addressing_Mode mode, u8 disp8, uint32_t disp32);

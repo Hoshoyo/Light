@@ -97,10 +97,25 @@ typedef struct {
     };
 } IR_Value;
 
+typedef enum {
+    IIR_FLAG_HAS_IMM  = (1 << 0),
+    IIR_FLAG_HAS_DISP = (1 << 1),
+    IIR_FLAG_IS_FP_OPERAND1 = (1 << 2),
+    IIR_FLAG_IS_FP_OPERAND2 = (1 << 3),
+    IIR_FLAG_IS_FP_DEST = (1 << 4),
+} IR_Instruction_Flag;
+
 typedef struct {
     IR_Instruction_Type type;
     IR_Reg              t1, t2, t3;
     IR_Value            imm;
+    
+    uint32_t flags;
+    int activation_record_index;
+    u8* binary_offset;
+
+    IR_Reg ot1, ot2, ot3; // optional
+
     union {
         int byte_size;
         struct {
@@ -108,10 +123,6 @@ typedef struct {
             int16_t dst_byte_size;
         };
     };
-    bool has_imm_index_offset;
-    IR_Reg ot1, ot2, ot3;
-    int activation_record_index;
-    u8* binary_offset;
 } IR_Instruction;
 
 typedef struct {
@@ -149,6 +160,7 @@ typedef struct {
     IR_Virtual_Reg*  vregs;
     IR_Virtual_FReg* vfregs;
     IR_Physical_Reg  pregs[4 + 1];
+    IR_Physical_Reg  pfregs[4 + 1];
     IR_Instr_Insert* insertions;
 } IR_Activation_Rec;
 

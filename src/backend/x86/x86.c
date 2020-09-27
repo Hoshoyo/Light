@@ -235,6 +235,50 @@ x86_ir_mul_to_x86_arith(IR_Instruction* instr)
 }
 
 Instr_Emit_Result
+x86_emit_shift(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->byte_size);
+    X64_Register rop2 = ir_to_x86_Reg(instr->t2, instr->byte_size);
+    X64_Register rdst = ir_to_x86_Reg(instr->t3, instr->byte_size);
+    
+    bool op1_in_cl = (rop1 == CL || rop1 == CX || rop1 == ECX);
+    bool op2_not_in_cl = (rop2 != CL && rop2 != CX && rop2 != ECX);
+
+    if(op1_in_cl)
+    {
+        // mov ecx to eax
+        em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, instr->byte_size * 8,
+            x86_reg32_to_byte_size(EAX, instr->byte_size), rop1, 0, 0);
+        rop1 = x86_reg32_to_byte_size(EAX, instr->byte_size);
+    }
+
+    if(op2_not_in_cl)
+    {
+        // push ecx
+        // mov to ecx
+        em->at = emit_push_reg(0, em->at, DIRECT, ECX, 0, 0);
+        em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, instr->byte_size * 8, 
+            x86_reg32_to_byte_size(ECX, instr->byte_size), rop2, 0, 0);
+    }
+
+    // shl op1, ecx
+    em->at = emit_shift_reg(&info, em->at, instr->byte_size * 8, (instr->type == IR_SHL) ? SHL : SHR,
+        DIRECT, rop1, 0, 0);
+
+    if(op2_not_in_cl)
+    {
+        em->at = emit_pop_reg(0, em->at, ECX);
+    }
+
+    // mov to rdst
+    em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, instr->byte_size * 8,
+        rdst, rop1, 0, 0);
+
+    return info;
+}
+
+Instr_Emit_Result
 x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
@@ -374,6 +418,20 @@ x86_ir_cmov_to_x86_cmov(IR_Instruction* instr)
     return 0;
 }
 
+static X64_XMM_Arithmetic_Instr
+x86_ir_arithf_to_x86_arithf(IR_Instruction* instr)
+{
+    switch(instr->type)
+    {
+        case IR_ADDF: return XMM_ADDS;
+        case IR_SUBF: return XMM_SUBS;
+        case IR_MULF: return XMM_MULS;
+        case IR_DIVF: return XMM_DIVS;
+        default: break;
+    }
+    return 0;
+}
+
 Instr_Emit_Result
 x86_emit_cmp(X86_Emitter* em, IR_Instruction* instr)
 {
@@ -409,6 +467,17 @@ x86_emit_ret(X86_Emitter* em, IR_Instruction* instr)
     Instr_Emit_Result info = {0};
     
     em->at = emit_ret(&info, em->at, RET_NEAR);     // TODO(psv): ret far?
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_push(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_Register rop = ir_to_x86_Reg(instr->t1, instr->byte_size);
+    
+    em->at = emit_push_reg(&info, em->at, DIRECT, rop, 0, 0);
 
     return info;
 }
@@ -468,6 +537,78 @@ x86_emit_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
 }
 
 Instr_Emit_Result
+x86_emit_movf(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_XMM_Register rop = instr->t1;
+    X64_XMM_Register rdst = instr->t3;
+
+    em->at = emit_movs_ds_to_reg(&info, em->at, rdst, instr->byte_size == 4, 0); // TODO(psv): fill offset
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_loadf(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = { 0 };
+    X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->byte_size);
+    X64_XMM_Register rdst = instr->t3;
+
+    em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT, rdst, rop1, instr->byte_size == 4, 0, 0);
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_storef(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = { 0 };
+    X64_XMM_Register rop = instr->t1;
+    X64_Register rdest = ir_to_x86_Reg(instr->t3, instr->byte_size);
+
+    em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT, rop, rdest, instr->byte_size == 4, 0, 0);
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_arithf(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = { 0 };
+    X64_XMM_Register rop1 = instr->t1;
+    X64_XMM_Register rop2 = instr->t2;
+    X64_XMM_Register rdst = instr->t3;
+
+    if(rop1 == rdst)
+    {
+        X64_XMM_Register temp = rop2;
+        rop2 = rop1;
+        rop1 = rop2;
+    }
+
+    // mov rop1 -> dst
+    em->at = emit_movs_direct(0, em->at, rdst, rop1, instr->byte_size == 4);
+
+    // adds rdst, rop2
+    em->at = emit_arith_sse(&info, em->at, x86_ir_arithf_to_x86_arithf(instr), rdst, rop2, instr->byte_size == 4);
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_cmpf(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = { 0 };
+    X64_XMM_Register rop1 = instr->t1;
+    X64_XMM_Register rop2 = instr->t2;
+
+    em->at = emit_comiss_sse(&info, em->at, rop1, rop2);
+
+    return info;
+}
+
+Instr_Emit_Result
 x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
 {
     instr->binary_offset = em->at;
@@ -479,6 +620,8 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
         case IR_STORE: return x86_emit_store(em, instr);
         case IR_ADD: case IR_SUB: case IR_OR: case IR_XOR: case IR_AND:
             return x86_emit_arith(em, instr);
+        case IR_SHL: case IR_SHR:
+            return x86_emit_shift(em, instr);
         case IR_MUL: case IR_DIV:
             return x86_emit_mul(em, instr);
         case IR_NOT: case IR_NEG:
@@ -495,10 +638,24 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
             return x86_emit_call(em, instr);
         case IR_RET:
             return x86_emit_ret(em, instr);
+        case IR_PUSH:
+            return x86_emit_push(em, instr);
         case IR_JRZ: case IR_JRNZ:
             return x86_emit_cond_rjmp(em, instr, index);
         case IR_JR:
             return x86_emit_rjmp(em, instr, index);
+
+        // Floating point instructions
+        case IR_MOVF:
+            return x86_emit_movf(em, instr);
+        case IR_LOADF:
+            return x86_emit_loadf(em, instr);
+        case IR_STOREF:
+            return x86_emit_storef(em, instr);
+        case IR_ADDF: IR_SUBF: IR_MULF: IR_DIVF:
+            return x86_emit_arithf(em, instr);
+        case IR_CMPF:
+            return x86_emit_cmpf(em, instr);
         default: break;
     }
     return (Instr_Emit_Result){0};
