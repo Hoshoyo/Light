@@ -615,7 +615,7 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr)
         for(int i = 1; i < expr->expr_literal_array.data_length_bytes - 1; ++i)
         {
             iri_emit_mov(gen, IR_REG_NONE, t1, (IR_Value){.type = IR_VALUE_U8, .v_u8 = expr->expr_literal_array.data[i]},
-                8, false);
+                1, false);
             iri_emit_store(gen, t1, IR_REG_STACK_PTR, 
                 (IR_Value){.type = IR_VALUE_S32, .v_s32 = i}, 1, false);
         }
@@ -1334,8 +1334,18 @@ ir_allocate_reg(IR_Generator* gen, IR_Instruction* inst, int i)
     bool fp_operand2 = (inst->flags & IIR_FLAG_IS_FP_OPERAND2);
     bool fp_dest = (inst->flags & IIR_FLAG_IS_FP_DEST);
 
-    int p1 = fp_operand1 ? ensure_fp(ar, inst->t1, inst->byte_size, i) : ensure(ar, inst->t1, inst->byte_size, i);
-    int p2 = fp_operand2 ? ensure_fp(ar, inst->t2, inst->byte_size, i) : ensure(ar, inst->t2, inst->byte_size, i);
+    int p1 = -1, p2 = -1;
+
+    if(inst->type == IR_STORE || inst->type == IR_STOREF)
+    {
+        p1 = fp_operand1 ? ensure_fp(ar, inst->t1, inst->byte_size, i) : ensure(ar, inst->t1, inst->byte_size, i);
+        p2 = fp_operand2 ? ensure_fp(ar, inst->t2, 4, i) : ensure(ar, inst->t2, 4, i);
+    }
+    else
+    {
+        p1 = fp_operand1 ? ensure_fp(ar, inst->t1, inst->byte_size, i) : ensure(ar, inst->t1, inst->byte_size, i);
+        p2 = fp_operand2 ? ensure_fp(ar, inst->t2, inst->byte_size, i) : ensure(ar, inst->t2, inst->byte_size, i);
+    }
 
     // allocate physical register for operands
     if(!needed_after(ar, inst->t1, i, fp_operand1))

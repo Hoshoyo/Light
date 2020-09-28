@@ -171,7 +171,7 @@ Instr_Emit_Result
 x86_emit_store(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
-    X64_Register rdst = ir_to_x86_Reg(instr->t2, type_pointer_size_bits() / 8);
+    X64_Register rdst = ir_to_x86_Reg(instr->t2, 4);
     X64_Register rsrc = ir_to_x86_Reg(instr->t1, instr->byte_size);
 
     X64_Addressing_Mode mode = INDIRECT;
@@ -723,6 +723,32 @@ x86_emit_cmpf(X86_Emitter* em, IR_Instruction* instr)
 }
 
 Instr_Emit_Result
+x86_emit_copy(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = { 0 };
+    X64_Register rsrc = ir_to_x86_Reg(instr->t1, instr->byte_size);
+    X64_Register rdest = ir_to_x86_Reg(instr->t3, instr->byte_size);
+
+#if 0
+    // mov esi, src
+    em->at = emit_mov_reg(&info, em->at, MOV_MR, DIRECT, instr->byte_size * 8,
+        ESI, rsrc, 0, 0);
+
+    // mov edi, dst
+    em->at = emit_mov_reg(0, em->at, MOV_MR, DIRECT, instr->byte_size * 8,
+        EDI, rdest, 0, 0);
+
+    // push ecx
+    em->at = emit_push_reg(0, em->at, DIRECT, ECX, 0, 0);
+    
+    // mov ecx, imm
+    em->at = emit_mov_oi(0, em->at, ECX, (Int_Value){.v32 = instr->imm.v_s32});
+    #endif
+
+    return info;
+}
+
+Instr_Emit_Result
 x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
 {
     instr->binary_offset = em->at;
@@ -789,10 +815,13 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
             return x86_emit_loadf(em, instr);
         case IR_STOREF:
             return x86_emit_storef(em, instr);
-        case IR_ADDF: IR_SUBF: IR_MULF: IR_DIVF:
+        case IR_ADDF: case IR_SUBF: case IR_MULF: case IR_DIVF:
             return x86_emit_arithf(em, instr);
         case IR_CMPF:
             return x86_emit_cmpf(em, instr);
+    
+        case IR_COPY:
+            return x86_emit_copy(em, instr);
         default: break;
     }
     return (Instr_Emit_Result){0};
@@ -823,7 +852,6 @@ X86_generate(IR_Generator* gen)
         }
 
         x86_emit_instruction(&em, instr, i);
-        //if(i == 9) break;
     }
 
     for(int i = 0; i < array_length(em.relative_patches); ++i)
