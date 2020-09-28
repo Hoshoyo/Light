@@ -380,6 +380,103 @@ x86_emit_arith(X86_Emitter* em, IR_Instruction* instr)
 }
 
 Instr_Emit_Result
+x86_emit_cvt_si(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->src_byte_size);
+    X64_Register rdst = ir_to_x86_Reg(instr->t3, instr->dst_byte_size);
+
+    // src is < dest, convert with sign extension
+    if(instr->src_byte_size < instr->dst_byte_size)
+    {
+        em->at = emit_movsx(&info, em->at, DIRECT, instr->src_byte_size * 8, instr->dst_byte_size * 8,
+            rdst, rop1, 0, 0);
+    }
+    else
+    {
+        // do nothing
+    }
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_cvt_ui(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->src_byte_size);
+    X64_Register rdst = ir_to_x86_Reg(instr->t3, instr->dst_byte_size);
+
+    // src is < dest, convert with zero extension
+    if(instr->src_byte_size < instr->dst_byte_size)
+    {
+        em->at = emit_movzx(&info, em->at, DIRECT, instr->src_byte_size * 8, instr->dst_byte_size * 8,
+            rdst, rop1, 0, 0);
+    }
+    else
+    {
+        // do nothing
+    }
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_cvt_r32_r64(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_XMM_Register rop1 = instr->t1;
+    X64_XMM_Register rdst = instr->t3;
+
+    em->at = emit_cvt(&info, em->at, SSE_CVT_F64_F32, DIRECT, rop1, rdst, 0, 0, true);
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_cvt_r64_r32(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_XMM_Register rop1 = instr->t1;
+    X64_XMM_Register rdst = instr->t3;
+
+    em->at = emit_cvt(&info, em->at, SSE_CVT_F64_F32, DIRECT, rop1, rdst, 0, 0, false);
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_cvt_float_si(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_XMM_Register rop1 = instr->t1;
+    X64_Register rdst = ir_to_x86_Reg(instr->t3, instr->src_byte_size);
+
+    em->at = emit_cvt(&info, em->at, SSE_CVT_F32_INT32, DIRECT, rop1, rdst, 0, 0, instr->src_byte_size == 4);
+
+    return info;
+}
+
+Instr_Emit_Result
+x86_emit_cvt_si_float(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->src_byte_size);
+    X64_XMM_Register rdst = instr->t3;
+
+    // first convert to 32 bit integer
+    if(instr->src_byte_size < 32)
+    {
+        em->at = emit_movsx(&info, em->at, DIRECT, instr->src_byte_size * 8, instr->dst_byte_size * 8,
+            rdst, rop1, 0, 0);
+    }
+
+    em->at = emit_cvt(&info, em->at, SSE_CVT_INT32_F32, DIRECT, rop1, rdst, 0, 0, instr->dst_byte_size == 4);
+
+    return info;
+}
+
+Instr_Emit_Result
 x86_emit_lnot(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
@@ -552,10 +649,19 @@ Instr_Emit_Result
 x86_emit_loadf(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = { 0 };
-    X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->byte_size);
+    X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->src_byte_size);
     X64_XMM_Register rdst = instr->t3;
 
-    em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT, rdst, rop1, instr->byte_size == 4, 0, 0);
+    if(instr->imm.type == IR_VALUE_S32)
+    {
+        em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT_DWORD_DISPLACED, rdst, rop1, instr->byte_size == 4, 0,
+            instr->imm.v_s32);
+    }
+    else
+    {
+        em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT, rdst, rop1, instr->byte_size == 4, 0, 0);
+    }
+
 
     return info;
 }
@@ -565,7 +671,7 @@ x86_emit_storef(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = { 0 };
     X64_XMM_Register rop = instr->t1;
-    X64_Register rdest = ir_to_x86_Reg(instr->t3, instr->byte_size);
+    X64_Register rdest = ir_to_x86_Reg(instr->t2, instr->byte_size);
 
     em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT, rop, rdest, instr->byte_size == 4, 0, 0);
 
@@ -644,6 +750,29 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
             return x86_emit_cond_rjmp(em, instr, index);
         case IR_JR:
             return x86_emit_rjmp(em, instr, index);
+
+        // Conversions
+        case IR_CVT_SI:
+            return x86_emit_cvt_si(em, instr);
+        case IR_CVT_UI:
+            return x86_emit_cvt_ui(em, instr);
+        case IR_CVT_SI_R32:
+        case IR_CVT_SI_R64:
+            return x86_emit_cvt_si_float(em, instr);
+        case IR_CVT_R64_SI:
+        case IR_CVT_R32_SI:
+            return x86_emit_cvt_float_si(em, instr);
+        case IR_CVT_R32_R64:
+            return x86_emit_cvt_r32_r64(em, instr);
+        case IR_CVT_R64_R32:
+            return x86_emit_cvt_r64_r32(em, instr);
+
+        case IR_CVT_R64_UI:
+        case IR_CVT_UI_R64:
+        case IR_CVT_R32_UI:
+        case IR_CVT_UI_R32: 
+            assert(0); // TODO(psv): hard stuff
+            break;
 
         // Floating point instructions
         case IR_MOVF:

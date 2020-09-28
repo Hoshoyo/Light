@@ -39,8 +39,7 @@ emit_movs_mem_to_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mod
     if(register_equivalent(src, RBP))
     {
         // emit sib byte
-        *stream++ = make_sib(1, register_representation(dest), RBP);
-        *stream++ = 0;
+        *stream++ = make_sib(mode, register_representation(dest), RBP);
     }
     else if(register_equivalent(src, RSP))
     {
@@ -227,6 +226,8 @@ emit_float_test(u8* stream)
     stream = emit_arith_sse(0, stream, XMM_MULS, XMM1, XMM2, single_prec);
     stream = emit_arith_sse(0, stream, XMM_DIVS, XMM1, XMM2, single_prec);
 #endif
-    stream = emit_movs_mem_to_reg(0, stream, INDIRECT, XMM7, EBX, single_prec, 0, 0);
+    //stream = emit_movs_mem_to_reg(0, stream, INDIRECT, XMM7, EBX, single_prec, 0, 0);
+    stream = emit_cvt(0, stream, SSE_CVT_F64_F32, DIRECT, XMM1, XMM2, 0, 0, true);
+    stream = emit_cvt(0, stream, SSE_CVT_F64_F32, DIRECT, XMM1, XMM2, 0, 0, false);
     return stream;
 }

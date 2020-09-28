@@ -38,11 +38,11 @@ typedef enum {
     IR_CVT_UI,              // cvtui t1 -> t2
     IR_CVT_SI_R32,          // cvtsi2ss t -> tf
     IR_CVT_UI_R32,          // cvtui2ss t -> tf
-    IR_CVT_R32_I,           // cvtss2si tf -> t
+    IR_CVT_R32_SI,          // cvtss2si tf -> t
     IR_CVT_R32_UI,          // cvtss2ui tf -> t
     IR_CVT_SI_R64,          // cvtsi2ss t -> tf
     IR_CVT_UI_R64,          // cvtui2ss t -> tf
-    IR_CVT_R64_I,           // cvtss2si tf -> t
+    IR_CVT_R64_SI,          // cvtss2si tf -> t
     IR_CVT_R64_UI,          // cvtss2ui tf -> t
     IR_CVT_R32_R64,         // cvtss2ds tf1 -> tf2
     IR_CVT_R64_R32,         // cvtds2ss tf1 -> tf2
@@ -201,7 +201,7 @@ IR_Instruction* iri_get_temp_instr_ptr(IR_Generator* gen, int index);   // @IMPO
 
 IR_Instruction iri_new(IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm, int byte_size);
 void iri_emit_store(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size, bool fp);
-void iri_emit_load(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size, bool fp);
+void iri_emit_load(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int src_byte_size, int dst_byte_size, bool fp);
 void iri_emit_arith(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm, int byte_size);
 void iri_emit_not(IR_Generator* gen, IR_Reg t1, IR_Reg t2, int byte_size);
 void iri_emit_logic_not(IR_Generator* gen, IR_Reg t1, IR_Reg t2, int byte_size);

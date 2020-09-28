@@ -161,18 +161,96 @@ u8*
 emit_lea(Instr_Emit_Result* out_info, u8* stream, int bitsize, X64_Addressing_Mode mode, X64_Register dest, X64_Register src, u8 disp8, uint32_t disp32)
 {
     u8* start = stream;
+    s8 disp_offset = -1;
 
     assert(register_get_bitsize(dest) == bitsize);
     stream = emit_opcode(stream, 0x8D, bitsize, src, dest);
     *stream++ = make_modrm(mode, register_representation(dest), register_representation(src));
+    disp_offset = stream - start;
     stream = emit_displacement(mode, stream, disp8, disp32);
 
     if(out_info)
     {
         out_info->instr_byte_size = stream - start;
         out_info->immediate_offset = -1;
-        out_info->diplacement_offset = -1;
+        out_info->diplacement_offset = disp_offset;
     }
+    return stream;
+}
+
+// mov with sign extend (signed)
+u8*
+emit_movsx(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, int src_bitsize, int dst_bitsize, 
+    X64_Register dest, X64_Register src, u8 disp8, uint32_t disp32)
+{
+    bool using_extended_register = register_is_extended(dest) || register_is_extended(src);
+    u8* start = stream;
+    s8 disp_offset = -1;
+
+    if(dst_bitsize == 16)
+        *stream++ = 0x66;
+    if(dst_bitsize == 64 || using_extended_register)
+		*stream++ = make_rex(register_is_extended(dest), 0, register_is_extended(src), dst_bitsize == 64);
+
+    if(src_bitsize == 8)
+    {
+        *stream++ = 0x0f;
+        *stream++ = 0xbe;
+    }
+    else if(src_bitsize == 16)
+    {
+        *stream++ = 0x0f;
+        *stream++ = 0xbf;
+    }
+    *stream++ = make_modrm(mode, register_representation(dest), register_representation(src));
+    disp_offset = stream - start;
+    stream = emit_displacement(mode, stream, disp8, disp32);
+
+    if(out_info)
+    {
+        out_info->instr_byte_size = stream - start;
+        out_info->immediate_offset = -1;
+        out_info->diplacement_offset = disp_offset;
+    }
+
+    return stream;
+}
+
+// move with zero extend (unsigned)
+u8*
+emit_movzx(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, int src_bitsize, int dst_bitsize, 
+    X64_Register dest, X64_Register src, u8 disp8, uint32_t disp32)
+{
+    bool using_extended_register = register_is_extended(dest) || register_is_extended(src);
+    u8* start = stream;
+    s8 disp_offset = -1;
+
+    if(dst_bitsize == 16)
+        *stream++ = 0x66;
+    if(dst_bitsize == 64 || using_extended_register)
+		*stream++ = make_rex(register_is_extended(dest), 0, register_is_extended(src), dst_bitsize == 64);
+
+    if(src_bitsize == 8)
+    {
+        *stream++ = 0x0f;
+        *stream++ = 0xb6;
+    }
+    else if(src_bitsize == 16)
+    {
+        *stream++ = 0x0f;
+        *stream++ = 0xb7;
+    }
+    *stream++ = make_modrm(mode, register_representation(dest), register_representation(src));
+    disp_offset = stream - start;
+    stream = emit_displacement(mode, stream, disp8, disp32);
+
+    if(out_info)
+    {
+        out_info->instr_byte_size = stream - start;
+        out_info->immediate_offset = -1;
+        out_info->diplacement_offset = disp_offset;
+    }
+
     return stream;
 }
 
@@ -180,6 +258,16 @@ u8*
 emit_mov_test(u8* stream)
 {
 #if 1
+    stream = emit_movsx(0, stream, DIRECT, 8, 16, CX, AL, 0, 0);
+    stream = emit_movsx(0, stream, DIRECT, 8, 32, ECX, AL, 0, 0);
+    stream = emit_movsx(0, stream, DIRECT, 16, 32, ECX, AX, 0, 0);
+
+    stream = emit_movzx(0, stream, DIRECT, 8, 16, CX, AL, 0, 0);
+    stream = emit_movzx(0, stream, DIRECT, 8, 32, ECX, AL, 0, 0);
+    stream = emit_movzx(0, stream, DIRECT, 16, 32, ECX, AX, 0, 0);
+#endif
+
+#if 0
     // MR
     stream = emit_mov_reg(0, stream, MOV_MR8, DIRECT, 8, AL, BL, 0, 0);
     stream = emit_mov_reg(0, stream, MOV_MR, DIRECT, 16, AX, BX, 0, 0);
@@ -217,7 +305,7 @@ emit_mov_test(u8* stream)
     stream = emit_mov_reg(0, stream, MOV_MR8, INDIRECT, 64, R8, RSP, 0, 0);
 
 #endif
-#if 1
+#if 0
     // RM
     stream = emit_mov_reg(0, stream, MOV_RM8, DIRECT, 8, AL, BL, 0, 0);
     stream = emit_mov_reg(0, stream, MOV_RM, DIRECT, 16, AX, BX, 0, 0);
@@ -250,7 +338,7 @@ emit_mov_test(u8* stream)
     stream = emit_lea(0, stream, 64, RAX, R8);
     stream = emit_lea(0, stream, 64, RDX, RBX);
 #endif
-#if 1
+#if 0
     stream = emit_mov_moffs(0, stream, AL, 0x123456789abcdef, false);
     stream = emit_mov_moffs(0, stream, AX, 0x123456789abcdef, false);
     stream = emit_mov_moffs(0, stream, EAX, 0x123456789abcdef, false);
@@ -261,7 +349,7 @@ emit_mov_test(u8* stream)
     stream = emit_mov_moffs(0, stream, EAX, 0x123456789abcdef, true);
     stream = emit_mov_moffs(0, stream, RAX, 0x123456789abcdef, true);
 #endif
-#if 1
+#if 0
     stream = emit_mov_mi(0, stream, BL, (Int_Value){.v8 = 0x12});
     stream = emit_mov_mi(0, stream, BX, (Int_Value){.v16 = 0x1234});
     stream = emit_mov_mi(0, stream, EBX, (Int_Value){.v32 = 0x12345678});
@@ -272,7 +360,7 @@ emit_mov_test(u8* stream)
     stream = emit_mov_oi(0, stream, EBX, (Int_Value){.v32 = 0x12345678});
     stream = emit_mov_oi(0, stream, RBX, (Int_Value){.v64 = 0x123456789abcdef});
 #endif
-#if 1
+#if 0
     stream = emit_mov_mr_indirect_sib(0, stream, EAX, 1, R8, RDX);
     stream = emit_mov_mr_indirect_sib(0, stream, EAX, 1, R8, REG_NONE);
     stream = emit_mov_mr_indirect_sib(0, stream, EAX, 1, REG_NONE, RDX);

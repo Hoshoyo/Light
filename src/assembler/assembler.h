@@ -191,6 +191,8 @@ u8* emit_mov_mr_indirect_sib(Instr_Emit_Result* out_info, u8* stream, X64_Regist
 u8* emit_mov_oi(Instr_Emit_Result* out_info, u8* stream, X64_Register dest, Int_Value value);
 u8* emit_mov_mi(Instr_Emit_Result* out_info, u8* stream, X64_Register dest, Int_Value value);
 u8* emit_mov_moffs(Instr_Emit_Result* out_info, u8* stream, X64_Register src, uint64_t addr, bool invert);
+u8* emit_movsx(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, int src_bitsize, int dst_bitsize, X64_Register dest, X64_Register src, u8 disp8, uint32_t disp32);
+u8* emit_movzx(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, int src_bitsize, int dst_bitsize, X64_Register dest, X64_Register src, u8 disp8, uint32_t disp32);
 
 // cmov
 u8* emit_cmov_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_CMOVcc_Instruction opcode, int bitsize, X64_Register dest, X64_Register src, u8 disp8, uint32_t disp32);

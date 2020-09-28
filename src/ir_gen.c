@@ -52,22 +52,26 @@ iri_emit_cvt(IR_Generator* gen, IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, 
     inst.dst_byte_size = dst_byte_size;
 
     bool t1fp = false;
+    bool t2fp = false;
     switch(type)
     {
-        case IR_CVT_SI:         t1fp = false; break;
-        case IR_CVT_UI:         t1fp = false; break;
-        case IR_CVT_SI_R32:     t1fp = false; break;
-        case IR_CVT_UI_R32:     t1fp = false; break;
-        case IR_CVT_R32_I:      t1fp = true; break;
-        case IR_CVT_R32_UI:     t1fp = true; break;
-        case IR_CVT_SI_R64:     t1fp = false; break;
-        case IR_CVT_UI_R64:     t1fp = false; break;
-        case IR_CVT_R64_I:      t1fp = true; break;
-        case IR_CVT_R64_UI:     t1fp = true; break;
-        case IR_CVT_R32_R64:    t1fp = true; break;
-        case IR_CVT_R64_R32:    t1fp = true; break;
+        case IR_CVT_SI:         t1fp = false; t2fp = false; break;
+        case IR_CVT_UI:         t1fp = false; t2fp = false; break;
+        case IR_CVT_SI_R32:     t1fp = false; t2fp = true; break;
+        case IR_CVT_UI_R32:     t1fp = false; t2fp = true; break;
+        case IR_CVT_R32_SI:     t1fp = true; t2fp = false; break;
+        case IR_CVT_R32_UI:     t1fp = true; t2fp = false; break;
+        case IR_CVT_SI_R64:     t1fp = false; t2fp = true; break;
+        case IR_CVT_UI_R64:     t1fp = false; t2fp = true; break;
+        case IR_CVT_R64_SI:     t1fp = true; t2fp = false; break;
+        case IR_CVT_R64_UI:     t1fp = true; t2fp = false; break;
+        case IR_CVT_R32_R64:    t1fp = true; t2fp = true; break;
+        case IR_CVT_R64_R32:    t1fp = true; t2fp = true; break;
         default: break;
     }
+    inst.flags |= ((t1fp) ? IIR_FLAG_IS_FP_OPERAND1 : 0);
+    inst.flags |= ((t2fp) ? IIR_FLAG_IS_FP_DEST : 0);
+
     iri_update_reg_uses(gen, t1, t1fp);
     inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
@@ -94,9 +98,11 @@ iri_emit_mov(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_siz
 
 // LOAD t1+imm -> t2
 void
-iri_emit_load(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size, bool fp)
+iri_emit_load(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int src_byte_size, int dst_byte_size, bool fp)
 {
-    IR_Instruction inst = iri_new((fp)? IR_LOADF : IR_LOAD, t1, IR_REG_NONE, t2, imm, byte_size);
+    IR_Instruction inst = iri_new((fp)? IR_LOADF : IR_LOAD, t1, IR_REG_NONE, t2, imm, 0);
+    inst.src_byte_size = src_byte_size;
+    inst.dst_byte_size = dst_byte_size;
     inst.flags |= ((fp) ? IIR_FLAG_IS_FP_DEST : 0);
     iri_update_reg_uses(gen, t1, false);
     inst.activation_record_index = array_length(gen->ars) - 1;
@@ -384,26 +390,26 @@ void
 iri_print_cvt(FILE* out, IR_Instruction* instr)
 {
     bool t1fp = false;
-    bool t2fp = false;
+    bool t3fp = false;
     switch(instr->type)
     {
         case IR_CVT_SI:         fprintf(out, "CVTSI ");    break;
         case IR_CVT_UI:         fprintf(out, "CVTUI ");    break;
-        case IR_CVT_SI_R32:     fprintf(out, "CVTSI2SS "); t2fp = true; break;
-        case IR_CVT_UI_R32:     fprintf(out, "CVTUI2SS "); t2fp = true; break;
-        case IR_CVT_R32_I:      fprintf(out, "CVTSS2SI "); t1fp = true; break;
+        case IR_CVT_SI_R32:     fprintf(out, "CVTSI2SS "); t3fp = true; break;
+        case IR_CVT_UI_R32:     fprintf(out, "CVTUI2SS "); t3fp = true; break;
+        case IR_CVT_R32_SI:     fprintf(out, "CVTSS2SI "); t1fp = true; break;
         case IR_CVT_R32_UI:     fprintf(out, "CVTSS2UI "); t1fp = true; break;
-        case IR_CVT_SI_R64:     fprintf(out, "CVTSI2SD "); t2fp = true; break;
-        case IR_CVT_UI_R64:     fprintf(out, "CVTUI2SD "); t2fp = true; break;
-        case IR_CVT_R64_I:      fprintf(out, "CVTSD2SI "); t1fp = true; break;
+        case IR_CVT_SI_R64:     fprintf(out, "CVTSI2SD "); t3fp = true; break;
+        case IR_CVT_UI_R64:     fprintf(out, "CVTUI2SD "); t3fp = true; break;
+        case IR_CVT_R64_SI:     fprintf(out, "CVTSD2SI "); t1fp = true; break;
         case IR_CVT_R64_UI:     fprintf(out, "CVTSD2UI "); t1fp = true; break;
-        case IR_CVT_R32_R64:    fprintf(out, "CVTSS2SD "); t1fp = true; t2fp = true; break;
-        case IR_CVT_R64_R32:    fprintf(out, "CVTSD2SS "); t1fp = true; t2fp = true; break;
+        case IR_CVT_R32_R64:    fprintf(out, "CVTSS2SD "); t1fp = true; t3fp = true; break;
+        case IR_CVT_R64_R32:    fprintf(out, "CVTSD2SS "); t1fp = true; t3fp = true; break;
         default: break;
     }
     iri_print_register(out, instr->t1, instr->ot1, t1fp);
     fprintf(out, " -> ");
-    iri_print_register(out, instr->t2, instr->ot2, t2fp);
+    iri_print_register(out, instr->t3, instr->ot3, t3fp);
 }
 
 void
@@ -617,11 +623,11 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
 
         case IR_CVT_SI_R32:
         case IR_CVT_UI_R32:
-        case IR_CVT_R32_I:
+        case IR_CVT_R32_SI:
         case IR_CVT_R32_UI:
         case IR_CVT_SI_R64:
         case IR_CVT_UI_R64:
-        case IR_CVT_R64_I:
+        case IR_CVT_R64_SI:
         case IR_CVT_R64_UI:
         case IR_CVT_R32_R64:
         case IR_CVT_R64_R32:

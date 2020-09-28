@@ -74,7 +74,7 @@ ir_gen_load(IR_Generator* gen, Light_Ast* expr, IR_Reg src, IR_Reg dst)
 {
     Light_Type* type = type_alias_root(expr->type);
     if(type->kind == TYPE_KIND_PRIMITIVE)
-        iri_emit_load(gen, src, dst, (IR_Value){0}, type->size_bits / 8, type_primitive_float(type));
+        iri_emit_load(gen, src, dst, (IR_Value){0}, type_pointer_size_bits() / 8, type->size_bits / 8, type_primitive_float(type));
     else
     {
         // TODO(psv): bigger types
@@ -87,9 +87,10 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
     IR_Activation_Rec* ar = ir_get_current_ar(gen);
 
     if(decl->kind == AST_DECL_VARIABLE) {
-        if(decl->decl_variable.type->size_bits <= type_pointer_size_bits())
+        if(decl->decl_variable.type->size_bits <= type_pointer_size_bits() ||
+            type_primitive_float(decl->decl_variable.type))
         {
-            IR_Reg temp = ir_new_reg(gen, decl->type);
+            IR_Reg temp = ir_new_reg(gen, decl->decl_variable.type);
             decl->decl_variable.ir_temporary = temp;
         }
         else
@@ -217,12 +218,12 @@ ir_gen_cvt_to_int(IR_Generator* gen, Light_Ast* expr, int op_temp)
         if(op_type->size_bits == 32)
         {
             // -> r32
-            type = (type_primitive_uint(cast_type)) ? IR_CVT_R32_UI : IR_CVT_R32_I;
+            type = (type_primitive_uint(cast_type)) ? IR_CVT_R32_UI : IR_CVT_R32_SI;
         }
         else
         {
             // -> r64
-            type = (type_primitive_uint(cast_type)) ? IR_CVT_R64_UI : IR_CVT_R64_I;
+            type = (type_primitive_uint(cast_type)) ? IR_CVT_R64_UI : IR_CVT_R64_SI;
         }
         
         iri_emit_cvt(gen, type, op_temp, t, op_type->size_bits / 8, cast_type->size_bits / 8);
@@ -298,7 +299,7 @@ ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load)
             if(load)
             {
                 t2 = ir_new_reg(gen, expr->type);
-                iri_emit_load(gen, t1, t2, (IR_Value){0}, expr->type->size_bits / 8, type_primitive_float(expr->type));
+                iri_emit_load(gen, t1, t2, (IR_Value){0}, type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
             }
         } break;
 
@@ -409,7 +410,7 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
     if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS && load)
     {
         IR_Reg t4 = ir_new_reg(gen, expr->type);
-        iri_emit_load(gen, t3, t4, (IR_Value){0}, expr->type->size_bits / 8, type_primitive_float(expr->type));
+        iri_emit_load(gen, t3, t4, (IR_Value){0}, type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
         return t4;
     }
 
@@ -465,16 +466,16 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load)
     {
         Light_Ast_Decl_Variable* decl = &vdecl->decl_variable;
         // if it is not loaded in a temporary, then load it
-        if(load && !(decl->flags & DECL_VARIABLE_FLAG_LOADED))
+        if(load && !(decl->flags & DECL_VARIABLE_FLAG_LOADED) && decl->ir_temporary != IR_REG_NONE)
         {
             // LOAD SB+imm -> t
             t = decl->ir_temporary;
             iri_emit_load(gen, IR_REG_STACK_BASE, t, 
                 (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
-                expr->type->size_bits / 8, type_primitive_float(expr->type));
+                type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
             decl->flags |= DECL_VARIABLE_FLAG_LOADED;
         }
-        else if(load)
+        else if(load && decl->ir_temporary != IR_REG_NONE)
         {
             t = decl->ir_temporary;
         }
@@ -559,7 +560,8 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
     {
         IR_Reg r = ir_new_reg(gen, expr->type);
         assert(type_alias_root(expr->type)->kind == TYPE_KIND_PRIMITIVE);
-        iri_emit_load(gen, tres, r, (IR_Value){0}, expr->type->size_bits / 8, type_primitive_float(expr->type));
+        iri_emit_load(gen, tres, r, (IR_Value){0}, 
+            type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
         return r;
     }
     return tres;
