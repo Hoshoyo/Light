@@ -827,7 +827,6 @@ ir_gen_decl_assignment(IR_Generator* gen, Light_Ast* decl)
 
     IR_Reg t2 = ir_gen_expr(gen, expr, primitive_type);
 
-
     IR_Value stack_offset = (IR_Value){.type = IR_VALUE_S32, .v_s32 = decl->decl_variable.stack_offset};
     if(primitive_type || rvalue_type->kind == TYPE_KIND_FUNCTION || rvalue_type->kind == TYPE_KIND_POINTER)
     {
@@ -904,28 +903,6 @@ void
 ir_gen_comm_block(IR_Generator* gen, Light_Ast* body)
 {
     ir_gen_commands(gen, body->comm_block.commands, body->comm_block.command_count);
-    #if 0
-    // decls
-    for(int i = 0; i < body->comm_block.command_count; ++i) {
-        Light_Ast* comm = body->comm_block.commands[i];
-        if(comm->flags & AST_FLAG_DECLARATION)
-            ir_gen_decl(gen, comm);
-    }
-
-    // commands
-    for(int i = 0; i < body->comm_block.command_count; ++i) {
-        Light_Ast* comm = body->comm_block.commands[i];
-        if(comm->flags & AST_FLAG_COMMAND)
-            ir_gen_comm(gen, comm);
-        if(comm->flags & AST_FLAG_DECLARATION)
-        {
-            if(comm->kind == AST_DECL_VARIABLE && comm->decl_variable.assignment)
-            {
-                ir_gen_decl_assignment(gen, comm);
-            }
-        }
-    }
-    #endif
 }
 
 void

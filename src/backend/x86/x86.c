@@ -179,7 +179,7 @@ x86_emit_store(X86_Emitter* em, IR_Instruction* instr)
     else if(instr->imm.type == IR_VALUE_S32) mode = INDIRECT_DWORD_DISPLACED;
 
     em->at = emit_mov_reg(&info, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, mode, 
-        instr->byte_size * 8, rsrc, rdst,
+        instr->byte_size * 8, rdst, rsrc,
         (instr->imm.type == IR_VALUE_S8) ? instr->imm.v_s8 : 0,
         (instr->imm.type == IR_VALUE_S32) ? instr->imm.v_s32 : 0);
     return info;
@@ -189,8 +189,8 @@ Instr_Emit_Result
 x86_emit_load(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
-    X64_Register rdst = ir_to_x86_Reg(instr->t3, instr->byte_size);
-    X64_Register rsrc = ir_to_x86_Reg(instr->t1, instr->byte_size);
+    X64_Register rsrc = ir_to_x86_Reg(instr->t1, instr->src_byte_size);
+    X64_Register rdst = ir_to_x86_Reg(instr->t3, instr->dst_byte_size);
 
     X64_Addressing_Mode mode = INDIRECT;
     if(instr->imm.type == IR_VALUE_S8) mode = INDIRECT_BYTE_DISPLACED;
@@ -673,7 +673,15 @@ x86_emit_storef(X86_Emitter* em, IR_Instruction* instr)
     X64_XMM_Register rop = instr->t1;
     X64_Register rdest = ir_to_x86_Reg(instr->t2, instr->byte_size);
 
-    em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT, rop, rdest, instr->byte_size == 4, 0, 0);
+    if(instr->imm.type == IR_VALUE_S32)
+    {
+        em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT_DWORD_DISPLACED, rop, rdest, instr->byte_size == 4, 0,
+            instr->imm.v_s32);
+    }
+    else
+    {
+        em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT_BYTE_DISPLACED, rop, rdest, instr->byte_size == 4, 0, 0);
+    }
 
     return info;
 }
