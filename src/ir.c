@@ -1108,7 +1108,7 @@ static int
 best_preg(IR_Activation_Rec* ar)
 {
     int p = -1;
-    int max = -1;
+    int max = -1000;
     for(int i = 0; i < ARRAY_LENGTH(ar->pregs); ++i)
     {
         if(ar->pregs[i].next > max)
@@ -1121,7 +1121,7 @@ static int
 best_preg_fp(IR_Activation_Rec* ar)
 {
     int p = -1;
-    int max = -1;
+    int max = -100;
     for(int i = 0; i < ARRAY_LENGTH(ar->pfregs); ++i)
     {
         if(ar->pfregs[i].next > max)

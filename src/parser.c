@@ -918,13 +918,14 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
             result->expr_literal_struct.struct_exprs = array_new(Light_Ast*);
             result->flags |= AST_FLAG_COMPILER_GENERATED;
 
+            // @String
             // length
             u64 len = first->length - 2;
-            Light_Ast* ll0 = ast_new_expr_literal_primitive_u64(scope, 0, (Lexical_Range){0});
+            Light_Ast* ll0 = ast_new_expr_literal_primitive_u32(scope, 0, (Lexical_Range){0});
             ll0->flags |= AST_FLAG_COMPILER_GENERATED;
             array_push(result->expr_literal_struct.struct_exprs, ll0);
             // capacity
-            Light_Ast* ll1 = ast_new_expr_literal_primitive_u64(scope, len, (Lexical_Range){0});
+            Light_Ast* ll1 = ast_new_expr_literal_primitive_u32(scope, len, (Lexical_Range){0});
             ll1->flags |= AST_FLAG_COMPILER_GENERATED;
             array_push(result->expr_literal_struct.struct_exprs, ll1);
             // data

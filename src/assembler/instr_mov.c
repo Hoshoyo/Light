@@ -16,6 +16,12 @@ emit_mov_reg(Instr_Emit_Result* out_info, u8* stream, X64_Mov_Instr opcode, X64_
 
 	stream = emit_opcode(stream, opcode, bitsize, dest, src);
     *stream++ = make_modrm(mode, register_representation(src), register_representation(dest));
+    
+    if(register_equivalent(RSP, dest))
+    {
+        *stream++ = make_sib(0, RSP, RSP);
+    }
+
     disp_offset = stream - start;
     stream = emit_displacement(mode, stream, disp8, disp32);
     if((stream - start) == disp_offset) disp_offset = -1; // when stream is equal, no displacement exists
@@ -257,7 +263,10 @@ emit_movzx(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, in
 u8*
 emit_mov_test(u8* stream)
 {
-#if 1
+    stream = emit_mov_reg(0, stream, MOV_MR, INDIRECT_DWORD_DISPLACED, 32, ESP, ECX, 0, 0x12345);
+    stream = emit_mov_reg(0, stream, MOV_RM, INDIRECT_DWORD_DISPLACED, 32, ESP, ECX, 0, 0x12345);
+
+#if 0
     stream = emit_movsx(0, stream, DIRECT, 8, 16, CX, AL, 0, 0);
     stream = emit_movsx(0, stream, DIRECT, 8, 32, ECX, AL, 0, 0);
     stream = emit_movsx(0, stream, DIRECT, 16, 32, ECX, AX, 0, 0);
