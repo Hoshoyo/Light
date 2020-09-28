@@ -277,6 +277,20 @@ emit_movzx(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, in
 }
 
 u8*
+emit_rep_movs(Instr_Emit_Result* out_info, u8* stream, int bitsize)
+{
+    u8* start = stream;
+    if(bitsize == 16)
+        *stream++ = 0x66;
+    if(bitsize == 64)
+		*stream++ = make_rex(0, 0, 0, bitsize == 64);
+    *stream++ = 0xf3;
+    *stream++ = 0xa5;
+
+    return stream;
+}
+
+u8*
 emit_mov_test(u8* stream)
 {
     //stream = emit_mov_reg(0, stream, MOV_MR, INDIRECT_DWORD_DISPLACED, 32, ESP, ECX, 0, 0x12345);

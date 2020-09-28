@@ -729,7 +729,6 @@ x86_emit_copy(X86_Emitter* em, IR_Instruction* instr)
     X64_Register rsrc = ir_to_x86_Reg(instr->t1, instr->byte_size);
     X64_Register rdest = ir_to_x86_Reg(instr->t3, instr->byte_size);
 
-#if 0
     // mov esi, src
     em->at = emit_mov_reg(&info, em->at, MOV_MR, DIRECT, instr->byte_size * 8,
         ESI, rsrc, 0, 0);
@@ -743,7 +742,8 @@ x86_emit_copy(X86_Emitter* em, IR_Instruction* instr)
     
     // mov ecx, imm
     em->at = emit_mov_oi(0, em->at, ECX, (Int_Value){.v32 = instr->imm.v_s32});
-    #endif
+    
+    em->at = emit_rep_movs(0, em->at, 8);
 
     return info;
 }
