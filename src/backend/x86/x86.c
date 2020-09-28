@@ -82,13 +82,13 @@ x86_reg32_to_byte_size(X64_Register reg, int byte_size)
 static X64_Register
 ir_to_x86_Reg(IR_Reg r, int byte_size)
 {
+    if (r == IR_REG_NONE) return REG_NONE;
     // 8 16 32
     X64_Register n[][4] = {
+        {REG_NONE, REG_NONE, REG_NONE, REG_NONE},
         {BL,   BX,   REG_NONE, EBX},
         {CL,   CX,   REG_NONE, ECX},
         {DL,   DX,   REG_NONE, EDX},
-        {SIL,  SI,   REG_NONE, ESI},
-        {DIL,  DI,   REG_NONE, EDI},
     };
 
     switch(r)
@@ -171,7 +171,7 @@ Instr_Emit_Result
 x86_emit_store(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
-    X64_Register rdst = ir_to_x86_Reg(instr->t2, instr->byte_size);
+    X64_Register rdst = ir_to_x86_Reg(instr->t2, type_pointer_size_bits() / 8);
     X64_Register rsrc = ir_to_x86_Reg(instr->t1, instr->byte_size);
 
     X64_Addressing_Mode mode = INDIRECT;
@@ -823,6 +823,7 @@ X86_generate(IR_Generator* gen)
         }
 
         x86_emit_instruction(&em, instr, i);
+        //if(i == 9) break;
     }
 
     for(int i = 0; i < array_length(em.relative_patches); ++i)

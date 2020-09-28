@@ -52,6 +52,8 @@ static bool
 register_equivalent(X64_Register r, X64_Register c)
 {
 	if(r <= R15W && c <= R15W) return register_representation(r) == register_representation(c);
+	if (r == RSP && c == SPL) return true;
+	if (r == RBP && c == BPL) return true;
 	return r == c;
 }
 

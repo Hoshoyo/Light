@@ -159,7 +159,7 @@ typedef struct {
 
     IR_Virtual_Reg*  vregs;
     IR_Virtual_FReg* vfregs;
-    IR_Physical_Reg  pregs[4 + 1];
+    IR_Physical_Reg  pregs[3 + 1];
     IR_Physical_Reg  pfregs[4 + 1];
     IR_Instr_Insert* insertions;
 } IR_Activation_Rec;

@@ -17,9 +17,19 @@ emit_mov_reg(Instr_Emit_Result* out_info, u8* stream, X64_Mov_Instr opcode, X64_
 	stream = emit_opcode(stream, opcode, bitsize, dest, src);
     *stream++ = make_modrm(mode, register_representation(src), register_representation(dest));
     
-    if(register_equivalent(RSP, dest))
+    if(opcode == MOV_MR8 || opcode == MOV_MR)
     {
-        *stream++ = make_sib(0, RSP, RSP);
+        if(register_equivalent(RSP, dest))
+        {
+            *stream++ = make_sib(0, RSP, RSP);
+        }
+    }
+    else if(opcode == MOV_RM8 || opcode == MOV_RM)
+    {
+        if(register_equivalent(RSP, src))
+        {
+            *stream++ = make_sib(0, RSP, RSP);
+        }
     }
 
     disp_offset = stream - start;
@@ -172,6 +182,12 @@ emit_lea(Instr_Emit_Result* out_info, u8* stream, int bitsize, X64_Addressing_Mo
     assert(register_get_bitsize(dest) == bitsize);
     stream = emit_opcode(stream, 0x8D, bitsize, src, dest);
     *stream++ = make_modrm(mode, register_representation(dest), register_representation(src));
+    
+    if (register_equivalent(RSP, src))
+    {
+        *stream++ = make_sib(0, RSP, RSP);
+    }
+
     disp_offset = stream - start;
     stream = emit_displacement(mode, stream, disp8, disp32);
 
@@ -263,8 +279,10 @@ emit_movzx(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, in
 u8*
 emit_mov_test(u8* stream)
 {
-    stream = emit_mov_reg(0, stream, MOV_MR, INDIRECT_DWORD_DISPLACED, 32, ESP, ECX, 0, 0x12345);
-    stream = emit_mov_reg(0, stream, MOV_RM, INDIRECT_DWORD_DISPLACED, 32, ESP, ECX, 0, 0x12345);
+    //stream = emit_mov_reg(0, stream, MOV_MR, INDIRECT_DWORD_DISPLACED, 32, ESP, ECX, 0, 0x12345);
+    //stream = emit_mov_reg(0, stream, MOV_MR, INDIRECT_DWORD_DISPLACED, 8, ESP, SIL, 0, 0x12345);
+    //stream = emit_mov_reg(0, stream, MOV_MR8, INDIRECT_DWORD_DISPLACED, 32, ESP, ECX, 0, 0x12345);
+    //stream = emit_mov_reg(0, stream, MOV_RM, INDIRECT_DWORD_DISPLACED, 32, ECX, ESP, 0, 0x12345);
 
 #if 0
     stream = emit_movsx(0, stream, DIRECT, 8, 16, CX, AL, 0, 0);
