@@ -107,6 +107,8 @@ typedef enum {
     IIR_FLAG_IS_FP_OPERAND1 = (1 << 2),
     IIR_FLAG_IS_FP_OPERAND2 = (1 << 3),
     IIR_FLAG_IS_FP_DEST = (1 << 4),
+
+    IIR_FLAG_INSTRUCTION_OFFSET = (1 << 5), // the immediate value is an instruction offset
 } IR_Instruction_Flag;
 
 typedef struct {

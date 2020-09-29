@@ -1081,7 +1081,7 @@ ir_patch_proc_calls(IR_Generator* gen)
     {
         IR_Decl_To_Patch dpatch = gen->decl_patch[i];
         IR_Instruction* instr = iri_get_temp_instr_ptr(gen, dpatch.instr_number);
-        instr->flags |= IIR_FLAG_HAS_IMM;
+        instr->flags |= (IIR_FLAG_HAS_IMM | IIR_FLAG_INSTRUCTION_OFFSET);
         instr->imm.v_u64 = dpatch.decl->decl_proc.ir_instr_index;
     }
 }

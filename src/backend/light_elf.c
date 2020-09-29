@@ -22,7 +22,7 @@ copy_stream(u8* dst, u8* src, int size)
 void
 light_elf_emit(u8* in_stream, int in_stream_size_bytes)
 {
-    unsigned char* stream = (unsigned char*)calloc(1, 2048);
+    unsigned char* stream = (unsigned char*)calloc(1, 1024*1024);
     unsigned char* at = stream;
 
     int file_offset = 0;
@@ -158,6 +158,11 @@ light_elf_emit(u8* in_stream, int in_stream_size_bytes)
     at += sizeof(str_sh);
 
     FILE* file = fopen("out2.bin", "wb");
+    if(!file)
+    {
+        fprintf(stderr, "Could not open file out2.bin for writing\n");
+        return;
+    }
     fwrite(stream, at - stream, 1, file);
     fclose(file);
 }

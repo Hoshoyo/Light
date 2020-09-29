@@ -13,6 +13,9 @@ typedef struct {
     int bytes;          // number of bytes to be replaced
     int issuer_index;       // index
     int rel_index_offset;   // relative offset from the instruction that issued to the target
+
+    int extra_offset;
+    bool sum;
 } X86_Patch;
 
 typedef struct {
@@ -148,7 +151,7 @@ x86_emit_lea(X86_Emitter* em, IR_Instruction* instr)
 }
 
 Instr_Emit_Result
-x86_emit_mov(X86_Emitter* em, IR_Instruction* instr)
+x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
 {
     Instr_Emit_Result info = {0};
     X64_Register rdst = ir_to_x86_Reg(instr->t3, instr->byte_size);
@@ -157,7 +160,21 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr)
     if(instr->imm.type != IR_VALUE_NONE)
     {
         // imm to reg
+        u8* patch_addr = em->at;
         em->at = emit_mov_oi(&info, em->at, rdst, (Int_Value){.v64 = instr->imm.v_u64});
+
+        if(instr->flags & IIR_FLAG_INSTRUCTION_OFFSET)
+        {
+            X86_Patch patch = {0};
+            patch.issuer_addr = patch_addr;
+            patch.addr = patch_addr + info.immediate_offset;
+            patch.bytes = 4;
+            patch.extra_offset = 0x08048060 + info.instr_byte_size - 1; // TODO(psv): proper calculation of offset entry point
+            patch.instr_byte_size = instr->byte_size;
+            patch.issuer_index = index;
+            patch.rel_index_offset = instr->imm.v_s32;
+            array_push(em->relative_patches, patch);
+        }
     }
     else
     {
@@ -632,7 +649,7 @@ x86_emit_cond_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
 }
 
 Instr_Emit_Result
-x86_emit_call(X86_Emitter* em, IR_Instruction* instr)
+x86_emit_call(X86_Emitter* em, IR_Instruction* instr, int index)
 {
     Instr_Emit_Result info = {0};
     X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->byte_size);
@@ -818,7 +835,7 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
     switch(instr->type)
     {
         case IR_LEA:  return  x86_emit_lea(em, instr);
-        case IR_MOV:  return  x86_emit_mov(em, instr);
+        case IR_MOV:  return  x86_emit_mov(em, instr, index);
         case IR_LOAD: return  x86_emit_load(em, instr);
         case IR_STORE: return x86_emit_store(em, instr);
         case IR_ADD: case IR_SUB: case IR_OR: case IR_XOR: case IR_AND:
@@ -838,7 +855,7 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
         case IR_CMOVLU: case IR_CMOVLEU:
             return x86_emit_cmov(em, instr);
         case IR_CALL:
-            return x86_emit_call(em, instr);
+            return x86_emit_call(em, instr, index);
         case IR_RET:
             return x86_emit_ret(em, instr);
         case IR_HLT:
@@ -929,7 +946,12 @@ X86_generate(IR_Generator* gen)
         u8* target_addr = gen->instructions[em.relative_patches[i].issuer_index + em.relative_patches[i].rel_index_offset].binary_offset;
         u8* patch_addr = em.relative_patches[i].addr;
         int diff = target_addr - issuer_addr - em.relative_patches[i].instr_byte_size;
-        *(char*)patch_addr = (char)diff;
+        int bytes = em.relative_patches[i].bytes;
+        int extra = em.relative_patches[i].extra_offset;
+        if(bytes == 1)
+            *(char*)patch_addr = (char)(diff);
+        else if(bytes == 4)
+            *(int*)patch_addr = diff + extra;
     }
 
 #if 0
