@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <light_array.h>
+#include "../light_elf.h"
 
 typedef struct {
     u8* issuer_addr;    // address of the instruction to calculate the relative offset
@@ -932,6 +933,7 @@ X86_generate(IR_Generator* gen)
         *(char*)patch_addr = (char)diff;
     }
 
+#if 0
     FILE* out = fopen("test.bin", "wb");
     if(!out)
     {
@@ -940,6 +942,8 @@ X86_generate(IR_Generator* gen)
     }
     fwrite(em.base, em.at - em.base, 1, out);
     fclose(out);
-
+#else
+    light_elf_emit(em.base, em.at - em.base);
+#endif
     return 0;
 }

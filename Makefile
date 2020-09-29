@@ -5,7 +5,7 @@ LIGHTVMDIR=../src/light_vm
 DISABLE_WARNINGS=-Wno-unused-variable -Wno-unused-function
 
 all: lightvm
-	$(CC) -DLIGHTMAIN -Iinclude -Wall $(DISABLE_WARNINGS) -g -m64 ./src/*.c ./src/utils/*.c ./src/backend/c/*.c ./src/backend/x86/*.c ./src/assembler/*.c -o $(BINDIR)/light $(LINKFLAGS)
+	$(CC) -DLIGHTMAIN -Iinclude -Wall $(DISABLE_WARNINGS) -g -m64 ./src/*.c ./src/utils/*.c ./src/backend/c/*.c ./src/backend/x86/*.c ./src/assembler/*.c ./src/backend/*.c -o $(BINDIR)/light $(LINKFLAGS)
 
 lightvm:
 	cd ./bin; nasm -felf64 $(LIGHTVMDIR)/lvm.asm -o lvm.o

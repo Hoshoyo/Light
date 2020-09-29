@@ -3,9 +3,5 @@
 main : () -> s32 {
     a := 3;
 
-    return 0;
-}
-
-foo : (a : s32, b : s32) -> s32 {
-    return a + b;
+    return a;
 }
