@@ -722,6 +722,38 @@ x86_emit_cmpf(X86_Emitter* em, IR_Instruction* instr)
     return info;
 }
 
+// move rnbytes zeros to rdst + imm
+Instr_Emit_Result
+x86_emit_clear(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = { 0 };
+    X64_Register rdst = ir_to_x86_Reg(instr->t1, instr->byte_size);
+    X64_Register rnbyte = ir_to_x86_Reg(instr->t2, instr->byte_size);
+    IR_Value imm = instr->imm;
+
+    if(rnbyte != ECX)
+    {
+        // push ecx
+        em->at = emit_push_reg(0, em->at, DIRECT, ECX, 0, 0);
+        // mov ecx, imm
+        em->at = emit_mov_reg(0, em->at, MOV_MR, DIRECT, instr->byte_size * 8, ECX, rnbyte, 0, 0);
+    }
+
+    // clear eax
+    em->at = emit_arith_mr(0, ARITH_XOR, em->at, EAX, EAX, DIRECT, 0, 0);
+
+    em->at = emit_lea(0, em->at, instr->byte_size * 8, INDIRECT_DWORD_DISPLACED, EDI, rdst, 0, instr->imm.v_s32);
+
+    em->at = emit_rep_stos(&info, em->at, 8);
+
+    if(rnbyte != ECX)
+    {
+        em->at = emit_pop_reg(0, em->at, ECX);
+    }
+
+    return info;
+}
+
 Instr_Emit_Result
 x86_emit_copy(X86_Emitter* em, IR_Instruction* instr)
 {
@@ -744,6 +776,8 @@ x86_emit_copy(X86_Emitter* em, IR_Instruction* instr)
     em->at = emit_mov_oi(0, em->at, ECX, (Int_Value){.v32 = instr->imm.v_s32});
     
     em->at = emit_rep_movs(0, em->at, 8);
+
+    em->at = emit_pop_reg(0, em->at, ECX);
 
     return info;
 }
@@ -822,6 +856,8 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
     
         case IR_COPY:
             return x86_emit_copy(em, instr);
+        case IR_CLEAR:
+            return x86_emit_clear(em, instr);
         default: break;
     }
     return (Instr_Emit_Result){0};

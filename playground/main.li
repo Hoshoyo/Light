@@ -1,7 +1,8 @@
 
 
 main : () -> s32 {
-    a := "foo";
+    a : s64;
+    a = 3;
 
     return 0;
 }

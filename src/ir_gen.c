@@ -14,6 +14,21 @@ iri_value_byte_size(IR_Value value)
     return size[value.type];
 }
 
+IR_Value
+iri_value_new_signed(int byte_size, uint64_t v)
+{
+    IR_Value res = {0};
+    switch(byte_size)
+    {
+        case 1: res.type = IR_VALUE_S8;  res.v_s8  = (s8) v; break;
+        case 2: res.type = IR_VALUE_S16; res.v_s16 = (s16)v; break;
+        case 4: res.type = IR_VALUE_S32; res.v_s32 = (s32)v; break;
+        case 8: res.type = IR_VALUE_S64; res.v_s64 = (s64)v; break;
+        default: break;
+    }
+    return res;
+}
+
 IR_Instruction
 iri_new(IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm, int byte_size)
 {
@@ -243,6 +258,16 @@ void
 iri_emit_copy(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size)
 {
     IR_Instruction inst = iri_new(IR_COPY, t1, IR_REG_NONE, t2, imm, byte_size);
+    iri_update_reg_uses(gen, t1, false);
+    iri_update_reg_uses(gen, t2, false);
+    inst.activation_record_index = array_length(gen->ars) - 1;
+    array_push(gen->instructions, inst);
+}
+
+void
+iri_emit_clear(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size)
+{
+    IR_Instruction inst = iri_new(IR_CLEAR, t1, t2, IR_REG_NONE, imm, byte_size);
     iri_update_reg_uses(gen, t1, false);
     iri_update_reg_uses(gen, t2, false);
     inst.activation_record_index = array_length(gen->ars) - 1;

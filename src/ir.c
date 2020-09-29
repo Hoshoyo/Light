@@ -81,6 +81,30 @@ ir_gen_load(IR_Generator* gen, Light_Ast* expr, IR_Reg src, IR_Reg dst)
     }
 }
 
+// requires r0 to be zeroed
+void
+ir_gen_variable_initialization(IR_Generator* gen, Light_Ast* decl)
+{
+    IR_Activation_Rec* ar = ir_get_current_ar(gen);
+    Light_Type* type = type_alias_root(decl->decl_variable.type);
+
+    int soff = decl->decl_variable.stack_offset;
+
+    if(type->size_bits <= type_pointer_size_bits())
+    {
+        // emit normal store r0 -> sb + imm
+        iri_emit_store(gen, IR_REG_PROC_RET, IR_REG_STACK_BASE, 
+            iri_value_new_signed(4, decl->decl_variable.stack_offset), type->size_bits / 8, false);
+    }
+    else
+    {
+        // emit copy sb relative
+        IR_Reg t = ir_new_temp(gen);
+        iri_emit_mov(gen, IR_REG_NONE, t, iri_value_new_signed(4, type->size_bits / 8), type_pointer_size_bits() / 8, false);
+        iri_emit_clear(gen, IR_REG_STACK_BASE, t, (IR_Value){.v_s32 = soff}, type_pointer_size_bits() / 8);
+    }
+}
+
 void
 ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
 {
@@ -112,6 +136,10 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
             }
             ir_set_vreg_addr(gen, decl->decl_variable.ir_temporary, ar->offset, type_primitive_float(decl->decl_variable.type));
         }
+
+        // Initialize with the default value
+        // TODO(psv): for now just do 0
+        ir_gen_variable_initialization(gen, decl);
 
         ar->offset -= (decl->decl_variable.type->size_bits / 8);
 
@@ -877,6 +905,9 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
 void
 ir_gen_commands(IR_Generator* gen, Light_Ast** commands, int comm_count)
 {
+    // clear r0 to use in the variable initialization
+    iri_emit_arith(gen, IR_XOR, IR_REG_PROC_RET, IR_REG_PROC_RET, IR_REG_PROC_RET, (IR_Value){0}, type_pointer_size_bits() / 8);
+
     // decls
     for(int i = 0; i < comm_count; ++i) {
         Light_Ast* comm = commands[i];
