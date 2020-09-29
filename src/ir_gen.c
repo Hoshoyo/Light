@@ -255,6 +255,14 @@ iri_emit_push(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size)
 }
 
 void
+iri_emit_pop(IR_Generator* gen, IR_Reg t, int byte_size)
+{
+    IR_Instruction inst = iri_new(IR_POP, t, IR_REG_NONE, IR_REG_NONE, (IR_Value){0}, byte_size);
+    inst.activation_record_index = array_length(gen->ars) - 1;
+    array_push(gen->instructions, inst);
+}
+
+void
 iri_emit_copy(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size)
 {
     IR_Instruction inst = iri_new(IR_COPY, t1, IR_REG_NONE, t2, imm, byte_size);
@@ -629,6 +637,13 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
         } break;
         case IR_PUSH: {
             fprintf(out, "PUSH ");
+            if(instr->t1 == IR_REG_NONE)
+                iri_print_value(out, instr->imm);
+            else
+                iri_print_register(out, instr->t1, instr->ot1, false);
+        } break;
+        case IR_POP: {
+            fprintf(out, "POP ");
             if(instr->t1 == IR_REG_NONE)
                 iri_print_value(out, instr->imm);
             else

@@ -192,8 +192,10 @@ emit_ret(Instr_Emit_Result* out_info, u8* stream, X64_Ret_Instruction opcode)
 u8*
 emit_jmp_cond_test(u8* stream)
 {
-    stream = emit_jmp_cond_rel32(0, stream, JZ, 0x12345678);
+    stream = emit_pop_reg(0, stream, EBP);
+
 #if 0
+    stream = emit_jmp_cond_rel32(0, stream, JZ, 0x12345678);
     stream = emit_jmp_reg_unconditional(0, stream, DIRECT, RBX, 0, 0);
     stream = emit_jmp_reg_unconditional(0, stream, INDIRECT, RBX, 0, 0);
     stream = emit_jmp_reg_unconditional(0, stream, INDIRECT_BYTE_DISPLACED, RBX, 0x12, 0);

@@ -63,6 +63,17 @@ ir_new_reg(IR_Generator* gen, Light_Type* type) {
     return (type_primitive_float(type)) ? ir_new_tempf(gen) : ir_new_temp(gen);
 }
 
+// X86
+#define IR_TO_X86 1
+void
+ir_gen_x86_epilogue(IR_Generator* gen)
+{
+    // mov esp, ebp
+    iri_emit_mov(gen, IR_REG_STACK_BASE, IR_REG_STACK_PTR, (IR_Value){0}, type_pointer_size_bits() / 8, false);
+    // pop ebp
+    iri_emit_pop(gen, IR_REG_STACK_BASE, type_pointer_size_bits() / 8);
+}
+
 // *****************************************************
 // *****************************************************
 // ***************** AST Generate **********************
@@ -946,6 +957,9 @@ ir_gen_comm_return(IR_Generator* gen, Light_Ast* comm)
             comm->comm_return.expression->type->size_bits / 8, 
             type_primitive_float(comm->comm_return.expression->type));
     }
+#if IR_TO_X86
+    ir_gen_x86_epilogue(gen);
+#endif
     iri_emit_ret(gen);
 }
 
@@ -1017,6 +1031,18 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
     // setup arguments in the stack
     proc->decl_proc.ir_instr_index = iri_current_instr_index(gen);
 
+#if IR_TO_X86
+    // x86 prologue
+    // push ebp
+    // mov ebp, esp
+    // sub esp, stack_size
+    iri_emit_push(gen, IR_REG_STACK_BASE, (IR_Value){0}, type_pointer_size_bits() / 8);
+    iri_emit_mov(gen, IR_REG_STACK_PTR, IR_REG_STACK_BASE, (IR_Value){0}, type_pointer_size_bits() / 8, false);
+    int sub_esp_index = iri_current_instr_index(gen);
+    iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR, 
+        (IR_Value){.type = IR_VALUE_S32, .v_s32 = 0}, type_pointer_size_bits() / 8);
+#endif
+
     // TODO(psv): consider alignment
     int stack_offset = 0;
     for(int i = 0; i < proc->decl_proc.argument_count; ++i)
@@ -1028,6 +1054,12 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
         arg->decl_variable.stack_offset = stack_offset + arg->decl_variable.type->size_bits / 8;
         stack_offset += (arg->decl_variable.type->size_bits / 8);
     }
+
+    gen->ars[array_length(gen->ars) - 1].stack_size_bytes = stack_offset;
+
+#if IR_TO_X86
+    iri_get_temp_instr_ptr(gen, sub_esp_index)->imm.v_s32 = stack_offset;
+#endif
 
     ir_gen_comm_block(gen, proc->decl_proc.body);
 }

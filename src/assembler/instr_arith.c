@@ -179,7 +179,9 @@ u8*
 emit_and_test(u8* stream)
 {
     X64_Arithmetic_Instr instr = ARITH_CMP;
-#if 1
+    stream = emit_arith_mi(0, stream, ARITH_SUB, DIRECT, ESP, (Int_Value){.v32 = 123}, 0, 0);
+
+#if 0
     stream = emit_arith_mi(0, stream, instr, DIRECT, RAX, (Int_Value){.v64 = 0x12345678}, 0, 0);
     stream = emit_arith_mi(0, stream, instr, DIRECT, RBX, (Int_Value){.v64 = 0x12345678}, 0, 0);
     stream = emit_arith_mi(0, stream, instr, DIRECT, EAX, (Int_Value){.v64 = 0x123}, 0, 0);
@@ -215,7 +217,7 @@ emit_and_test(u8* stream)
     stream = emit_arith_mi(0, stream, instr, INDIRECT_DWORD_DISPLACED, RAX, (Int_Value){.v64 = 0x12}, 0, 0x12345678);
     stream = emit_arith_mi(0, stream, instr, INDIRECT_DWORD_DISPLACED, R9, (Int_Value){.v64 = 0x12}, 0, 0x12345678);
 #endif
-#if 1
+#if 0
     stream = emit_arith_mi_imm8_sext(0, stream, instr, RBX, 0x12, DIRECT, 0, 0);
     stream = emit_arith_mi_imm8_sext(0, stream, instr, EBX, 0x12, DIRECT, 0, 0);
     stream = emit_arith_mi_imm8_sext(0, stream, instr, BX, 0x12, DIRECT, 0, 0);

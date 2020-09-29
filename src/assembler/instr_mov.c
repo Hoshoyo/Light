@@ -19,14 +19,14 @@ emit_mov_reg(Instr_Emit_Result* out_info, u8* stream, X64_Mov_Instr opcode, X64_
     
     if(opcode == MOV_MR8 || opcode == MOV_MR)
     {
-        if(register_equivalent(RSP, dest))
+        if(register_equivalent(RSP, dest) && mode != DIRECT)
         {
             *stream++ = make_sib(0, RSP, RSP);
         }
     }
     else if(opcode == MOV_RM8 || opcode == MOV_RM)
     {
-        if(register_equivalent(RSP, src))
+        if(register_equivalent(RSP, src) && mode != DIRECT)
         {
             *stream++ = make_sib(0, RSP, RSP);
         }
@@ -307,6 +307,7 @@ emit_rep_stos(Instr_Emit_Result* out_info, u8* stream, int bitsize)
 u8*
 emit_mov_test(u8* stream)
 {
+    stream = emit_mov_reg(0, stream, MOV_MR, DIRECT, 32, ESP, EBP, 0, 0);
     //stream = emit_mov_reg(0, stream, MOV_MR, INDIRECT_DWORD_DISPLACED, 32, ESP, ECX, 0, 0x12345);
     //stream = emit_mov_reg(0, stream, MOV_MR, INDIRECT_DWORD_DISPLACED, 8, ESP, SIL, 0, 0x12345);
     //stream = emit_mov_reg(0, stream, MOV_MR8, INDIRECT_DWORD_DISPLACED, 32, ESP, ECX, 0, 0x12345);

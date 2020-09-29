@@ -61,6 +61,7 @@ typedef enum {
     IR_CALL,    // call t / call imm  (imm is the absolute addres in instruction number)
     IR_RET,     // ret
     IR_PUSH,    // push t
+    IR_POP,     // pop t
 
     IR_COPY,        // copy t1, imm -> t2
     IR_CLEAR,       // clear t1 + imm, t2  sets t2 bytes from t1 + imm to zero
@@ -153,6 +154,7 @@ typedef struct {
 typedef struct {
     int index;
     int offset; // also byte count at the end
+    int stack_size_bytes;
 
     // Register allocation stuff
     IR_Reg temp_int;
@@ -217,6 +219,7 @@ void iri_emit_jrz(IR_Generator* gen, IR_Reg t1, IR_Value imm, int byte_size);
 void iri_emit_jrnz(IR_Generator* gen, IR_Reg t1, IR_Value imm, int byte_size);
 void iri_emit_call(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size);
 void iri_emit_push(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size);
+void iri_emit_pop(IR_Generator* gen, IR_Reg t, int byte_size);
 void iri_emit_ret(IR_Generator* gen);
 void iri_emit_copy(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size);
 void iri_emit_clear(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int byte_size);

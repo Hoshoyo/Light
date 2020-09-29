@@ -567,6 +567,16 @@ x86_emit_ret(X86_Emitter* em, IR_Instruction* instr)
 
     return info;
 }
+Instr_Emit_Result
+x86_emit_pop(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+    X64_Register rop = ir_to_x86_Reg(instr->t1, instr->byte_size);
+    
+    em->at = emit_pop_reg(&info, em->at, rop);
+
+    return info;
+}
 
 Instr_Emit_Result
 x86_emit_push(X86_Emitter* em, IR_Instruction* instr)
@@ -814,6 +824,8 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
             return x86_emit_ret(em, instr);
         case IR_PUSH:
             return x86_emit_push(em, instr);
+        case IR_POP:
+            return x86_emit_pop(em, instr);
         case IR_JRZ: case IR_JRNZ:
             return x86_emit_cond_rjmp(em, instr, index);
         case IR_JR:
