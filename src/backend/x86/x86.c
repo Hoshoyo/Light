@@ -308,10 +308,9 @@ x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
     em->at = emit_mul(&info, em->at, instr->byte_size * 8, x86_ir_mul_to_x86_arith(instr), rop2, DIRECT, 0, 0);
 
     // move result that is in edx to the destination register
-    if(not_edx)
     {
         em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, 
-            instr->byte_size * 8, rdst, x86_reg32_to_byte_size(EDX, instr->byte_size), 0, 0);
+            instr->byte_size * 8, rdst, x86_reg32_to_byte_size(EAX, instr->byte_size), 0, 0);
     }
 
     // pop back edx if it was not the result in the first place
