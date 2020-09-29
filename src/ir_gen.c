@@ -246,6 +246,14 @@ iri_emit_ret(IR_Generator* gen)
 }
 
 void
+iri_emit_hlt(IR_Generator* gen)
+{
+    IR_Instruction inst = iri_new(IR_HLT, IR_REG_NONE, IR_REG_NONE, IR_REG_NONE, (IR_Value){0}, 0);
+    inst.activation_record_index = array_length(gen->ars) - 1;
+    array_push(gen->instructions, inst);
+}
+
+void
 iri_emit_push(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size)
 {
     IR_Instruction inst = iri_new(IR_PUSH, t, IR_REG_NONE, IR_REG_NONE, imm, byte_size);
@@ -651,6 +659,9 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
         } break;
         case IR_RET: {
             fprintf(out, "RET ");
+        } break;
+        case IR_HLT: {
+            fprintf(out, "HLT ");
         } break;
         case IR_COPY: {
             fprintf(out, "COPY ");

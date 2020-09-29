@@ -960,7 +960,17 @@ ir_gen_comm_return(IR_Generator* gen, Light_Ast* comm)
 #if IR_TO_X86
     ir_gen_x86_epilogue(gen);
 #endif
-    iri_emit_ret(gen);
+
+    // TODO(psv): could be a block inside a block
+    if(comm->scope_at->creator_node->kind == AST_DECL_PROCEDURE && 
+        comm->scope_at->creator_node->decl_proc.flags & DECL_PROC_FLAG_MAIN)
+    {
+        iri_emit_hlt(gen);
+    }
+    else
+    {
+        iri_emit_ret(gen);
+    }
 }
 
 void

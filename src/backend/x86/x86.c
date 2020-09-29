@@ -559,6 +559,24 @@ x86_emit_cmov(X86_Emitter* em, IR_Instruction* instr)
 }
 
 Instr_Emit_Result
+x86_emit_hlt(X86_Emitter* em, IR_Instruction* instr)
+{
+    Instr_Emit_Result info = {0};
+
+#define X86_LINUX
+#if defined X86_LINUX
+    // mov ebx, eax
+    em->at = emit_mov_reg(&info, em->at, MOV_MR, DIRECT, 32, EBX, EAX, 0, 0);
+    // mov eax, 1
+    em->at = emit_mov_oi(0, em->at, EAX, (Int_Value){.v32 = 1});
+    // int 0x80
+    em->at = emit_int(0, em->at, 0x80);
+#endif
+
+    return info;
+}
+
+Instr_Emit_Result
 x86_emit_ret(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
@@ -567,6 +585,7 @@ x86_emit_ret(X86_Emitter* em, IR_Instruction* instr)
 
     return info;
 }
+
 Instr_Emit_Result
 x86_emit_pop(X86_Emitter* em, IR_Instruction* instr)
 {
@@ -822,6 +841,8 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
             return x86_emit_call(em, instr);
         case IR_RET:
             return x86_emit_ret(em, instr);
+        case IR_HLT:
+            return x86_emit_hlt(em, instr);
         case IR_PUSH:
             return x86_emit_push(em, instr);
         case IR_POP:

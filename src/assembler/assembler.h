@@ -237,6 +237,7 @@ u8* emit_call_rel32(Instr_Emit_Result* out_info, u8* stream, int imm);
 u8* emit_push_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_Register reg, u8 disp8, uint32_t disp32);
 u8* emit_pop_reg(Instr_Emit_Result* out_info, u8* stream, X64_Register reg);
 u8* emit_ret(Instr_Emit_Result* out_info, u8* stream, X64_Ret_Instruction opcode);
+u8* emit_int(Instr_Emit_Result* out_info, u8* stream, u8 byte);
 
 // tests
 u8* emit_mov_test(u8* stream);

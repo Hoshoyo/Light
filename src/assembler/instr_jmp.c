@@ -190,6 +190,22 @@ emit_ret(Instr_Emit_Result* out_info, u8* stream, X64_Ret_Instruction opcode)
 }
 
 u8*
+emit_int(Instr_Emit_Result* out_info, u8* stream, u8 byte)
+{
+    u8* start = stream;
+    *stream++ = 0xcd;
+    *stream++ = byte;
+
+    if(out_info)
+    {
+        out_info->instr_byte_size = stream - start;
+        out_info->diplacement_offset = -1;
+        out_info->immediate_offset = -1;
+    }
+    return stream;
+}
+
+u8*
 emit_jmp_cond_test(u8* stream)
 {
     stream = emit_pop_reg(0, stream, EBP);
