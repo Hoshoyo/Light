@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <light_array.h>
 #include "../light_elf.h"
+#include "../light_pecoff.h"
 
 typedef struct {
     u8* issuer_addr;    // address of the instruction to calculate the relative offset
@@ -580,8 +581,10 @@ x86_emit_hlt(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
 
-#define X86_LINUX
-#if defined X86_LINUX
+#define X86_WINDOWS
+#if defined X86_WINDOWS
+    em->at = emit_ret(&info, em->at, RET_NEAR);
+#elif defined X86_LINUX
     // mov ebx, eax
     em->at = emit_mov_reg(&info, em->at, MOV_MR, DIRECT, 32, EBX, EAX, 0, 0);
     // mov eax, 1
@@ -964,7 +967,11 @@ X86_generate(IR_Generator* gen)
     fwrite(em.base, em.at - em.base, 1, out);
     fclose(out);
 #else
+#if defined(_WIN32) || defined(_WIN64)
+    light_pecoff_emit(em.base, em.at - em.base);
+#else
     light_elf_emit(em.base, em.at - em.base);
+#endif
 #endif
     return 0;
 }
