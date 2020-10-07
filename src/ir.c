@@ -112,7 +112,7 @@ ir_gen_variable_initialization(IR_Generator* gen, Light_Ast* decl)
         // emit copy sb relative
         IR_Reg t = ir_new_temp(gen);
         iri_emit_mov(gen, IR_REG_NONE, t, iri_value_new_signed(4, type->size_bits / 8), type_pointer_size_bits() / 8, false);
-        iri_emit_clear(gen, IR_REG_STACK_BASE, t, (IR_Value){.v_s32 = soff}, type_pointer_size_bits() / 8);
+        iri_emit_clear(gen, IR_REG_STACK_BASE, t, (IR_Value){.type = IR_VALUE_S32, .v_s32 = soff}, type_pointer_size_bits() / 8);
     }
 }
 
@@ -131,7 +131,7 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
         else
             decl->decl_variable.ir_temporary = IR_REG_NONE;
         decl->decl_variable.stack_index = ar->index--;
-        decl->decl_variable.stack_offset = ar->offset;
+        decl->decl_variable.stack_offset = ar->offset - decl->decl_variable.type->size_bits / 8;
 
         if(decl->decl_variable.ir_temporary != IR_REG_NONE)
         {
@@ -410,6 +410,29 @@ ir_gen_expr_cond(IR_Generator* gen, Light_Ast* expr, IR_Reg t1, IR_Reg t2, IR_Re
 }
 
 IR_Reg
+ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, IR_Reg t1, IR_Reg t2, IR_Reg t3, bool load)
+{
+    int type_size_bytes = expr->type->size_bits / 8;
+    // multiply by the type size
+    if(type_size_bytes > 1)
+    {
+        iri_emit_mov(gen, IR_REG_NONE, IR_REG_PROC_RET, (IR_Value){.type = IR_VALUE_S32, .v_s32 = type_size_bytes}, type_pointer_size_bits() / 8, false);
+        // mul t2, imm -> t3
+        iri_emit_arith(gen, IR_MUL, t2, IR_REG_PROC_RET, t3, (IR_Value){0}, type_pointer_size_bits() / 8);
+    }
+
+    iri_emit_arith(gen, IR_ADD, t1, t2, t3, (IR_Value){0}, type_size_bytes);
+    
+    if(load)
+    {
+        IR_Reg t4 = ir_new_reg(gen, expr->type);
+        iri_emit_load(gen, t3, t4, (IR_Value){0}, type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
+        return t4;
+    }
+    return t3;
+}
+
+IR_Reg
 ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
 {
     IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, true);
@@ -434,7 +457,7 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
         case OP_BINARY_SHR:             instr_type = IR_SHR; break;
         case OP_BINARY_LOGIC_AND:       instr_type = IR_LAND; break;
         case OP_BINARY_LOGIC_OR:        instr_type = IR_LOR; break;
-        case OP_BINARY_VECTOR_ACCESS:   instr_type = IR_ADD; break;
+        case OP_BINARY_VECTOR_ACCESS:   return ir_gen_expr_vector_access(gen, expr, t1, t2, t3, load);
 
         case OP_BINARY_LT:
         case OP_BINARY_GT:
@@ -1063,6 +1086,15 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
         arg->decl_variable.stack_index = i + 2;
         arg->decl_variable.stack_offset = stack_offset + arg->decl_variable.type->size_bits / 8;
         stack_offset += (arg->decl_variable.type->size_bits / 8);
+    }
+    Light_Scope* body_scope = proc->decl_proc.body->comm_block.block_scope;
+    stack_offset = 0;
+    for (int i = 0; i < body_scope->decl_count; ++i)
+    {
+        if (body_scope->decls[i]->kind == AST_DECL_VARIABLE)
+        {
+            stack_offset += (body_scope->decls[i]->decl_variable.type->size_bits / 8);
+        }
     }
 
     gen->ars[array_length(gen->ars) - 1].stack_size_bytes = stack_offset;
