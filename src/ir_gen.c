@@ -680,6 +680,15 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
             fprintf(out, " -> ");
             iri_print_register(out, instr->t3, instr->ot3, false);
         } break;
+        case IR_CLEAR:{
+            // clear t1 + imm, t2
+            fprintf(out, "CLEAR ");
+            iri_print_register(out, instr->t1, instr->ot1, false);
+            fprintf(out, " + ");
+            iri_print_value(out, instr->imm);
+            fprintf(out, ", ");
+            iri_print_register(out, instr->t2, instr->ot2, false);
+        } break;
 
         case IR_CVT_SI_R32:
         case IR_CVT_UI_R32:

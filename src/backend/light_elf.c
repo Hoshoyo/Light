@@ -1,7 +1,9 @@
 #include "light_elf.h"
+#if defined(__linux__)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <elf.h>
 
 static int align_delta(int offset, int align_to){
@@ -166,3 +168,5 @@ light_elf_emit(u8* in_stream, int in_stream_size_bytes)
     fwrite(stream, at - stream, 1, file);
     fclose(file);
 }
+
+#endif
