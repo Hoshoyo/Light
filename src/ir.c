@@ -112,7 +112,7 @@ ir_gen_variable_initialization(IR_Generator* gen, Light_Ast* decl)
         // emit copy sb relative
         IR_Reg t = ir_new_temp(gen);
         iri_emit_mov(gen, IR_REG_NONE, t, iri_value_new_signed(4, type->size_bits / 8), type_pointer_size_bits() / 8, false);
-        iri_emit_clear(gen, IR_REG_STACK_BASE, t, (IR_Value){.v_s32 = soff}, type_pointer_size_bits() / 8);
+        iri_emit_clear(gen, IR_REG_STACK_BASE, t, (IR_Value){.type = IR_VALUE_S32, .v_s32 = soff}, type_pointer_size_bits() / 8);
     }
 }
 
@@ -623,11 +623,11 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr)
         IR_Reg expt = ir_gen_expr(gen, e, true);
         if(e->flags & AST_FLAG_EXPRESSION_LVALUE)
         {
-            iri_emit_copy(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
+            iri_emit_copy(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = -offset}, e->type->size_bits / 8);
         }
         else
         {
-            iri_emit_store(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8,
+            iri_emit_store(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = -offset}, e->type->size_bits / 8,
                 type_primitive_float(e->type));
         }
     }
@@ -1031,6 +1031,22 @@ ir_gen_comm(IR_Generator* gen, Light_Ast* comm)
     array_push(gen->node_ranges, range);
 }
 
+int
+ir_calculate_proc_stack_size(Light_Ast* proc)
+{
+    Light_Scope* pscope = proc->decl_proc.body->comm_block.block_scope;
+    int stack_size_bytes = 0;
+    for(int i = 0; i < pscope->decl_count; ++i)
+    {
+        if(pscope->decls[i]->kind == AST_DECL_VARIABLE)
+        {
+            int var_size_bytes = pscope->decls[i]->decl_variable.type->size_bits / 8;
+            stack_size_bytes += var_size_bytes;
+        }
+    }
+    return stack_size_bytes;
+}
+
 void
 ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
 {
@@ -1041,6 +1057,8 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
     // setup arguments in the stack
     proc->decl_proc.ir_instr_index = iri_current_instr_index(gen);
 
+    int stack_size_bytes = ir_calculate_proc_stack_size(proc);
+
 #if IR_TO_X86
     // x86 prologue
     // push ebp
@@ -1050,7 +1068,7 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
     iri_emit_mov(gen, IR_REG_STACK_PTR, IR_REG_STACK_BASE, (IR_Value){0}, type_pointer_size_bits() / 8, false);
     int sub_esp_index = iri_current_instr_index(gen);
     iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR, 
-        (IR_Value){.type = IR_VALUE_S32, .v_s32 = 0}, type_pointer_size_bits() / 8);
+        (IR_Value){.type = IR_VALUE_S32, .v_s32 = stack_size_bytes}, type_pointer_size_bits() / 8);
 #endif
 
     // TODO(psv): consider alignment
@@ -1066,10 +1084,6 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
     }
 
     gen->ars[array_length(gen->ars) - 1].stack_size_bytes = stack_offset;
-
-#if IR_TO_X86
-    iri_get_temp_instr_ptr(gen, sub_esp_index)->imm.v_s32 = stack_offset;
-#endif
 
     ir_gen_comm_block(gen, proc->decl_proc.body);
 }

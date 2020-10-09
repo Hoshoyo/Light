@@ -122,13 +122,9 @@ typedef struct {
 
     IR_Reg ot1, ot2, ot3; // optional
 
-    union {
-        int byte_size;
-        struct {
-            int16_t src_byte_size;
-            int16_t dst_byte_size;
-        };
-    };
+    int byte_size;
+    int16_t src_byte_size;
+    int16_t dst_byte_size;
 } IR_Instruction;
 
 typedef struct {

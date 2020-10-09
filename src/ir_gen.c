@@ -118,6 +118,7 @@ iri_emit_load(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int src_byt
     IR_Instruction inst = iri_new((fp)? IR_LOADF : IR_LOAD, t1, IR_REG_NONE, t2, imm, 0);
     inst.src_byte_size = src_byte_size;
     inst.dst_byte_size = dst_byte_size;
+    inst.byte_size = src_byte_size;
     inst.flags |= ((fp) ? IIR_FLAG_IS_FP_DEST : 0);
     iri_update_reg_uses(gen, t1, false);
     inst.activation_record_index = array_length(gen->ars) - 1;
@@ -649,6 +650,14 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
                 iri_print_value(out, instr->imm);
             else
                 iri_print_register(out, instr->t1, instr->ot1, false);
+        } break;
+        case IR_CLEAR: {
+            fprintf(out, "CLEAR ");
+            iri_print_register(out, instr->t1, instr->ot1, false);
+            fprintf(out, " + ");
+            iri_print_value(out, instr->imm);
+            fprintf(out, ", ");
+            iri_print_register(out, instr->t2, instr->ot2, false);
         } break;
         case IR_POP: {
             fprintf(out, "POP ");
