@@ -32,6 +32,7 @@ ir_new_temp(IR_Generator* gen) {
     }
     fprintf(stderr, "tried to allocate more than 3 integer registers\n");
     assert(0);
+    return IR_REG_NONE;
 }
 static IR_Reg
 ir_new_tempf(IR_Generator* gen) {
@@ -46,6 +47,7 @@ ir_new_tempf(IR_Generator* gen) {
     }
     fprintf(stderr, "tried to allocate more than 8 float registers\n");
     assert(0);
+    return IR_REG_NONE;
 }
 
 static void
@@ -139,7 +141,7 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
 
         ar->offset -= (decl->decl_variable.type->size_bits / 8);
 
-        fprintf(stdout, "variable[SB+%d] %.*s", decl->decl_variable.stack_offset,
+        fprintf(stdout, "variable[SB+%d] %.*s\n", decl->decl_variable.stack_offset,
             decl->decl_constant.name->length, decl->decl_constant.name->data);
     }
 }
@@ -392,9 +394,30 @@ ir_gen_expr_cond(IR_Generator* gen, Light_Ast* expr, IR_Reg t1, IR_Reg t2, IR_Re
 }
 
 IR_Reg
-ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, IR_Reg t1, IR_Reg t2, IR_Reg t3, bool load)
+ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load)
 {
     int type_size_bytes = expr->type->size_bits / 8;
+
+    IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, false);
+    ir_free_reg(gen, t1);
+    iri_emit_push(gen, t1, (IR_Value) { 0 }, type_pointer_size_bits() / 8);
+
+    IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true);
+
+    if (t2 == t1)
+    {
+        t1 = ir_new_reg(gen, expr->expr_binary.left->type);
+    }
+
+    iri_emit_pop(gen, t1, type_pointer_size_bits() / 8);
+    IR_Reg t3 = ir_new_reg(gen, expr->type);
+
+    ir_free_reg(gen, t2);
+    ir_free_reg(gen, t1);
+
+    bool fp = type_primitive_float(expr->expr_binary.left->type);
+    bool signed_ = (!fp && type_primitive_sint(expr->expr_binary.left->type));
+
     // multiply by the type size
     if(type_size_bytes > 1)
     {
@@ -403,14 +426,14 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, IR_Reg t1, IR_Reg 
         iri_emit_arith(gen, IR_MUL, t2, IR_REG_PROC_RET, t3, (IR_Value){0}, type_pointer_size_bits() / 8);
     }
 
-    iri_emit_arith(gen, IR_ADD, t1, t2, t3, (IR_Value){0}, type_size_bytes);
+    iri_emit_arith(gen, IR_ADD, t3, t1, t3, (IR_Value){0}, type_size_bytes);
     
     if(load)
     {
-        IR_Reg t4 = ir_new_reg(gen, expr->type);
-        iri_emit_load(gen, t3, t4, (IR_Value){0}, type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
-        ir_free_reg(gen, t3);
-        return t4;
+        //IR_Reg t4 = ir_new_reg(gen, expr->type);
+        iri_emit_load(gen, t3, t3, (IR_Value){0}, type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
+        //ir_free_reg(gen, t3);
+        return t3;
     }
     return t3;
 }
@@ -418,17 +441,33 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, IR_Reg t1, IR_Reg 
 IR_Reg
 ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
 {
+    // first check for pointer arithmetic
+    if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS)
+        return ir_gen_expr_vector_access(gen, expr, load);
+
+    // TODO(psv): pointer arithmetic
+    if (expr->expr_binary.left->flags & AST_FLAG_EXPRESSION_LVALUE && !load)
+        return 0;
+
     IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, true);
     ir_free_reg(gen, t1);
     iri_emit_push(gen, t1, (IR_Value){0}, expr->expr_binary.left->type->size_bits / 8);
 
     IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true);
+
+    if (t2 == t1)
+    {
+        t1 = ir_new_reg(gen, expr->expr_binary.left->type);
+    }
     ir_free_reg(gen, t2);
     
     iri_emit_pop(gen, t1, expr->expr_binary.left->type->size_bits / 8);
+    ir_free_reg(gen, t1);
+
     IR_Reg t3 = ir_new_reg(gen, expr->type);
 
     bool fp = type_primitive_float(expr->expr_binary.left->type);
+    bool signed_ = (!fp && type_primitive_sint(expr->expr_binary.left->type));
 
     int byte_size = expr->type->size_bits / 8;
 
@@ -436,8 +475,8 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
     switch(expr->expr_binary.op) {
         case OP_BINARY_PLUS:            instr_type = (fp) ? IR_ADDF : IR_ADD; break;
         case OP_BINARY_MINUS:           instr_type = (fp) ? IR_SUBF : IR_SUB; break;
-        case OP_BINARY_MULT:            instr_type = (fp) ? IR_MULF : IR_MUL; break;
-        case OP_BINARY_DIV:             instr_type = (fp) ? IR_DIVF : IR_DIV; break;
+        case OP_BINARY_MULT:            instr_type = (fp) ? IR_MULF : ((signed_) ? IR_IMUL : IR_MUL); break;
+        case OP_BINARY_DIV:             instr_type = (fp) ? IR_DIVF : ((signed_) ? IR_IDIV : IR_DIV); break;
         case OP_BINARY_MOD:             instr_type = IR_MOD; break;
         case OP_BINARY_AND:             instr_type = IR_AND; break;
         case OP_BINARY_OR:              instr_type = IR_OR; break;
@@ -446,7 +485,7 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
         case OP_BINARY_SHR:             instr_type = IR_SHR; break;
         case OP_BINARY_LOGIC_AND:       instr_type = IR_LAND; break;
         case OP_BINARY_LOGIC_OR:        instr_type = IR_LOR; break;
-        case OP_BINARY_VECTOR_ACCESS:   return ir_gen_expr_vector_access(gen, expr, t1, t2, t3, load);
+        //case OP_BINARY_VECTOR_ACCESS:   return ir_gen_expr_vector_access(gen, expr, t1, t2, t3, load);
 
         case OP_BINARY_LT:
         case OP_BINARY_GT:
@@ -902,6 +941,9 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
 
     IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);  
     iri_emit_pop(gen, t2, rvalue_type->size_bits / 8);
+
+    ir_free_reg(gen, t1);
+    ir_free_reg(gen, t2);
     
     if(primitive_type || rvalue_type->kind == TYPE_KIND_FUNCTION || rvalue_type->kind == TYPE_KIND_POINTER)
     {
@@ -1136,10 +1178,6 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
     }
 
     ir_patch_proc_calls(gen);
-
-    iri_print_instructions(gen);
-
-    fprintf(stdout, "\n");
 
     iri_print_instructions(gen);
 }

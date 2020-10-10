@@ -383,6 +383,8 @@ iri_print_instr_arith(FILE* out, IR_Instruction* instr)
         case IR_AND:    fprintf(out, "AND "); break;
         case IR_MUL:    fprintf(out, "MUL "); break;
         case IR_DIV:    fprintf(out, "DIV "); break;
+        case IR_IMUL:   fprintf(out, "IMUL "); break;
+        case IR_IDIV:   fprintf(out, "IDIV "); break;
         case IR_MOD:    fprintf(out, "MOD "); break;
         case IR_OR:     fprintf(out, "OR ");  break;
         case IR_XOR:    fprintf(out, "XOR "); break;
@@ -559,6 +561,7 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
             if(instr->imm.type != IR_VALUE_NONE)
                 iri_print_value(out, instr->imm);
         } break;
+        case IR_IMUL: case IR_IDIV:
         case IR_SUB: case IR_AND: case IR_MUL:
         case IR_DIV: case IR_MOD: case IR_OR:
         case IR_XOR: case IR_SHL: case IR_SHR:

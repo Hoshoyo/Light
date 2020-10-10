@@ -18,7 +18,9 @@ typedef enum {
     IR_LOAD,                // load t1 -> t2        where t1 is an address
     IR_STORE,               // store t1 -> t2       where t2 is an address 
     IR_ADD, IR_SUB,         // add t1, t2 -> t3
-    IR_MUL, IR_DIV, IR_MOD, // mul t1, t2 -> t3
+    IR_MUL, IR_IMUL,        // mul t1, t2 -> t3
+    IR_MOD,                 // mod t1, t2 -> t3
+    IR_DIV, IR_IDIV,        // div t1, t2 -> t3
     IR_SHL, IR_SHR,         // shl t1, t2 -> t3
     IR_OR, IR_XOR, IR_AND,  // xor t1, t2 -> t3
     IR_LAND, IR_LOR,        // land t1, t2 -> t3
