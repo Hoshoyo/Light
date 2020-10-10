@@ -397,7 +397,7 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load, bool in
 {
     int type_size_bytes = expr->type->size_bits / 8;
 
-    IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, false, inside_literal, outer_offset);
+    IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, (expr->expr_binary.left->type->kind == TYPE_KIND_POINTER), inside_literal, outer_offset);
     ir_free_reg(gen, t1);
     iri_emit_push(gen, t1, (IR_Value) { 0 }, type_pointer_size_bytes());
 
@@ -420,9 +420,12 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load, bool in
         iri_emit_mov(gen, IR_REG_NONE, IR_REG_PROC_RET, (IR_Value){.type = IR_VALUE_S32, .v_s32 = type_size_bytes}, type_pointer_size_bytes(), false);
         // mul t2, imm -> t3
         iri_emit_arith(gen, IR_MUL, t2, IR_REG_PROC_RET, t3, (IR_Value){0}, type_pointer_size_bytes());
+        iri_emit_arith(gen, IR_ADD, t3, t1, t3, (IR_Value){0}, type_pointer_size_bytes());
     }
-
-    iri_emit_arith(gen, IR_ADD, t3, t1, t3, (IR_Value){0}, type_pointer_size_bytes());
+    else
+    {
+        iri_emit_arith(gen, IR_ADD, t1, t2, t3, (IR_Value) { 0 }, type_pointer_size_bytes());
+    }
     
     if(load)
     {
