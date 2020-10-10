@@ -160,6 +160,7 @@ typedef struct {
     int index;
     int offset; // also byte count at the end
     int stack_size_bytes;
+    int literals_stack_size;
 
     // Register allocation stuff
     IR_Reg temp_int;

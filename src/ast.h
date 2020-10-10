@@ -178,6 +178,7 @@ typedef struct  {
 	uint64_t             data_length_bytes;
 	bool                 raw_data;
 	Light_Storage_Class  storage_class;
+	int                  stack_offset;
 } Light_Ast_Expr_Literal_Array;
 
 typedef struct {
@@ -190,6 +191,7 @@ typedef struct {
 		struct Light_Ast_t** struct_decls;
 	};
 	Light_Storage_Class  storage_class;
+	int                  stack_offset;
 } Light_Ast_Expr_Literal_Struct;
 
 typedef struct {

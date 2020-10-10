@@ -651,17 +651,22 @@ IR_Reg
 ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr, bool inside_literal, int outer_offset)
 {
     int size_bytes = expr->type->size_bits / 8;
+    int stack_offset = outer_offset;
+
     // alocate bytes in the stack for it only if its not inner
     if (!inside_literal)
     {
-        iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR,
-            (IR_Value){.type = IR_VALUE_S32, .v_s32 = size_bytes}, type_pointer_size_bytes());
+        // alocate space for it in the activation record
+        IR_Activation_Rec* ar = ir_get_current_ar(gen);
+        expr->expr_literal_struct.stack_offset = (ar->literals_stack_size + ar->stack_size_bytes);
+        ar->literals_stack_size += size_bytes;
+        stack_offset = expr->expr_literal_struct.stack_offset;
     }
     
     Light_Type* struct_type = type_alias_root(expr->type);
-    for(int i = 0, offset = outer_offset;
+    for(int i = 0, offset = stack_offset;
         i < array_length(expr->expr_literal_struct.struct_exprs);
-        ++i, offset = outer_offset + struct_type->struct_info.offset_bits[i] / 8)
+        ++i, offset = stack_offset + struct_type->struct_info.offset_bits[i] / 8)
     {
         Light_Ast* e = expr->expr_literal_struct.struct_exprs[i];
         IR_Reg expt = ir_gen_expr(gen, e, true, true, offset);
@@ -672,18 +677,18 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr, bool inside_literal, 
         }
         else if(e->flags & AST_FLAG_EXPRESSION_LVALUE)
         {
-            iri_emit_copy(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
+            iri_emit_copy(gen, expt, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
         }
         else
         {
-            iri_emit_store(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8,
+            iri_emit_store(gen, expt, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8,
                 type_primitive_float(e->type));
         }
         ir_free_reg(gen, expt);
     }
 
     IR_Reg t = ir_new_temp(gen);
-    iri_emit_lea(gen, IR_REG_STACK_PTR, t, (IR_Value){.type = IR_VALUE_S32, .v_s32 = outer_offset}, type_pointer_size_bytes());
+    iri_emit_lea(gen, IR_REG_STACK_BASE, t, (IR_Value){.type = IR_VALUE_S32, .v_s32 = stack_offset}, type_pointer_size_bytes());
     return t;
 }
 
@@ -691,12 +696,15 @@ IR_Reg
 ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr, bool inside_literal, int outer_offset)
 {
     int size_bytes = (expr->type->size_bits / 8);
+    int stack_offset = outer_offset;
 
-    // alocate bytes in the stack for it only if its not inner
-    if (!inside_literal)
+    if (!inside_literal || expr->expr_literal_array.raw_data)
     {
-        iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR,
-            (IR_Value){.type = IR_VALUE_S32, .v_s32 = size_bytes}, type_pointer_size_bytes());
+        // alocate space for it in the activation record
+        IR_Activation_Rec* ar = ir_get_current_ar(gen);
+        expr->expr_literal_array.stack_offset = (ar->literals_stack_size + ar->stack_size_bytes);
+        ar->literals_stack_size += size_bytes;
+        stack_offset = expr->expr_literal_array.stack_offset;
     }
 
     if(expr->expr_literal_array.raw_data)
@@ -709,25 +717,24 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr, bool inside_literal, i
         {
             iri_emit_mov(gen, IR_REG_NONE, t1, (IR_Value){.type = IR_VALUE_U8, .v_u8 = expr->expr_literal_array.data[i]},
                 1, false);
-            iri_emit_store(gen, t1, IR_REG_STACK_PTR, 
-                (IR_Value){.type = IR_VALUE_S32, .v_s32 = i - 1 + outer_offset}, 1, false);
+            iri_emit_store(gen, t1, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = i - 1 + stack_offset}, 1, false);
         }
         ir_free_reg(gen, t1);
     }
     else
     {
         // expressions array
-        for(int i = 0, offset = outer_offset; i < array_length(expr->expr_literal_array.array_exprs); ++i)
+        for(int i = 0, offset = stack_offset; i < array_length(expr->expr_literal_array.array_exprs); ++i)
         {
             Light_Ast* e = expr->expr_literal_array.array_exprs[i];
             IR_Reg expt = ir_gen_expr(gen, e, true, true, offset);
             if(e->flags & AST_FLAG_EXPRESSION_LVALUE)
             {
-                iri_emit_copy(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
+                iri_emit_copy(gen, expt, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
             }
             else
             {
-                iri_emit_store(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8,
+                iri_emit_store(gen, expt, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8,
                     type_primitive_float(e->type));
             }
             ir_free_reg(gen, expt);
@@ -736,7 +743,7 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr, bool inside_literal, i
     }
 
     IR_Reg t = ir_new_temp(gen);
-    iri_emit_lea(gen, IR_REG_STACK_PTR, t, (IR_Value){.type = IR_VALUE_S32, .v_s32 = outer_offset}, type_pointer_size_bytes());
+    iri_emit_lea(gen, IR_REG_STACK_BASE, t, (IR_Value){.type = IR_VALUE_S32, .v_s32 = stack_offset}, type_pointer_size_bytes());
     return t;
 }
 
@@ -1149,6 +1156,13 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
     gen->ars[array_length(gen->ars) - 1].stack_size_bytes = stack_size_bytes;
 
     ir_gen_comm_block(gen, proc->decl_proc.body);
+
+    // allocate more bytes to the eventual literals in this block
+    IR_Activation_Rec* ar = ir_get_current_ar(gen);
+    if (ar->literals_stack_size > 0)
+    {
+        gen->instructions[sub_esp_index].imm.v_s32 += ar->literals_stack_size;
+    }
 }
 
 void
