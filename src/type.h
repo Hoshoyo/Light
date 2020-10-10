@@ -30,6 +30,7 @@ Light_Ast*  type_value_expression(Light_Scope* scope, Light_Type* t);
 u64         type_hash(Light_Type* type);
 bool        type_check_equality(Light_Type* t1, Light_Type* t2);
 u32         type_pointer_size_bits();
+u32         type_pointer_size_bytes();
 
 // Create
 

@@ -285,7 +285,7 @@ emit_rep_movs(Instr_Emit_Result* out_info, u8* stream, int bitsize)
     if(bitsize == 64)
 		*stream++ = make_rex(0, 0, 0, bitsize == 64);
     *stream++ = 0xf3;
-    *stream++ = 0xa5;
+    *stream++ = (bitsize == 8) ? 0xa4 : 0xa5;
 
     return stream;
 }

@@ -145,6 +145,11 @@ type_pointer_size_bits() {
     //return 64;
 }
 
+uint32_t
+type_pointer_size_bytes() {
+    return type_pointer_size_bits() >> 3;
+}
+
 Light_Type* 
 type_new_pointer(Light_Type* pointer_to) {
     Light_Type* result = type_alloc();
