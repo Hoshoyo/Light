@@ -347,7 +347,6 @@ ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load)
 
         default: break;
     }
-    ir_free_reg(gen, t1);
     return t2;
 }
 
@@ -426,7 +425,7 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load)
         iri_emit_arith(gen, IR_MUL, t2, IR_REG_PROC_RET, t3, (IR_Value){0}, type_pointer_size_bits() / 8);
     }
 
-    iri_emit_arith(gen, IR_ADD, t3, t1, t3, (IR_Value){0}, type_size_bytes);
+    iri_emit_arith(gen, IR_ADD, t3, t1, t3, (IR_Value){0}, type_pointer_size_bits() / 8);
     
     if(load)
     {
@@ -939,7 +938,12 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
     iri_emit_push(gen, t2, (IR_Value){0}, rvalue_type->size_bits / 8);
     ir_free_reg(gen, t2);
 
-    IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);  
+    IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);
+    if (t2 == t1)
+    {
+        t2 = ir_new_temp(gen);
+    }
+
     iri_emit_pop(gen, t2, rvalue_type->size_bits / 8);
 
     ir_free_reg(gen, t1);
@@ -1149,7 +1153,7 @@ ir_new_activation_record(IR_Generator* gen)
 {
     IR_Activation_Rec ar = {0};
     ar.index = -1;
-    ar.offset = -(int)(type_pointer_size_bits() / 8);
+    ar.offset = 0; // -(int)(type_pointer_size_bits() / 8);
     ar.temp_int = 1;            // temp 0 is reserved for proc call return value
     ar.temp_float = 0x0f000001; // temp 0x0f000000 is reserved for proc call return value 
 
