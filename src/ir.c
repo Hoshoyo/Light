@@ -652,30 +652,50 @@ IR_Reg
 ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr)
 {
     int size_bytes = expr->type->size_bits / 8;
-    // alocate bytes in the stack for it
-    iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR,
-        (IR_Value){.type = IR_VALUE_S32, .v_s32 = size_bytes}, type_pointer_size_bytes());
+    int outer_offset = 0;
+    // alocate bytes in the stack for it only if its not inner
+    if (!(expr->flags & AST_FLAG_INNER_STRUCT_LITERAL))
+    {
+        iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR,
+            (IR_Value){.type = IR_VALUE_S32, .v_s32 = size_bytes}, type_pointer_size_bytes());
+    }
+    else
+    {
+        outer_offset = expr->expr_literal_struct.ir_stack_ptr_offset;
+    }
     
     Light_Type* struct_type = type_alias_root(expr->type);
-    for(int i = 0, offset = 0;
+    for(int i = 0, offset = outer_offset;
         i < array_length(expr->expr_literal_struct.struct_exprs);
-        ++i, offset = struct_type->struct_info.offset_bits[i] / 8)
+        ++i, offset = outer_offset + struct_type->struct_info.offset_bits[i] / 8)
     {
         Light_Ast* e = expr->expr_literal_struct.struct_exprs[i];
-        IR_Reg expt = ir_gen_expr(gen, e, true);
-        if(e->flags & AST_FLAG_EXPRESSION_LVALUE)
+        e->flags |= AST_FLAG_INNER_STRUCT_LITERAL;
+        if (e->kind == AST_EXPRESSION_LITERAL_STRUCT)
         {
-            iri_emit_copy(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = -offset}, e->type->size_bits / 8);
+            e->expr_literal_struct.ir_stack_ptr_offset = offset;
+        }
+
+        IR_Reg expt = ir_gen_expr(gen, e, true);
+
+        if (e->kind == AST_EXPRESSION_LITERAL_STRUCT)
+        {
+            // did everything already
+        }
+        else if(e->flags & AST_FLAG_EXPRESSION_LVALUE)
+        {
+            iri_emit_copy(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
         }
         else
         {
-            iri_emit_store(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = -offset}, e->type->size_bits / 8,
+            iri_emit_store(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8,
                 type_primitive_float(e->type));
         }
+        ir_free_reg(gen, expt);
     }
 
     IR_Reg t = ir_new_temp(gen);
-    iri_emit_lea(gen, IR_REG_STACK_PTR, t, (IR_Value){0}, type_pointer_size_bytes());
+    iri_emit_lea(gen, IR_REG_STACK_PTR, t, (IR_Value){.type = IR_VALUE_S32, .v_s32 = outer_offset}, type_pointer_size_bytes());
     return t;
 }
 
@@ -745,6 +765,7 @@ ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load)
         case AST_EXPRESSION_LITERAL_STRUCT:    res =  ir_gen_expr_lit_struct(gen, expr); break;
         default: break;
     }
+    gen->instructions[array_length(gen->instructions) - 1].origin_node = expr;
 
     return res;
 }

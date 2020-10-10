@@ -364,7 +364,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
                 return type;
 
             // Calculate sizes and offsets for every field
-            type->struct_info.offset_bits = array_new(s32);
+            type->struct_info.offset_bits = array_new(int64_t);
             s32 size_bits = 0;
             s32 offset_bits = 0;
             s32 struct_alignment_bytes = type->struct_info.alignment_bytes;

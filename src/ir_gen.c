@@ -461,6 +461,12 @@ iri_print_cvt(FILE* out, IR_Instruction* instr)
 void
 iri_print_instruction(FILE* out, IR_Instruction* instr)
 {
+    if(instr->origin_node && instr->origin_node->flags & AST_FLAG_EXPRESSION)
+    {
+        // print origin
+        ast_print_expression(instr->origin_node, LIGHT_AST_PRINT_STDOUT, 0);
+        printf(":\n");
+    }
     switch(instr->type)
     {
         case IR_LEA: {

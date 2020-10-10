@@ -374,11 +374,11 @@ x86_emit_arith(X86_Emitter* em, IR_Instruction* instr)
     if(instr->imm.type != IR_VALUE_NONE)
     {
         // add rdst, imm -> reg
-        em->at = emit_arith_mi(&info, em->at, x86_ir_arith_to_x86_arith(instr), DIRECT, rdst, (Int_Value){.v64 = instr->imm.v_u64}, 0, 0);
+        em->at = emit_arith_mi(&info, em->at, x86_ir_arith_to_x86_arith(instr), DIRECT, rop1, (Int_Value){.v64 = instr->imm.v_u64}, 0, 0);
     }
     else
     {
-        // add rdst, reg -> reg
+        // add rop1, rop2 -> rop1
         em->at = emit_arith_mr(&info, x86_ir_arith_to_x86_arith(instr), em->at, rop1, rop2, DIRECT, 0, 0);
     }
 

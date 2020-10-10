@@ -190,6 +190,7 @@ typedef struct {
 		struct Light_Ast_t** struct_decls;
 	};
 	Light_Storage_Class  storage_class;
+	int                  ir_stack_ptr_offset;	// Only for IR generation
 } Light_Ast_Expr_Literal_Struct;
 
 typedef struct {
@@ -383,6 +384,7 @@ typedef enum {
 	AST_FLAG_ALLOW_BASE_ENUM = (1 << 5), // This flags allows type inference to not error out if a variable with enum type is seen
 	AST_FLAG_EXPRESSION_LVALUE = (1 << 6),
 	AST_FLAG_COMPILER_GENERATED = (1 << 7),
+	AST_FLAG_INNER_STRUCT_LITERAL = (1 << 8),	// TODO(psv): set this before IR generation
 } Light_Ast_Flags;
 
 typedef struct Lexical_Range {

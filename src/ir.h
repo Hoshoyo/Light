@@ -128,6 +128,8 @@ typedef struct {
     int byte_size;
     int16_t src_byte_size;
     int16_t dst_byte_size;
+
+    Light_Ast* origin_node;
 } IR_Instruction;
 
 typedef struct {
