@@ -171,6 +171,7 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
             patch.addr = patch_addr + info.immediate_offset;
             patch.bytes = 4;
             patch.extra_offset = 0x08048060 + info.instr_byte_size - 1; // TODO(psv): proper calculation of offset entry point
+            //patch.extra_offset = 0x400000 + 0x1000 + info.instr_byte_size - 1;
             patch.instr_byte_size = instr->byte_size;
             patch.issuer_index = index;
             patch.rel_index_offset = instr->imm.v_s32;

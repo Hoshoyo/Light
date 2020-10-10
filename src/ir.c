@@ -7,7 +7,7 @@
 
 #define ARRAY_LENGTH(A) (sizeof(A) / sizeof(*A))
 
-int  ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load);
+int  ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset);
 void ir_gen_comm(IR_Generator* gen, Light_Ast* comm);
 void ir_gen_commands(IR_Generator* gen, Light_Ast** commands, int comm_count);
 void ir_new_activation_record(IR_Generator* gen);
@@ -303,13 +303,13 @@ ir_gen_expr_unary_cast(IR_Generator* gen, Light_Ast* expr, IR_Reg op_temp, bool 
 }
 
 IR_Reg
-ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load)
+ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset)
 {
     bool lval = expr->flags & AST_FLAG_EXPRESSION_LVALUE;
 
     // when the operand is a variable and the op is address of,
     // the expression address must be loaded, instead of value
-    IR_Reg t1 = ir_gen_expr(gen, expr->expr_unary.operand, (expr->expr_unary.op != OP_UNARY_ADDRESSOF));
+    IR_Reg t1 = ir_gen_expr(gen, expr->expr_unary.operand, (expr->expr_unary.op != OP_UNARY_ADDRESSOF), inside_literal, outer_offset);
     IR_Reg t2 = t1;
 
     switch(expr->expr_unary.op)
@@ -393,15 +393,15 @@ ir_gen_expr_cond(IR_Generator* gen, Light_Ast* expr, IR_Reg t1, IR_Reg t2, IR_Re
 }
 
 IR_Reg
-ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load)
+ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset)
 {
     int type_size_bytes = expr->type->size_bits / 8;
 
-    IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, false);
+    IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, false, inside_literal, outer_offset);
     ir_free_reg(gen, t1);
     iri_emit_push(gen, t1, (IR_Value) { 0 }, type_pointer_size_bytes());
 
-    IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true);
+    IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true, inside_literal, outer_offset);
 
     t1 = ir_new_reg(gen, expr->expr_binary.left->type);
 
@@ -435,21 +435,21 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load)
 }
 
 IR_Reg
-ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
+ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset)
 {
     // first check for pointer arithmetic
     if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS)
-        return ir_gen_expr_vector_access(gen, expr, load);
+        return ir_gen_expr_vector_access(gen, expr, load, inside_literal, outer_offset);
 
     // TODO(psv): pointer arithmetic
     if (expr->expr_binary.left->flags & AST_FLAG_EXPRESSION_LVALUE && !load)
         return 0;
 
-    IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, true);
+    IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, true, inside_literal, outer_offset);
     ir_free_reg(gen, t1);
     iri_emit_push(gen, t1, (IR_Value){0}, expr->expr_binary.left->type->size_bits / 8);
 
-    IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true);
+    IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true, inside_literal, outer_offset);
 
     t1 = ir_new_reg(gen, expr->expr_binary.left->type);
     iri_emit_pop(gen, t1, expr->expr_binary.left->type->size_bits / 8);
@@ -519,7 +519,7 @@ ir_gen_expr_lit_prim(IR_Generator* gen, Light_Ast* expr)
 }
 
 IR_Reg
-ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load)
+ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset)
 {
     IR_Reg t = IR_REG_NONE;
     Light_Ast* vdecl = expr->expr_variable.decl;
@@ -556,30 +556,35 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load)
     }
     else if (vdecl->kind == AST_DECL_CONSTANT)
     {
-        t = ir_gen_expr(gen, vdecl->decl_constant.value, load);
+        t = ir_gen_expr(gen, vdecl->decl_constant.value, load, false, 0);
     }
 
     return t;
 }
 
 IR_Reg
-ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load)
+ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset)
 {
-    IR_Reg caller = ir_gen_expr(gen, expr->expr_proc_call.caller_expr, true);
-    // push caller into the stack
-    iri_emit_push(gen, caller, (IR_Value){0}, type_pointer_size_bytes());
+    IR_Reg caller = ir_gen_expr(gen, expr->expr_proc_call.caller_expr, true, inside_literal, outer_offset);
 
-    // push the arguments
-    for(int i = 0; i < expr->expr_proc_call.arg_count; ++i)
+    if (expr->expr_proc_call.arg_count > 0)
     {
-        Light_Ast* arg = expr->expr_proc_call.args[i];
-        IR_Reg arg_r = ir_gen_expr(gen, arg, true);
-        iri_emit_push(gen, arg_r, (IR_Value){0}, arg->type->size_bits / 8);
-        ir_free_reg(gen, arg_r);
+        // push caller into the stack
+        iri_emit_push(gen, caller, (IR_Value){0}, type_pointer_size_bytes());
+
+        // push the arguments
+        for(int i = 0; i < expr->expr_proc_call.arg_count; ++i)
+        {
+            Light_Ast* arg = expr->expr_proc_call.args[i];
+            IR_Reg arg_r = ir_gen_expr(gen, arg, true, inside_literal, outer_offset);
+            iri_emit_push(gen, arg_r, (IR_Value){0}, arg->type->size_bits / 8);
+            ir_free_reg(gen, arg_r);
+        }
+
+        // pop caller back to use it
+        iri_emit_pop(gen, caller, type_pointer_size_bytes());
     }
 
-    // pop caller back to use it
-    iri_emit_pop(gen, caller, type_pointer_size_bytes());
     iri_emit_call(gen, caller, (IR_Value){0}, expr->type->size_bits / 8);
     ir_free_reg(gen, caller);
 
@@ -587,7 +592,7 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load)
 }
 
 IR_Reg
-ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
+ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset)
 {
     Light_Type* ltype = type_alias_root(expr->expr_dot.left->type);
 
@@ -605,7 +610,7 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
         }
     }
 
-    IR_Reg t = ir_gen_expr(gen, expr->expr_dot.left, false);
+    IR_Reg t = ir_gen_expr(gen, expr->expr_dot.left, false, inside_literal, outer_offset);
 
     IR_Reg tres = IR_REG_NONE;
     if(ltype->kind == TYPE_KIND_STRUCT)
@@ -632,7 +637,7 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
     if(load)
     {
         IR_Reg r = ir_new_reg(gen, expr->type);
-        assert(type_alias_root(expr->type)->kind == TYPE_KIND_PRIMITIVE);
+        //assert(type_alias_root(expr->type)->kind == TYPE_KIND_PRIMITIVE);
         iri_emit_load(gen, tres, r, (IR_Value){0}, 
             type_pointer_size_bytes(), expr->type->size_bits / 8, type_primitive_float(expr->type));
         ir_free_reg(gen, t);
@@ -643,19 +648,14 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
 }
 
 IR_Reg
-ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr)
+ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr, bool inside_literal, int outer_offset)
 {
     int size_bytes = expr->type->size_bits / 8;
-    int outer_offset = 0;
     // alocate bytes in the stack for it only if its not inner
-    if (!(expr->flags & AST_FLAG_INNER_STRUCT_LITERAL))
+    if (!inside_literal)
     {
         iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR,
             (IR_Value){.type = IR_VALUE_S32, .v_s32 = size_bytes}, type_pointer_size_bytes());
-    }
-    else
-    {
-        outer_offset = expr->expr_literal_struct.ir_stack_ptr_offset;
     }
     
     Light_Type* struct_type = type_alias_root(expr->type);
@@ -664,13 +664,7 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr)
         ++i, offset = outer_offset + struct_type->struct_info.offset_bits[i] / 8)
     {
         Light_Ast* e = expr->expr_literal_struct.struct_exprs[i];
-        e->flags |= AST_FLAG_INNER_STRUCT_LITERAL;
-        if (e->kind == AST_EXPRESSION_LITERAL_STRUCT || e->kind == AST_EXPRESSION_LITERAL_ARRAY)
-        {
-            e->expr_literal_struct.ir_stack_ptr_offset = offset;
-        }
-
-        IR_Reg expt = ir_gen_expr(gen, e, true);
+        IR_Reg expt = ir_gen_expr(gen, e, true, true, offset);
 
         if (e->kind == AST_EXPRESSION_LITERAL_STRUCT || e->kind == AST_EXPRESSION_LITERAL_ARRAY)
         {
@@ -694,20 +688,15 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr)
 }
 
 IR_Reg
-ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr)
+ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr, bool inside_literal, int outer_offset)
 {
     int size_bytes = (expr->type->size_bits / 8);
-    int outer_offset = 0;
 
     // alocate bytes in the stack for it only if its not inner
-    if (!(expr->flags & AST_FLAG_INNER_STRUCT_LITERAL))
+    if (!inside_literal)
     {
         iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR,
             (IR_Value){.type = IR_VALUE_S32, .v_s32 = size_bytes}, type_pointer_size_bytes());
-    }
-    else
-    {
-        outer_offset = expr->expr_literal_struct.ir_stack_ptr_offset;
     }
 
     if(expr->expr_literal_array.raw_data)
@@ -721,7 +710,7 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr)
             iri_emit_mov(gen, IR_REG_NONE, t1, (IR_Value){.type = IR_VALUE_U8, .v_u8 = expr->expr_literal_array.data[i]},
                 1, false);
             iri_emit_store(gen, t1, IR_REG_STACK_PTR, 
-                (IR_Value){.type = IR_VALUE_S32, .v_s32 = i}, 1, false);
+                (IR_Value){.type = IR_VALUE_S32, .v_s32 = i - 1 + outer_offset}, 1, false);
         }
         ir_free_reg(gen, t1);
     }
@@ -731,7 +720,7 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr)
         for(int i = 0, offset = outer_offset; i < array_length(expr->expr_literal_array.array_exprs); ++i)
         {
             Light_Ast* e = expr->expr_literal_array.array_exprs[i];
-            IR_Reg expt = ir_gen_expr(gen, e, true);
+            IR_Reg expt = ir_gen_expr(gen, e, true, true, offset);
             if(e->flags & AST_FLAG_EXPRESSION_LVALUE)
             {
                 iri_emit_copy(gen, expt, IR_REG_STACK_PTR, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
@@ -752,20 +741,20 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr)
 }
 
 IR_Reg
-ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load)
+ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset)
 {
     IR_Reg res = IR_REG_NONE;
 
     switch(expr->kind)
     {
         case AST_EXPRESSION_LITERAL_PRIMITIVE: res =  ir_gen_expr_lit_prim(gen, expr); break;
-        case AST_EXPRESSION_VARIABLE:          res =  ir_gen_expr_variable(gen, expr, load); break;
-        case AST_EXPRESSION_BINARY:            res =  ir_gen_expr_binary(gen, expr, load); break;
-        case AST_EXPRESSION_UNARY:             res =  ir_gen_expr_unary(gen, expr, load); break;
-        case AST_EXPRESSION_PROCEDURE_CALL:    res =  ir_gen_expr_proc_call(gen, expr, load); break;
-        case AST_EXPRESSION_DOT:               res =  ir_gen_expr_dot(gen, expr, load); break;
-        case AST_EXPRESSION_LITERAL_ARRAY:     res =  ir_gen_expr_lit_array(gen, expr); break;
-        case AST_EXPRESSION_LITERAL_STRUCT:    res =  ir_gen_expr_lit_struct(gen, expr); break;
+        case AST_EXPRESSION_VARIABLE:          res =  ir_gen_expr_variable(gen, expr, load, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_BINARY:            res =  ir_gen_expr_binary(gen, expr, load, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_UNARY:             res =  ir_gen_expr_unary(gen, expr, load, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_PROCEDURE_CALL:    res =  ir_gen_expr_proc_call(gen, expr, load, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_DOT:               res =  ir_gen_expr_dot(gen, expr, load, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_LITERAL_ARRAY:     res =  ir_gen_expr_lit_array(gen, expr, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_LITERAL_STRUCT:    res =  ir_gen_expr_lit_struct(gen, expr, inside_literal, outer_offset); break;
         default: break;
     }
     gen->instructions[array_length(gen->instructions) - 1].origin_node = expr;
@@ -777,7 +766,7 @@ void
 ir_gen_comm_if(IR_Generator* gen, Light_Ast* stmt)
 {
     // if(condition)
-    IR_Reg cond_temp = ir_gen_expr(gen, stmt->comm_if.condition, true);
+    IR_Reg cond_temp = ir_gen_expr(gen, stmt->comm_if.condition, true, false, 0);
 
     // jrz t, 0 -> else
     int if_true_index = iri_current_instr_index(gen);
@@ -851,7 +840,7 @@ ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
     array_push(gen->loop_start_labels, while_start_index);
 
     // while(condition)
-    IR_Reg cond_temp = ir_gen_expr(gen, stmt->comm_while.condition, true);
+    IR_Reg cond_temp = ir_gen_expr(gen, stmt->comm_while.condition, true, false, 0);
 
     int while_true_index = iri_current_instr_index(gen);
     // jrz t, 0 -> end
@@ -899,7 +888,7 @@ ir_gen_comm_for(IR_Generator* gen, Light_Ast* stmt)
     jmp_over_ep_index_instr->imm.v_s32 = cond_index - jmp_over_ep_index;
 
     // for(condition)
-    IR_Reg cond_temp = ir_gen_expr(gen, stmt->comm_for.condition, true);
+    IR_Reg cond_temp = ir_gen_expr(gen, stmt->comm_for.condition, true, false, 0);
 
     int for_true_index = iri_current_instr_index(gen);
     // jrz t, 0 -> end
@@ -933,7 +922,7 @@ ir_gen_decl_assignment(IR_Generator* gen, Light_Ast* decl)
     Light_Type* rvalue_type = type_alias_root(expr->type);
     bool primitive_type = rvalue_type->kind == TYPE_KIND_PRIMITIVE || rvalue_type->kind == TYPE_KIND_ENUM;
 
-    IR_Reg t2 = ir_gen_expr(gen, expr, primitive_type);
+    IR_Reg t2 = ir_gen_expr(gen, expr, primitive_type, false, 0);
 
     IR_Value stack_offset = (IR_Value){.type = IR_VALUE_S32, .v_s32 = decl->decl_variable.stack_offset};
     if(primitive_type || rvalue_type->kind == TYPE_KIND_FUNCTION || rvalue_type->kind == TYPE_KIND_POINTER)
@@ -957,13 +946,14 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
     int byte_size = comm->rvalue->type->size_bits / 8;
     Light_Type* rvalue_type = type_alias_root(comm->rvalue->type);
     bool primitive_type = rvalue_type->kind == TYPE_KIND_PRIMITIVE;
+    bool pointer_type = rvalue_type->kind == TYPE_KIND_POINTER;
 
-    IR_Reg t2 = ir_gen_expr(gen, comm->rvalue, primitive_type);
+    IR_Reg t2 = ir_gen_expr(gen, comm->rvalue, primitive_type||pointer_type, false, 0);
     // push result to the stack
     iri_emit_push(gen, t2, (IR_Value){0}, rvalue_type->size_bits / 8);
     ir_free_reg(gen, t2);
 
-    IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);
+    IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false, false, 0);
     if (t2 == t1)
     {
         t2 = ir_new_temp(gen);
@@ -1024,7 +1014,7 @@ ir_gen_comm_return(IR_Generator* gen, Light_Ast* comm)
 {
     if(comm->comm_return.expression)
     {
-        IR_Reg t = ir_gen_expr(gen, comm->comm_return.expression, true);
+        IR_Reg t = ir_gen_expr(gen, comm->comm_return.expression, true, false, 0);
         ir_free_reg(gen, t);
         iri_emit_mov(gen, t, IR_REG_PROC_RET, (IR_Value){0}, 
             comm->comm_return.expression->type->size_bits / 8, 
