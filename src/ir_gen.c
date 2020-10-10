@@ -45,6 +45,7 @@ iri_new(IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm,
 static void
 iri_update_reg_uses(IR_Generator* gen, IR_Reg t, bool fp)
 {
+    #if 0
     IR_Activation_Rec* ar = &gen->ars[array_length(gen->ars) - 1];
     if (t == IR_REG_NONE) return;
     if(fp)
@@ -57,6 +58,7 @@ iri_update_reg_uses(IR_Generator* gen, IR_Reg t, bool fp)
         if(t <= IR_REG_PROC_RET) return;
         array_push(ar->vregs[t].uses, array_length(gen->instructions));
     }
+    #endif
 }
 
 void
@@ -651,14 +653,6 @@ iri_print_instruction(FILE* out, IR_Instruction* instr)
             else
                 iri_print_register(out, instr->t1, instr->ot1, false);
         } break;
-        case IR_CLEAR: {
-            fprintf(out, "CLEAR ");
-            iri_print_register(out, instr->t1, instr->ot1, false);
-            fprintf(out, " + ");
-            iri_print_value(out, instr->imm);
-            fprintf(out, ", ");
-            iri_print_register(out, instr->t2, instr->ot2, false);
-        } break;
         case IR_POP: {
             fprintf(out, "POP ");
             if(instr->t1 == IR_REG_NONE)
@@ -723,14 +717,13 @@ iri_print_instructions(IR_Generator* gen)
     qsort(gen->node_ranges, array_length(gen->node_ranges), sizeof(*gen->node_ranges), ir_node_range_comp);
 
     IR_Activation_Rec* ar = 0;
-    for(int i = 0, j = 0; i < array_length(gen->instructions); ++i)
+    for(int i = 0; i < array_length(gen->instructions); ++i)
     {
         IR_Instruction* instr =  gen->instructions + i;
         IR_Activation_Rec* current_ar = &gen->ars[instr->activation_record_index];
         if(ar != current_ar)
         {
             ar = current_ar;
-            j = 0;
         }
 
 #if 0
@@ -740,14 +733,6 @@ iri_print_instructions(IR_Generator* gen)
             ast_print_node(gen->node_ranges[nr_index].node, LIGHT_AST_PRINT_STDOUT, 0);
             fprintf(stdout, ":\n");
             nr_index++;
-        }
-#endif
-#if 1
-        if(array_length(ar->insertions) > j && ar->insertions[j].index == i)
-        {
-            iri_print_instruction(stdout, &ar->insertions[j].inst);
-            fprintf(stdout, "\n");
-            j++;
         }
 #endif
 

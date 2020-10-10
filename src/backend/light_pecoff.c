@@ -1,7 +1,9 @@
 #include "light_pecoff.h"
 #include <stdlib.h>
-#include <windows.h>
 #include <stdio.h>
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+
 
 static int align_delta(int offset, int align_to)
 {
@@ -156,3 +158,4 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
     fwrite(stream, at - stream, 1, file);
     fclose(file);
 }
+#endif

@@ -1,3 +1,4 @@
+#if 0
 #include "utils/allocator.h"
 #include "light_array.h"
 #include <assert.h>
@@ -20,52 +21,45 @@ ir_get_current_ar(IR_Generator* gen)
 
 static IR_Reg
 ir_new_temp(IR_Generator* gen) {
-    IR_Activation_Rec* ar = ir_get_current_ar(gen);
+    IR_Virtual_Reg vreg = { 0 };
+    vreg.has_mem_address = false;
+    vreg.preg_mapped = -1;
+    vreg.uses = array_new(int);
 
-    for(int i = 1; i < 4; ++i)
-    {
-        if(ar->reg_int[i] == 0)
-        {
-            ar->reg_int[i] = 1;
-            return i;
-        }
-    }
-    fprintf(stderr, "tried to allocate more than 3 integer registers\n");
-    assert(0);
+    IR_Activation_Rec* ar = ir_get_current_ar(gen);
+    array_push(ar->vregs, vreg);
+    return ar->temp_int++;
 }
 static IR_Reg
 ir_new_tempf(IR_Generator* gen) {
+    IR_Virtual_FReg vfreg = { 0 };
+    vfreg.uses = array_new(int);
+    vfreg.has_mem_address = false;
+    vfreg.pfreg_mapped = -1;
+
     IR_Activation_Rec* ar = ir_get_current_ar(gen);
-    for(int i = 1; i < 8; ++i)
-    {
-        if(ar->reg_float[i] == 0)
-        {
-            ar->reg_float[i] = 1;
-            return i + IR_REG_PROC_RETF;
-        }
-    }
-    fprintf(stderr, "tried to allocate more than 8 float registers\n");
-    assert(0);
+    array_push(ar->vfregs, vfreg);
+    return ar->temp_float++;
 }
 
+// where addr is offset from stack
 static void
-ir_free_reg(IR_Generator* gen, IR_Reg r)
+ir_set_vreg_addr(IR_Generator* gen, IR_Reg reg, int addr, bool fp)
 {
     IR_Activation_Rec* ar = ir_get_current_ar(gen);
-    if(r > IR_REG_PROC_RETF)
+    if(fp)
     {
-        r = r - IR_REG_PROC_RETF;
-        ar->reg_float[r] = 0;
-    }
-    else if(r < IR_REG_PROC_RETF)
-    {
-        ar->reg_int[r] = 0;
+        ar->vfregs[reg].has_mem_address = true;
+        ar->vfregs[reg].address = addr;
     }
     else
-        assert(0);
+    {
+        ar->vregs[reg].has_mem_address = true;
+        ar->vregs[reg].address = addr;
+    }
 }
 
-static IR_Reg
+static int
 ir_new_reg(IR_Generator* gen, Light_Type* type) {
     return (type_primitive_float(type)) ? ir_new_tempf(gen) : ir_new_temp(gen);
 }
@@ -120,7 +114,6 @@ ir_gen_variable_initialization(IR_Generator* gen, Light_Ast* decl)
         IR_Reg t = ir_new_temp(gen);
         iri_emit_mov(gen, IR_REG_NONE, t, iri_value_new_signed(4, type->size_bits / 8), type_pointer_size_bits() / 8, false);
         iri_emit_clear(gen, IR_REG_STACK_BASE, t, (IR_Value){.type = IR_VALUE_S32, .v_s32 = soff}, type_pointer_size_bits() / 8);
-        ir_free_reg(gen, t);
     }
 }
 
@@ -129,9 +122,32 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
 {
     IR_Activation_Rec* ar = ir_get_current_ar(gen);
 
-    if(decl->kind == AST_DECL_VARIABLE)
-    {
+    if(decl->kind == AST_DECL_VARIABLE) {
+        if(decl->decl_variable.type->size_bits <= type_pointer_size_bits() ||
+            type_primitive_float(decl->decl_variable.type))
+        {
+            IR_Reg temp = ir_new_reg(gen, decl->decl_variable.type);
+            decl->decl_variable.ir_temporary = temp;
+        }
+        else
+            decl->decl_variable.ir_temporary = IR_REG_NONE;
+        decl->decl_variable.stack_index = ar->index--;
         decl->decl_variable.stack_offset = ar->offset - decl->decl_variable.type->size_bits / 8;
+
+        if(decl->decl_variable.ir_temporary != IR_REG_NONE)
+        {
+            if(type_primitive_float(decl->decl_variable.type))
+            {
+                ar->vfregs[decl->decl_variable.ir_temporary].has_mem_address = true;
+                ar->vfregs[decl->decl_variable.ir_temporary].address = decl->decl_variable.stack_offset;
+            }
+            else
+            {
+                ar->vregs[decl->decl_variable.ir_temporary].has_mem_address = true;
+                ar->vregs[decl->decl_variable.ir_temporary].address = decl->decl_variable.stack_offset;
+            }
+            ir_set_vreg_addr(gen, decl->decl_variable.ir_temporary, ar->offset, type_primitive_float(decl->decl_variable.type));
+        }
 
         // Initialize with the default value
         // TODO(psv): for now just do 0
@@ -139,8 +155,14 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
 
         ar->offset -= (decl->decl_variable.type->size_bits / 8);
 
-        fprintf(stdout, "variable[SB+%d] %.*s", decl->decl_variable.stack_offset,
+#if PRINT_VARIABLE_INFO || 1
+        fprintf(stdout, "variable[SB+%d] %.*s => ", decl->decl_variable.stack_offset,
             decl->decl_constant.name->length, decl->decl_constant.name->data);
+        if(type_primitive_float(decl->decl_variable.type))
+            fprintf(stdout, "tf%d\n", decl->decl_variable.ir_temporary);
+        else
+            fprintf(stdout, "t%d\n", decl->decl_variable.ir_temporary);
+#endif
     }
 }
 
@@ -263,7 +285,7 @@ ir_gen_cvt_to_int(IR_Generator* gen, Light_Ast* expr, int op_temp)
 }
 
 IR_Reg
-ir_gen_expr_unary_cast(IR_Generator* gen, Light_Ast* expr, IR_Reg op_temp, bool load)
+ir_gen_expr_unary_cast(IR_Generator* gen, Light_Ast* expr, int op_temp, bool load)
 {
     Light_Ast* operand = expr->expr_unary.operand;
     Light_Type* tcast = type_alias_root(expr->expr_unary.type_to_cast);
@@ -345,7 +367,6 @@ ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load)
 
         default: break;
     }
-    ir_free_reg(gen, t1);
     return t2;
 }
 
@@ -361,8 +382,6 @@ ir_gen_expr_cond(IR_Generator* gen, Light_Ast* expr, IR_Reg t1, IR_Reg t2, IR_Re
     // CMP t1, t2
     // CMPF tf1, tf2
     iri_emit_cmp(gen, t1, t2, (IR_Value){0}, byte_size, fp);
-    ir_free_reg(gen, t1);
-    ir_free_reg(gen, t2);
 
     IR_Value one = {.v_u8 = 1, .type = IR_VALUE_U8};
 
@@ -409,7 +428,6 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, IR_Reg t1, IR_Reg 
     {
         IR_Reg t4 = ir_new_reg(gen, expr->type);
         iri_emit_load(gen, t3, t4, (IR_Value){0}, type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
-        ir_free_reg(gen, t3);
         return t4;
     }
     return t3;
@@ -419,13 +437,7 @@ IR_Reg
 ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
 {
     IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, true);
-    ir_free_reg(gen, t1);
-    iri_emit_push(gen, t1, (IR_Value){0}, expr->expr_binary.left->type->size_bits / 8);
-
     IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true);
-    ir_free_reg(gen, t2);
-    
-    iri_emit_pop(gen, t1, expr->expr_binary.left->type->size_bits / 8);
     IR_Reg t3 = ir_new_reg(gen, expr->type);
 
     bool fp = type_primitive_float(expr->expr_binary.left->type);
@@ -457,6 +469,13 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load)
         default: break;
     }
     iri_emit_arith(gen, instr_type, t1, t2, t3, (IR_Value){0}, byte_size);
+    
+    if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS && load)
+    {
+        IR_Reg t4 = ir_new_reg(gen, expr->type);
+        iri_emit_load(gen, t3, t4, (IR_Value){0}, type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
+        return t4;
+    }
 
     return t3;
 }
@@ -480,7 +499,11 @@ ir_gen_expr_lit_prim(IR_Generator* gen, Light_Ast* expr)
         case TYPE_PRIMITIVE_BOOL: value.type = IR_VALUE_U8; break;
         default: break;
     }
-    IR_Reg t = ir_new_reg(gen, expr->type);
+    IR_Reg t = IR_REG_NONE;
+    if(type_primitive_float(expr->type))
+        t = ir_new_tempf(gen);
+    else
+        t = ir_new_temp(gen);
     iri_emit_mov(gen, IR_REG_NONE, t, value, iri_value_byte_size(value), type_primitive_float(expr->type));
 
     return t;
@@ -506,17 +529,23 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load)
     {
         Light_Ast_Decl_Variable* decl = &vdecl->decl_variable;
         // if it is not loaded in a temporary, then load it
-        t = ir_new_reg(gen, expr->type);
-        if(load)
+        if(load && !(decl->flags & DECL_VARIABLE_FLAG_LOADED) && decl->ir_temporary != IR_REG_NONE)
         {
             // LOAD SB+imm -> t
+            t = decl->ir_temporary;
             iri_emit_load(gen, IR_REG_STACK_BASE, t, 
                 (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
                 type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
+            decl->flags |= DECL_VARIABLE_FLAG_LOADED;
+        }
+        else if(load && decl->ir_temporary != IR_REG_NONE)
+        {
+            t = decl->ir_temporary;
         }
         else
         {
             // LEA
+            t = ir_new_temp(gen);
             iri_emit_lea(gen, IR_REG_STACK_BASE, t, 
                 (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
                 (int)type_pointer_size_bits() / 8);
@@ -534,8 +563,6 @@ IR_Reg
 ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load)
 {
     IR_Reg caller = ir_gen_expr(gen, expr->expr_proc_call.caller_expr, true);
-    // push caller into the stack
-    iri_emit_push(gen, caller, (IR_Value){0}, type_pointer_size_bits() / 8);
 
     // push the arguments
     for(int i = 0; i < expr->expr_proc_call.arg_count; ++i)
@@ -543,13 +570,9 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load)
         Light_Ast* arg = expr->expr_proc_call.args[i];
         IR_Reg arg_r = ir_gen_expr(gen, arg, true);
         iri_emit_push(gen, arg_r, (IR_Value){0}, arg->type->size_bits / 8);
-        ir_free_reg(gen, arg_r);
     }
 
-    // pop caller back to use it
-    iri_emit_pop(gen, caller, type_pointer_size_bits() / 8);
     iri_emit_call(gen, caller, (IR_Value){0}, expr->type->size_bits / 8);
-    ir_free_reg(gen, caller);
 
     return IR_REG_PROC_RET;
 }
@@ -589,7 +612,6 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
             }
         }
         iri_emit_arith(gen, IR_ADD, t, IR_REG_NONE, tres, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, type_pointer_size_bits() / 8);
-        ir_free_reg(gen, t);
     }
     else if(ltype->kind == TYPE_KIND_UNION)
     {
@@ -603,8 +625,6 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load)
         assert(type_alias_root(expr->type)->kind == TYPE_KIND_PRIMITIVE);
         iri_emit_load(gen, tres, r, (IR_Value){0}, 
             type_pointer_size_bits() / 8, expr->type->size_bits / 8, type_primitive_float(expr->type));
-        ir_free_reg(gen, t);
-        ir_free_reg(gen, tres);
         return r;
     }
     return tres;
@@ -719,7 +739,6 @@ ir_gen_comm_if(IR_Generator* gen, Light_Ast* stmt)
     // jrz t, 0 -> else
     int if_true_index = iri_current_instr_index(gen);
     iri_emit_jrz(gen, cond_temp, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, 4);    // TODO(psv): identify proper size
-    ir_free_reg(gen, cond_temp);
 
     // generate true branch
     ir_gen_comm(gen, stmt->comm_if.body_true);
@@ -793,7 +812,6 @@ ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
     int while_true_index = iri_current_instr_index(gen);
     // jrz t, 0 -> end
     iri_emit_jrz(gen, cond_temp, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, 32);
-    ir_free_reg(gen, cond_temp);
 
     if(stmt->comm_while.body)
     {
@@ -883,9 +901,7 @@ ir_gen_decl_assignment(IR_Generator* gen, Light_Ast* decl)
         iri_emit_lea(gen, IR_REG_STACK_BASE, t1, stack_offset, type_pointer_size_bits() / 8);
         iri_emit_copy(gen, t2, t1, (IR_Value){.type = IR_VALUE_U32, .v_u32 = byte_size}, 
             type_pointer_size_bits() / 8);
-        ir_free_reg(gen, t1);
     }
-    ir_free_reg(gen, t2);
 }
 
 void
@@ -896,19 +912,26 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
     bool primitive_type = rvalue_type->kind == TYPE_KIND_PRIMITIVE;
 
     IR_Reg t2 = ir_gen_expr(gen, comm->rvalue, primitive_type);
-    // push result to the stack
-    iri_emit_push(gen, t2, (IR_Value){0}, rvalue_type->size_bits / 8);
-    ir_free_reg(gen, t2);
 
-    IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);  
-    iri_emit_pop(gen, t2, rvalue_type->size_bits / 8);
-    
+    const bool always_store = true;
+
     if(primitive_type || rvalue_type->kind == TYPE_KIND_FUNCTION || rvalue_type->kind == TYPE_KIND_POINTER)
     {
-        iri_emit_store(gen, t2, t1, (IR_Value){0}, byte_size, type_primitive_float(comm->rvalue->type));
+        if(comm->lvalue->kind == AST_EXPRESSION_VARIABLE && !always_store)
+        {
+            Light_Ast* var_decl = comm->lvalue->expr_variable.decl;
+            iri_emit_mov(gen, t2, var_decl->decl_variable.ir_temporary, (IR_Value){0},
+                byte_size, type_primitive_float(comm->rvalue->type));
+        }
+        else
+        {
+            IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);  
+            iri_emit_store(gen, t2, t1, (IR_Value){0}, byte_size, type_primitive_float(comm->rvalue->type));
+        }
     }
     else
     {
+        IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false);
         iri_emit_copy(gen, t2, t1, (IR_Value){.type = IR_VALUE_U32, .v_u32 = byte_size}, 
             type_pointer_size_bits() / 8);
     }
@@ -954,7 +977,6 @@ ir_gen_comm_return(IR_Generator* gen, Light_Ast* comm)
     if(comm->comm_return.expression)
     {
         IR_Reg t = ir_gen_expr(gen, comm->comm_return.expression, true);
-        ir_free_reg(gen, t);
         iri_emit_mov(gen, t, IR_REG_PROC_RET, (IR_Value){0}, 
             comm->comm_return.expression->type->size_bits / 8, 
             type_primitive_float(comm->comm_return.expression->type));
@@ -1102,14 +1124,36 @@ ir_patch_proc_calls(IR_Generator* gen)
     }
 }
 
+void ir_allocate_register(IR_Generator* gen);
+
 void
 ir_new_activation_record(IR_Generator* gen)
 {
     IR_Activation_Rec ar = {0};
     ar.index = -1;
     ar.offset = -(int)(type_pointer_size_bits() / 8);
-    ar.temp_int = 1;            // temp 0 is reserved for proc call return value
-    ar.temp_float = 0x0f000001; // temp 0x0f000000 is reserved for proc call return value 
+    ar.temp_int = 1;   // temp 0 is reserved for proc call return value
+    ar.temp_float = 1; // temp 0 is reserved for proc call return value 
+    
+    // r0
+    ar.vregs = array_new(IR_Virtual_Reg);
+    IR_Virtual_Reg nvreg = {0};
+    array_push(ar.vregs, nvreg);
+
+    // rf0
+    ar.vfregs = array_new(IR_Virtual_FReg);
+    IR_Virtual_FReg nfvreg = {0};
+    array_push(ar.vfregs, nfvreg);
+
+    for(int i = 0; i < ARRAY_LENGTH(ar.pregs); ++i)
+        ar.pregs[i].vreg = IR_REG_NONE;
+    ar.pregs[0].next = -100; // never pick the return value register
+
+    for(int i = 0; i < ARRAY_LENGTH(ar.pfregs); ++i)
+        ar.pfregs[i].vreg = IR_REG_NONE;
+    ar.pfregs[0].next = -100; // never pick the return value register
+
+    ar.insertions = array_new(IR_Instr_Insert);
 
     array_push(gen->ars, ar);
 }
@@ -1139,7 +1183,314 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
 
     iri_print_instructions(gen);
 
+    ir_allocate_register(gen);
     fprintf(stdout, "\n");
 
     iri_print_instructions(gen);
 }
+
+// -----------------------------------
+// register allocation
+// -----------------------------------
+
+static int
+next_preg(IR_Activation_Rec* ar)
+{
+    for(int i = 1; i < ARRAY_LENGTH(ar->pregs); ++i)
+    {
+        if(ar->pregs[i].vreg == IR_REG_NONE)
+            return i;
+    }
+    return -1;
+}
+
+static int
+next_preg_fp(IR_Activation_Rec* ar)
+{
+    for(int i = 1; i < ARRAY_LENGTH(ar->pfregs); ++i)
+    {
+        if(ar->pfregs[i].vreg == IR_REG_NONE)
+            return i;
+    }
+    return -1;
+}
+
+static int
+best_preg(IR_Activation_Rec* ar)
+{
+    int p = -1;
+    int max = -1000;
+    for(int i = 0; i < ARRAY_LENGTH(ar->pregs); ++i)
+    {
+        if(ar->pregs[i].next > max)
+            max = i;
+    }
+    return max;
+}
+
+static int
+best_preg_fp(IR_Activation_Rec* ar)
+{
+    int p = -1;
+    int max = -100;
+    for(int i = 0; i < ARRAY_LENGTH(ar->pfregs); ++i)
+    {
+        if(ar->pfregs[i].next > max)
+            max = i;
+    }
+    return max;
+}
+
+static int
+reg_alloc(IR_Activation_Rec* ar, IR_Reg reg, int byte_size, int index)
+{
+    int p = next_preg(ar);
+    if(p == -1)
+    {
+        p = best_preg(ar);
+        // emit store p -> vreg address        
+        IR_Instruction store = iri_new(IR_STORE, p, IR_REG_STACK_BASE, IR_REG_NONE,
+            (IR_Value){.type = IR_VALUE_S32, .v_s32 = ar->vregs[reg].address}, byte_size);
+        store.ot1 = ar->pregs[p].vreg;
+        store.ot2 = reg;
+        IR_Instr_Insert insert = {
+            .index = index,
+            .inst = store
+        };
+        array_push(ar->insertions, insert);
+    }
+    if(ar->pregs[p].vreg != IR_REG_NONE)
+    {
+        ar->vregs[ar->pregs[p].vreg].preg_mapped = IR_REG_NONE;
+    }
+    ar->pregs[p].next = -1;
+    ar->pregs[p].vreg = reg;
+    ar->vregs[reg].preg_mapped = p;
+    return p;
+}
+
+static int
+reg_alloc_fp(IR_Activation_Rec* ar, IR_Reg freg, int byte_size, int index)
+{
+    int p = next_preg_fp(ar);
+    if(p == -1)
+    {
+        p = best_preg_fp(ar);
+        // emit store p -> vreg address        
+        IR_Instruction store = iri_new(IR_STOREF, p, IR_REG_STACK_BASE, IR_REG_NONE,
+            (IR_Value){.type = IR_VALUE_S32, .v_s32 = ar->vfregs[freg].address}, byte_size);
+        store.ot1 = ar->pfregs[p].vreg;
+        store.ot2 = freg;
+        IR_Instr_Insert insert = {
+            .index = index,
+            .inst = store
+        };
+        array_push(ar->insertions, insert);
+    }
+    if(ar->pfregs[p].vreg != IR_REG_NONE)
+    {
+        ar->vfregs[ar->pfregs[p].vreg].pfreg_mapped = IR_REG_NONE;
+    }
+    ar->pfregs[p].next = -1;
+    ar->pfregs[p].vreg = freg;
+    ar->vfregs[freg].pfreg_mapped = p;
+    return p;
+}
+
+
+static int
+ensure(IR_Activation_Rec* ar, IR_Reg reg, int byte_size, int index)
+{
+    int p = -1;
+    if(reg <= IR_REG_PROC_RET) return reg;
+    if(ar->vregs[reg].preg_mapped != -1)
+        p = ar->vregs[reg].preg_mapped;
+    else
+    {
+        p = reg_alloc(ar, reg, byte_size, index);
+        // emit load from reg.addr -> p
+        if(!ar->vregs[reg].has_mem_address)
+        {
+            // alocate an address for it
+        }
+        IR_Instruction load = iri_new(IR_LOADF, IR_REG_STACK_BASE, IR_REG_NONE, p, 
+            (IR_Value){.type = IR_VALUE_S32, .v_s32 = ar->vregs[reg].address}, byte_size);
+        load.ot1 = reg;
+        load.ot3 = ar->pregs[p].vreg;
+        IR_Instr_Insert insert = {
+            .index = index,
+            .inst = load
+        };
+        array_push(ar->insertions, insert);
+    }
+    return p;
+}
+
+static int
+ensure_fp(IR_Activation_Rec* ar, IR_Reg freg, int byte_size, int index)
+{
+    int p = -1;
+    if(freg <= IR_REG_PROC_RET) return freg;
+    if(ar->vfregs[freg].pfreg_mapped != -1)
+        p = ar->vfregs[freg].pfreg_mapped;
+    else
+    {
+        p = reg_alloc_fp(ar, freg, byte_size, index);
+        // emit load from reg.addr -> p
+        if(!ar->vfregs[freg].has_mem_address)
+        {
+            // alocate an address for it
+        }
+        IR_Instruction load = iri_new(IR_LOAD, IR_REG_STACK_BASE, IR_REG_NONE, p, 
+            (IR_Value){.type = IR_VALUE_S32, .v_s32 = ar->vfregs[freg].address}, byte_size);
+        load.ot1 = freg;
+        load.ot3 = ar->pfregs[p].vreg;
+        IR_Instr_Insert insert = {
+            .index = index,
+            .inst = load
+        };
+        array_push(ar->insertions, insert);
+    }
+    return p;
+}
+
+static void
+free_preg(IR_Activation_Rec* ar, int pr)
+{
+    ar->pregs[pr].next = 10000;
+    ar->pregs[pr].vreg = IR_REG_NONE;
+}
+
+static void
+free_pfreg(IR_Activation_Rec* ar, int pfr)
+{
+    ar->pfregs[pfr].next = 10000;
+    ar->pfregs[pfr].vreg = IR_REG_NONE;
+}
+
+static bool
+needed_after_int(IR_Activation_Rec* ar, IR_Reg r, int index)
+{
+    if (r <= IR_REG_PROC_RET) return true;
+    int last_use = ar->vregs[r].uses[array_length(ar->vregs[r].uses) - 1];
+    return (last_use > index);
+}
+
+static bool
+needed_after_fp(IR_Activation_Rec* ar, IR_Reg rf, int index)
+{
+    if (rf <= IR_REG_PROC_RET) return true;
+    int last_use = ar->vfregs[rf].uses[array_length(ar->vfregs[rf].uses) - 1];
+    return (last_use > index);
+}
+
+static bool
+needed_after(IR_Activation_Rec* ar, IR_Reg r, int index, bool fp)
+{
+    return (fp) ? needed_after_fp(ar, r, index) : needed_after_int(ar, r, index);
+}
+
+static void
+ir_rewrite_with_pregs(IR_Instruction* instr, int p1, int p2, int p3)
+{
+    if (instr->t1 != IR_REG_NONE) instr->t1 = p1;
+    if (instr->t2 != IR_REG_NONE) instr->t2 = p2;
+    if (instr->t3 != IR_REG_NONE) instr->t3 = p3;
+}
+
+static void
+update_next_int(IR_Activation_Rec* ar, IR_Reg treg, int preg, int index)
+{
+    if (preg <= IR_REG_PROC_RET) return;
+    for(int i = 0; i < array_length(ar->vregs[treg].uses); ++i)
+    {
+        if(ar->vregs[treg].uses[i] > index)
+        {
+            ar->pregs[preg].next = ar->vregs[treg].uses[i];
+            break;
+        }
+    }
+}
+
+static void
+update_next_fp(IR_Activation_Rec* ar, IR_Reg tfreg, int pfreg, int index)
+{
+    if (pfreg <= IR_REG_PROC_RET) return;
+    for(int i = 0; i < array_length(ar->vfregs[tfreg].uses); ++i)
+    {
+        if(ar->vfregs[tfreg].uses[i] > index)
+        {
+            ar->pfregs[pfreg].next = ar->vfregs[tfreg].uses[i];
+            break;
+        }
+    }
+}
+
+static void
+update_next(IR_Activation_Rec* ar, IR_Reg treg, int preg, int index, bool fp)
+{
+    if(fp) update_next_fp(ar, treg, preg, index);
+    else   update_next_int(ar, treg, preg, index);
+}
+
+void
+ir_allocate_reg(IR_Generator* gen, IR_Instruction* inst, int i)
+{
+    IR_Activation_Rec* ar = &gen->ars[inst->activation_record_index];
+    inst->ot1 = inst->t1;
+    inst->ot2 = inst->t2;
+    inst->ot3 = inst->t3;
+
+    bool fp_operand1 = (inst->flags & IIR_FLAG_IS_FP_OPERAND1);
+    bool fp_operand2 = (inst->flags & IIR_FLAG_IS_FP_OPERAND2);
+    bool fp_dest = (inst->flags & IIR_FLAG_IS_FP_DEST);
+
+    int p1 = -1, p2 = -1;
+
+    if(inst->type == IR_STORE || inst->type == IR_STOREF)
+    {
+        p1 = fp_operand1 ? ensure_fp(ar, inst->t1, inst->byte_size, i) : ensure(ar, inst->t1, inst->byte_size, i);
+        p2 = fp_operand2 ? ensure_fp(ar, inst->t2, 4, i) : ensure(ar, inst->t2, 4, i);
+    }
+    else
+    {
+        p1 = fp_operand1 ? ensure_fp(ar, inst->t1, inst->byte_size, i) : ensure(ar, inst->t1, inst->byte_size, i);
+        p2 = fp_operand2 ? ensure_fp(ar, inst->t2, inst->byte_size, i) : ensure(ar, inst->t2, inst->byte_size, i);
+    }
+
+    // allocate physical register for operands
+    if(!needed_after(ar, inst->t1, i, fp_operand1))
+        free_preg(ar, p1);
+    if(!needed_after(ar, inst->t2, i, fp_operand2))
+        free_preg(ar, p2);
+
+    // alocate physical register for result
+    int p3 = -1;
+    if(fp_dest)
+        p3 = (inst->t3 > IR_REG_PROC_RET) ? reg_alloc_fp(ar, inst->t3, inst->byte_size, i) : inst->t3;
+    else
+        p3 = (inst->t3 > IR_REG_PROC_RET) ? reg_alloc(ar, inst->t3, inst->byte_size /* consider dst and src byte size */, i) : inst->t3;
+    
+    // rewrite instruction to p1, p2 -> p3
+    ir_rewrite_with_pregs(inst, p1, p2, p3);
+
+    // update next instruction index where each virtual register is used
+    if(needed_after(ar, inst->t1, i, fp_operand1))
+        update_next(ar, inst->t1, p1, i, fp_operand1);
+    if(needed_after(ar, inst->t2, i, fp_operand2))
+        update_next(ar, inst->t2, p2, i, fp_operand2);
+    update_next(ar, inst->t3, p3, i, fp_dest);
+}
+
+void
+ir_allocate_register(IR_Generator* gen)
+{
+    IR_Instruction* instructions = gen->instructions;
+
+    for(int i = 0; i < array_length(instructions); ++i)
+    {
+        IR_Instruction* inst = &instructions[i];
+        ir_allocate_reg(gen, inst, i);
+    }
+}
+#endif

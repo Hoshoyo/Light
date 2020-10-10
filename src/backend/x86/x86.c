@@ -581,10 +581,9 @@ x86_emit_hlt(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
 
-#define X86_WINDOWS
-#if defined X86_WINDOWS
+#if defined (_WIN32) || defined(_WIN64)
     em->at = emit_ret(&info, em->at, RET_NEAR);
-#elif defined X86_LINUX
+#elif defined (__linux__)
     // mov ebx, eax
     em->at = emit_mov_reg(&info, em->at, MOV_MR, DIRECT, 32, EBX, EAX, 0, 0);
     // mov eax, 1
@@ -925,19 +924,13 @@ X86_generate(IR_Generator* gen)
     em.relative_patches = array_new(X86_Patch);
 
     IR_Activation_Rec* ar = 0;
-    for(int i = 0, j = 0; i < array_length(gen->instructions); ++i)
+    for(int i = 0; i < array_length(gen->instructions); ++i)
     {
         IR_Instruction* instr = gen->instructions + i;
         IR_Activation_Rec* current_ar = &gen->ars[instr->activation_record_index];
         if(ar != current_ar)
         {
             ar = current_ar;
-            j = 0;
-        }
-        if(array_length(ar->insertions) > 0 && ar->insertions[j].index == i)
-        {
-            x86_emit_instruction(&em, &ar->insertions[j].inst, -1);
-            j++;
         }
 
         x86_emit_instruction(&em, instr, i);

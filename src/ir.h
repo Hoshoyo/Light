@@ -7,7 +7,8 @@ typedef enum {
     IR_REG_STACK_PTR = -3,
     IR_REG_STACK_BASE = -2,
     IR_REG_NONE = -1,
-    IR_REG_PROC_RET = 0,
+    IR_REG_PROC_RET  = 0,
+    IR_REG_PROC_RETF = 0x0f000000,
 } IR_Reg;
 
 typedef enum {
@@ -160,11 +161,16 @@ typedef struct {
     IR_Reg temp_int;
     IR_Reg temp_float;
 
+    IR_Reg reg_int[4];
+    IR_Reg reg_float[9];
+
+#if 0
     IR_Virtual_Reg*  vregs;
     IR_Virtual_FReg* vfregs;
     IR_Physical_Reg  pregs[3 + 1];
     IR_Physical_Reg  pfregs[4 + 1];
     IR_Instr_Insert* insertions;
+#endif
 } IR_Activation_Rec;
 
 typedef struct {
