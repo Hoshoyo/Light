@@ -457,10 +457,9 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_li
     t1 = ir_new_reg(gen, expr->expr_binary.left->type);
     iri_emit_pop(gen, t1, expr->expr_binary.left->type->size_bits / 8);
 
+    IR_Reg t3 = ir_new_reg(gen, expr->type);
     ir_free_reg(gen, t2);
     ir_free_reg(gen, t1);
-
-    IR_Reg t3 = ir_new_reg(gen, expr->type);
 
     bool fp = type_primitive_float(expr->expr_binary.left->type);
     bool signed_ = (!fp && type_primitive_sint(expr->expr_binary.left->type));
@@ -854,7 +853,7 @@ ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
 
     int while_true_index = iri_current_instr_index(gen);
     // jrz t, 0 -> end
-    iri_emit_jrz(gen, cond_temp, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, 32);
+    iri_emit_jrz(gen, cond_temp, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, type_pointer_size_bytes());
     ir_free_reg(gen, cond_temp);
 
     if(stmt->comm_while.body)
@@ -864,7 +863,7 @@ ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
 
     // generate while jump to beginning
     int jmp_start_index = iri_current_instr_index(gen);
-    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = while_start_index - jmp_start_index}, 32);
+    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = while_start_index - jmp_start_index}, type_pointer_size_bytes());
 
     int end_index = iri_current_instr_index(gen);
     // fill condition jump with the end address
@@ -884,7 +883,7 @@ ir_gen_comm_for(IR_Generator* gen, Light_Ast* stmt)
     
     // jump over epilogue
     int jmp_over_ep_index = iri_current_instr_index(gen);
-    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = 0}, 32);
+    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = 0}, type_pointer_size_bytes());
 
     int for_start_index = iri_current_instr_index(gen);
     array_push(gen->loop_start_labels, for_start_index);
@@ -902,7 +901,7 @@ ir_gen_comm_for(IR_Generator* gen, Light_Ast* stmt)
 
     int for_true_index = iri_current_instr_index(gen);
     // jrz t, 0 -> end
-    iri_emit_jrz(gen, cond_temp, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, 32);
+    iri_emit_jrz(gen, cond_temp, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, type_pointer_size_bytes());
 
     if(stmt->comm_for.body)
     {
@@ -911,7 +910,7 @@ ir_gen_comm_for(IR_Generator* gen, Light_Ast* stmt)
 
     // generate for jump to beginning
     int jmp_start_index = iri_current_instr_index(gen);
-    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = for_start_index - jmp_start_index}, 32);
+    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = for_start_index - jmp_start_index}, type_pointer_size_bytes());
 
     int end_index = iri_current_instr_index(gen);
     // fill condition jump with the end address
