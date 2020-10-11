@@ -77,9 +77,11 @@ int main(int argc, char** argv) {
 #endif
 
 #if 1
+    double generate_start = os_time_us();
     IR_Generator irgen = {0};
     ir_generate(&irgen, ast);
     X86_generate(&irgen);
+    double generate_elapsed = (os_time_us() - generate_start) / 1000.0;
 #endif
 
 #if 0
@@ -89,12 +91,11 @@ int main(int argc, char** argv) {
     backend_c_generate_top_level(ast, global_type_table, &global_scope, main_file_directory, outfile, compiler_path);
     double generate_elapsed = (os_time_us() - generate_start) / 1000.0;
 
-    double total_elapsed = (os_time_us() - start) / 1000.0;
-
     double gcc_start = os_time_us();
     backend_c_compile_with_gcc(ast, outfile, main_file_directory);
     double gcc_elapsed = (os_time_us() - gcc_start) / 1000.0;
-
+#else
+    double total_elapsed = (os_time_us() - start) / 1000.0;
     printf("- elapsed time:\n\n");
     printf("  lexing:          %.2f ms\n", lexing_elapsed);
     printf("  parse:           %.2f ms\n", parse_elapsed);
@@ -102,9 +103,7 @@ int main(int argc, char** argv) {
     printf("  code generation: %.2f ms\n", generate_elapsed);
     printf("  total:           %.2f ms\n", total_elapsed);
     printf("\n");
-    printf("  gcc backend:     %.2f ms\n", gcc_elapsed);
-#else
-    //tac_generate(ast);
+    //printf("  gcc backend:     %.2f ms\n", gcc_elapsed);
 #endif
 
 #if 0
