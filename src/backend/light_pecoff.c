@@ -3,9 +3,10 @@
 #include <stdio.h>
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
+#include <light_array.h>
 
 #define COFF_IDATA
-//#define COFF_RELOC
+#define COFF_RELOC
 
 static int align_delta(int offset, int align_to)
 {
@@ -17,88 +18,256 @@ static char dos_hdr[] = {
     0x77, 0x90, 0x144, 0x0, 0x3, 0x0, 0x0, 0x0, 0x4, 0x0, 0x0, 0x0, 0x255, 0x255, 0x0, 0x0, 0x184, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x64, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x176, 0x0, 0x0, 0x0, 0x14, 0x31, 0x186, 0x14, 0x0, 0x180, 0x9, 0x205, 0x33, 0x184, 0x1, 0x76, 0x205, 0x33, 0x84, 0x104, 0x105, 0x115, 0x32, 0x112, 0x114, 0x111, 0x103, 0x114, 0x97, 0x109, 0x32, 0x99, 0x97, 0x110, 0x110, 0x111, 0x116, 0x32, 0x98, 0x101, 0x32, 0x114, 0x117, 0x110, 0x32, 0x105, 0x110, 0x32, 0x68, 0x79, 0x83, 0x32, 0x109, 0x111, 0x100, 0x101, 0x46, 0x13, 0x13, 0x10, 0x36, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x239, 0x10, 0x11, 0x221, 0x171, 0x107, 0x101, 0x142, 0x171, 0x107, 0x101, 0x142, 0x171, 0x107, 0x101, 0x142, 0x60, 0x53, 0x97, 0x143, 0x169, 0x107, 0x101, 0x142, 0x60, 0x53, 0x103, 0x143, 0x170, 0x107, 0x101, 0x142, 0x82, 0x105, 0x99, 0x104, 0x171, 0x107, 0x101, 0x142, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
 };
 
-typedef struct {
-    u16 type   : 4;
-    u16 offset : 12;
-} Relocation_Entry;
+static Relocation_Entry
+relocation_new(int offset)
+{
+    Relocation_Entry r = {.type = IMAGE_REL_BASED_HIGHLOW, .offset = offset};
+    return r;
+}
 
 static u8*
-write_reloc(u8* at, int base_rva, Optional_Header_DataDir* data_dir)
+write_reloc(u8* at, int reloc_rva, int text_rva, Optional_Header_DataDir* data_dir, Relocation_Entry* entries)
 {
     u8* start = at;
     Base_Relocation_Block* brb = (Base_Relocation_Block*)at;
-    brb->page_rva = 0x1000;
-    brb->block_size = (at - start);
+    brb->page_rva = text_rva; // .text address to which calculate offsets from
     at += sizeof(Base_Relocation_Block);
 
-   // Relocation_Entry entry = {.type = IMAGE_REL_BASED_HIGHLOW, .offset = };
+    for(int r = 0; r < array_length(entries); ++r)
+    {
+        *(Relocation_Entry*)at = entries[r];
+        at += sizeof(Relocation_Entry);
+    }
+
+    brb->block_size = (at - start);
+    data_dir->base_relocation_table.size = brb->block_size;
+    data_dir->base_relocation_table.virtual_address = reloc_rva;
+
+    return at;
+}
+
+typedef struct {
+    char* symbol;
+    int   length;
+    u16   hint;
+
+    // import address table address
+    u32* iat_patch_addr;
+    int  iat_rva;
+
+    // import name table address to patch
+    u32* inamt_patch_addr;
+} Import_Symbol;
+
+typedef struct {
+    char* name;
+    int   length;
+    Import_Symbol *symbols;
+
+    // import address table start address
+    void* iat_addr;
+    int   iat_rva;
+
+    u32* ilt_patch_addr;        // import lookup table address to patch
+    u32* ilt_patch_name_rva;    // name rva address to patch
+} Import_Libs;
+
+Import_Libs
+pecoff_new_lib(const char* name)
+{
+    int length = strlen(name);
+    void* n = calloc(length, 1);
+    memcpy(n, name, length);
+
+    Import_Libs l = {.name = n, .length = length};
+    l.symbols = array_new(Import_Symbol);
+    return l;
+}
+
+Import_Symbol
+pecoff_new_symbol(const char* name, u16 hint)
+{
+    int length = strlen(name);
+    void* n = calloc(length, 1);
+    memcpy(n, name, length);
+    Import_Symbol s = {.symbol = n, .length = length, .hint = hint};
+    return s;
+}
+
+// @Temporary
+static Import_Libs*
+import_libs_new()
+{
+    Import_Libs* libs = array_new(Import_Libs);
+
+    // user32
+    Import_Libs user32 = pecoff_new_lib("USER32.dll");
+    array_push(user32.symbols, pecoff_new_symbol("MessageBoxA", 0x27f));
+    array_push(libs, user32);
+
+    // kernel32
+    Import_Libs kernel32 = pecoff_new_lib("KERNEL32.dll");
+    array_push(kernel32.symbols, pecoff_new_symbol("LoadLibraryA", 0x3c1));
+    array_push(kernel32.symbols, pecoff_new_symbol("FreeLibrary", 0x3c1));
+    array_push(libs, kernel32);
+
+    return libs;
+}
+
+static u8*
+write_iat(u8* at, Import_Libs* libs, int base_rva, int rva, Optional_Header_DataDir* data_dir, int ptr_size_bytes)
+{
+    u8* start = at;
+
+    for(int lib = 0; lib < array_length(libs); ++lib)
+    {
+        Import_Libs* l = libs + lib;
+        l->iat_addr = at;
+        l->iat_rva = rva + (at - start);
+        for(int s = 0; s < array_length(l->symbols); ++s)
+        {
+            Import_Symbol* symbol = l->symbols + s;
+            symbol->iat_patch_addr = (u32*)at;
+            symbol->iat_rva = rva + (at - start);
+            at += ptr_size_bytes;
+        }
+    }
+
+    // at the end, fill out the size
+    data_dir->import_address_table.size = (at - start);
+    data_dir->import_address_table.virtual_address = rva;
+
+    return at;
+}
+
+// @IMPORTANT the at stream must be zero filled for this function to work
+static u8*
+write_idt(u8* at, Import_Libs* libs, int base_rva, int rva, Optional_Header_DataDir* data_dir, int ptr_size_bytes)
+{
+    u8* start = at;
+
+    // fil the data directory information
+    data_dir->import_table.size = sizeof(Import_Directory_Table) * (array_length(libs) + 1); // one extra for the null entry
+    data_dir->import_table.virtual_address = rva;
+
+    for(int lib = 0; lib < array_length(libs); ++lib)
+    {
+        Import_Libs* l = libs + lib;
+        Import_Directory_Table* idt = (Import_Directory_Table*)at;
+        idt->import_address_table = l->iat_rva;
+        
+        // fill addresses to be patched later
+        l->ilt_patch_addr = &idt->import_lookup_table;
+        l->ilt_patch_name_rva = &idt->name_rva;
+
+        at += sizeof(Import_Directory_Table);
+    }
+    at += sizeof(Import_Directory_Table); // null entry
 
     return at;
 }
 
 static u8*
-write_idata(u8* at, int base_rva, Optional_Header_DataDir* data_dir)
+write_ilt(u8* at, Import_Libs* libs, int base_rva, int rva, Optional_Header_DataDir* data_dir, int ptr_size_bytes)
 {
-    int rva_offset = 0;
     u8* start = at;
-    // Import address table
-    u32* iat_msg_box = (u32*)at;
-    at += 4 + 44; // size of pointer (MessageBoxA)
-    //at += 4 + 44; // size of pointer (LoadLibraryA)
-    rva_offset += (at - start);
-    data_dir->import_address_table.size = (at - start);
-    data_dir->import_address_table.virtual_address = base_rva;
 
-    // Import directory table (one for each DLL that the image refers)
-    int idt_rva = base_rva + (at - start);
-    Import_Directory_Table* idt = (Import_Directory_Table*)at;
-    rva_offset += sizeof(Import_Directory_Table);
-    at += sizeof(Import_Directory_Table);
-    idt->import_address_table = base_rva;
-    data_dir->import_table.size = sizeof(Import_Directory_Table) * 2; // 2 entries, counting the null one
-    data_dir->import_table.virtual_address = idt_rva;
-    // Null entry
-    at += sizeof(Import_Directory_Table);
-    idt->import_lookup_table = base_rva + (at - start);
+    for(int lib = 0; lib < array_length(libs); ++lib)
+    {
+        Import_Libs* l = libs + lib;
+        *l->ilt_patch_addr = rva + (at - start);
 
-    // Indirect RVA to name of functions + 44 bytes of padding (it seems)
-    u32* msgbox_rva_addr = (u32*)at;
-    at += (sizeof(u32) + 44);
+        for(int s = 0; s < array_length(l->symbols); ++s)
+        {
+            Import_Symbol* symbol = l->symbols + s;
 
-    // Import name table
-    *msgbox_rva_addr = base_rva + (at - start);
-    *iat_msg_box = base_rva + (at - start);
-    Hint_Name_Table msgbox = {0};
-    msgbox.hint = 0x27f;
-    *(Hint_Name_Table*)at = msgbox;
-    at += sizeof(Hint_Name_Table);
-    memcpy(at, "MessageBoxA", sizeof "MessageBoxA");
-    at += sizeof "MessageBoxA";
-    if((at - start) % 2 != 0) *at++ = 0;    // address must be even
-    idt->name_rva = (at - start) + base_rva;
-    memcpy(at, "USER32.dll", sizeof "USER32.dll");
-    at += sizeof "USER32.dll";
-    *at++ = 0;
-    
-    at = at + align_delta(at - start, 0x200);
-/*
-    Hint_Name_Table loadliba = {0};
-    loadliba.hint = 0x3c1;
-    *(Hint_Name_Table*)at = loadliba;
-    at += sizeof(Hint_Name_Table);
-    memcpy(at, "LoadLibraryA", sizeof "LoadLibraryA");
-    at += sizeof "LoadLibraryA";
-    if((at - start) % 2 != 0) *at++ = 0;    // address must be even
-    memcpy(at, "KERNEL32.dll", sizeof "KERNEL32.dll");
-    at += sizeof "KERNEL32.dll";
-    *at++ = 0;
-    if((at - start) % 2 != 0) *at++ = 0;    // address must be even
-*/
+            symbol->inamt_patch_addr = (u32*)at;
+            at += ptr_size_bytes;       // allocate 4 bytes to symbol name address
+        }
+
+        *(u32*)at = 0;
+        at += ptr_size_bytes;   // null entry
+    }
+
     return at;
 }
 
+static u8*
+write_iname_table(u8* at, Import_Libs* libs, int base_rva, int rva, Optional_Header_DataDir* data_dir, int ptr_size_bytes)
+{
+    u8* start = at;
+
+    for(int lib = 0; lib < array_length(libs); ++lib)
+    {
+        Import_Libs* l = libs + lib;
+        for(int s = 0; s < array_length(l->symbols); ++s)
+        {
+            Import_Symbol* symbol = l->symbols + s;
+            *symbol->iat_patch_addr = rva + (at - start);
+            *symbol->inamt_patch_addr = rva + (at - start);
+
+            // write hint
+            *(u16*)at = symbol->hint;
+            at += sizeof(u16);
+
+            // write symbol
+            memcpy(at, symbol->symbol, symbol->length);
+            at += (symbol->length);
+            *at++ = 0;
+
+            // align to even address
+            if((rva + (at - start)) % 2 != 0) *at++ = 0;
+        }
+        // patch the idt name_rva and write the library name
+        *l->ilt_patch_name_rva = rva + (at - start);
+        memcpy(at, l->name, l->length);
+        at += l->length;
+        *at++ = 0;
+
+        // align to even address
+        if((rva + (at - start)) % 2 != 0) *at++ = 0;
+    }
+
+    return at;
+}
+
+static u8*
+write_idata(u8* at, Import_Libs* libs, int base_rva, Optional_Header_DataDir* data_dir)
+{
+    u8* start = at;
+
+    // write the import address table IAT
+    at = write_iat(at, libs, base_rva, base_rva, data_dir, 4);
+
+    // write the import directory table IDT
+    at = write_idt(at, libs, base_rva, base_rva + (at - start), data_dir, 4);
+
+    // write the import lookup table ILT
+    at = write_ilt(at, libs, base_rva, base_rva + (at - start), data_dir, 4);
+
+    // write the import name table INT
+    at = write_iname_table(at, libs, base_rva, base_rva + (at - start), data_dir, 4);
+
+    at = at + align_delta(at - start, 0x200);
+
+    return at;
+}
+
+static Relocation_Entry*
+fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches)
+{
+    Relocation_Entry* rentries = array_new(Relocation_Entry);
+    for(int i = 0; i < array_length(rel_patches); ++i)
+    {
+        int offset = rel_patches[i].issuer_offset;
+        *((int*)(rel_patches[i].addr)) = (*(int*)(rel_patches[i].addr)) + base_rva + rva;
+        array_push(rentries, relocation_new(offset));
+    }
+    return rentries;
+}
+
 void
-light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
+light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches)
 {
     u8* stream = (u8*)calloc(1, 1024*1024);
     u8* at = stream;
@@ -202,6 +371,9 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
     text_st->characteristics = IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_CNT_CODE;
     coff_hdr->num_sections++;
 
+    // this needs to be written before the text section
+    Relocation_Entry* reloc_entries = fill_relative_patches(opt_pe32->image_base_pe32, text_st->virtual_address, rel_patches);
+
 #if defined(COFF_IDATA)
     /*
         Section table
@@ -232,7 +404,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
     at += sizeof(Section_Table);
     memcpy(reloc_st->name, ".reloc", sizeof(".reloc") - 1);
     reloc_st->virtual_size = 0;         // filled after
-    reloc_st->virtual_address = 0x4000; // TODO(psv): 
+    reloc_st->virtual_address = 0x3000; // TODO(psv): 
     reloc_st->size_of_raw_data = 0;     // filled after, must be a multiple of file alignment
     reloc_st->ptr_to_raw_data = 0;      // filled after
     reloc_st->ptr_to_relocations = 0;
@@ -285,7 +457,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
     at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
     idata_st->ptr_to_raw_data = at - stream;
     u8* idata_start = at;
-    at = write_idata(at, idata_st->virtual_address, opt_datadir);
+    at = write_idata(at, import_libs_new(), idata_st->virtual_address, opt_datadir);
     idata_st->virtual_size = at - idata_start;
     idata_st->size_of_raw_data = idata_st->virtual_size + align_delta(idata_st->virtual_size, opt_pe32->file_alignment);
 #endif
@@ -294,7 +466,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
     at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
     reloc_st->ptr_to_raw_data = at - stream;
     u8* reloc_start = at;
-    at = write_reloc(at, reloc_st->virtual_address, opt_datadir);
+    at = write_reloc(at, reloc_st->virtual_address, text_st->virtual_address, opt_datadir, reloc_entries);
     reloc_st->virtual_size = at - reloc_start;
     reloc_st->size_of_raw_data = reloc_st->virtual_size + align_delta(reloc_st->virtual_size, opt_pe32->file_alignment);
 #endif
@@ -303,7 +475,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
         End of file
     */
     at += align_delta(at - stream, opt_pe32->section_alignment);
-    opt_pe32->size_of_image = at - stream + 0x4000;
+    opt_pe32->size_of_image = at - stream + 0x6000;
 
     /*
         File write

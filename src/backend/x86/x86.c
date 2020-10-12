@@ -8,18 +8,6 @@
 #include "../light_pecoff.h"
 
 typedef struct {
-    u8* issuer_addr;    // address of the instruction to calculate the relative offset
-    u8* addr;           // address to be patched
-    int instr_byte_size;
-    int bytes;          // number of bytes to be replaced
-    int issuer_index;       // index
-    int rel_index_offset;   // relative offset from the instruction that issued to the target
-
-    int extra_offset;
-    bool sum;
-} X86_Patch;
-
-typedef struct {
     u8* base;
     u8* at;
 
@@ -168,10 +156,11 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
         {
             X86_Patch patch = {0};
             patch.issuer_addr = patch_addr;
+            patch.issuer_offset = patch_addr - em->base + info.immediate_offset;
             patch.addr = patch_addr + info.immediate_offset;
             patch.bytes = 4;
-            patch.extra_offset = 0x08048060 + info.instr_byte_size - 1; // TODO(psv): proper calculation of offset entry point
-            //patch.extra_offset = 0x400000 + 0x1000 + info.instr_byte_size - 1;
+            //patch.extra_offset = 0x08048060 + info.instr_byte_size - 1; // TODO(psv): proper calculation of offset entry point
+            patch.extra_offset = info.instr_byte_size - 1;
             patch.instr_byte_size = instr->byte_size;
             patch.issuer_index = index;
             patch.rel_index_offset = instr->imm.v_s32;
@@ -955,7 +944,7 @@ X86_generate(IR_Generator* gen)
     fclose(out);
 #else
 #if defined(_WIN32) || defined(_WIN64)
-    light_pecoff_emit(em.base, em.at - em.base);
+    light_pecoff_emit(em.base, em.at - em.base, em.relative_patches);
 #else
     light_elf_emit(em.base, em.at - em.base);
 #endif

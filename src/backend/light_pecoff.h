@@ -1,5 +1,6 @@
 #pragma once
 #include <common.h>
+#include "x86/x86.h"
 
 #pragma pack(push)
 #pragma pack(1)
@@ -243,6 +244,11 @@ typedef struct {
 	u8 number_of_aux_symbols;
 } Symbol_Table_Entry;
 
+typedef struct {
+    u16 offset : 12;
+    u16 type   : 4;
+} Relocation_Entry;
+
 #pragma pack(pop)
 
-void light_pecoff_emit(u8* in_stream, int in_stream_size_bytes);
+void light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patch);
