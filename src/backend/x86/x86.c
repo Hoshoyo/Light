@@ -155,6 +155,7 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
         if(instr->flags & IIR_FLAG_INSTRUCTION_OFFSET)
         {
             X86_Patch patch = {0};
+            patch.generate_relocation = true;
             patch.issuer_addr = patch_addr;
             patch.issuer_offset = patch_addr - em->base;
             patch.issuer_imm_offset = info.immediate_offset;
@@ -164,7 +165,7 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
             patch.extra_offset = info.instr_byte_size - 1;
             patch.instr_byte_size = instr->byte_size;
             patch.issuer_index = index;
-            patch.rel_index_offset = instr->imm.v_s32;
+            patch.rel_index_offset = instr->imm.v_s32 - index; // TODO(psv): this is generated wrong i think, it is not considering a relative offset
             array_push(em->relative_patches, patch);
         }
     }
@@ -623,6 +624,7 @@ x86_emit_cond_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
     em->at = emit_jmp_cond_rel32(&info, em->at, (instr->type == IR_JRZ) ? JZ : JNZ, 0);
 
     X86_Patch patch = {0};
+    patch.generate_relocation = false;
     patch.issuer_addr = jmp_addr;
     patch.addr = jmp_addr + info.immediate_offset;
     patch.bytes = sizeof(int);
@@ -654,6 +656,7 @@ x86_emit_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
     em->at = emit_jmp_rel_unconditional(&info, em->at, instr->byte_size * 8, (Int_Value){0});
 
     X86_Patch patch = {0};
+    patch.generate_relocation = false;
     patch.issuer_addr = jmp_addr;
     patch.addr = jmp_addr + info.immediate_offset;
     patch.bytes = sizeof(int);
@@ -923,7 +926,7 @@ X86_generate(IR_Generator* gen)
     for(int i = 0; i < array_length(em.relative_patches); ++i)
     {
         u8* issuer_addr = em.relative_patches[i].issuer_addr;
-        u8* target_addr = gen->instructions[em.relative_patches[i].rel_index_offset].binary_offset;
+        u8* target_addr = gen->instructions[em.relative_patches[i].issuer_index + em.relative_patches[i].rel_index_offset].binary_offset;
         u8* patch_addr = em.relative_patches[i].addr;
         int diff = target_addr - issuer_addr - em.relative_patches[i].instr_byte_size;
         int bytes = em.relative_patches[i].bytes;

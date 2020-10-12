@@ -13,6 +13,7 @@ typedef struct {
 
     int extra_offset;
     bool sum;
+    bool generate_relocation;
 } X86_Patch;
 
 int X86_generate(IR_Generator* gen);
