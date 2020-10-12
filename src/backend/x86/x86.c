@@ -156,7 +156,8 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
         {
             X86_Patch patch = {0};
             patch.issuer_addr = patch_addr;
-            patch.issuer_offset = patch_addr - em->base + info.immediate_offset;
+            patch.issuer_offset = patch_addr - em->base;
+            patch.issuer_imm_offset = info.immediate_offset;
             patch.addr = patch_addr + info.immediate_offset;
             patch.bytes = 4;
             //patch.extra_offset = 0x08048060 + info.instr_byte_size - 1; // TODO(psv): proper calculation of offset entry point
@@ -922,7 +923,7 @@ X86_generate(IR_Generator* gen)
     for(int i = 0; i < array_length(em.relative_patches); ++i)
     {
         u8* issuer_addr = em.relative_patches[i].issuer_addr;
-        u8* target_addr = gen->instructions[em.relative_patches[i].issuer_index + em.relative_patches[i].rel_index_offset].binary_offset;
+        u8* target_addr = gen->instructions[em.relative_patches[i].rel_index_offset].binary_offset;
         u8* patch_addr = em.relative_patches[i].addr;
         int diff = target_addr - issuer_addr - em.relative_patches[i].instr_byte_size;
         int bytes = em.relative_patches[i].bytes;

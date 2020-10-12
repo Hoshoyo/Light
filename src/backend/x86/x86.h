@@ -9,6 +9,7 @@ typedef struct {
     int issuer_index;       // index
     int rel_index_offset;   // relative offset from the instruction that issued to the target
     int issuer_offset;
+    int issuer_imm_offset;
 
     int extra_offset;
     bool sum;

@@ -259,9 +259,10 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches)
     Relocation_Entry* rentries = array_new(Relocation_Entry);
     for(int i = 0; i < array_length(rel_patches); ++i)
     {
-        int offset = rel_patches[i].issuer_offset;
-        *((int*)(rel_patches[i].addr)) = (*(int*)(rel_patches[i].addr)) + base_rva + rva;
-        array_push(rentries, relocation_new(offset));
+        int issuer_offset = rel_patches[i].issuer_offset + rel_patches[i].issuer_imm_offset;
+        int offset = rel_patches[i].issuer_offset + (*(int*)(rel_patches[i].addr));
+        *((int*)(rel_patches[i].addr)) = offset + base_rva + rva;
+        array_push(rentries, relocation_new(issuer_offset));
     }
     return rentries;
 }
