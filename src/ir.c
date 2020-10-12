@@ -569,13 +569,13 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load, bool inside
 {
     IR_Reg caller = ir_gen_expr(gen, expr->expr_proc_call.caller_expr, true, inside_literal, outer_offset);
 
+    int arg_stack_size = 0;
     if (expr->expr_proc_call.arg_count > 0)
     {
         // push caller into the stack
         iri_emit_push(gen, caller, (IR_Value){0}, type_pointer_size_bytes());
         ir_free_reg(gen, caller);
 
-        int arg_stack_size = 0;
         // push the arguments
         for(int i = 0; i < expr->expr_proc_call.arg_count; ++i)
         {
@@ -587,13 +587,20 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load, bool inside
         }
 
         // pop caller back to use it
-        //iri_emit_pop(gen, caller, type_pointer_size_bytes());
         iri_emit_load(gen, IR_REG_STACK_PTR, caller, (IR_Value){.type = IR_VALUE_S32, .v_s32 = arg_stack_size},
             type_pointer_size_bytes(), type_pointer_size_bytes(), false);
     }
 
     iri_emit_call(gen, caller, (IR_Value){0}, expr->type->size_bits / 8);
     ir_free_reg(gen, caller);
+
+    if(arg_stack_size > 0)
+    {
+        // TODO(psv): use return with pop immediate
+        // pop an extra 4 bytes that is the caller address that was in the stack before
+        iri_emit_arith(gen, IR_ADD, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR, 
+                (IR_Value){.type = IR_VALUE_S32, .v_s32 = arg_stack_size + type_pointer_size_bytes()}, type_pointer_size_bytes());
+    }
 
     return IR_REG_PROC_RET;
 }
@@ -1037,11 +1044,6 @@ ir_gen_comm_return(IR_Generator* gen, Light_Ast* comm)
             comm->comm_return.expression->type->size_bits / 8, 
             type_primitive_float(comm->comm_return.expression->type));
     }
-
-    IR_Activation_Rec* ar = ir_get_current_ar(gen);
-    // TODO(psv): use return with pop immediate
-    iri_emit_arith(gen, IR_ADD, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR, 
-            (IR_Value){.type = IR_VALUE_S32, .v_s32 = ar->stack_args_size_bytes}, type_pointer_size_bytes());
 
 #if IR_TO_X86
     ir_gen_x86_epilogue(gen);
