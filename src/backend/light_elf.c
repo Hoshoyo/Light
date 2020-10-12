@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <light_array.h>
 #include <elf.h>
 
 static int align_delta(int offset, int align_to){
@@ -21,8 +21,22 @@ copy_stream(u8* dst, u8* src, int size)
     return dst;
 }
 
+static void
+fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches)
+{
+    for(int i = 0; i < array_length(rel_patches); ++i)
+    {
+        if (rel_patches[i].generate_relocation)
+        {
+            int issuer_offset = rel_patches[i].issuer_offset + rel_patches[i].issuer_imm_offset;
+            int offset = rel_patches[i].issuer_offset + (*(int*)(rel_patches[i].addr));
+            *((int*)(rel_patches[i].addr)) = offset + base_rva + rva;
+        }
+    }
+}
+
 void
-light_elf_emit(u8* in_stream, int in_stream_size_bytes)
+light_elf_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches)
 {
     unsigned char* stream = (unsigned char*)calloc(1, 1024*1024);
     unsigned char* at = stream;
@@ -80,29 +94,11 @@ light_elf_emit(u8* in_stream, int in_stream_size_bytes)
 
     // emit code section .text
     int text_offset = file_offset;
+
+    fill_relative_patches(ph.vaddr, file_offset, rel_patches);
     
     unsigned char* mem = at;
-    #if 0
-    // mov eax, 1
-    *mem++ = 0xb8;
-    *mem++ = 0x01;
-    *mem++ = 0x00;
-    *mem++ = 0x00;
-    *mem++ = 0x00;
-
-    // mov ebx, 0x2a
-    *mem++ = 0xbb;
-    *mem++ = 0x2a;
-    *mem++ = 0x00;
-    *mem++ = 0x00;
-    *mem++ = 0x00;
-
-    // int 0x80
-    *mem++ = 0xcd;
-    *mem++ = 0x80;
-    #else
     mem = copy_stream(mem, in_stream, in_stream_size_bytes);
-    #endif
 
     file_offset += (mem-at);
     int text_size = mem-at;

@@ -606,6 +606,7 @@ Light_Ast* ast_new_user_value_struct_literal(Light_Scope* scope, Light_Ast* expr
 
 // Utils
 bool literal_primitive_evaluate(Light_Ast* p);
+bool scope_inside_main(Light_Scope* scope);
 
 // -------------- --------- ----------------
 // --------------   Print   ----------------

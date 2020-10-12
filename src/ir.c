@@ -1049,9 +1049,7 @@ ir_gen_comm_return(IR_Generator* gen, Light_Ast* comm)
     ir_gen_x86_epilogue(gen);
 #endif
 
-    // TODO(psv): could be a block inside a block
-    if(comm->scope_at->creator_node->kind == AST_DECL_PROCEDURE && 
-        comm->scope_at->creator_node->decl_proc.flags & DECL_PROC_FLAG_MAIN)
+    if(scope_inside_main(comm->scope_at))
     {
         iri_emit_hlt(gen);
     }
