@@ -666,7 +666,7 @@ x86_emit_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
     X86_Patch patch = {0};
     patch.issuer_addr = jmp_addr;
     patch.addr = jmp_addr + info.immediate_offset;
-    patch.bytes = 1;
+    patch.bytes = sizeof(int);
     patch.rel_index_offset = instr->imm.v_s32;
     patch.instr_byte_size = info.instr_byte_size;
     patch.issuer_index = index;

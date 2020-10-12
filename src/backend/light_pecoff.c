@@ -4,6 +4,8 @@
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 
+#define COFF_IDATA
+//#define COFF_RELOC
 
 static int align_delta(int offset, int align_to)
 {
@@ -14,6 +16,86 @@ static int align_delta(int offset, int align_to)
 static char dos_hdr[] = {
     0x77, 0x90, 0x144, 0x0, 0x3, 0x0, 0x0, 0x0, 0x4, 0x0, 0x0, 0x0, 0x255, 0x255, 0x0, 0x0, 0x184, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x64, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x176, 0x0, 0x0, 0x0, 0x14, 0x31, 0x186, 0x14, 0x0, 0x180, 0x9, 0x205, 0x33, 0x184, 0x1, 0x76, 0x205, 0x33, 0x84, 0x104, 0x105, 0x115, 0x32, 0x112, 0x114, 0x111, 0x103, 0x114, 0x97, 0x109, 0x32, 0x99, 0x97, 0x110, 0x110, 0x111, 0x116, 0x32, 0x98, 0x101, 0x32, 0x114, 0x117, 0x110, 0x32, 0x105, 0x110, 0x32, 0x68, 0x79, 0x83, 0x32, 0x109, 0x111, 0x100, 0x101, 0x46, 0x13, 0x13, 0x10, 0x36, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x239, 0x10, 0x11, 0x221, 0x171, 0x107, 0x101, 0x142, 0x171, 0x107, 0x101, 0x142, 0x171, 0x107, 0x101, 0x142, 0x60, 0x53, 0x97, 0x143, 0x169, 0x107, 0x101, 0x142, 0x60, 0x53, 0x103, 0x143, 0x170, 0x107, 0x101, 0x142, 0x82, 0x105, 0x99, 0x104, 0x171, 0x107, 0x101, 0x142, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
 };
+
+typedef struct {
+    u16 type   : 4;
+    u16 offset : 12;
+} Relocation_Entry;
+
+static u8*
+write_reloc(u8* at, int base_rva, Optional_Header_DataDir* data_dir)
+{
+    u8* start = at;
+    Base_Relocation_Block* brb = (Base_Relocation_Block*)at;
+    brb->page_rva = 0x1000;
+    brb->block_size = (at - start);
+    at += sizeof(Base_Relocation_Block);
+
+   // Relocation_Entry entry = {.type = IMAGE_REL_BASED_HIGHLOW, .offset = };
+
+    return at;
+}
+
+static u8*
+write_idata(u8* at, int base_rva, Optional_Header_DataDir* data_dir)
+{
+    int rva_offset = 0;
+    u8* start = at;
+    // Import address table
+    u32* iat_msg_box = (u32*)at;
+    at += 4 + 44; // size of pointer (MessageBoxA)
+    //at += 4 + 44; // size of pointer (LoadLibraryA)
+    rva_offset += (at - start);
+    data_dir->import_address_table.size = (at - start);
+    data_dir->import_address_table.virtual_address = base_rva;
+
+    // Import directory table (one for each DLL that the image refers)
+    int idt_rva = base_rva + (at - start);
+    Import_Directory_Table* idt = (Import_Directory_Table*)at;
+    rva_offset += sizeof(Import_Directory_Table);
+    at += sizeof(Import_Directory_Table);
+    idt->import_address_table = base_rva;
+    data_dir->import_table.size = sizeof(Import_Directory_Table) * 2; // 2 entries, counting the null one
+    data_dir->import_table.virtual_address = idt_rva;
+    // Null entry
+    at += sizeof(Import_Directory_Table);
+    idt->import_lookup_table = base_rva + (at - start);
+
+    // Indirect RVA to name of functions + 44 bytes of padding (it seems)
+    u32* msgbox_rva_addr = (u32*)at;
+    at += (sizeof(u32) + 44);
+
+    // Import name table
+    *msgbox_rva_addr = base_rva + (at - start);
+    *iat_msg_box = base_rva + (at - start);
+    Hint_Name_Table msgbox = {0};
+    msgbox.hint = 0x27f;
+    *(Hint_Name_Table*)at = msgbox;
+    at += sizeof(Hint_Name_Table);
+    memcpy(at, "MessageBoxA", sizeof "MessageBoxA");
+    at += sizeof "MessageBoxA";
+    if((at - start) % 2 != 0) *at++ = 0;    // address must be even
+    idt->name_rva = (at - start) + base_rva;
+    memcpy(at, "USER32.dll", sizeof "USER32.dll");
+    at += sizeof "USER32.dll";
+    *at++ = 0;
+    
+    at = at + align_delta(at - start, 0x200);
+/*
+    Hint_Name_Table loadliba = {0};
+    loadliba.hint = 0x3c1;
+    *(Hint_Name_Table*)at = loadliba;
+    at += sizeof(Hint_Name_Table);
+    memcpy(at, "LoadLibraryA", sizeof "LoadLibraryA");
+    at += sizeof "LoadLibraryA";
+    if((at - start) % 2 != 0) *at++ = 0;    // address must be even
+    memcpy(at, "KERNEL32.dll", sizeof "KERNEL32.dll");
+    at += sizeof "KERNEL32.dll";
+    *at++ = 0;
+    if((at - start) % 2 != 0) *at++ = 0;    // address must be even
+*/
+    return at;
+}
 
 void
 light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
@@ -39,7 +121,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
     coff_hdr->signature.p = 'P';
     coff_hdr->signature.e = 'E';
     coff_hdr->machine = IMAGE_FILE_MACHINE_I386;
-    coff_hdr->num_sections = 1;  // only text section for now
+    coff_hdr->num_sections = 0;
     coff_hdr->time_stamp = 0x590bf118;    // TODO(psv): see if necessary
     coff_hdr->ptr_to_symbol_table = 0;
     coff_hdr->num_of_symbols = 0;
@@ -101,7 +183,11 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
     opt_datadir->architecture.size = 0;
     opt_datadir->architecture.virtual_address = 0;
 
-    // Section table .text
+    /*
+        Section table
+        .text (code)
+        contains the x86 code for the executable
+    */
     Section_Table* text_st = (Section_Table*)at;
     at += sizeof(Section_Table);
     memcpy(text_st->name, ".text", sizeof(".text") - 1);
@@ -114,10 +200,48 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
     text_st->num_of_relocations = 0;
     text_st->num_of_line_numbers = 0;
     text_st->characteristics = IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_CNT_CODE;
+    coff_hdr->num_sections++;
 
-    // align to filealignment
-    int offset = at - stream;
-    at += align_delta(offset, opt_pe32->file_alignment);
+#if defined(COFF_IDATA)
+    /*
+        Section table
+        .idata (read only initialized data)
+        contains imported symbols
+    */
+    Section_Table* idata_st = (Section_Table*)at;
+    at += sizeof(Section_Table);
+    memcpy(idata_st->name, ".idata", sizeof(".idata") - 1);
+    idata_st->virtual_size = 0;         // filled after
+    idata_st->virtual_address = 0x2000; // TODO(psv): maybe this should be text_st->size_of_raw_data + text_st->size_of_raw_data
+    idata_st->size_of_raw_data = 0;     // filled after, must be a multiple of file alignment
+    idata_st->ptr_to_raw_data = 0;      // filled after
+    idata_st->ptr_to_relocations = 0;
+    idata_st->ptr_to_line_numbers = 0;
+    idata_st->num_of_relocations = 0;
+    idata_st->num_of_line_numbers = 0;
+    idata_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ;
+    coff_hdr->num_sections++;
+#endif
+#if defined(COFF_RELOC)
+    /*
+        Section table
+        .reloc (relocation)
+        contains relocation tables
+    */
+    Section_Table* reloc_st = (Section_Table*)at;
+    at += sizeof(Section_Table);
+    memcpy(reloc_st->name, ".reloc", sizeof(".reloc") - 1);
+    reloc_st->virtual_size = 0;         // filled after
+    reloc_st->virtual_address = 0x4000; // TODO(psv): 
+    reloc_st->size_of_raw_data = 0;     // filled after, must be a multiple of file alignment
+    reloc_st->ptr_to_raw_data = 0;      // filled after
+    reloc_st->ptr_to_relocations = 0;
+    reloc_st->ptr_to_line_numbers = 0;
+    reloc_st->num_of_relocations = 0;
+    reloc_st->num_of_line_numbers = 0;
+    reloc_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_DISCARDABLE;
+    coff_hdr->num_sections++;
+#endif
 
     /*
     // Section table .data
@@ -138,17 +262,52 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes)
     at += align_delta(offset, opt_pe32->file_alignment);
     */
 
+    // align to filealignment
+    int offset = at - stream;
+    at += align_delta(offset, opt_pe32->file_alignment);
+
+    // End of section headers
     opt_pe32->size_of_headers = at - stream;
 
+    /*
+        .text raw data
+    */
     text_st->ptr_to_raw_data = at - stream;
     // emit text data
     memcpy(at, in_stream, in_stream_size_bytes);
     at += in_stream_size_bytes;
 
-    // must be at the end
-    at += align_delta(at - stream, opt_pe32->section_alignment);
-    opt_pe32->size_of_image = at - stream + 0x1000;
+    /*
+        .idata raw data
+    */
+#if defined(COFF_IDATA)
+    // idata
+    at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
+    idata_st->ptr_to_raw_data = at - stream;
+    u8* idata_start = at;
+    at = write_idata(at, idata_st->virtual_address, opt_datadir);
+    idata_st->virtual_size = at - idata_start;
+    idata_st->size_of_raw_data = idata_st->virtual_size + align_delta(idata_st->virtual_size, opt_pe32->file_alignment);
+#endif
+#if defined(COFF_RELOC)
+    // reloc
+    at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
+    reloc_st->ptr_to_raw_data = at - stream;
+    u8* reloc_start = at;
+    at = write_reloc(at, reloc_st->virtual_address, opt_datadir);
+    reloc_st->virtual_size = at - reloc_start;
+    reloc_st->size_of_raw_data = reloc_st->virtual_size + align_delta(reloc_st->virtual_size, opt_pe32->file_alignment);
+#endif
 
+    /*
+        End of file
+    */
+    at += align_delta(at - stream, opt_pe32->section_alignment);
+    opt_pe32->size_of_image = at - stream + 0x4000;
+
+    /*
+        File write
+    */
     FILE* file = fopen("out1.exe", "wb");
     if(!file)
     {

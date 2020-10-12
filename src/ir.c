@@ -879,7 +879,8 @@ void
 ir_gen_comm_for(IR_Generator* gen, Light_Ast* stmt)
 {
     // generate prologue
-    ir_gen_commands(gen, stmt->comm_for.prologue, array_length(stmt->comm_for.prologue));
+    if(stmt->comm_for.prologue)
+        ir_gen_commands(gen, stmt->comm_for.prologue, array_length(stmt->comm_for.prologue));
     
     // jump over epilogue
     int jmp_over_ep_index = iri_current_instr_index(gen);
@@ -889,7 +890,8 @@ ir_gen_comm_for(IR_Generator* gen, Light_Ast* stmt)
     array_push(gen->loop_start_labels, for_start_index);
 
     // generate epilogue
-    ir_gen_commands(gen, stmt->comm_for.epilogue, array_length(stmt->comm_for.epilogue));
+    if(stmt->comm_for.epilogue)
+        ir_gen_commands(gen, stmt->comm_for.epilogue, array_length(stmt->comm_for.epilogue));
 
     int cond_index = iri_current_instr_index(gen);
 
@@ -902,6 +904,7 @@ ir_gen_comm_for(IR_Generator* gen, Light_Ast* stmt)
     int for_true_index = iri_current_instr_index(gen);
     // jrz t, 0 -> end
     iri_emit_jrz(gen, cond_temp, (IR_Value){.type = IR_VALUE_TO_BE_FILLED}, type_pointer_size_bytes());
+    ir_free_reg(gen, cond_temp);
 
     if(stmt->comm_for.body)
     {
@@ -1052,7 +1055,7 @@ ir_gen_comm_continue(IR_Generator* gen, Light_Ast* comm)
     int index = iri_current_instr_index(gen);
 
     int diff = gen->loop_start_labels[array_length(gen->loop_start_labels) - 1 - lvl] - index;
-    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = diff}, 32);
+    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = diff}, type_pointer_size_bytes());
 }
 
 void
@@ -1060,7 +1063,7 @@ ir_gen_comm_break(IR_Generator* gen, Light_Ast* comm)
 {
     int lvl = (int)comm->comm_break.level_value;
     int index = iri_current_instr_index(gen);
-    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = 0}, 32);
+    iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = 0}, type_pointer_size_bytes());
     IR_Instr_Jmp_Patch ijp = {0};
     ijp.index = index;
     ijp.level = lvl - 1;

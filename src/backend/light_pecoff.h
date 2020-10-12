@@ -200,20 +200,38 @@ typedef struct {
 typedef struct {
 	u32 page_rva;
 	u32 block_size;
-	u16* type_and_offset;						// high 4 bits type -> low 12 bits offset
+	//u16* type_and_offset;						// high 4 bits type -> low 12 bits offset
 } Base_Relocation_Block;
 
 typedef struct {
-	u8 entries[24];
-} Import_Lookup_Table;
+	u16 hint;						// An index into the export name pointer table. A match is attempted 
+									// first with this value. If it fails, a binary search is performed 
+									// on the DLL’s export name pointer table.
+	u8 name[0];						// An ASCII string that contains the name to import. This is the string 
+									// that must be matched to the public name in the DLL. This string is 
+									// case sensitive and terminated by a null byte.
+
+	// A trailing zero-pad byte that appears after the trailing null byte, if necessary, to align the next entry on an even boundary
+} Hint_Name_Table;
 
 typedef struct {
-	u32 import_lookup_table;
-	u32 time_date_stamp;
+	//u8 entries[24];
+	u32 ordinal_number    : 16;
+	u32 unused            : 15;
+	u32 ordinal_name_flag : 1;
+	u32 hint_name_table_rva;
+} Import_Lookup_Table_PE32;
+
+typedef struct {
+	u32 import_lookup_table;		// The RVA of the import lookup table. This table contains a name or ordinal for each import. 
+									// (The name “Characteristics” is used in Winnt.h, but no longer describes this field.)
+	u32 time_date_stamp;			// The stamp that is set to zero until the image is bound. After the image is bound, 
+									// this field is set to the time/data stamp of the DLL.
 	u32 forwarder_chain;
-	u32 name_rva;
-	u32 import_address_table;
-	Import_Lookup_Table entries;
+	u32 name_rva;					// The address of an ASCII string that contains the name of the DLL. 
+									// This address is relative to the image base.
+	u32 import_address_table;		// The RVA of the import address table. The contents of this table are 
+									// identical to the contents of the import lookup table until the image is bound
 } Import_Directory_Table;
 
 typedef struct {
