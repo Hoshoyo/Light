@@ -16,4 +16,13 @@ typedef struct {
     bool generate_relocation;
 } X86_Patch;
 
+typedef struct {
+    int   length_bytes;
+    char* large_data;           // when data is more than 8 bytes
+    char  reg_size_data[8];     // when data is <= 8 bytes
+
+    // patch address offset from beginning
+    int patch_offset;
+} X86_Data;
+
 int X86_generate(IR_Generator* gen);

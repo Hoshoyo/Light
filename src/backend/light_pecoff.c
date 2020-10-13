@@ -7,6 +7,7 @@
 
 #define COFF_IDATA
 #define COFF_RELOC
+#define COFF_RDATA
 
 static int align_delta(int offset, int align_to)
 {
@@ -23,6 +24,30 @@ relocation_new(int offset)
 {
     Relocation_Entry r = {.type = IMAGE_REL_BASED_HIGHLOW, .offset = offset};
     return r;
+}
+
+static u8*
+write_rdata(u8* at, u8* text_ptr, int rdata_rva, int base_rva, X86_Data* data_seg, Relocation_Entry* rentries)
+{
+    int offset = 0;
+    for(int i = 0; i < array_length(data_seg); ++i)
+    {
+        X86_Data* data = data_seg + i;
+        if(data->length_bytes > 8)
+        {
+            memcpy(at, data->large_data, data->length_bytes);
+        }
+        else
+        {
+            memcpy(at, data->reg_size_data, data->length_bytes);
+        }
+        *(u32*)(text_ptr + data->patch_offset) = rdata_rva + offset + base_rva;
+        offset += data->length_bytes;
+        at += data->length_bytes;
+        array_push(rentries, relocation_new(data->patch_offset));
+    }
+    *at++ = 0;
+    return at;
 }
 
 static u8*
@@ -271,7 +296,7 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches)
 }
 
 void
-light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches)
+light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Data* data_seg)
 {
     u8* stream = (u8*)calloc(1, 1024*1024);
     u8* at = stream;
@@ -303,13 +328,13 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
 
     Optional_Header* optional_hdr = (Optional_Header*)at;
     at += sizeof(Optional_Header);
-    optional_hdr->magic = 0x10b; // 32bit, 0x20b for 64
+    optional_hdr->magic = 0x10b;                // 32bit, 0x20b for 64
     optional_hdr->maj_linker_version = 0x0e;
     optional_hdr->min_linker_version = 0x18;
-    optional_hdr->size_of_code = 0x200;//(u32)in_stream_size_bytes;
-    optional_hdr->size_of_init_data = 0; // only needed for static data
-    optional_hdr->size_of_uninit_data = 0; // only needed for static data
-    optional_hdr->address_of_entry = 0x1000;  // TODO <---------------- Entry point address 
+    optional_hdr->size_of_code = 0;             // filled after
+    optional_hdr->size_of_init_data = 0;        // only needed for static data
+    optional_hdr->size_of_uninit_data = 0;      // only needed for static data
+    optional_hdr->address_of_entry = 0x1000;    // TODO <---------------- Entry point address 
     optional_hdr->base_of_code = 0x1000;
     optional_hdr->base_of_data = 0;
 
@@ -349,8 +374,8 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     opt_datadir->exception_table.virtual_address = 0;
     opt_datadir->certificate_table.size = 0;
     opt_datadir->certificate_table.virtual_address = 0;
-    //opt_datadir->base_relocation_table.size = 0x10;
-    //opt_datadir->base_relocation_table.virtual_address = 0x5000;
+    opt_datadir->base_relocation_table.size = 0;
+    opt_datadir->base_relocation_table.virtual_address = 0;
     opt_datadir->debug.size = 0;
     opt_datadir->debug.virtual_address = 0;
     opt_datadir->architecture.size = 0;
@@ -375,6 +400,8 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     text_st->characteristics = IMAGE_SCN_MEM_EXECUTE|IMAGE_SCN_MEM_READ|IMAGE_SCN_CNT_CODE;
     coff_hdr->num_sections++;
 
+    optional_hdr->size_of_code = text_st->size_of_raw_data;
+
     // this needs to be written before the text section
     Relocation_Entry* reloc_entries = fill_relative_patches(opt_pe32->image_base_pe32, text_st->virtual_address, rel_patches);
 
@@ -388,7 +415,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     at += sizeof(Section_Table);
     memcpy(idata_st->name, ".idata", sizeof(".idata") - 1);
     idata_st->virtual_size = 0;         // filled after
-    idata_st->virtual_address = 0x2000; // TODO(psv): maybe this should be text_st->size_of_raw_data + text_st->size_of_raw_data
+    idata_st->virtual_address = text_st->virtual_address + text_st->size_of_raw_data + align_delta(text_st->size_of_raw_data, opt_pe32->section_alignment); // TODO(psv): maybe this should be text_st->size_of_raw_data + text_st->size_of_raw_data
     idata_st->size_of_raw_data = 0;     // filled after, must be a multiple of file alignment
     idata_st->ptr_to_raw_data = 0;      // filled after
     idata_st->ptr_to_relocations = 0;
@@ -396,6 +423,26 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     idata_st->num_of_relocations = 0;
     idata_st->num_of_line_numbers = 0;
     idata_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ;
+    coff_hdr->num_sections++;
+#endif
+#if defined(COFF_RDATA)
+    /*
+        Section table
+        .rdata (read only initialized data)
+        contains 
+    */
+    Section_Table* rdata_st = (Section_Table*)at;
+    at += sizeof(Section_Table);
+    memcpy(rdata_st->name, ".rdata", sizeof(".rdata") - 1);
+    rdata_st->virtual_size = 0;      // filled after
+    rdata_st->virtual_address = 0;   // filled after
+    rdata_st->size_of_raw_data = 0;  // filled after, must be multiple of file alignment
+    rdata_st->ptr_to_raw_data = 0;   // filled after
+    rdata_st->ptr_to_relocations = 0;
+    rdata_st->ptr_to_line_numbers = 0;
+    rdata_st->num_of_relocations = 0;
+    rdata_st->num_of_line_numbers = 0;
+    rdata_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ;
     coff_hdr->num_sections++;
 #endif
 #if defined(COFF_RELOC)
@@ -408,7 +455,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     at += sizeof(Section_Table);
     memcpy(reloc_st->name, ".reloc", sizeof(".reloc") - 1);
     reloc_st->virtual_size = 0;         // filled after
-    reloc_st->virtual_address = 0x3000; // TODO(psv): 
+    reloc_st->virtual_address = 0;      // filled after
     reloc_st->size_of_raw_data = 0;     // filled after, must be a multiple of file alignment
     reloc_st->ptr_to_raw_data = 0;      // filled after
     reloc_st->ptr_to_relocations = 0;
@@ -418,25 +465,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     reloc_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_DISCARDABLE;
     coff_hdr->num_sections++;
 #endif
-
-    /*
-    // Section table .data
-    Section_Table* data_st = (Section_Table*)at;
-    at += sizeof(Section_Table);
-    memcpy(text_st->name, ".data", sizeof(".data") - 1);
-    data_st->virtual_size = 0;
-    data_st->virtual_address = 0x4000;
-    data_st->size_of_raw_data = 0;
-    data_st->ptr_to_raw_data = 0;   // filled after
-    data_st->ptr_to_relocations = 0;
-    data_st->ptr_to_line_numbers = 0;
-    data_st->num_of_relocations = 0;
-    data_st->num_of_line_numbers = 0;
-    data_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE;
-
-    offset = at - stream;
-    at += align_delta(offset, opt_pe32->file_alignment);
-    */
+    Section_Table* last_before_reloc = 0;
 
     // align to filealignment
     int offset = at - stream;
@@ -448,10 +477,12 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     /*
         .text raw data
     */
+    u8* text_ptr = at;
     text_st->ptr_to_raw_data = at - stream;
     // emit text data
     memcpy(at, in_stream, in_stream_size_bytes);
     at += in_stream_size_bytes;
+    last_before_reloc = text_st;
 
     /*
         .idata raw data
@@ -464,22 +495,38 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     at = write_idata(at, import_libs_new(), idata_st->virtual_address, opt_datadir);
     idata_st->virtual_size = at - idata_start;
     idata_st->size_of_raw_data = idata_st->virtual_size + align_delta(idata_st->virtual_size, opt_pe32->file_alignment);
+    last_before_reloc = idata_st;
+#endif
+#if defined(COFF_RDATA)
+    // rdata
+    at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
+    rdata_st->ptr_to_raw_data = at - stream;
+    u8* rdata_start = at;
+    rdata_st->virtual_address = idata_st->virtual_address + idata_st->size_of_raw_data + align_delta(idata_st->size_of_raw_data, opt_pe32->section_alignment);
+    at = write_rdata(at, text_ptr, rdata_st->virtual_address, opt_pe32->image_base_pe32, data_seg, reloc_entries);
+    rdata_st->virtual_size = at - rdata_start;
+    rdata_st->size_of_raw_data = rdata_st->virtual_size + align_delta(rdata_st->virtual_size, opt_pe32->file_alignment);
+    last_before_reloc = rdata_st;
 #endif
 #if defined(COFF_RELOC)
     // reloc
     at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
     reloc_st->ptr_to_raw_data = at - stream;
     u8* reloc_start = at;
+    reloc_st->virtual_address = last_before_reloc->virtual_address + last_before_reloc->size_of_raw_data + align_delta(last_before_reloc->size_of_raw_data, opt_pe32->section_alignment);
     at = write_reloc(at, reloc_st->virtual_address, text_st->virtual_address, opt_datadir, reloc_entries);
     reloc_st->virtual_size = at - reloc_start;
     reloc_st->size_of_raw_data = reloc_st->virtual_size + align_delta(reloc_st->virtual_size, opt_pe32->file_alignment);
 #endif
+    // this should be set to the last virtual address section table
+    Section_Table* last_table_va = reloc_st;
 
     /*
         End of file
     */
     at += align_delta(at - stream, opt_pe32->section_alignment);
-    opt_pe32->size_of_image = at - stream + 0x6000;
+    opt_pe32->size_of_image = last_table_va->virtual_address + last_table_va->size_of_raw_data +
+        align_delta(last_table_va->size_of_raw_data, opt_pe32->section_alignment);
 
     /*
         File write

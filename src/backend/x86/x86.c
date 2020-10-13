@@ -12,6 +12,8 @@ typedef struct {
     u8* at;
 
     X86_Patch* relative_patches;
+    X86_Data* data;
+    int       data_offset;
 } X86_Emitter;
 
 // Expect 32 bit register en
@@ -165,7 +167,7 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
             patch.extra_offset = info.instr_byte_size - 1;
             patch.instr_byte_size = instr->byte_size;
             patch.issuer_index = index;
-            patch.rel_index_offset = instr->imm.v_s32 - index; // TODO(psv): this is generated wrong i think, it is not considering a relative offset
+            patch.rel_index_offset = instr->imm.v_s32;
             array_push(em->relative_patches, patch);
         }
     }
@@ -675,7 +677,18 @@ x86_emit_movf(X86_Emitter* em, IR_Instruction* instr)
     X64_XMM_Register rop = instr->t1;
     X64_XMM_Register rdst = instr->t3;
 
-    em->at = emit_movs_ds_to_reg(&info, em->at, rdst, instr->byte_size == 4, 0); // TODO(psv): fill offset
+    X86_Data data = {.length_bytes = instr->byte_size};
+    if(instr->byte_size == 4)
+        memcpy(data.reg_size_data, &instr->imm.v_r32, 4);
+    else if(instr->byte_size == 8)
+        memcpy(data.reg_size_data, &instr->imm.v_r64, 8);
+
+    int patch_offset = (em->at - em->base);
+    em->at = emit_movs_ds_to_reg(&info, em->at, rdst, instr->byte_size == 4, 0);
+    data.patch_offset = patch_offset + info.diplacement_offset;
+    em->data_offset += instr->byte_size;
+
+    array_push(em->data, data);
 
     return info;
 }
@@ -696,7 +709,6 @@ x86_emit_loadf(X86_Emitter* em, IR_Instruction* instr)
     {
         em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT, rdst, rop1, instr->byte_size == 4, 0, 0);
     }
-
 
     return info;
 }
@@ -909,6 +921,7 @@ X86_generate(IR_Generator* gen)
     em.base = (u8*)calloc(1, 1024 * 1024);
     em.at = em.base;
     em.relative_patches = array_new(X86_Patch);
+    em.data = array_new(X86_Data);
 
     IR_Activation_Rec* ar = 0;
     for(int i = 0; i < array_length(gen->instructions); ++i)
@@ -926,7 +939,12 @@ X86_generate(IR_Generator* gen)
     for(int i = 0; i < array_length(em.relative_patches); ++i)
     {
         u8* issuer_addr = em.relative_patches[i].issuer_addr;
+        // TODO(psv): why is this like that?
+#if defined(_WIN32) || defined(_WIN64)
+        u8* target_addr = gen->instructions[/*em.relative_patches[i].issuer_index +*/ em.relative_patches[i].rel_index_offset].binary_offset;
+#else
         u8* target_addr = gen->instructions[em.relative_patches[i].issuer_index + em.relative_patches[i].rel_index_offset].binary_offset;
+#endif
         u8* patch_addr = em.relative_patches[i].addr;
         int diff = target_addr - issuer_addr - em.relative_patches[i].instr_byte_size;
         int bytes = em.relative_patches[i].bytes;
@@ -948,7 +966,7 @@ X86_generate(IR_Generator* gen)
     fclose(out);
 #else
 #if defined(_WIN32) || defined(_WIN64)
-    light_pecoff_emit(em.base, em.at - em.base, em.relative_patches);
+    light_pecoff_emit(em.base, em.at - em.base, em.relative_patches, em.data);
 #else
     light_elf_emit(em.base, em.at - em.base);
 #endif

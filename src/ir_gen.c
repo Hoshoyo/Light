@@ -348,7 +348,10 @@ iri_print_register(FILE* out, IR_Reg reg, IR_Reg original, bool fp)
             #if 0
             fprintf(out, (fp) ? "tf%d (otf%d)":"t%d (ot%d)", reg, original); 
             #else
-            fprintf(out, (fp) ? "tf%d":"t%d", reg); 
+            if(reg >= IR_REG_PROC_RETF)
+                fprintf(out, "tf%d", reg - IR_REG_PROC_RETF);
+            else
+                fprintf(out, "t%d", reg);
             #endif
         } break;
     }
