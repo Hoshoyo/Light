@@ -939,12 +939,7 @@ X86_generate(IR_Generator* gen)
     for(int i = 0; i < array_length(em.relative_patches); ++i)
     {
         u8* issuer_addr = em.relative_patches[i].issuer_addr;
-        // TODO(psv): why is this like that?
-#if defined(_WIN32) || defined(_WIN64)
-        u8* target_addr = gen->instructions[/*em.relative_patches[i].issuer_index +*/ em.relative_patches[i].rel_index_offset].binary_offset;
-#else
-        u8* target_addr = gen->instructions[em.relative_patches[i].issuer_index + em.relative_patches[i].rel_index_offset].binary_offset;
-#endif
+        u8* target_addr = gen->instructions[em.relative_patches[i].rel_index_offset].binary_offset;
         u8* patch_addr = em.relative_patches[i].addr;
         int diff = target_addr - issuer_addr - em.relative_patches[i].instr_byte_size;
         int bytes = em.relative_patches[i].bytes;
