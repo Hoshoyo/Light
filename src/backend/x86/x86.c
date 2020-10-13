@@ -674,8 +674,7 @@ Instr_Emit_Result
 x86_emit_movf(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
-    X64_XMM_Register rop = instr->t1;
-    X64_XMM_Register rdst = instr->t3;
+    X64_XMM_Register rdst = instr->t3 - IR_REG_PROC_RETF;
 
     X86_Data data = {.length_bytes = instr->byte_size};
     if(instr->byte_size == 4)

@@ -73,7 +73,7 @@ emit_movs_ds_to_reg(Instr_Emit_Result* out_info, u8* stream, X64_XMM_Register de
     *stream++ = (single_precision) ? 0xf3 : 0xf2;
     *stream++ = 0x0f;
     *stream++ = 0x10;
-    *stream++ = 0x05;
+    *stream++ = make_modrm(INDIRECT, dest, 5);
     disp_offset = stream - start;
     *(uint32_t*)stream = ds_offset;
     stream += sizeof(uint32_t);

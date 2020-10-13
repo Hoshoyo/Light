@@ -438,6 +438,33 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load, bool in
 }
 
 IR_Reg
+ir_gen_expr_binary_float(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset)
+{
+    // TODO(psv): register allocation here is not viable
+    IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, true, inside_literal, outer_offset);
+    IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true, inside_literal, outer_offset);
+    IR_Reg t3 = ir_new_reg(gen, expr->type);
+    ir_free_reg(gen, t2);
+    ir_free_reg(gen, t1);
+
+    int byte_size = expr->type->size_bits / 8;
+
+    IR_Instruction_Type instr_type = IR_NONE;
+    switch(expr->expr_binary.op) {
+        case OP_BINARY_PLUS:            instr_type = IR_ADDF; break;
+        case OP_BINARY_MINUS:           instr_type = IR_SUBF; break;
+        case OP_BINARY_MULT:            instr_type = IR_MULF; break;
+        case OP_BINARY_DIV:             instr_type = IR_DIVF; break;
+        case OP_BINARY_NOT_EQUAL:   return ir_gen_expr_cond(gen, expr, t1, t2, t3, true);
+        default: assert(0); break;
+    }
+
+    iri_emit_arith(gen, instr_type, t1, t2, t3, (IR_Value){0}, byte_size);
+
+    return t3;
+}
+
+IR_Reg
 ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset)
 {
     // first check for pointer arithmetic
@@ -447,6 +474,10 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_li
     // TODO(psv): pointer arithmetic
     if (expr->expr_binary.left->flags & AST_FLAG_EXPRESSION_LVALUE && !load)
         return 0;
+    
+    if(type_primitive_float(expr->expr_binary.left->type))
+        return ir_gen_expr_binary_float(gen, expr, load, inside_literal, outer_offset);
+    
 
     IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, true, inside_literal, outer_offset);
     ir_free_reg(gen, t1);
@@ -461,17 +492,16 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_li
     ir_free_reg(gen, t2);
     ir_free_reg(gen, t1);
 
-    bool fp = type_primitive_float(expr->expr_binary.left->type);
-    bool signed_ = (!fp && type_primitive_sint(expr->expr_binary.left->type));
+    bool signed_ = type_primitive_sint(expr->expr_binary.left->type);
 
     int byte_size = expr->type->size_bits / 8;
 
     IR_Instruction_Type instr_type = IR_NONE;
     switch(expr->expr_binary.op) {
-        case OP_BINARY_PLUS:            instr_type = (fp) ? IR_ADDF : IR_ADD; break;
-        case OP_BINARY_MINUS:           instr_type = (fp) ? IR_SUBF : IR_SUB; break;
-        case OP_BINARY_MULT:            instr_type = (fp) ? IR_MULF : ((signed_) ? IR_IMUL : IR_MUL); break;
-        case OP_BINARY_DIV:             instr_type = (fp) ? IR_DIVF : ((signed_) ? IR_IDIV : IR_DIV); break;
+        case OP_BINARY_PLUS:            instr_type = IR_ADD; break;
+        case OP_BINARY_MINUS:           instr_type = IR_SUB; break;
+        case OP_BINARY_MULT:            instr_type = ((signed_) ? IR_IMUL : IR_MUL); break;
+        case OP_BINARY_DIV:             instr_type = ((signed_) ? IR_IDIV : IR_DIV); break;
         case OP_BINARY_MOD:             instr_type = IR_MOD; break;
         case OP_BINARY_AND:             instr_type = IR_AND; break;
         case OP_BINARY_OR:              instr_type = IR_OR; break;
@@ -480,14 +510,13 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_li
         case OP_BINARY_SHR:             instr_type = IR_SHR; break;
         case OP_BINARY_LOGIC_AND:       instr_type = IR_LAND; break;
         case OP_BINARY_LOGIC_OR:        instr_type = IR_LOR; break;
-        //case OP_BINARY_VECTOR_ACCESS:   return ir_gen_expr_vector_access(gen, expr, t1, t2, t3, load);
 
         case OP_BINARY_LT:
         case OP_BINARY_GT:
         case OP_BINARY_LE:
         case OP_BINARY_GE:
         case OP_BINARY_EQUAL:
-        case OP_BINARY_NOT_EQUAL:   return ir_gen_expr_cond(gen, expr, t1, t2, t3, fp);
+        case OP_BINARY_NOT_EQUAL:   return ir_gen_expr_cond(gen, expr, t1, t2, t3, false);
         default: break;
     }
     iri_emit_arith(gen, instr_type, t1, t2, t3, (IR_Value){0}, byte_size);
