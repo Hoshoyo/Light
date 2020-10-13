@@ -163,6 +163,7 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
             patch.issuer_imm_offset = info.immediate_offset;
             patch.addr = patch_addr + info.immediate_offset;
             patch.bytes = 4;
+            //patch.extra_offset = 0x08048060 + info.instr_byte_size - 1; // TODO(psv): proper calculation of offset entry point
             patch.extra_offset = info.instr_byte_size - 1;
             patch.instr_byte_size = instr->byte_size;
             patch.issuer_index = index;
@@ -954,21 +955,11 @@ X86_generate(IR_Generator* gen)
             *(int*)patch_addr = diff + extra;
     }
 
-#if 0
-    FILE* out = fopen("test.bin", "wb");
-    if(!out)
-    {
-        fprintf(stderr, "could not open file test.bin for writing\n");
-        return -1;
-    }
-    fwrite(em.base, em.at - em.base, 1, out);
-    fclose(out);
-#else
+
 #if defined(_WIN32) || defined(_WIN64)
     light_pecoff_emit(em.base, em.at - em.base, em.relative_patches, em.data);
 #else
     light_elf_emit(em.base, em.at - em.base, em.relative_patches);
-#endif
 #endif
     return 0;
 }

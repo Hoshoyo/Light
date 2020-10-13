@@ -550,10 +550,9 @@ ast_new_comm_return(Light_Scope* scope, Light_Ast* expr, Light_Token* return_tok
 bool
 scope_inside_main(Light_Scope* scope) {
     while(scope) {
-        if(scope->creator_node->kind == AST_DECL_PROCEDURE && 
-            scope->creator_node->decl_proc.flags & DECL_PROC_FLAG_MAIN)
+        if(scope->creator_node->kind == AST_DECL_PROCEDURE)
         {
-            return true;
+            return (scope->creator_node->decl_proc.flags & DECL_PROC_FLAG_MAIN);
         }
         scope = scope->parent;
     }
