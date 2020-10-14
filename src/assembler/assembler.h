@@ -143,10 +143,10 @@ typedef enum {
 } X64_SSE_Compare_Flag;
 
 typedef enum {
-	SSE_CVT_F32_INT32 = 0x2D,
+	SSE_CVT_F32_INT32 = 0x2c, // 0x2D -> no truncation
 	SSE_CVT_INT32_F32 = 0x2A,
 	SSE_CVT_F64_F32 = 0x5A,
-	SSE_CVT_F64_INT32 = 0x2C,
+	SSE_CVT_F64_INT32 = 0x2c, // 0x2D -> no truncation
 } X64_SSE_Convert_Instr;
 
 typedef enum {
