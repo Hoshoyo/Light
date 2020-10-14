@@ -221,11 +221,13 @@ x86_ir_arith_to_x86_arith(IR_Instruction* instr)
 {
     switch(instr->type)
     {
-        case IR_ADD: return ARITH_ADD;
-        case IR_SUB: return ARITH_SUB;
-        case IR_OR: return ARITH_OR;
-        case IR_AND: return ARITH_AND;
-        case IR_XOR: return ARITH_XOR;
+        case IR_ADD:  return ARITH_ADD;
+        case IR_SUB:  return ARITH_SUB;
+        case IR_LOR:
+        case IR_OR:   return ARITH_OR;
+        case IR_LAND:
+        case IR_AND:  return ARITH_AND;
+        case IR_XOR:  return ARITH_XOR;
         default: assert(0); break;
     }
     return -1;
@@ -318,9 +320,9 @@ x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
 
     // mov to eax
     em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, 
-        instr->byte_size * 8, x86_reg32_to_byte_size(EAX, instr->byte_size), rop1, 0, 0);
+        instr->byte_size * 8, x86_reg32_to_byte_size(EAX, instr->byte_size), rop2, 0, 0);
 
-    em->at = emit_mul(&info, em->at, instr->byte_size * 8, x86_ir_mul_to_x86_arith(instr), rop2, DIRECT, 0, 0);
+    em->at = emit_mul(&info, em->at, instr->byte_size * 8, x86_ir_mul_to_x86_arith(instr), rop1, DIRECT, 0, 0);
 
     // move result that is in eax/edx to the destination register
     {
@@ -857,6 +859,7 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
         case IR_LOAD: return  x86_emit_load(em, instr);
         case IR_STORE: return x86_emit_store(em, instr);
         case IR_ADD: case IR_SUB: case IR_OR: case IR_XOR: case IR_AND:
+        case IR_LAND: case IR_LOR:
             return x86_emit_arith(em, instr);
         case IR_SHL: case IR_SHR:
             return x86_emit_shift(em, instr);

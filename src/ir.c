@@ -318,6 +318,7 @@ ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_lit
             // only perform a dereference when it is an lvalue
             if(load)
             {
+                ir_free_reg(gen, t1);
                 t2 = ir_new_reg(gen, expr->type);
                 iri_emit_load(gen, t1, t2, (IR_Value){0}, type_pointer_size_bytes(), expr->type->size_bits / 8, type_primitive_float(expr->type));
             }
