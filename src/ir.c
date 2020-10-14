@@ -406,13 +406,10 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load, bool in
     t1 = ir_new_reg(gen, expr->expr_binary.left->type);
 
     iri_emit_pop(gen, t1, type_pointer_size_bytes(), false);
-    IR_Reg t3 = ir_new_reg(gen, expr->type);
+    IR_Reg t3 = ir_new_temp(gen);
 
     ir_free_reg(gen, t2);
     ir_free_reg(gen, t1);
-
-    bool fp = type_primitive_float(expr->expr_binary.left->type);
-    bool signed_ = (!fp && type_primitive_sint(expr->expr_binary.left->type));
 
     // multiply by the type size
     if(type_size_bytes > 1)
@@ -429,10 +426,18 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load, bool in
     
     if(load)
     {
-        //IR_Reg t4 = ir_new_reg(gen, expr->type);
-        iri_emit_load(gen, t3, t3, (IR_Value){0}, type_pointer_size_bytes(), expr->type->size_bits / 8, type_primitive_float(expr->type));
-        //ir_free_reg(gen, t3);
-        return t3;
+        if (type_primitive_float(expr->type))
+        {
+            ir_free_reg(gen, t3);
+            IR_Reg t4 = ir_new_reg(gen, expr->type);
+            iri_emit_load(gen, t3, t4, (IR_Value){0}, type_pointer_size_bytes(), expr->type->size_bits / 8, true);
+            return t4;
+        }
+        else
+        {
+            iri_emit_load(gen, t3, t3, (IR_Value){0}, type_pointer_size_bytes(), expr->type->size_bits / 8, type_primitive_float(expr->type));
+            return t3;
+        }
     }
     return t3;
 }
