@@ -9,6 +9,10 @@
 #define COFF_RELOC
 #define COFF_RDATA
 
+typedef struct {
+    Relocation_Entry* relocs;
+} PECoff_Generator;
+
 static int align_delta(int offset, int align_to)
 {
 	int rest = offset % align_to;
@@ -27,7 +31,7 @@ relocation_new(int offset)
 }
 
 static u8*
-write_rdata(u8* at, u8* text_ptr, int rdata_rva, int base_rva, X86_Data* data_seg, Relocation_Entry* rentries)
+write_rdata(u8* at, u8* text_ptr, int rdata_rva, int base_rva, X86_Data* data_seg, PECoff_Generator* gen)
 {
     int offset = 0;
     for(int i = 0; i < array_length(data_seg); ++i)
@@ -44,23 +48,23 @@ write_rdata(u8* at, u8* text_ptr, int rdata_rva, int base_rva, X86_Data* data_se
         *(u32*)(text_ptr + data->patch_offset) = rdata_rva + offset + base_rva;
         offset += data->length_bytes;
         at += data->length_bytes;
-        array_push(rentries, relocation_new(data->patch_offset));
+        array_push(gen->relocs, relocation_new(data->patch_offset));
     }
     *at++ = 0;
     return at;
 }
 
 static u8*
-write_reloc(u8* at, int reloc_rva, int text_rva, Optional_Header_DataDir* data_dir, Relocation_Entry* entries)
+write_reloc(u8* at, int reloc_rva, int text_rva, Optional_Header_DataDir* data_dir, PECoff_Generator* gen)
 {
     u8* start = at;
     Base_Relocation_Block* brb = (Base_Relocation_Block*)at;
     brb->page_rva = text_rva; // .text address to which calculate offsets from
     at += sizeof(Base_Relocation_Block);
 
-    for(int r = 0; r < array_length(entries); ++r)
+    for(int r = 0; r < array_length(gen->relocs); ++r)
     {
-        *(Relocation_Entry*)at = entries[r];
+        *(Relocation_Entry*)at = gen->relocs[r];
         at += sizeof(Relocation_Entry);
     }
 
@@ -278,10 +282,10 @@ write_idata(u8* at, Import_Libs* libs, int base_rva, Optional_Header_DataDir* da
     return at;
 }
 
-static Relocation_Entry*
-fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches)
+static void
+fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches, PECoff_Generator* gen)
 {
-    Relocation_Entry* rentries = array_new(Relocation_Entry);
+    gen->relocs = array_new(Relocation_Entry);
     for(int i = 0; i < array_length(rel_patches); ++i)
     {
         if (rel_patches[i].generate_relocation)
@@ -289,15 +293,15 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches)
             int issuer_offset = rel_patches[i].issuer_offset + rel_patches[i].issuer_imm_offset;
             int offset = rel_patches[i].issuer_offset + (*(int*)(rel_patches[i].addr));
             *((int*)(rel_patches[i].addr)) = offset + base_rva + rva;
-            array_push(rentries, relocation_new(issuer_offset));
+            array_push(gen->relocs, relocation_new(issuer_offset));
         }
     }
-    return rentries;
 }
 
 void
 light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Data* data_seg)
 {
+    PECoff_Generator gen = { 0 };
     u8* stream = (u8*)calloc(1, 1024*1024);
     u8* at = stream;
 
@@ -403,7 +407,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     optional_hdr->size_of_code = text_st->size_of_raw_data;
 
     // this needs to be written before the text section
-    Relocation_Entry* reloc_entries = fill_relative_patches(opt_pe32->image_base_pe32, text_st->virtual_address, rel_patches);
+    fill_relative_patches(opt_pe32->image_base_pe32, text_st->virtual_address, rel_patches, &gen);
 
 #if defined(COFF_IDATA)
     /*
@@ -503,7 +507,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     rdata_st->ptr_to_raw_data = at - stream;
     u8* rdata_start = at;
     rdata_st->virtual_address = idata_st->virtual_address + idata_st->size_of_raw_data + align_delta(idata_st->size_of_raw_data, opt_pe32->section_alignment);
-    at = write_rdata(at, text_ptr, rdata_st->virtual_address, opt_pe32->image_base_pe32, data_seg, reloc_entries);
+    at = write_rdata(at, text_ptr, rdata_st->virtual_address, opt_pe32->image_base_pe32, data_seg, &gen);
     rdata_st->virtual_size = at - rdata_start;
     rdata_st->size_of_raw_data = rdata_st->virtual_size + align_delta(rdata_st->virtual_size, opt_pe32->file_alignment);
     last_before_reloc = rdata_st;
@@ -514,7 +518,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     reloc_st->ptr_to_raw_data = at - stream;
     u8* reloc_start = at;
     reloc_st->virtual_address = last_before_reloc->virtual_address + last_before_reloc->size_of_raw_data + align_delta(last_before_reloc->size_of_raw_data, opt_pe32->section_alignment);
-    at = write_reloc(at, reloc_st->virtual_address, text_st->virtual_address, opt_datadir, reloc_entries);
+    at = write_reloc(at, reloc_st->virtual_address, text_st->virtual_address, opt_datadir, &gen);
     reloc_st->virtual_size = at - reloc_start;
     reloc_st->size_of_raw_data = reloc_st->virtual_size + align_delta(reloc_st->virtual_size, opt_pe32->file_alignment);
 #endif

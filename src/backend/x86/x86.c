@@ -596,9 +596,18 @@ Instr_Emit_Result
 x86_emit_pop(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
-    X64_Register rop = ir_to_x86_Reg(instr->t1, instr->byte_size);
     
-    em->at = emit_pop_reg(&info, em->at, rop);
+    if(instr->flags & IIR_FLAG_IS_FP_OPERAND1)
+    {
+        X64_XMM_Register rop = instr->t1 - IR_REG_PROC_RETF;
+        em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT, rop, ESP, (instr->byte_size == 4), 0, 0);
+        em->at = emit_pop_reg(&info, em->at, EAX);
+    }
+    else
+    {
+        X64_Register rop = ir_to_x86_Reg(instr->t1, instr->byte_size);
+        em->at = emit_pop_reg(&info, em->at, rop);
+    }
 
     return info;
 }
@@ -607,9 +616,18 @@ Instr_Emit_Result
 x86_emit_push(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
-    X64_Register rop = ir_to_x86_Reg(instr->t1, instr->byte_size);
-    
-    em->at = emit_push_reg(&info, em->at, DIRECT, rop, 0, 0);
+    if(instr->flags & IIR_FLAG_IS_FP_OPERAND1)
+    {
+        X64_XMM_Register rop = instr->t1 - IR_REG_PROC_RETF;
+        // allocate space for the xmm register
+        em->at = emit_push_reg(&info, em->at, DIRECT, EAX, 0, 0);
+        em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT, rop, ESP, (instr->byte_size == 4), 0, 0);
+    }
+    else
+    {
+        X64_Register rop = ir_to_x86_Reg(instr->t1, instr->byte_size);
+        em->at = emit_push_reg(&info, em->at, DIRECT, rop, 0, 0);
+    }
 
     return info;
 }
@@ -697,7 +715,7 @@ x86_emit_loadf(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = { 0 };
     X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->src_byte_size);
-    X64_XMM_Register rdst = instr->t3;
+    X64_XMM_Register rdst = instr->t3 - IR_REG_PROC_RETF;
 
     if(instr->imm.type == IR_VALUE_S32)
     {
@@ -716,7 +734,7 @@ Instr_Emit_Result
 x86_emit_storef(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = { 0 };
-    X64_XMM_Register rop = instr->t1;
+    X64_XMM_Register rop = instr->t1 - IR_REG_PROC_RETF;
     X64_Register rdest = ir_to_x86_Reg(instr->t2, instr->byte_size);
 
     if(instr->imm.type == IR_VALUE_S32)

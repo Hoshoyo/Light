@@ -257,18 +257,20 @@ iri_emit_hlt(IR_Generator* gen)
 }
 
 void
-iri_emit_push(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size)
+iri_emit_push(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size, bool fp)
 {
     IR_Instruction inst = iri_new(IR_PUSH, t, IR_REG_NONE, IR_REG_NONE, imm, byte_size);
+    inst.flags |= ((fp) ? IIR_FLAG_IS_FP_OPERAND1 : 0);
     iri_update_reg_uses(gen, t, false);
     inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }
 
 void
-iri_emit_pop(IR_Generator* gen, IR_Reg t, int byte_size)
+iri_emit_pop(IR_Generator* gen, IR_Reg t, int byte_size, bool fp)
 {
     IR_Instruction inst = iri_new(IR_POP, t, IR_REG_NONE, IR_REG_NONE, (IR_Value){0}, byte_size);
+    inst.flags |= ((fp) ? IIR_FLAG_IS_FP_OPERAND1 : 0);
     inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }

@@ -80,7 +80,7 @@ ir_gen_x86_epilogue(IR_Generator* gen)
     // mov esp, ebp
     iri_emit_mov(gen, IR_REG_STACK_BASE, IR_REG_STACK_PTR, (IR_Value){0}, type_pointer_size_bytes(), false);
     // pop ebp
-    iri_emit_pop(gen, IR_REG_STACK_BASE, type_pointer_size_bytes());
+    iri_emit_pop(gen, IR_REG_STACK_BASE, type_pointer_size_bytes(), false);
 }
 
 // *****************************************************
@@ -234,7 +234,7 @@ ir_gen_cvt_to_int(IR_Generator* gen, Light_Ast* expr, int op_temp)
     if(type_primitive_float(op_type))
     {
         IR_Instruction_Type type = IR_NONE;
-        t = ir_new_tempf(gen);
+        t = ir_new_temp(gen);
         if(op_type->size_bits == 32)
         {
             // -> r32
@@ -399,13 +399,13 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load, bool in
 
     IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, (expr->expr_binary.left->type->kind == TYPE_KIND_POINTER), inside_literal, outer_offset);
     ir_free_reg(gen, t1);
-    iri_emit_push(gen, t1, (IR_Value) { 0 }, type_pointer_size_bytes());
+    iri_emit_push(gen, t1, (IR_Value) { 0 }, type_pointer_size_bytes(), false);
 
     IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true, inside_literal, outer_offset);
 
     t1 = ir_new_reg(gen, expr->expr_binary.left->type);
 
-    iri_emit_pop(gen, t1, type_pointer_size_bytes());
+    iri_emit_pop(gen, t1, type_pointer_size_bytes(), false);
     IR_Reg t3 = ir_new_reg(gen, expr->type);
 
     ir_free_reg(gen, t2);
@@ -481,12 +481,12 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_li
 
     IR_Reg t1 = ir_gen_expr(gen, expr->expr_binary.left, true, inside_literal, outer_offset);
     ir_free_reg(gen, t1);
-    iri_emit_push(gen, t1, (IR_Value){0}, expr->expr_binary.left->type->size_bits / 8);
+    iri_emit_push(gen, t1, (IR_Value){0}, expr->expr_binary.left->type->size_bits / 8, false);
 
     IR_Reg t2 = ir_gen_expr(gen, expr->expr_binary.right, true, inside_literal, outer_offset);
 
     t1 = ir_new_reg(gen, expr->expr_binary.left->type);
-    iri_emit_pop(gen, t1, expr->expr_binary.left->type->size_bits / 8);
+    iri_emit_pop(gen, t1, expr->expr_binary.left->type->size_bits / 8, false);
 
     IR_Reg t3 = ir_new_reg(gen, expr->type);
     ir_free_reg(gen, t2);
@@ -602,7 +602,7 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load, bool inside
     if (expr->expr_proc_call.arg_count > 0)
     {
         // push caller into the stack
-        iri_emit_push(gen, caller, (IR_Value){0}, type_pointer_size_bytes());
+        iri_emit_push(gen, caller, (IR_Value){0}, type_pointer_size_bytes(), false);
         ir_free_reg(gen, caller);
 
         // push the arguments
@@ -610,7 +610,7 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load, bool inside
         {
             Light_Ast* arg = expr->expr_proc_call.args[i];
             IR_Reg arg_r = ir_gen_expr(gen, arg, true, inside_literal, outer_offset);
-            iri_emit_push(gen, arg_r, (IR_Value){0}, arg->type->size_bits / 8);
+            iri_emit_push(gen, arg_r, (IR_Value){0}, arg->type->size_bits / 8, type_primitive_float(arg->type));
             arg_stack_size += (arg->type->size_bits / 8);
             ir_free_reg(gen, arg_r);
         }
@@ -1003,7 +1003,7 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
 
     IR_Reg t2 = ir_gen_expr(gen, comm->rvalue, primitive_type||pointer_type, false, 0);
     // push result to the stack
-    iri_emit_push(gen, t2, (IR_Value){0}, rvalue_type->size_bits / 8);
+    iri_emit_push(gen, t2, (IR_Value){0}, rvalue_type->size_bits / 8, type_primitive_float(comm->rvalue->type));
     ir_free_reg(gen, t2);
 
     IR_Reg t1 = ir_gen_expr(gen, comm->lvalue, false, false, 0);
@@ -1012,7 +1012,7 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
         t2 = ir_new_temp(gen);
     }
 
-    iri_emit_pop(gen, t2, rvalue_type->size_bits / 8);
+    iri_emit_pop(gen, t2, rvalue_type->size_bits / 8, type_primitive_float(comm->rvalue->type));
 
     ir_free_reg(gen, t1);
     ir_free_reg(gen, t2);
@@ -1179,7 +1179,7 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
     // push ebp
     // mov ebp, esp
     // sub esp, stack_size
-    iri_emit_push(gen, IR_REG_STACK_BASE, (IR_Value){0}, type_pointer_size_bytes());
+    iri_emit_push(gen, IR_REG_STACK_BASE, (IR_Value){0}, type_pointer_size_bytes(), false);
     iri_emit_mov(gen, IR_REG_STACK_PTR, IR_REG_STACK_BASE, (IR_Value){0}, type_pointer_size_bytes(), false);
     int sub_esp_index = iri_current_instr_index(gen);
     iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR, 

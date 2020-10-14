@@ -1,5 +1,6 @@
 #include "util.h"
 
+// F3 0F 11 0C 24
 u8*
 emit_movs_reg_to_mem(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode, X64_XMM_Register src, X64_Register dst, bool single_precision, u8 disp8, uint32_t disp32)
 {
@@ -10,7 +11,29 @@ emit_movs_reg_to_mem(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mod
     *stream++ = (single_precision) ? 0xf3 : 0xf2;
     *stream++ = 0x0f;
     *stream++ = 0x11;
-    *stream++ = make_modrm(mode, src, register_representation(dst));
+
+    if (register_equivalent(dst, RBP))
+    {
+        // emit sib byte
+        if (mode == INDIRECT)
+        {
+            *stream++ = make_modrm(INDIRECT_BYTE_DISPLACED, src, register_representation(dst));
+            *stream++ = 0;
+        }
+        else
+        {
+            *stream++ = make_modrm(mode, src, register_representation(dst));
+        }
+    }
+    else if (register_equivalent(dst, RSP))
+    {
+        *stream++ = make_modrm(mode, src, register_representation(dst));
+        *stream++ = make_sib(0, RSP, RSP);
+    }
+    else
+    {
+        *stream++ = make_modrm(mode, src, register_representation(dst));
+    }
 
     disp_offset = stream - start;
     stream = emit_displacement(mode, stream, disp8, disp32);
