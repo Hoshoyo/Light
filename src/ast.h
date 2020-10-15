@@ -322,7 +322,7 @@ typedef struct {
 
 	uint32_t           flags;
 	int32_t            argument_count;
-	int32_t            ir_instr_index;
+	int32_t            ir_instr_index;         // Could be either index of the instruction or index in the data segment
 	
 	Light_Token*       extern_library_name;
 } Light_Ast_Decl_Procedure;

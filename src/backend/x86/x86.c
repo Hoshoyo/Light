@@ -11,9 +11,12 @@ typedef struct {
     u8* base;
     u8* at;
 
-    X86_Patch* relative_patches;
-    X86_Data* data;
-    int       data_offset;
+    X86_Import* imports;
+    X86_Patch*  relative_patches;
+    X86_Data*   data;
+    int         data_offset;
+
+    IR_Generator* ir_gen;
 } X86_Emitter;
 
 // Expect 32 bit register en
@@ -163,12 +166,23 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
             patch.issuer_imm_offset = info.immediate_offset;
             patch.addr = patch_addr + info.immediate_offset;
             patch.bytes = 4;
-            //patch.extra_offset = 0x08048060 + info.instr_byte_size - 1; // TODO(psv): proper calculation of offset entry point
             patch.extra_offset = info.instr_byte_size - 1;
             patch.instr_byte_size = instr->byte_size;
             patch.issuer_index = index;
             patch.rel_index_offset = instr->imm.v_s32;
             array_push(em->relative_patches, patch);
+        }
+        else if(instr->flags & IIR_FLAG_IMPORT_OFFSET)
+        {
+            // Get the import table and fill the patch offset with the
+            // address of the current instruction
+            IR_Import_Entry* imp = &em->ir_gen->import_table[instr->imm.v_u64];
+            X86_Import import = {
+                .decl = imp->decl, 
+                .import_table_index = (int)instr->imm.v_u64, 
+                .patch_addr = patch_addr + info.immediate_offset
+            };
+            array_push(em->imports, import);
         }
     }
     else
@@ -942,6 +956,8 @@ X86_generate(IR_Generator* gen)
     em.at = em.base;
     em.relative_patches = array_new(X86_Patch);
     em.data = array_new(X86_Data);
+    em.imports = array_new(X86_Import);
+    em.ir_gen = gen;
 
     IR_Activation_Rec* ar = 0;
     for(int i = 0; i < array_length(gen->instructions); ++i)
@@ -956,6 +972,7 @@ X86_generate(IR_Generator* gen)
         x86_emit_instruction(&em, instr, i);
     }
 
+    // Do instruction relative address patching
     for(int i = 0; i < array_length(em.relative_patches); ++i)
     {
         u8* issuer_addr = em.relative_patches[i].issuer_addr;
@@ -972,9 +989,8 @@ X86_generate(IR_Generator* gen)
             *(int*)patch_addr = diff + extra;
     }
 
-
 #if defined(_WIN32) || defined(_WIN64)
-    light_pecoff_emit(em.base, em.at - em.base, em.relative_patches, em.data);
+    light_pecoff_emit(em.base, em.at - em.base, em.relative_patches, em.data, em.imports);
 #else
     light_elf_emit(em.base, em.at - em.base, em.relative_patches);
 #endif

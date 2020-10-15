@@ -568,8 +568,19 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_
         IR_Decl_To_Patch patch = {0};
         patch.decl = vdecl;
         patch.instr_number = iri_current_instr_index(gen);
+        if(vdecl->decl_proc.flags & DECL_PROC_FLAG_EXTERN)
+        {
+            patch.external = true;
+            // mov 0x12345678 -> t
+            // load t -> t
+            iri_emit_mov(gen, IR_REG_NONE, t, (IR_Value){.type = IR_VALUE_U64, .v_u64 = 0}, type_pointer_size_bytes(), false);
+            iri_emit_load(gen, t, t, (IR_Value){0}, type_pointer_size_bytes(), type_pointer_size_bytes(), false);
+        }
+        else
+        {
+            iri_emit_mov(gen, IR_REG_NONE, t, (IR_Value){.type = IR_VALUE_U64, .v_u64 = 0}, type_pointer_size_bytes(), false);
+        }
         array_push(gen->decl_patch, patch);
-        iri_emit_mov(gen, IR_REG_NONE, t, (IR_Value){.type = IR_VALUE_U64, .v_u64 = 0}, type_pointer_size_bytes(), false);
     }
     else if(vdecl->kind == AST_DECL_VARIABLE)
     {
@@ -1220,13 +1231,29 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
 }
 
 void
+ir_gen_proc_external(IR_Generator* gen, Light_Ast* proc)
+{
+    IR_Import_Entry entry = {0};
+    entry.decl = proc;
+    proc->decl_proc.ir_instr_index = array_length(gen->import_table);
+    array_push(gen->import_table, entry);
+}
+
+void
 ir_patch_proc_calls(IR_Generator* gen)
 {
     for(int i = 0; i < array_length(gen->decl_patch); ++i)
     {
         IR_Decl_To_Patch dpatch = gen->decl_patch[i];
         IR_Instruction* instr = iri_get_temp_instr_ptr(gen, dpatch.instr_number);
-        instr->flags |= (IIR_FLAG_HAS_IMM | IIR_FLAG_INSTRUCTION_OFFSET);
+        if(dpatch.external)
+        {
+            instr->flags |= (IIR_FLAG_HAS_IMM | IIR_FLAG_IMPORT_OFFSET);
+        }
+        else
+        {
+            instr->flags |= (IIR_FLAG_HAS_IMM | IIR_FLAG_INSTRUCTION_OFFSET);
+        }
         instr->imm.v_u64 = dpatch.decl->decl_proc.ir_instr_index;
     }
 }
@@ -1250,12 +1277,16 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
     gen->loop_start_labels = array_new(int);
     gen->node_ranges = array_new(IR_Node_Range);
     gen->ars = array_new(IR_Activation_Rec);
+    gen->import_table = array_new(IR_Import_Entry);
 
     for(u64 i = 0; i < array_length(ast); ++i) {
         Light_Ast* n = ast[i];
         switch(n->kind) {
             case AST_DECL_PROCEDURE: {
-                ir_gen_proc(gen, n);
+                if(n->decl_proc.flags & DECL_PROC_FLAG_EXTERN)
+                    ir_gen_proc_external(gen, n);
+                else
+                    ir_gen_proc(gen, n);
             } break;
             case AST_DECL_VARIABLE: {
                 // TODO(psv): global variables in the data segment

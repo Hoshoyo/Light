@@ -10,6 +10,8 @@
 #include "backend/c/toplevel.h"
 #include <light_array.h>
 #include "ir.h"
+#define HOHT_IMPLEMENTATION
+#include <hoht.h>
 #include "backend/x86/x86.h"
 
 int main(int argc, char** argv) {

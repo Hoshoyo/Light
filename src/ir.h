@@ -112,6 +112,7 @@ typedef enum {
     IIR_FLAG_IS_FP_DEST = (1 << 4),
 
     IIR_FLAG_INSTRUCTION_OFFSET = (1 << 5), // the immediate value is an instruction offset
+    IIR_FLAG_IMPORT_OFFSET = (1 << 6),      // the immediate value is the index of the import table
 } IR_Instruction_Flag;
 
 typedef struct {
@@ -182,6 +183,7 @@ typedef struct {
 typedef struct {
     int        instr_number;
     Light_Ast* decl;
+    bool       external;
 } IR_Decl_To_Patch;
 
 typedef struct {
@@ -196,8 +198,13 @@ typedef struct {
 } IR_Node_Range;
 
 typedef struct {
+    Light_Ast* decl;
+} IR_Import_Entry;
+
+typedef struct {
     IR_Instruction*    instructions;
     IR_Activation_Rec* ars; // the current is always the last
+    IR_Import_Entry* import_table;
 
     // needed for break and continue
     int* loop_start_labels;

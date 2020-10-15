@@ -2,6 +2,14 @@
 #include "../../ir.h"
 
 typedef struct {
+    Light_Ast* decl;
+    int        import_table_index;
+    int        lib_index;
+    int        sym_index;
+    void*      patch_addr;
+} X86_Import;
+
+typedef struct {
     u8* issuer_addr;    // address of the instruction to calculate the relative offset
     u8* addr;           // address to be patched
     int instr_byte_size;

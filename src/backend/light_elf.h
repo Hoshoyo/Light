@@ -49,4 +49,4 @@ typedef struct {
     short e_shstrndx;    // Contains index of the section header table entry that contains the section names.
 } ELF32_Header;
 
-void light_elf_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches);
+void light_elf_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Import* imports);

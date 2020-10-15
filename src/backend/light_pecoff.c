@@ -4,6 +4,8 @@
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #include <light_array.h>
+#include <light_arena.h>
+#include <hoht.h>
 
 #define COFF_IDATA
 #define COFF_RELOC
@@ -102,9 +104,8 @@ typedef struct {
 } Import_Libs;
 
 Import_Libs
-pecoff_new_lib(const char* name)
+pecoff_new_lib(const char* name, int length)
 {
-    int length = strlen(name);
     void* n = calloc(length, 1);
     memcpy(n, name, length);
 
@@ -114,9 +115,8 @@ pecoff_new_lib(const char* name)
 }
 
 Import_Symbol
-pecoff_new_symbol(const char* name, u16 hint)
+pecoff_new_symbol(const char* name, int length, u16 hint)
 {
-    int length = strlen(name);
     void* n = calloc(length, 1);
     memcpy(n, name, length);
     Import_Symbol s = {.symbol = n, .length = length, .hint = hint};
@@ -130,17 +130,91 @@ import_libs_new()
     Import_Libs* libs = array_new(Import_Libs);
 
     // user32
-    Import_Libs user32 = pecoff_new_lib("USER32.dll");
-    array_push(user32.symbols, pecoff_new_symbol("MessageBoxA", 0x27f));
+    Import_Libs user32 = pecoff_new_lib("USER32.dll", sizeof("USER32.dll") - 1);
+    array_push(user32.symbols, pecoff_new_symbol("MessageBoxA", sizeof("MessageBoxA") - 1, 0x27f));
     array_push(libs, user32);
 
     // kernel32
-    Import_Libs kernel32 = pecoff_new_lib("KERNEL32.dll");
-    array_push(kernel32.symbols, pecoff_new_symbol("LoadLibraryA", 0x3c1));
-    array_push(kernel32.symbols, pecoff_new_symbol("FreeLibrary", 0x3c1));
+    Import_Libs kernel32 = pecoff_new_lib("KERNEL32.dll", sizeof("KERNEL32.dll") - 1);
+    array_push(kernel32.symbols, pecoff_new_symbol("LoadLibraryA", sizeof("LoadLibraryA") - 1, 0x3c1));
+    array_push(kernel32.symbols, pecoff_new_symbol("FreeLibrary", sizeof("FreeLibrary") - 1, 0x3c1));
     array_push(libs, kernel32);
 
     return libs;
+}
+
+// TODO(psv): optimize this, no need to iterate through both hash tables
+static Hoht_Table htlibs;
+typedef struct {
+    string     libstr;
+    Hoht_Table symbols;
+    int        lib_index;
+} ILib;
+static Import_Libs*
+import_libs(u8* stream_text_base, u8* text_base, X86_Import* imports)
+{
+    Import_Libs* libs = array_new(Import_Libs);
+    hoht_new(&htlibs, array_length(imports) * 8, sizeof(ILib), 0.5f, malloc, free);
+
+    // push all libraries and symbols to the hash table
+    for(int i = 0; i < array_length(imports); ++i)
+    {
+        X86_Import* imp = imports + i;
+        imp->patch_addr = stream_text_base + ((u8*)imp->patch_addr - text_base); // patch address is now inside the output stream
+        *((u32*)imp->patch_addr) = 0xcccccccc;
+        
+        string libstr = MAKE_STR_LEN(imp->decl->decl_proc.extern_library_name->data + 1, imp->decl->decl_proc.extern_library_name->length - 2);
+        string symstr = MAKE_STR_LEN(imp->decl->decl_proc.name->data, imp->decl->decl_proc.name->length);
+        u64 hashlib = fnv_1_hash(libstr.data, libstr.length);
+        u64 hashsymb = fnv_1_hash(symstr.data, symstr.length);
+
+        ILib* lentry = (ILib*)hoht_get_value_hashed(&htlibs, hashlib);
+        if(!lentry)
+        {
+            ILib ilib = {.libstr = libstr, .lib_index = array_length(libs)};
+            hoht_new(&ilib.symbols, array_length(imports) * 8, sizeof(string), 0.5f, malloc, free);
+            hoht_push_hashed(&ilib.symbols, hashsymb, &symstr);
+            hoht_push_hashed(&htlibs, hashlib, &ilib);
+            
+            Import_Libs lib = pecoff_new_lib(libstr.data, libstr.length);
+            array_push(lib.symbols, pecoff_new_symbol(symstr.data, symstr.length, 0xcc));
+            array_push(libs, lib);
+            imp->lib_index = ilib.lib_index;
+            imp->sym_index = 0;
+        }
+        else
+        {
+            string* sym = (string*)hoht_get_value_hashed(&lentry->symbols, hashsymb);
+            if(sym)
+            {
+                // Symbol already exists, just update the X86_Import
+                imp->sym_index = sym->value;
+                imp->lib_index = lentry->lib_index;
+            }
+            else
+            {
+                // Create the symbol
+                symstr.value = array_length(libs[lentry->lib_index].symbols);
+                imp->lib_index = lentry->lib_index;
+                imp->sym_index = symstr.value;
+                array_push(libs[lentry->lib_index].symbols, pecoff_new_symbol(symstr.data, symstr.length, 0xcc));
+                hoht_push_hashed(&lentry->symbols, hashsymb, &symstr);
+            }
+        }
+    }
+    return libs;
+}
+
+static void
+patch_imports(Import_Libs* libs, X86_Import* imports, int base_rva, u8* text_base, Relocation_Entry* relocs)
+{
+    for(int i = 0; i < array_length(imports); ++i)
+    {
+        int iat_rva = libs[imports[i].lib_index].symbols[imports[i].sym_index].iat_rva;
+        *(u32*)imports[i].patch_addr = iat_rva + base_rva;
+        
+        array_push(relocs, relocation_new((u8*)imports[i].patch_addr - text_base));
+    }
 }
 
 static u8*
@@ -299,7 +373,7 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches, PECoff_Gene
 }
 
 void
-light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Data* data_seg)
+light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports)
 {
     PECoff_Generator gen = { 0 };
     u8* stream = (u8*)calloc(1, 1024*1024);
@@ -496,10 +570,13 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
     idata_st->ptr_to_raw_data = at - stream;
     u8* idata_start = at;
-    at = write_idata(at, import_libs_new(), idata_st->virtual_address, opt_datadir);
+    //at = write_idata(at, import_libs_new(), idata_st->virtual_address, opt_datadir);
+    Import_Libs* imp_libs = import_libs(text_ptr, in_stream, imports);
+    at = write_idata(at, imp_libs, idata_st->virtual_address, opt_datadir);
     idata_st->virtual_size = at - idata_start;
     idata_st->size_of_raw_data = idata_st->virtual_size + align_delta(idata_st->virtual_size, opt_pe32->file_alignment);
     last_before_reloc = idata_st;
+    patch_imports(imp_libs, imports, opt_pe32->image_base_pe32, text_ptr, gen.relocs);
 #endif
 #if defined(COFF_RDATA)
     // rdata
