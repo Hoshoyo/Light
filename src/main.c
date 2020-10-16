@@ -79,9 +79,11 @@ int main(int argc, char** argv) {
 #endif
 
 #if 1
-    double generate_start = os_time_us();
+    double ir_start = os_time_us();
     IR_Generator irgen = {0};
     ir_generate(&irgen, ast);
+    double ir_elapsed = (os_time_us() - ir_start) / 1000.0;
+    double generate_start = os_time_us();
     X86_generate(&irgen);
     double generate_elapsed = (os_time_us() - generate_start) / 1000.0;
 #endif
@@ -102,7 +104,8 @@ int main(int argc, char** argv) {
     printf("  lexing:          %.2f ms\n", lexing_elapsed);
     printf("  parse:           %.2f ms\n", parse_elapsed);
     printf("  type check:      %.2f ms\n", tcheck_elapsed);
-    printf("  code generation: %.2f ms\n", generate_elapsed);
+    printf("  ir generation:   %.2f ms\n", ir_elapsed);
+    printf("  x86 generation:  %.2f ms\n", generate_elapsed);
     printf("  total:           %.2f ms\n", total_elapsed);
     printf("\n");
     //printf("  gcc backend:     %.2f ms\n", gcc_elapsed);

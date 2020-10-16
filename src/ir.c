@@ -141,8 +141,8 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
 
         ar->offset -= (decl->decl_variable.type->size_bits / 8);
 
-        fprintf(stdout, "variable[SB+%d] %.*s\n", decl->decl_variable.stack_offset,
-            decl->decl_constant.name->length, decl->decl_constant.name->data);
+        //fprintf(stdout, "variable[SB+%d] %.*s\n", decl->decl_variable.stack_offset,
+        //    decl->decl_constant.name->length, decl->decl_constant.name->data);
     }
 }
 
@@ -1300,5 +1300,5 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
 
     ir_patch_proc_calls(gen);
 
-    iri_print_instructions(gen);
+    //iri_print_instructions(gen);
 }

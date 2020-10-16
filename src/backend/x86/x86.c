@@ -7,6 +7,10 @@
 #include "../light_elf.h"
 #include "../light_pecoff.h"
 
+/*
+    NOTE(psv): Apparently idata without any imports crashes the executable
+*/
+
 typedef struct {
     u8* base;
     u8* at;
@@ -954,7 +958,7 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
     }
     return (Instr_Emit_Result){0};
 }
-
+#include "../../utils/os.h"
 int
 X86_generate(IR_Generator* gen)
 {
