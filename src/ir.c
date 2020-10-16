@@ -718,7 +718,7 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr, bool inside_literal, 
     {
         // alocate space for it in the activation record
         IR_Activation_Rec* ar = ir_get_current_ar(gen);
-        expr->expr_literal_struct.stack_offset = (ar->literals_stack_size + ar->stack_size_bytes);
+        expr->expr_literal_struct.stack_offset = -(ar->literals_stack_size + ar->stack_size_bytes) - size_bytes;
         ar->literals_stack_size += size_bytes;
         stack_offset = expr->expr_literal_struct.stack_offset;
     }
@@ -755,6 +755,7 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr, bool inside_literal, 
 IR_Reg
 ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr, bool inside_literal, int outer_offset)
 {
+    // TODO(psv): when raw data is string, remove 2 bytes extra here
     int size_bytes = (expr->type->size_bits / 8);
     int stack_offset = outer_offset;
 
@@ -762,7 +763,7 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr, bool inside_literal, i
     {
         // alocate space for it in the activation record
         IR_Activation_Rec* ar = ir_get_current_ar(gen);
-        expr->expr_literal_array.stack_offset = (ar->literals_stack_size + ar->stack_size_bytes);
+        expr->expr_literal_array.stack_offset = -(ar->literals_stack_size + ar->stack_size_bytes) - size_bytes;
         ar->literals_stack_size += size_bytes;
         stack_offset = expr->expr_literal_array.stack_offset;
     }

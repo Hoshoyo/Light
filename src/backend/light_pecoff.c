@@ -584,6 +584,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     rdata_st->ptr_to_raw_data = at - stream;
     u8* rdata_start = at;
     rdata_st->virtual_address = idata_st->virtual_address + idata_st->size_of_raw_data + align_delta(idata_st->size_of_raw_data, opt_pe32->section_alignment);
+    //rdata_st->virtual_address = text_st->virtual_address + text_st->size_of_raw_data + align_delta(text_st->size_of_raw_data, opt_pe32->section_alignment);
     at = write_rdata(at, text_ptr, rdata_st->virtual_address, opt_pe32->image_base_pe32, data_seg, &gen);
     rdata_st->virtual_size = at - rdata_start;
     rdata_st->size_of_raw_data = rdata_st->virtual_size + align_delta(rdata_st->virtual_size, opt_pe32->file_alignment);
