@@ -206,14 +206,14 @@ import_libs(u8* stream_text_base, u8* text_base, X86_Import* imports)
 }
 
 static void
-patch_imports(Import_Libs* libs, X86_Import* imports, int base_rva, u8* text_base, Relocation_Entry* relocs)
+patch_imports(Import_Libs* libs, X86_Import* imports, int base_rva, u8* text_base, PECoff_Generator* gen)
 {
     for(int i = 0; i < array_length(imports); ++i)
     {
         int iat_rva = libs[imports[i].lib_index].symbols[imports[i].sym_index].iat_rva;
         *(u32*)imports[i].patch_addr = iat_rva + base_rva;
         
-        array_push(relocs, relocation_new((u8*)imports[i].patch_addr - text_base));
+        array_push(gen->relocs, relocation_new((u8*)imports[i].patch_addr - text_base));
     }
 }
 
@@ -576,7 +576,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     idata_st->virtual_size = at - idata_start;
     idata_st->size_of_raw_data = idata_st->virtual_size + align_delta(idata_st->virtual_size, opt_pe32->file_alignment);
     last_before_reloc = idata_st;
-    patch_imports(imp_libs, imports, opt_pe32->image_base_pe32, text_ptr, gen.relocs);
+    patch_imports(imp_libs, imports, opt_pe32->image_base_pe32, text_ptr, &gen);
 #endif
 #if defined(COFF_RDATA)
     // rdata

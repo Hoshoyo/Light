@@ -241,9 +241,15 @@ iri_emit_call(IR_Generator* gen, IR_Reg t, IR_Value imm, int byte_size)
 }
 
 void
-iri_emit_ret(IR_Generator* gen)
+iri_emit_ret(IR_Generator* gen, int pop_bytes)
 {
-    IR_Instruction inst = iri_new(IR_RET, IR_REG_NONE, IR_REG_NONE, IR_REG_NONE, (IR_Value){0}, 0);
+    IR_Value value = {0};
+    if(pop_bytes > 0)
+    {
+        value.type = IR_VALUE_S32;
+        value.v_s32 = pop_bytes;
+    }
+    IR_Instruction inst = iri_new(IR_RET, IR_REG_NONE, IR_REG_NONE, IR_REG_NONE, value, 0);
     inst.activation_record_index = array_length(gen->ars) - 1;
     array_push(gen->instructions, inst);
 }

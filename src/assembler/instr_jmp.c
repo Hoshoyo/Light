@@ -190,6 +190,24 @@ emit_ret(Instr_Emit_Result* out_info, u8* stream, X64_Ret_Instruction opcode)
 }
 
 u8*
+emit_ret_stack_pop(Instr_Emit_Result* out_info, u8* stream, X64_Ret_Instruction opcode, uint16_t imm)
+{
+    u8* start = stream;
+    *stream++ = opcode;
+    s8 imm_offset = stream - start;
+    *(uint16_t*)stream = imm;
+    stream += sizeof(uint16_t);
+
+    if(out_info)
+    {
+        out_info->instr_byte_size = stream - start;
+        out_info->diplacement_offset = -1;
+        out_info->immediate_offset = imm_offset;
+    }
+    return stream;
+}
+
+u8*
 emit_int(Instr_Emit_Result* out_info, u8* stream, u8 byte)
 {
     u8* start = stream;

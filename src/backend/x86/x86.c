@@ -603,7 +603,14 @@ x86_emit_ret(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
     
-    em->at = emit_ret(&info, em->at, RET_NEAR);     // TODO(psv): ret far?
+    if(instr->imm.type == IR_VALUE_S32)
+    {
+        em->at = emit_ret_stack_pop(&info, em->at, RET_NEAR_STACK_POP, (uint16_t)instr->imm.v_s32);
+    }
+    else
+    {
+        em->at = emit_ret(&info, em->at, RET_NEAR);     // TODO(psv): ret far?
+    }
 
     return info;
 }

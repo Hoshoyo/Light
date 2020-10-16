@@ -642,10 +642,9 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load, bool inside
 
     if(arg_stack_size > 0)
     {
-        // TODO(psv): use return with pop immediate
         // pop an extra 4 bytes that is the caller address that was in the stack before
         iri_emit_arith(gen, IR_ADD, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR, 
-                (IR_Value){.type = IR_VALUE_S32, .v_s32 = arg_stack_size + type_pointer_size_bytes()}, type_pointer_size_bytes());
+                (IR_Value){.type = IR_VALUE_S32, .v_s32 = 4}, type_pointer_size_bytes());
     }
 
     return IR_REG_PROC_RET;
@@ -1102,7 +1101,10 @@ ir_gen_comm_return(IR_Generator* gen, Light_Ast* comm)
     }
     else
     {
-        iri_emit_ret(gen);
+        // TODO(psv): check calling convention
+        // clear the stack (stdcall only)
+        IR_Activation_Rec* ar = ir_get_current_ar(gen);
+        iri_emit_ret(gen, ar->stack_args_size_bytes);
     }
 }
 
