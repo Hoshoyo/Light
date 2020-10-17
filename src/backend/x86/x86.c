@@ -963,7 +963,7 @@ int
 X86_generate(IR_Generator* gen)
 {
     X86_Emitter em = {0};
-    em.base = (u8*)calloc(1, 1024 * 1024);
+    em.base = (u8*)calloc(1, 1024 * 1024 * 16);
     em.at = em.base;
     em.relative_patches = array_new(X86_Patch);
     em.data = array_new(X86_Data);

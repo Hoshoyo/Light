@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "ast.h"
+#include <stdio.h>
 
 typedef enum {
     IR_REG_INSTR_PTR = -4,
@@ -246,4 +247,4 @@ void iri_emit_clear(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int b
 
 int  iri_value_byte_size(IR_Value value);
 IR_Value iri_value_new_signed(int byte_size, uint64_t v);
-void iri_print_instructions(IR_Generator* gen);
+void iri_print_instructions(FILE* out, IR_Generator* gen);

@@ -1,6 +1,7 @@
 #include "ir.h"
 #include <stdio.h>
 #include "light_array.h"
+#include <assert.h>
 
 /* Load */
 
@@ -32,6 +33,7 @@ iri_value_new_signed(int byte_size, uint64_t v)
 IR_Instruction
 iri_new(IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm, int byte_size)
 {
+    assert(byte_size <= type_pointer_size_bytes());
     IR_Instruction inst = {0};
     inst.type = type;
     inst.t1 = t1;
@@ -731,7 +733,7 @@ ir_node_range_comp(const void* n1, const void* n2)
 }
 
 void
-iri_print_instructions(IR_Generator* gen)
+iri_print_instructions(FILE* out, IR_Generator* gen)
 {
     int nr_index = 0;
     qsort(gen->node_ranges, array_length(gen->node_ranges), sizeof(*gen->node_ranges), ir_node_range_comp);
@@ -756,8 +758,8 @@ iri_print_instructions(IR_Generator* gen)
         }
 #endif
 
-        fprintf(stdout, "%d: ", i);
-        iri_print_instruction(stdout, instr);
-        fprintf(stdout, "\n");
+        fprintf(out, "%d: ", i);
+        iri_print_instruction(out, instr);
+        fprintf(out, "\n");
     }
 }

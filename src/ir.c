@@ -6,6 +6,8 @@
 #include "ir.h"
 
 #define ARRAY_LENGTH(A) (sizeof(A) / sizeof(*A))
+#define MAX(A, B) (((A) > (B)) ? (A) : (B))
+#define MIN(A, B) (((A) < (B)) ? (A) : (B))
 
 int  ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, int outer_offset);
 void ir_gen_comm(IR_Generator* gen, Light_Ast* comm);
@@ -623,12 +625,13 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load, bool inside
         ir_free_reg(gen, caller);
 
         // push the arguments
-        for(int i = 0; i < expr->expr_proc_call.arg_count; ++i)
+        for(int i = expr->expr_proc_call.arg_count - 1; i >= 0; --i)
         {
             Light_Ast* arg = expr->expr_proc_call.args[i];
             IR_Reg arg_r = ir_gen_expr(gen, arg, true, inside_literal, outer_offset);
-            iri_emit_push(gen, arg_r, (IR_Value){0}, arg->type->size_bits / 8, type_primitive_float(arg->type));
-            arg_stack_size += (arg->type->size_bits / 8);
+            int push_bytes = MIN(arg->type->size_bits / 8, type_pointer_size_bytes());
+            iri_emit_push(gen, arg_r, (IR_Value){0}, push_bytes, type_primitive_float(arg->type));
+            arg_stack_size += push_bytes;
             ir_free_reg(gen, arg_r);
         }
 
@@ -672,10 +675,18 @@ ir_gen_expr_dot(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_liter
     IR_Reg t = ir_gen_expr(gen, expr->expr_dot.left, false, inside_literal, outer_offset);
 
     IR_Reg tres = IR_REG_NONE;
-    if(ltype->kind == TYPE_KIND_STRUCT)
+    // TODO: unions
+    if(ltype->kind == TYPE_KIND_STRUCT || ltype->kind == TYPE_KIND_POINTER)
     {
         int32_t offset = 0;
         tres = ir_new_temp(gen);
+
+        if (ltype->kind == TYPE_KIND_POINTER)
+        {
+            ltype = type_alias_root(ltype->pointer_to);
+            iri_emit_load(gen, t, t, (IR_Value) { 0 }, type_pointer_size_bytes(), type_pointer_size_bytes(), false);
+        }
+
         for(int i = 0; i < ltype->struct_info.fields_count; ++i)
         {
             if(ltype->struct_info.fields[i]->decl_variable.name->data == expr->expr_dot.identifier->data)
@@ -1019,6 +1030,9 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
     bool pointer_type = rvalue_type->kind == TYPE_KIND_POINTER;
 
     IR_Reg t2 = ir_gen_expr(gen, comm->rvalue, primitive_type||pointer_type, false, 0);
+    if (!comm->lvalue)
+        return;
+
     // push result to the stack
     iri_emit_push(gen, t2, (IR_Value){0}, rvalue_type->size_bits / 8, type_primitive_float(comm->rvalue->type));
     ir_free_reg(gen, t2);
@@ -1300,5 +1314,7 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
 
     ir_patch_proc_calls(gen);
 
-    //iri_print_instructions(gen);
+    FILE* ir_out = fopen("irout.txt", "w");
+    iri_print_instructions(ir_out, gen);
+    fclose(ir_out);
 }

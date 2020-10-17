@@ -7,9 +7,9 @@
 #include <light_arena.h>
 #include <hoht.h>
 
-#define COFF_IDATA
-#define COFF_RELOC
-#define COFF_RDATA
+#define COFF_IDATA 1
+#define COFF_RELOC 1
+#define COFF_RDATA 1
 
 typedef struct {
     Relocation_Entry* relocs;
@@ -376,7 +376,7 @@ void
 light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports)
 {
     PECoff_Generator gen = { 0 };
-    u8* stream = (u8*)calloc(1, 1024*1024);
+    u8* stream = (u8*)calloc(1, 1024*1024*16);
     u8* at = stream;
 
     u8* ptr_to_pe_header = 0;
@@ -570,7 +570,6 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
     idata_st->ptr_to_raw_data = at - stream;
     u8* idata_start = at;
-    //at = write_idata(at, import_libs_new(), idata_st->virtual_address, opt_datadir);
     Import_Libs* imp_libs = import_libs(text_ptr, in_stream, imports);
     at = write_idata(at, imp_libs, idata_st->virtual_address, opt_datadir);
     idata_st->virtual_size = at - idata_start;
@@ -584,7 +583,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     rdata_st->ptr_to_raw_data = at - stream;
     u8* rdata_start = at;
     rdata_st->virtual_address = idata_st->virtual_address + idata_st->size_of_raw_data + align_delta(idata_st->size_of_raw_data, opt_pe32->section_alignment);
-    //rdata_st->virtual_address = text_st->virtual_address + text_st->size_of_raw_data + align_delta(text_st->size_of_raw_data, opt_pe32->section_alignment);
+    //    rdata_st->virtual_address = text_st->virtual_address + text_st->size_of_raw_data + align_delta(text_st->size_of_raw_data, opt_pe32->section_alignment);
     at = write_rdata(at, text_ptr, rdata_st->virtual_address, opt_pe32->image_base_pe32, data_seg, &gen);
     rdata_st->virtual_size = at - rdata_start;
     rdata_st->size_of_raw_data = rdata_st->virtual_size + align_delta(rdata_st->virtual_size, opt_pe32->file_alignment);
@@ -619,7 +618,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
         fprintf(stderr, "Could not open file out2.bin for writing\n");
         return;
     }
-    fwrite(stream, at - stream, 1, file);
+    fwrite(stream, 1, at - stream, file);
     fclose(file);
 }
 #endif
