@@ -438,9 +438,9 @@ x86_emit_cvt_ui(X86_Emitter* em, IR_Instruction* instr)
         em->at = emit_movzx(&info, em->at, DIRECT, instr->src_byte_size * 8, instr->dst_byte_size * 8,
             rdst, rop1, 0, 0);
     }
-    else
+    else if (rop1 != rdst)
     {
-        // do nothing
+        em->at = emit_mov_reg(0, em->at, MOV_MR, DIRECT, instr->byte_size * 8, rdst, rop1, 0, 0);
     }
 
     return info;

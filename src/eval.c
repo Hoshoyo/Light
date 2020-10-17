@@ -338,8 +338,17 @@ eval_directive_sizeof(Light_Ast* directive) {
 
 	// transform
 	directive->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
-	directive->type = type_primitive_get(TYPE_PRIMITIVE_S64); // default type is s64
 	directive->expr_literal_primitive.token = dir_token;
 	directive->expr_literal_primitive.type = LITERAL_HEX_INT;
-	directive->expr_literal_primitive.value_s64 = type->size_bits / 8; // size in bytes
+
+	int ptrbits = type_pointer_size_bits();
+	if (ptrbits == 64) {
+		directive->type = type_primitive_get(TYPE_PRIMITIVE_S64); // default type is s64
+		directive->expr_literal_primitive.value_s64 = type->size_bits / 8; // size in bytes
+	} else if(ptrbits == 32) {
+		directive->type = type_primitive_get(TYPE_PRIMITIVE_S32); // default type is s32
+		directive->expr_literal_primitive.value_s32 = type->size_bits / 8; // size in bytes
+	} else {
+		assert(0);
+	}
 }
