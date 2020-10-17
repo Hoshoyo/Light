@@ -317,6 +317,12 @@ iri_get_temp_instr_ptr(IR_Generator* gen, int index)
     return 0;
 }
 
+IR_Value
+iri_value_s32(int value)
+{
+    return (IR_Value){.type = IR_VALUE_S32, .v_s32 = value};
+}
+
 /* Print */
 void
 iri_print_value(FILE* out, IR_Value value)

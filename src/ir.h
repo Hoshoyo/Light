@@ -247,4 +247,5 @@ void iri_emit_clear(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int b
 
 int  iri_value_byte_size(IR_Value value);
 IR_Value iri_value_new_signed(int byte_size, uint64_t v);
+IR_Value iri_value_s32(int value);
 void iri_print_instructions(FILE* out, IR_Generator* gen);
