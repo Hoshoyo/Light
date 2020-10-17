@@ -215,6 +215,8 @@ typedef struct {
     IR_Decl_To_Patch* decl_patch;  // at the end, iterate through all these indexes and fill the instruction with the proc address
 
     IR_Node_Range* node_ranges;
+
+    int index_of_entry_point;
 } IR_Generator;
 
 void ir_generate(IR_Generator* gen, Light_Ast** ast);

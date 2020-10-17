@@ -969,6 +969,7 @@ X86_generate(IR_Generator* gen)
     em.data = array_new(X86_Data);
     em.imports = array_new(X86_Import);
     em.ir_gen = gen;
+    int entry_point_offset = 0;
 
     IR_Activation_Rec* ar = 0;
     for(int i = 0; i < array_length(gen->instructions); ++i)
@@ -980,6 +981,10 @@ X86_generate(IR_Generator* gen)
             ar = current_ar;
         }
 
+        if(gen->index_of_entry_point == i)
+        {
+            entry_point_offset = em.at - em.base;
+        }
         x86_emit_instruction(&em, instr, i);
     }
 
@@ -1001,7 +1006,7 @@ X86_generate(IR_Generator* gen)
     }
 
 #if defined(_WIN32) || defined(_WIN64)
-    light_pecoff_emit(em.base, em.at - em.base, em.relative_patches, em.data, em.imports);
+    light_pecoff_emit(em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports);
 #else
     light_elf_emit(em.base, em.at - em.base, em.relative_patches);
 #endif

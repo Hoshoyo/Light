@@ -1244,8 +1244,13 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
     IR_Activation_Rec* ar = ir_get_current_ar(gen);
 
     // setup arguments in the stack
-    proc->decl_proc.ir_instr_index = iri_current_instr_index(gen);
+    int instr_index = iri_current_instr_index(gen);
+    if(proc->decl_proc.flags & DECL_PROC_FLAG_MAIN)
+    {
+        gen->index_of_entry_point = instr_index;
+    }
 
+    proc->decl_proc.ir_instr_index = instr_index;
     int stack_size_bytes = ir_calculate_proc_stack_size(proc);
 
     // prologue

@@ -373,7 +373,7 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches, PECoff_Gene
 }
 
 void
-light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports)
+light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offset, X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports)
 {
     PECoff_Generator gen = { 0 };
     u8* stream = (u8*)calloc(1, 1024*1024*16);
@@ -412,7 +412,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     optional_hdr->size_of_code = 0;             // filled after
     optional_hdr->size_of_init_data = 0;        // only needed for static data
     optional_hdr->size_of_uninit_data = 0;      // only needed for static data
-    optional_hdr->address_of_entry = 0x1000;    // TODO <---------------- Entry point address 
+    optional_hdr->address_of_entry = 0x1000 + entry_point_offset;
     optional_hdr->base_of_code = 0x1000;
     optional_hdr->base_of_data = 0;
 
