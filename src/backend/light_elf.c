@@ -36,7 +36,7 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches)
 }
 
 void
-light_elf_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches)
+light_elf_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Import* imports)
 {
     unsigned char* stream = (unsigned char*)calloc(1, 1024*1024);
     unsigned char* at = stream;
