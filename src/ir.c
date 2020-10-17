@@ -143,8 +143,8 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
 
         ar->offset -= (decl->decl_variable.type->size_bits / 8);
 
-        //fprintf(stdout, "variable[SB+%d] %.*s\n", decl->decl_variable.stack_offset,
-        //    decl->decl_constant.name->length, decl->decl_constant.name->data);
+        fprintf(stdout, "variable[SB+%d -(0x%x)] %.*s\n", decl->decl_variable.stack_offset, -decl->decl_variable.stack_offset,
+            decl->decl_constant.name->length, decl->decl_constant.name->data);
     }
 }
 
@@ -262,6 +262,7 @@ ir_gen_cvt_to_int(IR_Generator* gen, Light_Ast* expr, int op_temp)
             iri_emit_cvt(gen, IR_CVT_SI, op_temp, t, op_type->size_bits / 8, cast_type->size_bits / 8);
         }
     }
+    ir_free_reg(gen, op_temp);
 
     return t;
 }
@@ -1021,14 +1022,44 @@ ir_gen_decl_assignment(IR_Generator* gen, Light_Ast* decl)
 }
 
 void
+ir_gen_comm_assignment_big(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
+{
+    int byte_size = comm->rvalue->type->size_bits / 8;
+
+    IR_Reg rval = ir_gen_expr(gen, comm->rvalue, false, false, 0);
+    iri_emit_push(gen, rval, (IR_Value) { 0 }, type_pointer_size_bytes(), false);
+    ir_free_reg(gen, rval);
+
+    IR_Reg lval = ir_gen_expr(gen, comm->lvalue, false, false, 0);
+    if (lval == rval)
+        rval = ir_new_temp(gen);
+
+    iri_emit_pop(gen, rval, type_pointer_size_bytes(), false);
+
+    // addresses are in rval and lval, copy from rval to lval byte_size bytes
+    iri_emit_copy(gen, rval, lval, iri_value_s32(byte_size), type_pointer_size_bytes());
+
+    ir_free_reg(gen, rval);
+    ir_free_reg(gen, lval);
+}
+
+void
 ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
 {
     int byte_size = comm->rvalue->type->size_bits / 8;
+    if (byte_size > type_pointer_size_bytes())
+    {
+        ir_gen_comm_assignment_big(gen, comm);
+        return;
+    }
+
     Light_Type* rvalue_type = type_alias_root(comm->rvalue->type);
     bool primitive_type = rvalue_type->kind == TYPE_KIND_PRIMITIVE;
     bool pointer_type = rvalue_type->kind == TYPE_KIND_POINTER;
 
     IR_Reg t2 = ir_gen_expr(gen, comm->rvalue, primitive_type||pointer_type, false, 0);
+
+    // This is in case a function call without return assignment
     if (!comm->lvalue)
         return;
 
@@ -1346,7 +1377,7 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
 
     ir_patch_proc_calls(gen);
 
-    FILE* ir_out = fopen("irout.txt", "w");
+    FILE* ir_out = stdout;//fopen("irout.txt", "w");
     iri_print_instructions(ir_out, gen);
-    fclose(ir_out);
+    //fclose(ir_out);
 }
