@@ -641,7 +641,7 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load, bool inside
             type_pointer_size_bytes(), type_pointer_size_bytes(), false);
     }
 
-    iri_emit_call(gen, caller, (IR_Value){0}, expr->type->size_bits / 8);
+    iri_emit_call(gen, caller, (IR_Value){0}, type_pointer_size_bytes());
     ir_free_reg(gen, caller);
 
     if(arg_stack_size > 0)
@@ -1214,6 +1214,8 @@ int
 ir_calculate_proc_stack_size(Light_Ast* proc)
 {
     Light_Scope* pscope = proc->decl_proc.body->comm_block.block_scope;
+    if (!pscope) return 0; // procedure has no declarations
+
     int stack_size_bytes = 0;
     for(int i = 0; i < pscope->decl_count; ++i)
     {
