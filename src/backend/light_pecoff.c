@@ -489,19 +489,24 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
         .idata (read only initialized data)
         contains imported symbols
     */
-    Section_Table* idata_st = (Section_Table*)at;
-    at += sizeof(Section_Table);
-    memcpy(idata_st->name, ".idata", sizeof(".idata") - 1);
-    idata_st->virtual_size = 0;         // filled after
-    idata_st->virtual_address = text_st->virtual_address + text_st->size_of_raw_data + align_delta(text_st->size_of_raw_data, opt_pe32->section_alignment); // TODO(psv): maybe this should be text_st->size_of_raw_data + text_st->size_of_raw_data
-    idata_st->size_of_raw_data = 0;     // filled after, must be a multiple of file alignment
-    idata_st->ptr_to_raw_data = 0;      // filled after
-    idata_st->ptr_to_relocations = 0;
-    idata_st->ptr_to_line_numbers = 0;
-    idata_st->num_of_relocations = 0;
-    idata_st->num_of_line_numbers = 0;
-    idata_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ;
-    coff_hdr->num_sections++;
+    bool has_imports = array_length(imports) > 0;
+    Section_Table* idata_st = 0;
+    if(has_imports)
+    {
+        idata_st = (Section_Table*)at;
+        at += sizeof(Section_Table);
+        memcpy(idata_st->name, ".idata", sizeof(".idata") - 1);
+        idata_st->virtual_size = 0;         // filled after
+        idata_st->virtual_address = text_st->virtual_address + text_st->size_of_raw_data + align_delta(text_st->size_of_raw_data, opt_pe32->section_alignment); // TODO(psv): maybe this should be text_st->size_of_raw_data + text_st->size_of_raw_data
+        idata_st->size_of_raw_data = 0;     // filled after, must be a multiple of file alignment
+        idata_st->ptr_to_raw_data = 0;      // filled after
+        idata_st->ptr_to_relocations = 0;
+        idata_st->ptr_to_line_numbers = 0;
+        idata_st->num_of_relocations = 0;
+        idata_st->num_of_line_numbers = 0;
+        idata_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ;
+        coff_hdr->num_sections++;
+    }
 #endif
 #if defined(COFF_RDATA)
     /*
@@ -567,23 +572,25 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     */
 #if defined(COFF_IDATA)
     // idata
-    at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
-    idata_st->ptr_to_raw_data = at - stream;
-    u8* idata_start = at;
-    Import_Libs* imp_libs = import_libs(text_ptr, in_stream, imports);
-    at = write_idata(at, imp_libs, idata_st->virtual_address, opt_datadir);
-    idata_st->virtual_size = at - idata_start;
-    idata_st->size_of_raw_data = idata_st->virtual_size + align_delta(idata_st->virtual_size, opt_pe32->file_alignment);
-    last_before_reloc = idata_st;
-    patch_imports(imp_libs, imports, opt_pe32->image_base_pe32, text_ptr, &gen);
+    if(has_imports)
+    {
+        at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
+        idata_st->ptr_to_raw_data = at - stream;
+        u8* idata_start = at;
+        Import_Libs* imp_libs = import_libs(text_ptr, in_stream, imports);
+        at = write_idata(at, imp_libs, idata_st->virtual_address, opt_datadir);
+        idata_st->virtual_size = at - idata_start;
+        idata_st->size_of_raw_data = idata_st->virtual_size + align_delta(idata_st->virtual_size, opt_pe32->file_alignment);
+        last_before_reloc = idata_st;
+        patch_imports(imp_libs, imports, opt_pe32->image_base_pe32, text_ptr, &gen);
+    }
 #endif
 #if defined(COFF_RDATA)
     // rdata
     at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
     rdata_st->ptr_to_raw_data = at - stream;
     u8* rdata_start = at;
-    rdata_st->virtual_address = idata_st->virtual_address + idata_st->size_of_raw_data + align_delta(idata_st->size_of_raw_data, opt_pe32->section_alignment);
-    //    rdata_st->virtual_address = text_st->virtual_address + text_st->size_of_raw_data + align_delta(text_st->size_of_raw_data, opt_pe32->section_alignment);
+    rdata_st->virtual_address = last_before_reloc->virtual_address + last_before_reloc->size_of_raw_data + align_delta(last_before_reloc->size_of_raw_data, opt_pe32->section_alignment);
     at = write_rdata(at, text_ptr, rdata_st->virtual_address, opt_pe32->image_base_pe32, data_seg, &gen);
     rdata_st->virtual_size = at - rdata_start;
     rdata_st->size_of_raw_data = rdata_st->virtual_size + align_delta(rdata_st->virtual_size, opt_pe32->file_alignment);
