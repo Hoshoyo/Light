@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "ast.h"
+#include <stdio.h>
 
 typedef enum {
     IR_REG_INSTR_PTR = -4,
@@ -214,6 +215,8 @@ typedef struct {
     IR_Decl_To_Patch* decl_patch;  // at the end, iterate through all these indexes and fill the instruction with the proc address
 
     IR_Node_Range* node_ranges;
+
+    int index_of_entry_point;
 } IR_Generator;
 
 void ir_generate(IR_Generator* gen, Light_Ast** ast);
@@ -246,4 +249,5 @@ void iri_emit_clear(IR_Generator* gen, IR_Reg t1, IR_Reg t2, IR_Value imm, int b
 
 int  iri_value_byte_size(IR_Value value);
 IR_Value iri_value_new_signed(int byte_size, uint64_t v);
-void iri_print_instructions(IR_Generator* gen);
+IR_Value iri_value_s32(int value);
+void iri_print_instructions(FILE* out, IR_Generator* gen);

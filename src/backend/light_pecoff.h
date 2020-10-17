@@ -251,4 +251,4 @@ typedef struct {
 
 #pragma pack(pop)
 
-void light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patch, X86_Data* data_seg, X86_Import* imports);
+void light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offset, X86_Patch* rel_patch, X86_Data* data_seg, X86_Import* imports);

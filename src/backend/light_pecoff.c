@@ -7,9 +7,9 @@
 #include <light_arena.h>
 #include <hoht.h>
 
-#define COFF_IDATA
-#define COFF_RELOC
-#define COFF_RDATA
+#define COFF_IDATA 1
+#define COFF_RELOC 1
+#define COFF_RDATA 1
 
 typedef struct {
     Relocation_Entry* relocs;
@@ -373,10 +373,10 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches, PECoff_Gene
 }
 
 void
-light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports)
+light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offset, X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports)
 {
     PECoff_Generator gen = { 0 };
-    u8* stream = (u8*)calloc(1, 1024*1024);
+    u8* stream = (u8*)calloc(1, 1024*1024*16);
     u8* at = stream;
 
     u8* ptr_to_pe_header = 0;
@@ -412,7 +412,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     optional_hdr->size_of_code = 0;             // filled after
     optional_hdr->size_of_init_data = 0;        // only needed for static data
     optional_hdr->size_of_uninit_data = 0;      // only needed for static data
-    optional_hdr->address_of_entry = 0x1000;    // TODO <---------------- Entry point address 
+    optional_hdr->address_of_entry = 0x1000 + entry_point_offset;
     optional_hdr->base_of_code = 0x1000;
     optional_hdr->base_of_data = 0;
 
@@ -489,19 +489,24 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
         .idata (read only initialized data)
         contains imported symbols
     */
-    Section_Table* idata_st = (Section_Table*)at;
-    at += sizeof(Section_Table);
-    memcpy(idata_st->name, ".idata", sizeof(".idata") - 1);
-    idata_st->virtual_size = 0;         // filled after
-    idata_st->virtual_address = text_st->virtual_address + text_st->size_of_raw_data + align_delta(text_st->size_of_raw_data, opt_pe32->section_alignment); // TODO(psv): maybe this should be text_st->size_of_raw_data + text_st->size_of_raw_data
-    idata_st->size_of_raw_data = 0;     // filled after, must be a multiple of file alignment
-    idata_st->ptr_to_raw_data = 0;      // filled after
-    idata_st->ptr_to_relocations = 0;
-    idata_st->ptr_to_line_numbers = 0;
-    idata_st->num_of_relocations = 0;
-    idata_st->num_of_line_numbers = 0;
-    idata_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ;
-    coff_hdr->num_sections++;
+    bool has_imports = array_length(imports) > 0;
+    Section_Table* idata_st = 0;
+    if(has_imports)
+    {
+        idata_st = (Section_Table*)at;
+        at += sizeof(Section_Table);
+        memcpy(idata_st->name, ".idata", sizeof(".idata") - 1);
+        idata_st->virtual_size = 0;         // filled after
+        idata_st->virtual_address = text_st->virtual_address + text_st->size_of_raw_data + align_delta(text_st->size_of_raw_data, opt_pe32->section_alignment); // TODO(psv): maybe this should be text_st->size_of_raw_data + text_st->size_of_raw_data
+        idata_st->size_of_raw_data = 0;     // filled after, must be a multiple of file alignment
+        idata_st->ptr_to_raw_data = 0;      // filled after
+        idata_st->ptr_to_relocations = 0;
+        idata_st->ptr_to_line_numbers = 0;
+        idata_st->num_of_relocations = 0;
+        idata_st->num_of_line_numbers = 0;
+        idata_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ;
+        coff_hdr->num_sections++;
+    }
 #endif
 #if defined(COFF_RDATA)
     /*
@@ -567,24 +572,25 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
     */
 #if defined(COFF_IDATA)
     // idata
-    at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
-    idata_st->ptr_to_raw_data = at - stream;
-    u8* idata_start = at;
-    //at = write_idata(at, import_libs_new(), idata_st->virtual_address, opt_datadir);
-    Import_Libs* imp_libs = import_libs(text_ptr, in_stream, imports);
-    at = write_idata(at, imp_libs, idata_st->virtual_address, opt_datadir);
-    idata_st->virtual_size = at - idata_start;
-    idata_st->size_of_raw_data = idata_st->virtual_size + align_delta(idata_st->virtual_size, opt_pe32->file_alignment);
-    last_before_reloc = idata_st;
-    patch_imports(imp_libs, imports, opt_pe32->image_base_pe32, text_ptr, &gen);
+    if(has_imports)
+    {
+        at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
+        idata_st->ptr_to_raw_data = at - stream;
+        u8* idata_start = at;
+        Import_Libs* imp_libs = import_libs(text_ptr, in_stream, imports);
+        at = write_idata(at, imp_libs, idata_st->virtual_address, opt_datadir);
+        idata_st->virtual_size = at - idata_start;
+        idata_st->size_of_raw_data = idata_st->virtual_size + align_delta(idata_st->virtual_size, opt_pe32->file_alignment);
+        last_before_reloc = idata_st;
+        patch_imports(imp_libs, imports, opt_pe32->image_base_pe32, text_ptr, &gen);
+    }
 #endif
 #if defined(COFF_RDATA)
     // rdata
     at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
     rdata_st->ptr_to_raw_data = at - stream;
     u8* rdata_start = at;
-    rdata_st->virtual_address = idata_st->virtual_address + idata_st->size_of_raw_data + align_delta(idata_st->size_of_raw_data, opt_pe32->section_alignment);
-    //rdata_st->virtual_address = text_st->virtual_address + text_st->size_of_raw_data + align_delta(text_st->size_of_raw_data, opt_pe32->section_alignment);
+    rdata_st->virtual_address = last_before_reloc->virtual_address + last_before_reloc->size_of_raw_data + align_delta(last_before_reloc->size_of_raw_data, opt_pe32->section_alignment);
     at = write_rdata(at, text_ptr, rdata_st->virtual_address, opt_pe32->image_base_pe32, data_seg, &gen);
     rdata_st->virtual_size = at - rdata_start;
     rdata_st->size_of_raw_data = rdata_st->virtual_size + align_delta(rdata_st->virtual_size, opt_pe32->file_alignment);
@@ -619,7 +625,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patche
         fprintf(stderr, "Could not open file out2.bin for writing\n");
         return;
     }
-    fwrite(stream, at - stream, 1, file);
+    fwrite(stream, 1, at - stream, file);
     fclose(file);
 }
 #endif
