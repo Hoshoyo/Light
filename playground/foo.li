@@ -1,0 +1,81 @@
+GetStdHandle : (std_handle : s32) -> ^void #extern("Kernel32.dll");
+WriteConsoleA : (handle : ^void, str : ^u8, length : s32, written : ^s32, reserved : s32) -> bool #extern("Kernel32.dll");
+RegisterClassExA : (wnd_class : ^WNDCLASSEXA) -> s32 #extern("User32.dll");
+CreateWindowExA : (ex_style: u32, class_name : ^u8, window_name : ^u8, style : u32, x : s32, y : s32, width : s32, height : s32, parent : s32, menu : s32, hinstance : s32, lparam : s32) -> ^void #extern("User32.dll");
+DefWindowProcA : (window : ^void, msg : u32, wparam : ^void, lparam : ^void) -> ^void #extern("User32.dll");
+GetMessageA : (msg : ^MSG, hwnd : ^void, msg_filter_min : u32, msg_filter_max : u32) -> s32 #extern("User32.dll");
+TranslateMessage : (msg : ^MSG) -> s32 #extern("User32.dll");
+DispatchMessageA : (msg : ^MSG) -> s32 #extern("User32.dll");
+ExitProcess : (ret : u32) -> s32 #extern("Kernel32.dll");
+PeekMessageA : (msg : ^MSG, hwnd : ^void, msg_min_filter : u32, msg_max_filter : u32, remove : u32) -> s32 #extern("User32.dll");
+
+WS_EX_ACCEPTFILES   :: 0x10;
+WS_EX_APPWINDOW     :: 0x40000;
+WS_EX_WINDOWEDGE    :: 0x100;
+WS_VISIBLE          :: 0x10000000;
+WS_OVERLAPPEDWINDOW :: 0xcf0000;
+WM_CLOSE            :: 0x10;
+PM_REMOVE           :u32: 0x1;
+
+POINT struct {
+    x : s32;
+    y : s32;
+}
+
+MSG struct {
+    hwnd    : ^void;
+    message : u32;
+    wparam  : ^void;
+    lparam  : ^void;
+    time    : u32;
+    point   : POINT;
+}
+
+WNDCLASSEXA struct {
+    cb_size       : u32;
+    /* Win 3.x */
+    style        : u32;
+    wndproc      : (^void, u32, ^u32, ^u32) -> ^void;
+    cb_cls_extra : s32;
+    cb_wnd_extra : s32;
+    h_instance   : s32;
+    h_icon       : s32;
+    h_cursor     : s32;
+    h_brush      : s32;
+    menu_name    : ^u8;
+    class_name   : ^u8;
+    /* Win 4.0 */
+    icon_sm      : s32;
+}
+
+wnd_proc : (window : ^void, msg : u32, wparam : ^u32, lparam : ^u32) -> ^void {
+    if(msg == 0x10)
+    {
+        ExitProcess(0);
+    }
+    return DefWindowProcA(window, msg, wparam, lparam);
+}
+
+main : () -> s32 {
+    wnd_class : WNDCLASSEXA;
+    wnd_class.cb_size = #size_of WNDCLASSEXA -> u32;
+    wnd_class.wndproc = wnd_proc;
+    wnd_class.h_instance = 0;
+    wnd_class.class_name = "HoWindow".data;
+    
+    if(RegisterClassExA(&wnd_class) == 0)
+    {
+        return 1;
+    }
+
+    window := CreateWindowExA(0, 
+        wnd_class.class_name, "Doo".data, 0x10cf0000, 0x80000000, 0x80000000, 1024, 768, 0, 0, 0, 0);
+    msg : MSG;
+    while true {
+        while PeekMessageA(&msg, window, 0, 0, PM_REMOVE) != 0 {
+            TranslateMessage(&msg);
+            DispatchMessageA(&msg);
+        }
+    }
+    return 0;
+}
