@@ -143,8 +143,8 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
 
         ar->offset -= (decl->decl_variable.type->size_bits / 8);
 
-        fprintf(stdout, "variable[SB+%d -(0x%x)] %.*s\n", decl->decl_variable.stack_offset, -decl->decl_variable.stack_offset,
-            decl->decl_constant.name->length, decl->decl_constant.name->data);
+        //fprintf(stdout, "variable[SB+%d -(0x%x)] %.*s\n", decl->decl_variable.stack_offset, -decl->decl_variable.stack_offset,
+        //    decl->decl_constant.name->length, decl->decl_constant.name->data);
     }
 }
 
@@ -541,19 +541,26 @@ ir_gen_expr_lit_prim(IR_Generator* gen, Light_Ast* expr)
 {
     IR_Value value = {0};
     value.v_u64 = expr->expr_literal_primitive.value_u64; // this forced any type to be inside the union correctly
-    switch(expr->type->primitive) {
-        case TYPE_PRIMITIVE_S8:   value.type = IR_VALUE_S8;  break;
-        case TYPE_PRIMITIVE_S16:  value.type = IR_VALUE_S16; break;
-        case TYPE_PRIMITIVE_S32:  value.type = IR_VALUE_S32; break;
-        case TYPE_PRIMITIVE_S64:  value.type = IR_VALUE_S64; break;
-        case TYPE_PRIMITIVE_U8:   value.type = IR_VALUE_U8;  break;
-        case TYPE_PRIMITIVE_U16:  value.type = IR_VALUE_U16; break;
-        case TYPE_PRIMITIVE_U32:  value.type = IR_VALUE_U32; break;
-        case TYPE_PRIMITIVE_U64:  value.type = IR_VALUE_U64; break;
-        case TYPE_PRIMITIVE_R32:  value.type = IR_VALUE_R32; break;
-        case TYPE_PRIMITIVE_R64:  value.type = IR_VALUE_R64; break;
-        case TYPE_PRIMITIVE_BOOL: value.type = IR_VALUE_U8; break;
-        default: break;
+    if (expr->expr_literal_primitive.type == LITERAL_POINTER)
+    {
+        value.type = IR_VALUE_S32; // TODO(psv): 64 bit support
+    }
+    else
+    {
+        switch(expr->type->primitive) {
+            case TYPE_PRIMITIVE_S8:   value.type = IR_VALUE_S8;  break;
+            case TYPE_PRIMITIVE_S16:  value.type = IR_VALUE_S16; break;
+            case TYPE_PRIMITIVE_S32:  value.type = IR_VALUE_S32; break;
+            case TYPE_PRIMITIVE_S64:  value.type = IR_VALUE_S64; break;
+            case TYPE_PRIMITIVE_U8:   value.type = IR_VALUE_U8;  break;
+            case TYPE_PRIMITIVE_U16:  value.type = IR_VALUE_U16; break;
+            case TYPE_PRIMITIVE_U32:  value.type = IR_VALUE_U32; break;
+            case TYPE_PRIMITIVE_U64:  value.type = IR_VALUE_U64; break;
+            case TYPE_PRIMITIVE_R32:  value.type = IR_VALUE_R32; break;
+            case TYPE_PRIMITIVE_R64:  value.type = IR_VALUE_R64; break;
+            case TYPE_PRIMITIVE_BOOL: value.type = IR_VALUE_U8; break;
+            default: break;
+        }
     }
     IR_Reg t = ir_new_reg(gen, expr->type);
     iri_emit_mov(gen, IR_REG_NONE, t, value, iri_value_byte_size(value), type_primitive_float(expr->type));
