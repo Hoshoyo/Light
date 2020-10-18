@@ -75,10 +75,6 @@ write_reloc(u8* at, int reloc_rva, int text_rva, Optional_Header_DataDir* data_d
     int r = 0;
     while(true)
     {
-        current_size = (at - start);
-
-        //at += align_delta(current_size, 4);
-
         Base_Relocation_Block* brb = (Base_Relocation_Block*)at;
         int rva_base = gen->relocs[r].offset32 & ~0xfff;
         brb->page_rva = text_rva + (gen->relocs[r].offset32 & ~0xfff); // .text address to which calculate offsets from
@@ -95,8 +91,7 @@ write_reloc(u8* at, int reloc_rva, int text_rva, Optional_Header_DataDir* data_d
             else
             {
                 // end a block
-                *at++ = 0;
-                *at++ = 0;
+                at += align_delta(at - start, 4);
                 brb->block_size = (at - block_start);
                 break;
             }
