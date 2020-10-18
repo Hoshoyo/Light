@@ -451,6 +451,7 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 static Light_Ast* 
 parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope, u32* error) {
     Light_Lexer* lexer = parser->lexer;
+    Light_Token* proc_name = name;
 
     if(!name) {
         name = lexer_next(lexer);
@@ -469,7 +470,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     // a normal procedure declaration instead of a type declaration.
     if( lexer_peek(lexer)->type == '(' &&
         lexer_peek_n(lexer, 1)->type == TOKEN_IDENTIFIER && 
-        lexer_peek_n(lexer, 2)->type == ':') 
+        (lexer_peek_n(lexer, 2)->type == ':' || lexer_peek_n(lexer, 2)->type == ','))
     {
         // Normal declaration
     } else if(
@@ -525,11 +526,31 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
                 ReturnIfError();
             }
 
-            Light_Token* name = lexer_next(lexer);
-            if (name->type != TOKEN_IDENTIFIER) {
-                *error |= parser_error_fatal(parser, name, "expected argument #%d declaration identifier but got '%.*s'\n", args_count + 1, TOKEN_STR(name));
-                return 0;
-            }
+            bool multiple_args = false;
+            int multiple_count = 0;
+            Light_Token* name = 0;
+            do {
+                name = lexer_next(lexer);
+                if (name->type != TOKEN_IDENTIFIER) {
+                    *error |= parser_error_fatal(parser, name, "expected argument #%d declaration identifier but got '%.*s'\n", args_count + 1, TOKEN_STR(name));
+                    return 0;
+                }
+
+                Light_Ast* arg_decl = 0;
+                // multiple arguments declarations
+                if(lexer_peek(lexer)->type == ',') {
+                    multiple_args = true;
+                    lexer_next(lexer);
+                    arg_decl = ast_new_decl_variable(args_scope, name, 0, 0, STORAGE_CLASS_STACK, 0, (Lexical_Range){name, name});
+                    array_push(arguments, arg_decl);   // defer filling type
+                    array_push(args_types, 0);         // defer filling this
+                } else {
+                    multiple_args = false;
+                }
+
+                multiple_count++;
+            } while(multiple_args);
+
             *error |= parser_require_and_eat(parser, ':');
             ReturnIfError();
 
@@ -537,6 +558,10 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 
             // TODO(psv): refactor token to be ...
             if(lexer_peek(parser->lexer)->type == '.') {
+                if(multiple_count > 1) {
+                    *error |= parser_error_fatal(parser, proc_name, "cannot have two or more arguments as variadic\n");
+                    ReturnIfError();
+                }
                 *error |= parser_require_and_eat(parser, '.');
                 ReturnIfError();
                 *error |= parser_require_and_eat(parser, '.');
@@ -557,12 +582,21 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
             Light_Ast* arg = parse_decl_variable(parser, name, arg_type, args_scope, error, false);
             array_push(arguments, arg);
             array_push(args_types, arg_type);
-            if(!(arg_type->flags & TYPE_FLAG_INTERNALIZED))
-                all_args_internalized = false;
+
+            for(int aa = 1; aa < multiple_count; ++aa) {
+                arguments[array_length(arguments) - 1 - aa]->decl_variable.type = arg_type;
+                args_types[array_length(args_types) - 1 - aa] = arg_type;
+                args_scope->decl_count++;
+                array_push(args_scope->decls, arguments[array_length(arguments) - 1 - aa]);
+                ++args_count;
+            }
 
             args_scope->decl_count++;
             array_push(args_scope->decls, arg);
             ++args_count;
+
+            if(!(arg_type->flags & TYPE_FLAG_INTERNALIZED))
+                all_args_internalized = false;
 
             if(variadic)
                 break; // must be the last one
