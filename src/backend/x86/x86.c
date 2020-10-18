@@ -1012,7 +1012,7 @@ X86_generate(IR_Generator* gen)
 #if defined(_WIN32) || defined(_WIN64)
     light_pecoff_emit(em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports);
 #else
-    light_elf_emit(em.base, em.at - em.base, em.relative_patches);
+    light_elf_emit(em.base, em.at - em.base, em.relative_patches, em.imports);
 #endif
     return 0;
 }
