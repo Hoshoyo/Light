@@ -41,6 +41,73 @@ initialize_global_identifiers_table() {
     string_table_add(&global_identifiers_table, light_special_idents_table[LIGHT_SPECIAL_IDENT_EXTERN], 0);
 }
 
+static int
+print_char_hex(char c)
+{
+    int length = 0;
+    char d1 = (c & 0xf0) >> 4;
+    char d2 = (c & 0xf);
+    length += printf("0x");
+    if(d1 < 10) {
+        length += printf("%c", d1 + '0');
+    } else {
+        length += printf("%c", d1 - 10 + 'a');
+    }
+    if(d2 < 10) {
+        length += printf("%c", d2 + '0');
+    } else {
+        length += printf("%c", d2 - 10 + 'a');
+    }
+    return length;
+}
+
+static int
+print_char(char c)
+{
+    switch(c)
+    {
+        case 0:  return printf("NUL");
+        case 1:  return printf("SOH");
+        case 2:  return printf("STX");
+        case 3:  return printf("ETX");
+        case 4:  return printf("EOT");
+        case 5:  return printf("ENQ");
+        case 6:  return printf("ACK");
+        case 7:  return printf("\\a");
+        case 8:  return printf("\\b");
+        case 9:  return printf("\\t");
+        case 10: return printf("\\n");
+        case 11: return printf("\\v");
+        case 12: return printf("\\f");
+        case 13: return printf("\\r");
+        case 14: return printf("SO");
+        case 15: return printf("SI");
+        case 16: return printf("DLE");
+        case 17: return printf("DC1");
+        case 18: return printf("DC2");
+        case 19: return printf("DC3");
+        case 20: return printf("DC4");
+        case 21: return printf("NAK");
+        case 22: return printf("SYN");
+        case 23: return printf("ETB");
+        case 24: return printf("CAN");
+        case 25: return printf("EM");
+        case 26: return printf("SUB");
+        case 27: return printf("ESC");
+        case 28: return printf("FS");
+        case 29: return printf("GS");
+        case 30: return printf("RS");
+        case 31: return printf("US");
+        case 127: return printf("DEL");
+        default: {
+            if((unsigned char)c > 127) {
+                return print_char_hex(c);
+            }
+            return printf("%c", c);
+        } break;
+    }
+}
+
 static bool
 is_letter(char c) {
 	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
