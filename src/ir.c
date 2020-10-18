@@ -143,8 +143,8 @@ ir_gen_decl(IR_Generator* gen, Light_Ast* decl)
 
         ar->offset -= (decl->decl_variable.type->size_bits / 8);
 
-        fprintf(stdout, "variable[SB+%d -(0x%x)] %.*s\n", decl->decl_variable.stack_offset, -decl->decl_variable.stack_offset,
-            decl->decl_constant.name->length, decl->decl_constant.name->data);
+        //fprintf(stdout, "variable[SB+%d -(0x%x)] %.*s\n", decl->decl_variable.stack_offset, -decl->decl_variable.stack_offset,
+        //    decl->decl_constant.name->length, decl->decl_constant.name->data);
     }
 }
 
@@ -335,14 +335,17 @@ ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_lit
         case OP_UNARY_MINUS: {
             t2 = ir_new_reg(gen, expr->type);
             iri_emit_neg(gen, t1, t2, expr->type->size_bits / 8, type_primitive_float(expr->type));
+            ir_free_reg(gen, t1);
         } break;
         case OP_UNARY_BITWISE_NOT: {
             t2 = ir_new_reg(gen, expr->type);
             iri_emit_not(gen, t1, t2, expr->type->size_bits / 8);
+            ir_free_reg(gen, t1);
         } break;
         case OP_UNARY_LOGIC_NOT: {
             t2 = ir_new_reg(gen, expr->type);
             iri_emit_logic_not(gen, t1, t2, expr->type->size_bits / 8);
+            ir_free_reg(gen, t1);
         } break;
 
         case OP_UNARY_CAST: {
@@ -538,19 +541,26 @@ ir_gen_expr_lit_prim(IR_Generator* gen, Light_Ast* expr)
 {
     IR_Value value = {0};
     value.v_u64 = expr->expr_literal_primitive.value_u64; // this forced any type to be inside the union correctly
-    switch(expr->type->primitive) {
-        case TYPE_PRIMITIVE_S8:   value.type = IR_VALUE_S8;  break;
-        case TYPE_PRIMITIVE_S16:  value.type = IR_VALUE_S16; break;
-        case TYPE_PRIMITIVE_S32:  value.type = IR_VALUE_S32; break;
-        case TYPE_PRIMITIVE_S64:  value.type = IR_VALUE_S64; break;
-        case TYPE_PRIMITIVE_U8:   value.type = IR_VALUE_U8;  break;
-        case TYPE_PRIMITIVE_U16:  value.type = IR_VALUE_U16; break;
-        case TYPE_PRIMITIVE_U32:  value.type = IR_VALUE_U32; break;
-        case TYPE_PRIMITIVE_U64:  value.type = IR_VALUE_U64; break;
-        case TYPE_PRIMITIVE_R32:  value.type = IR_VALUE_R32; break;
-        case TYPE_PRIMITIVE_R64:  value.type = IR_VALUE_R64; break;
-        case TYPE_PRIMITIVE_BOOL: value.type = IR_VALUE_U8; break;
-        default: break;
+    if (expr->expr_literal_primitive.type == LITERAL_POINTER)
+    {
+        value.type = IR_VALUE_S32; // TODO(psv): 64 bit support
+    }
+    else
+    {
+        switch(expr->type->primitive) {
+            case TYPE_PRIMITIVE_S8:   value.type = IR_VALUE_S8;  break;
+            case TYPE_PRIMITIVE_S16:  value.type = IR_VALUE_S16; break;
+            case TYPE_PRIMITIVE_S32:  value.type = IR_VALUE_S32; break;
+            case TYPE_PRIMITIVE_S64:  value.type = IR_VALUE_S64; break;
+            case TYPE_PRIMITIVE_U8:   value.type = IR_VALUE_U8;  break;
+            case TYPE_PRIMITIVE_U16:  value.type = IR_VALUE_U16; break;
+            case TYPE_PRIMITIVE_U32:  value.type = IR_VALUE_U32; break;
+            case TYPE_PRIMITIVE_U64:  value.type = IR_VALUE_U64; break;
+            case TYPE_PRIMITIVE_R32:  value.type = IR_VALUE_R32; break;
+            case TYPE_PRIMITIVE_R64:  value.type = IR_VALUE_R64; break;
+            case TYPE_PRIMITIVE_BOOL: value.type = IR_VALUE_U8; break;
+            default: break;
+        }
     }
     IR_Reg t = ir_new_reg(gen, expr->type);
     iri_emit_mov(gen, IR_REG_NONE, t, value, iri_value_byte_size(value), type_primitive_float(expr->type));
@@ -590,7 +600,7 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_
         Light_Ast_Decl_Variable* decl = &vdecl->decl_variable;
         // if it is not loaded in a temporary, then load it
         t = ir_new_reg(gen, expr->type);
-        if(load)
+        if(load && expr->type->size_bits <= type_pointer_size_bits())
         {
             // LOAD SB+imm -> t
             iri_emit_load(gen, IR_REG_STACK_BASE, t, 
@@ -916,7 +926,6 @@ ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
 {
     int while_start_index = iri_current_instr_index(gen);
     array_push(gen->loop_start_labels, while_start_index);
-
     // while(condition)
     IR_Reg cond_temp = ir_gen_expr(gen, stmt->comm_while.condition, true, false, 0);
 
@@ -929,9 +938,9 @@ ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
     {
         ir_gen_comm(gen, stmt->comm_while.body);
     }
-
     // generate while jump to beginning
     int jmp_start_index = iri_current_instr_index(gen);
+
     iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = while_start_index - jmp_start_index}, type_pointer_size_bytes());
 
     int end_index = iri_current_instr_index(gen);
@@ -1384,7 +1393,7 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
 
     ir_patch_proc_calls(gen);
 
-    FILE* ir_out = stdout;//fopen("irout.txt", "w");
-    iri_print_instructions(ir_out, gen);
-    //fclose(ir_out);
+    FILE* ir_out = fopen("irout.txt", "w");
+    //iri_print_instructions(ir_out, gen);
+    fclose(ir_out);
 }

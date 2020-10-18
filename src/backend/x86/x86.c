@@ -989,6 +989,7 @@ X86_generate(IR_Generator* gen)
     }
 
     // Do instruction relative address patching
+#if 1
     for(int i = 0; i < array_length(em.relative_patches); ++i)
     {
         u8* issuer_addr = em.relative_patches[i].issuer_addr;
@@ -1001,9 +1002,12 @@ X86_generate(IR_Generator* gen)
         int extra = em.relative_patches[i].extra_offset;
         if(bytes == 1)
             *(char*)patch_addr = (char)(diff);
-        else if(bytes == 4)
+        else if (bytes == 4)
+        {
             *(int*)patch_addr = diff + extra;
+        }
     }
+#endif
 
 #if defined(_WIN32) || defined(_WIN64)
     light_pecoff_emit(em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports);

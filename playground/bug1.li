@@ -1,0 +1,10 @@
+GetStdHandle : (std_handle : s32) -> ^void #extern("Kernel32.dll");
+main : () -> s32 {
+    while true {
+        //while false {
+        //    //a := 0;
+        //}
+    }
+    a := GetStdHandle(-11);
+    return 0;
+}

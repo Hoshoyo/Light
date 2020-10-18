@@ -21,10 +21,6 @@ static int align_delta(int offset, int align_to)
 	return((align_to - rest) % align_to);
 }
 
-static char dos_hdr[] = {
-    0x77, 0x90, 0x144, 0x0, 0x3, 0x0, 0x0, 0x0, 0x4, 0x0, 0x0, 0x0, 0x255, 0x255, 0x0, 0x0, 0x184, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x64, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x176, 0x0, 0x0, 0x0, 0x14, 0x31, 0x186, 0x14, 0x0, 0x180, 0x9, 0x205, 0x33, 0x184, 0x1, 0x76, 0x205, 0x33, 0x84, 0x104, 0x105, 0x115, 0x32, 0x112, 0x114, 0x111, 0x103, 0x114, 0x97, 0x109, 0x32, 0x99, 0x97, 0x110, 0x110, 0x111, 0x116, 0x32, 0x98, 0x101, 0x32, 0x114, 0x117, 0x110, 0x32, 0x105, 0x110, 0x32, 0x68, 0x79, 0x83, 0x32, 0x109, 0x111, 0x100, 0x101, 0x46, 0x13, 0x13, 0x10, 0x36, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x239, 0x10, 0x11, 0x221, 0x171, 0x107, 0x101, 0x142, 0x171, 0x107, 0x101, 0x142, 0x171, 0x107, 0x101, 0x142, 0x60, 0x53, 0x97, 0x143, 0x169, 0x107, 0x101, 0x142, 0x60, 0x53, 0x103, 0x143, 0x170, 0x107, 0x101, 0x142, 0x82, 0x105, 0x99, 0x104, 0x171, 0x107, 0x101, 0x142, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
-};
-
 static Relocation_Entry
 relocation_new(int offset)
 {
@@ -32,9 +28,10 @@ relocation_new(int offset)
     return r;
 }
 
-static u8*
+static int
 write_rdata(u8* at, u8* text_ptr, int rdata_rva, int base_rva, X86_Data* data_seg, PECoff_Generator* gen)
 {
+    u8* start = at;
     int offset = 0;
     for(int i = 0; i < array_length(data_seg); ++i)
     {
@@ -53,10 +50,10 @@ write_rdata(u8* at, u8* text_ptr, int rdata_rva, int base_rva, X86_Data* data_se
         array_push(gen->relocs, relocation_new(data->patch_offset));
     }
     *at++ = 0;
-    return at;
+    return at - start;
 }
 
-static u8*
+static int
 write_reloc(u8* at, int reloc_rva, int text_rva, Optional_Header_DataDir* data_dir, PECoff_Generator* gen)
 {
     u8* start = at;
@@ -74,7 +71,7 @@ write_reloc(u8* at, int reloc_rva, int text_rva, Optional_Header_DataDir* data_d
     data_dir->base_relocation_table.size = brb->block_size;
     data_dir->base_relocation_table.virtual_address = reloc_rva;
 
-    return at;
+    return at - start;
 }
 
 typedef struct {
@@ -106,7 +103,7 @@ typedef struct {
 Import_Libs
 pecoff_new_lib(const char* name, int length)
 {
-    void* n = calloc(length, 1);
+    void* n = calloc(1, length);
     memcpy(n, name, length);
 
     Import_Libs l = {.name = n, .length = length};
@@ -117,7 +114,7 @@ pecoff_new_lib(const char* name, int length)
 Import_Symbol
 pecoff_new_symbol(const char* name, int length, u16 hint)
 {
-    void* n = calloc(length, 1);
+    void* n = calloc(1, length);
     memcpy(n, name, length);
     Import_Symbol s = {.symbol = n, .length = length, .hint = hint};
     return s;
@@ -334,7 +331,7 @@ write_iname_table(u8* at, Import_Libs* libs, int base_rva, int rva, Optional_Hea
     return at;
 }
 
-static u8*
+static int
 write_idata(u8* at, Import_Libs* libs, int base_rva, Optional_Header_DataDir* data_dir)
 {
     u8* start = at;
@@ -352,8 +349,8 @@ write_idata(u8* at, Import_Libs* libs, int base_rva, Optional_Header_DataDir* da
     at = write_iname_table(at, libs, base_rva, base_rva + (at - start), data_dir, 4);
 
     at = at + align_delta(at - start, 0x200);
-
-    return at;
+    
+    return at - start;
 }
 
 static void
@@ -375,7 +372,7 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches, PECoff_Gene
 void
 light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offset, X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports)
 {
-    PECoff_Generator gen = { 0 };
+    PECoff_Generator gen = {0};
     u8* stream = (u8*)calloc(1, 1024*1024*16);
     u8* at = stream;
 
@@ -564,9 +561,8 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offse
     text_st->ptr_to_raw_data = at - stream;
     // emit text data
     memcpy(at, in_stream, in_stream_size_bytes);
-    at += in_stream_size_bytes;
+    at += (in_stream_size_bytes);
     last_before_reloc = text_st;
-
     /*
         .idata raw data
     */
@@ -578,7 +574,7 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offse
         idata_st->ptr_to_raw_data = at - stream;
         u8* idata_start = at;
         Import_Libs* imp_libs = import_libs(text_ptr, in_stream, imports);
-        at = write_idata(at, imp_libs, idata_st->virtual_address, opt_datadir);
+        at += write_idata(at, imp_libs, idata_st->virtual_address, opt_datadir);
         idata_st->virtual_size = at - idata_start;
         idata_st->size_of_raw_data = idata_st->virtual_size + align_delta(idata_st->virtual_size, opt_pe32->file_alignment);
         last_before_reloc = idata_st;
@@ -591,24 +587,24 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offse
     rdata_st->ptr_to_raw_data = at - stream;
     u8* rdata_start = at;
     rdata_st->virtual_address = last_before_reloc->virtual_address + last_before_reloc->size_of_raw_data + align_delta(last_before_reloc->size_of_raw_data, opt_pe32->section_alignment);
-    at = write_rdata(at, text_ptr, rdata_st->virtual_address, opt_pe32->image_base_pe32, data_seg, &gen);
+    at += write_rdata(at, text_ptr, rdata_st->virtual_address, opt_pe32->image_base_pe32, data_seg, &gen);
     rdata_st->virtual_size = at - rdata_start;
     rdata_st->size_of_raw_data = rdata_st->virtual_size + align_delta(rdata_st->virtual_size, opt_pe32->file_alignment);
     last_before_reloc = rdata_st;
 #endif
+
 #if defined(COFF_RELOC)
     // reloc
     at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
     reloc_st->ptr_to_raw_data = at - stream;
     u8* reloc_start = at;
     reloc_st->virtual_address = last_before_reloc->virtual_address + last_before_reloc->size_of_raw_data + align_delta(last_before_reloc->size_of_raw_data, opt_pe32->section_alignment);
-    at = write_reloc(at, reloc_st->virtual_address, text_st->virtual_address, opt_datadir, &gen);
+    at += write_reloc(at, reloc_st->virtual_address, text_st->virtual_address, opt_datadir, &gen);
     reloc_st->virtual_size = at - reloc_start;
     reloc_st->size_of_raw_data = reloc_st->virtual_size + align_delta(reloc_st->virtual_size, opt_pe32->file_alignment);
 #endif
     // this should be set to the last virtual address section table
     Section_Table* last_table_va = reloc_st;
-
     /*
         End of file
     */
