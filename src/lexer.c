@@ -56,6 +56,20 @@ is_hex_digit(char c) {
 	return (is_number(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
 }
 
+static u8
+hex_digits_to_char(char d1, char d2)
+{
+    if(is_number(d1)) d1 -= '0';
+    if(is_number(d2)) d2 -= '0';
+    if(d1 >= 'a' && d1 <= 'f') d1 = d1 - 'a' + 10;
+    if(d1 >= 'A' && d1 <= 'F') d1 = d1 - 'A' + 10;
+    if(d2 >= 'a' && d2 <= 'f') d2 = d2 - 'a' + 10;
+    if(d2 >= 'A' && d2 <= 'F') d2 = d2 - 'A' + 10;
+    
+    u8 r = ((d1 << 4) | d2);
+    return r;
+}
+
 static Light_Token
 token_number(u8* at, s32 line, s32 column) {
     Light_Token r = {0};
@@ -106,6 +120,79 @@ token_number(u8* at, s32 line, s32 column) {
     r.length = at - r.data;
 
     return r;
+}
+
+static int
+token_str_to_raw(Light_Token* token)
+{
+    // TODO(psv): Optimize this, use an arena in the Lexer or something
+    u8* mem = (u8*)calloc(1, token->length);
+    for(int i = 1, r = 0; i < token->length - 1; ++i)
+    {
+        u8 c = token->data[i];
+        switch(c)
+        {
+            case '\\': {
+                i++;
+                if(i < token->length - 1)
+                {
+                    u8 n = token->data[i];
+                    switch(n)
+                    {
+                        case '0':   mem[r] = 0; break;
+                        case '\\':  mem[r] = '\\'; break;
+                        case 'n':   mem[r] = '\n'; break;
+                        case 't':   mem[r] = '\t'; break;
+                        case 'r':   mem[r] = '\r'; break;
+                        case 'a':   mem[r] = '\a'; break;
+                        case 'b':   mem[r] = '\b'; break;
+                        case 'x': {
+                            // hexadecimal
+                            i++;
+                            if(i + 1 < token->length - 1)
+                            {
+                                u8 d1 = token->data[i];
+                                u8 d2 = token->data[i+1];
+                                i++;
+                                if(is_hex_digit(d1) && is_hex_digit(d2))
+                                {
+                                    mem[r] = hex_digits_to_char(d1, d2);
+                                }
+                                else
+                                {
+                                    fprintf(stderr, "invalid hex escape sequence, must be two hex digits\n");
+                                    return -1;
+                                }
+                            }
+                            else
+                            {
+                                fprintf(stderr, "invalid hex escape sequence at the end of string literal\n");
+                                return -1;
+                            }
+                        } break;
+                        default: {
+                            fprintf(stderr, "invalid escape sequence '%c'\n", n);
+                            return -1;
+                        }
+                    }
+                    ++r;
+                    token->raw_data_length++;
+                }
+                else
+                {
+                    fprintf(stderr, "invalid escape sequence at the end of string literal\n");
+                    return -1;
+                }
+            } break;
+            default: {
+                mem[r] = token->data[i];
+                token->raw_data_length++;
+                ++r;
+            } break;
+        }
+    }
+    token->raw_data = mem;
+    return 0;
 }
 
 static Light_Token
@@ -407,42 +494,12 @@ token_next(Light_Lexer* lexer) {
 					at++;
 					if (*at == '"') {
 						at++;
-					} else {
-						switch (*at) {
-						case 'a':
-						case 'b':
-						case 'f':
-						case 'n':
-						case 'r':
-						case 't':
-						case 'v':
-						case 'e':
-						case '\\':
-						case '\'':
-						case '"':
-						case '?':
-							break;
-						case 0:
-							break;
-						case 'x':
-							at++;
-							if (is_hex_digit(*at) || is_number(*at)) {
-								at++;
-								if (is_hex_digit(*at) || is_number(*at)) {
-									at++;
-								}
-							} else {
-								//printf("invalid escape sequence '\\x%c", *at);
-							}
-						default: {
-							//printf("invalid escape sequence '\\x%c", *at);
-						}break;
-						}
 					}
-				}
+                }
 			}
 			at++; // skip "
 			r.length = at - r.data;
+            if(token_str_to_raw(&r) == -1) exit(-1);
 		} break;
 
 		default: {

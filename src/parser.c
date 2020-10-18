@@ -907,8 +907,8 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
             arr->flags |= AST_FLAG_COMPILER_GENERATED;
             arr->expr_literal_array.raw_data = true;
             arr->expr_literal_array.array_strong_type = 0;
-            arr->expr_literal_array.data = first->data;
-            arr->expr_literal_array.data_length_bytes = (u64)first->length;
+            arr->expr_literal_array.data = first->raw_data;
+            arr->expr_literal_array.data_length_bytes = (u64)first->raw_data_length;
 
             Light_Ast* cast = ast_new_expr_unary(scope, arr, string_token, OP_UNARY_CAST, (Lexical_Range){0});
             cast->flags |= AST_FLAG_COMPILER_GENERATED;
@@ -920,7 +920,7 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
 
             // @String
             // length
-            u64 len = first->length - 2;
+            u64 len = first->raw_data_length;
             Light_Ast* ll0 = ast_new_expr_literal_primitive_u32(scope, 0, (Lexical_Range){0});
             ll0->flags |= AST_FLAG_COMPILER_GENERATED;
             array_push(result->expr_literal_struct.struct_exprs, ll0);

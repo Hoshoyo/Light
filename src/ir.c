@@ -793,8 +793,7 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr, bool inside_literal, i
         // raw data
         // TODO(psv): optimize to store 4 or more bytes at a time
         IR_Reg t1 = ir_new_temp(gen);
-        // skip " and leave " out
-        for(int i = 1; i < expr->expr_literal_array.data_length_bytes - 1; ++i)
+        for(int i = 0; i < expr->expr_literal_array.data_length_bytes; ++i)
         {
             iri_emit_mov(gen, IR_REG_NONE, t1, (IR_Value){.type = IR_VALUE_U8, .v_u8 = expr->expr_literal_array.data[i]},
                 1, false);

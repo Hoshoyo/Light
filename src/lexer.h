@@ -116,8 +116,10 @@ typedef struct {
     s32              column;
     u8*              data;
     s32              length;
+	s32              raw_data_length;
     u32              flags;
 	char*            filepath;
+	u8*              raw_data;
 } Light_Token;
 
 typedef enum {
