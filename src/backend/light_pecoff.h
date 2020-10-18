@@ -245,8 +245,11 @@ typedef struct {
 } Symbol_Table_Entry;
 
 typedef struct {
-    u16 offset : 12;
-    u16 type   : 4;
+	struct PE_Entry {
+		u16 offset : 12;
+		u16 type   : 4;
+	} entry;
+	int offset32;
 } Relocation_Entry;
 
 #pragma pack(pop)

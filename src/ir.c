@@ -252,14 +252,19 @@ ir_gen_cvt_to_int(IR_Generator* gen, Light_Ast* expr, int op_temp)
     }
     else
     {
-        t = ir_new_temp(gen);
         if(type_primitive_uint(cast_type) || type_primitive_bool(cast_type))
         {
+            t = ir_new_temp(gen);
             iri_emit_cvt(gen, IR_CVT_UI, op_temp, t, op_type->size_bits / 8, cast_type->size_bits / 8);
         }
         else if(type_primitive_sint(cast_type))
         {
+            t = ir_new_temp(gen);
             iri_emit_cvt(gen, IR_CVT_SI, op_temp, t, op_type->size_bits / 8, cast_type->size_bits / 8);
+        }
+        else if(cast_type->kind == TYPE_KIND_POINTER)
+        {
+            return op_temp;
         }
     }
     ir_free_reg(gen, op_temp);
@@ -797,7 +802,7 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr, bool inside_literal, i
         {
             iri_emit_mov(gen, IR_REG_NONE, t1, (IR_Value){.type = IR_VALUE_U8, .v_u8 = expr->expr_literal_array.data[i]},
                 1, false);
-            iri_emit_store(gen, t1, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = i - 1 + stack_offset}, 1, false);
+            iri_emit_store(gen, t1, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = i + stack_offset}, 1, false);
         }
         ir_free_reg(gen, t1);
     }
@@ -1392,7 +1397,7 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
 
     ir_patch_proc_calls(gen);
 
-    FILE* ir_out = fopen("irout.txt", "w");
-    //iri_print_instructions(ir_out, gen);
-    fclose(ir_out);
+    //FILE* ir_out = fopen("irout.txt", "w");
+    //iri_print_instructions(stdout, gen);
+    //fclose(ir_out);
 }

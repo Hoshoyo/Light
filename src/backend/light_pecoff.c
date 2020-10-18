@@ -24,7 +24,10 @@ static int align_delta(int offset, int align_to)
 static Relocation_Entry
 relocation_new(int offset)
 {
-    Relocation_Entry r = {.type = IMAGE_REL_BASED_HIGHLOW, .offset = offset};
+    Relocation_Entry r = {
+        .entry = {.type = IMAGE_REL_BASED_HIGHLOW, .offset = offset},
+        .offset32 = offset,
+    };
     return r;
 }
 
@@ -54,21 +57,57 @@ write_rdata(u8* at, u8* text_ptr, int rdata_rva, int base_rva, X86_Data* data_se
 }
 
 static int
+reloc_compare(const void* r1, const void* r2)
+{
+    Relocation_Entry* rel1 = (Relocation_Entry*)r1;
+    Relocation_Entry* rel2 = (Relocation_Entry*)r2;
+    return(rel1->offset32 - rel2->offset32);
+}
+
+static int
 write_reloc(u8* at, int reloc_rva, int text_rva, Optional_Header_DataDir* data_dir, PECoff_Generator* gen)
 {
     u8* start = at;
-    Base_Relocation_Block* brb = (Base_Relocation_Block*)at;
-    brb->page_rva = text_rva; // .text address to which calculate offsets from
-    at += sizeof(Base_Relocation_Block);
+    int current_size = 0;
 
-    for(int r = 0; r < array_length(gen->relocs); ++r)
+    qsort(gen->relocs, array_length(gen->relocs), sizeof(Relocation_Entry), reloc_compare);
+
+    int r = 0;
+    while(true)
     {
-        *(Relocation_Entry*)at = gen->relocs[r];
-        at += sizeof(Relocation_Entry);
+        current_size = (at - start);
+
+        //at += align_delta(current_size, 4);
+
+        Base_Relocation_Block* brb = (Base_Relocation_Block*)at;
+        int rva_base = gen->relocs[r].offset32 & ~0xfff;
+        brb->page_rva = text_rva + (gen->relocs[r].offset32 & ~0xfff); // .text address to which calculate offsets from
+        u8* block_start = at;
+        at += sizeof(Base_Relocation_Block);
+
+        for(; r < array_length(gen->relocs); ++r)
+        {
+            if((gen->relocs[r].offset32 - rva_base) < 0x1000)
+            {
+                *(struct PE_Entry*)at = gen->relocs[r].entry;
+                at += sizeof(struct PE_Entry);
+            }
+            else
+            {
+                // end a block
+                *at++ = 0;
+                *at++ = 0;
+                brb->block_size = (at - block_start);
+                break;
+            }
+        }
+        if (r >= array_length(gen->relocs)) {
+            brb->block_size = (at - block_start);
+            break;
+        }
     }
 
-    brb->block_size = (at - start);
-    data_dir->base_relocation_table.size = brb->block_size;
+    data_dir->base_relocation_table.size = (at - start);
     data_dir->base_relocation_table.virtual_address = reloc_rva;
 
     return at - start;
