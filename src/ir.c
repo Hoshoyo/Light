@@ -335,14 +335,17 @@ ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_lit
         case OP_UNARY_MINUS: {
             t2 = ir_new_reg(gen, expr->type);
             iri_emit_neg(gen, t1, t2, expr->type->size_bits / 8, type_primitive_float(expr->type));
+            ir_free_reg(gen, t1);
         } break;
         case OP_UNARY_BITWISE_NOT: {
             t2 = ir_new_reg(gen, expr->type);
             iri_emit_not(gen, t1, t2, expr->type->size_bits / 8);
+            ir_free_reg(gen, t1);
         } break;
         case OP_UNARY_LOGIC_NOT: {
             t2 = ir_new_reg(gen, expr->type);
             iri_emit_logic_not(gen, t1, t2, expr->type->size_bits / 8);
+            ir_free_reg(gen, t1);
         } break;
 
         case OP_UNARY_CAST: {
@@ -590,7 +593,7 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_
         Light_Ast_Decl_Variable* decl = &vdecl->decl_variable;
         // if it is not loaded in a temporary, then load it
         t = ir_new_reg(gen, expr->type);
-        if(load)
+        if(load && expr->type->size_bits <= type_pointer_size_bits())
         {
             // LOAD SB+imm -> t
             iri_emit_load(gen, IR_REG_STACK_BASE, t, 
@@ -916,7 +919,6 @@ ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
 {
     int while_start_index = iri_current_instr_index(gen);
     array_push(gen->loop_start_labels, while_start_index);
-
     // while(condition)
     IR_Reg cond_temp = ir_gen_expr(gen, stmt->comm_while.condition, true, false, 0);
 
@@ -929,9 +931,9 @@ ir_gen_comm_while(IR_Generator* gen, Light_Ast* stmt)
     {
         ir_gen_comm(gen, stmt->comm_while.body);
     }
-
     // generate while jump to beginning
     int jmp_start_index = iri_current_instr_index(gen);
+
     iri_emit_jr(gen, (IR_Value){.type = IR_VALUE_S32, .v_s32 = while_start_index - jmp_start_index}, type_pointer_size_bytes());
 
     int end_index = iri_current_instr_index(gen);
@@ -1384,7 +1386,7 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
 
     ir_patch_proc_calls(gen);
 
-    FILE* ir_out = stdout;//fopen("irout.txt", "w");
-    iri_print_instructions(ir_out, gen);
-    //fclose(ir_out);
+    FILE* ir_out = fopen("irout.txt", "w");
+    //iri_print_instructions(ir_out, gen);
+    fclose(ir_out);
 }

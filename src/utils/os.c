@@ -34,7 +34,7 @@ static void os_set_query_frequency() {
 	perf_frequency = (double)(li.QuadPart);
 }
 double os_time_us() {
-	static initialized = false;
+	static bool initialized = false;
 	if (!initialized) {
 		os_set_query_frequency();
 		initialized = true;
