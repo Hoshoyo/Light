@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "light_array.h"
 #include <assert.h>
+#include "type.h"
 
 /* Load */
 
