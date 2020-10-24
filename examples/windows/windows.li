@@ -1,0 +1,90 @@
+WS_EX_ACCEPTFILES   :u32: 0x10;
+WS_EX_APPWINDOW     :u32: 0x40000;
+WS_EX_WINDOWEDGE    :u32: 0x100;
+WS_VISIBLE          :u32: 0x10000000;
+WS_OVERLAPPEDWINDOW :u32: 0xcf0000;
+WM_CLOSE            :s32: 0x10;
+PM_REMOVE           :u32: 0x1;
+MB_ICONERROR        :u32: 0x10;
+CW_USEDEFAULT       :s32: 0x80000000;
+
+PFD_MAIN_PLANE :u8: 0;
+PFD_SUPPORT_OPENGL :u32: 0x20;
+PFD_DRAW_TO_WINDOW :u32: 0x4;
+PFD_DOUBLEBUFFER :u32: 0x1;
+PFD_TYPE_RGBA :u8: 0;
+
+POINT struct {
+    x : s32;
+    y : s32;
+}
+
+MSG struct {
+    hwnd    : ^void;
+    message : u32;
+    wparam  : ^void;
+    lparam  : ^void;
+    time    : u32;
+    point   : POINT;
+}
+
+WNDCLASSEXA struct {
+    cb_size       : u32;
+    /* Win 3.x */
+    style        : u32;
+    wndproc      : (^void, u32, ^u32, ^u32) -> ^void;
+    cb_cls_extra : s32;
+    cb_wnd_extra : s32;
+    h_instance   : s32;
+    h_icon       : s32;
+    h_cursor     : s32;
+    h_brush      : s32;
+    menu_name    : ^u8;
+    class_name   : ^u8;
+    /* Win 4.0 */
+    icon_sm      : s32;
+}
+
+Window_Info struct {
+    window     : ^void;
+    width      : s32;
+    height     : s32;
+    hdc        : ^void;
+    render_ctx : ^void;
+    core_ctx   : bool;
+}
+
+PIXELFORMATDESCRIPTOR struct {
+    nSize : u16;
+    nVersion : u16;
+    dwFlags : u32;
+    iPixelType : u8;
+    cColorBits : u8;
+    cRedBits : u8;
+    cRedShift : u8;
+    cGreenBits : u8;
+    cGreenShift : u8;
+    cBlueBits : u8;
+    cBlueShift : u8;
+    cAlphaBits : u8;
+    cAlphaShift : u8;
+    cAccumBits : u8;
+    cAccumRedBits : u8;
+    cAccumGreenBits : u8;
+    cAccumBlueBits : u8;
+    cAccumAlphaBits : u8;
+    cDepthBits : u8;
+    cStencilBits : u8;
+    cAuxBuffers : u8;
+    iLayerType : u8;
+    bReserved : u8;
+    dwLayerMask : u32;
+    dwVisibleMask : u32;
+    dwDamageMask : u32;
+}
+
+PROC (^void, ^void, ^s32) -> ^void;
+
+#import "windows_kernel32.li"
+#import "windows_gdi32.li"
+#import "windows_user32.li"

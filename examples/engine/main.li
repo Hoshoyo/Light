@@ -1,0 +1,106 @@
+#import "../opengl/opengl.li"
+#import "../windows/windows.li"
+
+init_opengl : (window_info : ^Window_Info) -> s32 {
+    pixel_format : s32;
+    window_info.hdc = GetDC(window_info.window);
+
+    pfd : PIXELFORMATDESCRIPTOR;
+    pfd.nSize = #size_of PIXELFORMATDESCRIPTOR -> u16;
+	pfd.nVersion = 1;
+	pfd.iLayerType = PFD_MAIN_PLANE;
+	pfd.dwFlags = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
+	pfd.cDepthBits = 32;
+	pfd.cColorBits = 24;
+	pfd.iPixelType = PFD_TYPE_RGBA;
+
+    pixel_format = ChoosePixelFormat(window_info.hdc, &pfd);
+	if !SetPixelFormat(window_info.hdc, pixel_format, &pfd) {
+		MessageBoxA(0 -> ^void, "Could not set a pixel format.\0".data, "Fatal Error\0".data, MB_ICONERROR);
+		return -1;
+	}
+
+    temp_context := wglCreateContext(window_info.hdc);
+	if !wglMakeCurrent(window_info.hdc, temp_context) {
+		MessageBoxA(0 -> ^void, "Could not create an OpenGL context.\n Make sure OpenGL compatible drivers are installed.\0".data, 
+            "Fatal Error\0".data, MB_ICONERROR);
+		return -1;
+	}
+
+    attribs := 
+    [
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+		WGL_CONTEXT_FLAGS_ARB, 0, 0
+    ];
+
+    wglCreateContextAttribsARB := wglGetProcAddress("wglCreateContextAttribsARB\0".data) -> (^void, ^void, ^s32) -> ^void;
+    if wglCreateContextAttribsARB == ((null) -> (^void, ^void, ^s32) -> ^void) {
+        ExitProcess(1);
+    }
+
+    window_info.render_ctx = wglCreateContextAttribsARB(window_info.hdc, 0 -> ^void, attribs -> ^s32);
+    if window_info.render_ctx != (0 -> ^void) {
+        wglMakeCurrent(0 -> ^void, 0 -> ^void);
+        wglDeleteContext(temp_context);
+        wglMakeCurrent(window_info.hdc, window_info.render_ctx);
+        window_info.core_ctx = true;
+    } else {
+        MessageBoxA(null, "Could not create an OpenGL 3.3 context.\n Make sure OpenGL compatible drivers are installed.\0".data, 
+            "Error\0".data, MB_ICONERROR);
+        window_info.core_ctx = false;
+    }
+
+    return 0;
+}
+
+wnd_proc : (window : ^void, msg : u32, wparam : ^u32, lparam : ^u32) -> ^void {
+    if(msg == 0x10)
+    {
+        ExitProcess(0);
+    }
+    return DefWindowProcA(window, msg, wparam, lparam);
+}
+
+main : () -> s32 {
+    wnd_class : WNDCLASSEXA;
+    wnd_class.cb_size = #size_of WNDCLASSEXA -> u32;
+    wnd_class.wndproc = wnd_proc;
+    wnd_class.h_instance = 0;
+    wnd_class.class_name = "HoWindow".data;
+    
+    if(RegisterClassExA(&wnd_class) == 0)
+    {
+        return 1;
+    }
+    
+    window := CreateWindowExA(
+        WS_EX_ACCEPTFILES | WS_EX_APPWINDOW | WS_EX_WINDOWEDGE, 
+        wnd_class.class_name, 
+        "Doo".data, 
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE, 
+        CW_USEDEFAULT, CW_USEDEFAULT, 
+        1024, 768, 0, 0, 0, 0);
+    msg : MSG;
+
+    winfo : Window_Info;
+    winfo.width = 1024;
+	winfo.height = 768;
+	winfo.window = window;
+
+    init_opengl(&winfo);
+
+    glClearColor(0.4, 0.5, 0.5, 1.0);
+
+    while true {
+        glClear(GL_COLOR_BUFFER_BIT);
+        while PeekMessageA(&msg, window, 0, 0, PM_REMOVE) != 0 {
+            TranslateMessage(&msg);
+            DispatchMessageA(&msg);
+        }
+
+        SwapBuffers(winfo.hdc);
+    }
+
+    return 0;
+}

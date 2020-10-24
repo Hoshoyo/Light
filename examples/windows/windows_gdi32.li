@@ -1,0 +1,3 @@
+ChoosePixelFormat : (hdc : ^void, pfd : ^PIXELFORMATDESCRIPTOR) -> s32 #extern("Gdi32.dll");
+SetPixelFormat : (hdc : ^void, format : s32, pfd : ^PIXELFORMATDESCRIPTOR) -> bool #extern("Gdi32.dll");
+SwapBuffers : (hdc : ^void) -> bool #extern("Gdi32.dll");

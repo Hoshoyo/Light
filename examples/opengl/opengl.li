@@ -1,0 +1,6 @@
+#import "../opengl/opengl_windows.li"
+
+glClearColor : (r : r32, g : r32, b : r32, a : r32) -> void #extern("OpenGL32.dll");
+glClear : (bitmask : u32) -> void #extern("OpenGL32.dll");
+
+GL_COLOR_BUFFER_BIT :u32: 0x4000;
