@@ -737,10 +737,11 @@ parse_init(Light_Parser* parser, Light_Lexer* lexer, Light_Scope* global_scope, 
     parser->parse_queue_array = array_new_len(string, 2048);
     string_table_new(&parser->parse_queue, 1024 * 1024);
 
-    // TODO(psv): error when this file is not found
+    // TODO(psv): Figure out if this is going to be done this way
+#if 0
     parse_push_internal_file(parser, "/../modules/base.li", compiler_path, compiler_path_size); // base must be first
     parse_push_internal_file(parser, "/../modules/reflect.li", compiler_path, compiler_path_size);
-
+#endif
     string mf = {strlen(main_file), 0, (char*)main_file};
     array_push(parser->parse_queue_array, mf);
     string_table_add(&parser->parse_queue, mf, 0);

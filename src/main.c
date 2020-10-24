@@ -14,6 +14,8 @@
 #include <hoht.h>
 #include "backend/x86/x86.h"
 
+Light_Ast** load_internal_modules(Light_Parser* parser, Light_Scope* global_scope);
+
 int main(int argc, char** argv) {
     double start = os_time_us();
 
@@ -39,7 +41,7 @@ int main(int argc, char** argv) {
     u32 parser_error = 0;
     parse_init(&parser, &lexer, &global_scope, compiler_path, compiler_path_size, argv[1]);
 
-    Light_Ast** ast = 0;
+    Light_Ast** ast = load_internal_modules(&parser, &global_scope);
 
     double parse_start = os_time_us();
     double lexing_elapsed = 0.0;
