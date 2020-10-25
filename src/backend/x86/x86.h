@@ -33,4 +33,10 @@ typedef struct {
     int patch_offset;
 } X86_Data;
 
+typedef struct {
+    int patch_offset;
+    int patch_length_bytes;
+    int dseg_entry_index;
+} X86_DataSeg_Patch;
+
 int X86_generate(IR_Generator* gen);

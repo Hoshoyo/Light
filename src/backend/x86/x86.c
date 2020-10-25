@@ -20,6 +20,8 @@ typedef struct {
     X86_Data*   data;
     int         data_offset;
 
+    X86_DataSeg_Patch* dseg_patch;
+
     IR_Generator* ir_gen;
 } X86_Emitter;
 
@@ -187,6 +189,16 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
                 .patch_addr = patch_addr + info.immediate_offset
             };
             array_push(em->imports, import);
+        }
+        else if(instr->flags & IIR_FLAG_DATASEG_OFFSET)
+        {
+            IR_Data_Segment_Entry* dsegentry = &em->ir_gen->dataseg[instr->imm.v_u64];
+            X86_DataSeg_Patch patch = {
+                .patch_offset = patch_addr + info.immediate_offset - em->base,
+                .patch_length_bytes = dsegentry->data_length_bytes,
+                .dseg_entry_index = instr->imm.v_u64,
+            };
+            array_push(em->dseg_patch, patch);
         }
     }
     else
@@ -958,6 +970,7 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
     }
     return (Instr_Emit_Result){0};
 }
+
 #include "../../utils/os.h"
 int
 X86_generate(IR_Generator* gen)
@@ -967,6 +980,7 @@ X86_generate(IR_Generator* gen)
     em.at = em.base;
     em.relative_patches = array_new(X86_Patch);
     em.data = array_new(X86_Data);
+    em.dseg_patch = array_new(X86_DataSeg_Patch);
     em.imports = array_new(X86_Import);
     em.ir_gen = gen;
     int entry_point_offset = 0;
@@ -1010,7 +1024,7 @@ X86_generate(IR_Generator* gen)
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
-    light_pecoff_emit(em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports);
+    light_pecoff_emit(em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports, em.dseg_patch, gen->dataseg);
 #else
     light_elf_emit(em.base, em.at - em.base, em.relative_patches, em.imports);
 #endif

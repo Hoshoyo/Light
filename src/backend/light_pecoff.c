@@ -10,6 +10,7 @@
 #define COFF_IDATA 1
 #define COFF_RELOC 1
 #define COFF_RDATA 1
+#define COFF_DATA 1
 
 typedef struct {
     Relocation_Entry* relocs;
@@ -29,6 +30,33 @@ relocation_new(int offset)
         .offset32 = offset,
     };
     return r;
+}
+
+static int
+write_data(u8* at, u8* text_ptr, int data_rva, int base_rva, X86_DataSeg_Patch* dseg_patches, IR_Data_Segment_Entry* dseg_entries, PECoff_Generator* gen)
+{
+    u8* start = at;
+    int offset = 0;
+
+    for(int i = 0; i < array_length(dseg_entries); ++i)
+    {
+        IR_Data_Segment_Entry* entry = dseg_entries + i;
+
+        entry->dseg_offset_bytes = offset;
+        offset += entry->data_length_bytes;
+    }
+    at += offset;   // allocate all the space
+
+    for(int i = 0; i < array_length(dseg_patches); ++i)
+    {
+        X86_DataSeg_Patch* patch = dseg_patches + i;
+        IR_Data_Segment_Entry* dseg_entry = &dseg_entries[patch->dseg_entry_index];
+        *(u32*)(text_ptr + patch->patch_offset) = data_rva + dseg_entry->dseg_offset_bytes + base_rva;
+        array_push(gen->relocs, relocation_new(patch->patch_offset));
+    }
+
+    *at++ = 0;
+    return at - start;
 }
 
 static int
@@ -404,7 +432,9 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches, PECoff_Gene
 }
 
 void
-light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offset, X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports)
+light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offset, 
+    X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports, 
+    X86_DataSeg_Patch* dseg_patches, IR_Data_Segment_Entry* dseg_entries)
 {
     PECoff_Generator gen = {0};
     u8* stream = (u8*)calloc(1, 1024*1024*16);
@@ -543,7 +573,6 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offse
     /*
         Section table
         .rdata (read only initialized data)
-        contains 
     */
     Section_Table* rdata_st = (Section_Table*)at;
     at += sizeof(Section_Table);
@@ -557,6 +586,25 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offse
     rdata_st->num_of_relocations = 0;
     rdata_st->num_of_line_numbers = 0;
     rdata_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ;
+    coff_hdr->num_sections++;
+#endif
+#if defined(COFF_DATA)
+    /*
+        Section table
+        .data (read and write data)
+    */
+    Section_Table* data_st = (Section_Table*)at;
+    at += sizeof(Section_Table);
+    memcpy(data_st->name, ".data", sizeof(".data") - 1);
+    data_st->virtual_size = 0;      // filled after
+    data_st->virtual_address = 0;   // filled after
+    data_st->size_of_raw_data = 0;  // filled after, must be multiple of file alignment
+    data_st->ptr_to_raw_data = 0;   // filled after
+    data_st->ptr_to_relocations = 0;
+    data_st->ptr_to_line_numbers = 0;
+    data_st->num_of_relocations = 0;
+    data_st->num_of_line_numbers = 0;
+    data_st->characteristics = IMAGE_SCN_CNT_INITIALIZED_DATA|IMAGE_SCN_MEM_READ|IMAGE_SCN_MEM_WRITE;
     coff_hdr->num_sections++;
 #endif
 #if defined(COFF_RELOC)
@@ -626,7 +674,17 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offse
     rdata_st->size_of_raw_data = rdata_st->virtual_size + align_delta(rdata_st->virtual_size, opt_pe32->file_alignment);
     last_before_reloc = rdata_st;
 #endif
-
+#if defined(COFF_DATA)
+    // data
+    at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data
+    data_st->ptr_to_raw_data = at - stream;
+    u8* data_start = at;
+    data_st->virtual_address = last_before_reloc->virtual_address + last_before_reloc->size_of_raw_data + align_delta(last_before_reloc->size_of_raw_data, opt_pe32->section_alignment);
+    at += write_data(at, text_ptr, data_st->virtual_address, opt_pe32->image_base_pe32, dseg_patches, dseg_entries, &gen);
+    data_st->virtual_size = at - data_start;
+    data_st->size_of_raw_data = data_st->virtual_size + align_delta(data_st->virtual_size, opt_pe32->file_alignment);
+    last_before_reloc = data_st;
+#endif
 #if defined(COFF_RELOC)
     // reloc
     at += align_delta(at - stream, opt_pe32->section_alignment);    // this is needed before every section raw data

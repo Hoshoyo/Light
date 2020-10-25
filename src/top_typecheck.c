@@ -649,6 +649,9 @@ typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
                 error |= decl_check_redefinition(scope, node, node->decl_variable.name);
                 if(error & TYPE_ERROR) { *decl_error |= error; return; }
             }
+            if(scope->level == 0) {
+                node->decl_variable.storage_class = STORAGE_CLASS_DATA_SEGMENT; 
+            }
 
             // Infer the type of expression
             if(node->decl_variable.assignment){

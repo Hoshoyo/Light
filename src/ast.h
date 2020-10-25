@@ -303,6 +303,7 @@ typedef struct {
 	int32_t  stack_offset; 			// Offset from Stack base, when is a proc argument this is the local copy offset from BP
 	int32_t  stack_argument_offset;	// When the variable is a proc argument, this is the offset from BP in the caller space
 	int32_t  ir_temporary; 			// temporary index in the IR code
+	int32_t  ir_instr_index;
 	int32_t  field_index;  			// Only relevant when DECL_VARIABLE_FLAG_STRUCT_FIELD is set
 } Light_Ast_Decl_Variable;
 

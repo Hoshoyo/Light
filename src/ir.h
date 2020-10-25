@@ -114,6 +114,7 @@ typedef enum {
 
     IIR_FLAG_INSTRUCTION_OFFSET = (1 << 5), // the immediate value is an instruction offset
     IIR_FLAG_IMPORT_OFFSET = (1 << 6),      // the immediate value is the index of the import table
+    IIR_FLAG_DATASEG_OFFSET = (1 << 7),
 } IR_Instruction_Flag;
 
 typedef struct {
@@ -203,16 +204,25 @@ typedef struct {
 } IR_Import_Entry;
 
 typedef struct {
+    Light_Ast* decl;
+    int data_length_bytes;
+    int dseg_offset_bytes;
+} IR_Data_Segment_Entry;
+
+typedef struct {
     IR_Instruction*    instructions;
     IR_Activation_Rec* ars; // the current is always the last
     IR_Import_Entry* import_table;
+    IR_Data_Segment_Entry* dataseg;
 
     // needed for break and continue
     int* loop_start_labels;
     IR_Instr_Jmp_Patch* jmp_patch;
 
     // needed for procedure address patching
-    IR_Decl_To_Patch* decl_patch;  // at the end, iterate through all these indexes and fill the instruction with the proc address
+    IR_Decl_To_Patch* procdecl_patch;  // at the end, iterate through all these indexes and fill the instruction with the proc address
+
+    IR_Decl_To_Patch* vardecl_patch;
 
     IR_Node_Range* node_ranges;
 

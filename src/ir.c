@@ -598,7 +598,7 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_
         {
             iri_emit_mov(gen, IR_REG_NONE, t, (IR_Value){.type = IR_VALUE_U64, .v_u64 = 0}, type_pointer_size_bytes(), false);
         }
-        array_push(gen->decl_patch, patch);
+        array_push(gen->procdecl_patch, patch);
     }
     else if(vdecl->kind == AST_DECL_VARIABLE)
     {
@@ -607,17 +607,49 @@ ir_gen_expr_variable(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_
         t = ir_new_reg(gen, expr->type);
         if(load && expr->type->size_bits <= type_pointer_size_bits())
         {
-            // LOAD SB+imm -> t
-            iri_emit_load(gen, IR_REG_STACK_BASE, t, 
-                (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
-                type_pointer_size_bytes(), expr->type->size_bits / 8, type_primitive_float(expr->type));
+            if(decl->storage_class == STORAGE_CLASS_STACK)
+            {
+                // LOAD SB+imm -> t
+                iri_emit_load(gen, IR_REG_STACK_BASE, t, 
+                    (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
+                    type_pointer_size_bytes(), expr->type->size_bits / 8, type_primitive_float(expr->type));
+            }
+            else if(decl->storage_class == STORAGE_CLASS_DATA_SEGMENT)
+            {
+                IR_Decl_To_Patch patch = {0};
+                patch.decl = vdecl;
+                patch.instr_number = iri_current_instr_index(gen);
+                
+                iri_emit_mov(gen, IR_REG_NONE, t, (IR_Value){.type = IR_VALUE_U64, .v_u64 = 0}, type_pointer_size_bytes(), false);
+                iri_emit_load(gen, t, t, (IR_Value){0}, type_pointer_size_bytes(), type_pointer_size_bytes(), false);
+
+                array_push(gen->vardecl_patch, patch);
+            }
+            else
+                assert(0); // not supported yet
         }
         else
         {
-            // LEA
-            iri_emit_lea(gen, IR_REG_STACK_BASE, t, 
-                (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
-                (int)type_pointer_size_bytes());
+            if (decl->storage_class == STORAGE_CLASS_STACK)
+            {
+                // LEA
+                iri_emit_lea(gen, IR_REG_STACK_BASE, t, 
+                    (IR_Value){.v_s32 = decl->stack_offset, .type = IR_VALUE_S32},
+                    (int)type_pointer_size_bytes());
+            }
+            else if(decl->storage_class == STORAGE_CLASS_DATA_SEGMENT)
+            {
+                // move data segment address to t
+                IR_Decl_To_Patch patch = {0};
+                patch.decl = vdecl;
+                patch.instr_number = iri_current_instr_index(gen);
+
+                iri_emit_mov(gen, IR_REG_NONE, t, (IR_Value){.type = IR_VALUE_U64, .v_u64 = 0}, type_pointer_size_bytes(), false);
+
+                array_push(gen->vardecl_patch, patch);
+            }
+            else
+                assert(0); // not supported yet
         }
     }
     else if (vdecl->kind == AST_DECL_CONSTANT)
@@ -1340,11 +1372,21 @@ ir_gen_proc_external(IR_Generator* gen, Light_Ast* proc)
 }
 
 void
+ir_gen_dataseg_variable(IR_Generator* gen, Light_Ast* decl)
+{
+    IR_Data_Segment_Entry entry = {0};
+    entry.decl = decl;
+    entry.data_length_bytes = decl->decl_variable.type->size_bits / 8;
+    decl->decl_variable.ir_instr_index = array_length(gen->dataseg);
+    array_push(gen->dataseg, entry);
+}
+
+void
 ir_patch_proc_calls(IR_Generator* gen)
 {
-    for(int i = 0; i < array_length(gen->decl_patch); ++i)
+    for(int i = 0; i < array_length(gen->procdecl_patch); ++i)
     {
-        IR_Decl_To_Patch dpatch = gen->decl_patch[i];
+        IR_Decl_To_Patch dpatch = gen->procdecl_patch[i];
         IR_Instruction* instr = iri_get_temp_instr_ptr(gen, dpatch.instr_number);
         if(dpatch.external)
         {
@@ -1355,6 +1397,18 @@ ir_patch_proc_calls(IR_Generator* gen)
             instr->flags |= (IIR_FLAG_HAS_IMM | IIR_FLAG_INSTRUCTION_OFFSET);
         }
         instr->imm.v_u64 = dpatch.decl->decl_proc.ir_instr_index;
+    }
+}
+
+void
+ir_patch_dataseg_variables(IR_Generator* gen)
+{
+    for(int i = 0; i < array_length(gen->vardecl_patch); ++i)
+    {
+        IR_Decl_To_Patch dpatch = gen->vardecl_patch[i];
+        IR_Instruction* instr = iri_get_temp_instr_ptr(gen, dpatch.instr_number);
+        instr->imm.v_u64 = dpatch.decl->decl_variable.ir_instr_index;
+        instr->flags |= IIR_FLAG_DATASEG_OFFSET;
     }
 }
 
@@ -1372,12 +1426,14 @@ ir_new_activation_record(IR_Generator* gen)
 
 void ir_generate(IR_Generator* gen, Light_Ast** ast) {
     gen->instructions = array_new(IR_Instruction);
-    gen->decl_patch = array_new(IR_Decl_To_Patch);
+    gen->procdecl_patch = array_new(IR_Decl_To_Patch);
+    gen->vardecl_patch = array_new(IR_Decl_To_Patch);
     gen->jmp_patch = array_new(IR_Instr_Jmp_Patch);
     gen->loop_start_labels = array_new(int);
     gen->node_ranges = array_new(IR_Node_Range);
     gen->ars = array_new(IR_Activation_Rec);
     gen->import_table = array_new(IR_Import_Entry);
+    gen->dataseg = array_new(IR_Data_Segment_Entry);
 
     for(u64 i = 0; i < array_length(ast); ++i) {
         Light_Ast* n = ast[i];
@@ -1389,13 +1445,14 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
                     ir_gen_proc(gen, n);
             } break;
             case AST_DECL_VARIABLE: {
-                // TODO(psv): global variables in the data segment
+                ir_gen_dataseg_variable(gen, n);
             } break;
             default: break;
         }
     }
 
     ir_patch_proc_calls(gen);
+    ir_patch_dataseg_variables(gen);
 
     //FILE* ir_out = fopen("irout.txt", "w");
     //iri_print_instructions(stdout, gen);
