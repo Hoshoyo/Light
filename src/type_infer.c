@@ -776,10 +776,11 @@ types_compatible(Light_Type* left, Light_Type* right) {
 
 static Light_Type*
 type_infer_expr_binary_pointer_arithmetic(Light_Ast* expr, Light_Type* inferred_left, Light_Type* inferred_right, u32* error) {
+    const Light_Type_Primitive ptr_arith_int_type = TYPE_PRIMITIVE_S32; // this must be s64 for 64 bit compiler @TODO
     switch(expr->expr_binary.op) {
         case OP_BINARY_PLUS:{
             if(type_primitive_int(inferred_right)) {
-                expr->expr_binary.right->type = type_infer_propagate(type_primitive_get(TYPE_PRIMITIVE_S64), expr->expr_binary.right, error);
+                expr->expr_binary.right->type = type_infer_propagate(type_primitive_get(ptr_arith_int_type), expr->expr_binary.right, error);
             } else {
                 type_error(error, expr->expr_binary.token_op, 
                     "pointer type addition is only valid with an integer type\n");
@@ -789,14 +790,14 @@ type_infer_expr_binary_pointer_arithmetic(Light_Ast* expr, Light_Type* inferred_
         case OP_BINARY_MINUS: {
             if(type_primitive_int(inferred_right)) {
                 // ptr - int
-                expr->expr_binary.right->type = type_infer_propagate(type_primitive_get(TYPE_PRIMITIVE_S64), expr->expr_binary.right, error);
+                expr->expr_binary.right->type = type_infer_propagate(type_primitive_get(ptr_arith_int_type), expr->expr_binary.right, error);
                 expr->type = inferred_left;
             } else if(inferred_right->kind == TYPE_KIND_POINTER) {
                 // ptr - ptr
                 if(!type_check_equality(inferred_left, inferred_right)) {
                     type_error_mismatch(error, expr->expr_binary.token_op, inferred_left, inferred_right);
                 }
-                expr->type = type_primitive_get(TYPE_PRIMITIVE_S64);
+                expr->type = type_primitive_get(ptr_arith_int_type);
             } else {
                 type_error(error, expr->expr_binary.token_op, 
                     "pointer type difference is only defined for integer and pointer types\n");

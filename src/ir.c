@@ -1048,7 +1048,7 @@ ir_gen_decl_assignment(IR_Generator* gen, Light_Ast* decl)
     Light_Type* rvalue_type = type_alias_root(expr->type);
     bool primitive_type = rvalue_type->kind == TYPE_KIND_PRIMITIVE || rvalue_type->kind == TYPE_KIND_ENUM;
 
-    IR_Reg t2 = ir_gen_expr(gen, expr, primitive_type, false, 0);
+    IR_Reg t2 = ir_gen_expr(gen, expr, primitive_type || (expr->flags & AST_FLAG_EXPRESSION_LVALUE), false, 0);
 
     IR_Value stack_offset = (IR_Value){.type = IR_VALUE_S32, .v_s32 = decl->decl_variable.stack_offset};
     if(primitive_type || rvalue_type->kind == TYPE_KIND_FUNCTION || rvalue_type->kind == TYPE_KIND_POINTER)
@@ -1322,7 +1322,7 @@ ir_gen_proc(IR_Generator* gen, Light_Ast* proc)
         arg->decl_variable.stack_offset = stack_offset;
         arg->decl_variable.stack_argument_offset = stack_offset;
         stack_offset += arg_byte_size;
-        stack_args_size_bytes += arg_byte_size;
+        stack_args_size_bytes += MIN(arg_byte_size, type_pointer_size_bytes());
 
         if(arg_byte_size > type_pointer_size_bytes())
         {

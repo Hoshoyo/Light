@@ -2,9 +2,11 @@
 #include <common.h>
 #include "x86/x86.h"
 
+#define RAWX_ARCH_X86 0x1
+#define RAWX_VERSION 0
+
 typedef struct {
-    u8  magic[3];        // RAW
-    u8  architecture;    // 0 = x86
+    u8  magic[4];        // RAWX
     u16 version;
     u32 flags;
     u32 load_address;
@@ -27,7 +29,7 @@ typedef struct {
 // .data is just raw data
 
 // .import
-typedef union {
+typedef struct {
     u32 section_symbol_offset;  // offset from the beginning of the section where the symbol name is located
     u32 section_lib_offset;     // offset from the beginning of the section where the library name is located
     u32 call_address;           // address to the syscall to be filled by the loader
@@ -42,3 +44,8 @@ typedef struct {
 // addresses properly.
 // char* symbol_name;
 // char* symbol_library;
+
+void
+light_rawos_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offset, 
+    X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports, 
+    X86_DataSeg_Patch* dseg_patches, IR_Data_Segment_Entry* dseg_entries);

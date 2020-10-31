@@ -1,5 +1,6 @@
 ## TODO
 
+- returning integer in a function that returns ^u8 causes circular dependencies
 - null should be cast automatically to proc type
 - fix bug where passing array to function causes gcc warning and is also wrong
 - investigate dot operator when struct type is still not internalized
