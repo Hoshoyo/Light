@@ -629,6 +629,7 @@ ir_gen_expr_lit_prim(IR_Generator* gen, Light_Ast* expr)
         }
     }
     IR_Reg t = ir_new_reg(gen, expr->type);
+    iri_emit_arith(gen, IR_XOR, t, t, t, (IR_Value){0}, type_pointer_size_bytes());
     iri_emit_mov(gen, IR_REG_NONE, t, value, iri_value_byte_size(value), type_primitive_float(expr->type));
 
     return t;
