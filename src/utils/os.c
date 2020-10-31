@@ -84,7 +84,7 @@ light_path_from_filename(const char* filename, uint64_t* size) {
 	char* fullpath = (char*)light_real_path(filename, &fullpath_size);
 	if (!fullpath) return 0;
 
-	size_t pathsize = fullpath_size - 1;
+	int pathsize = fullpath_size - 1;
 	for (; pathsize >= 0; --pathsize) {
 #if defined(_WIN32) || defined (_WIN64)
 		if (fullpath[pathsize] == '\\') {
@@ -102,9 +102,9 @@ light_path_from_filename(const char* filename, uint64_t* size) {
 
 const char*
 light_filename_from_path(const char* path) {
-	size_t len = strlen(path);
-	size_t i = len - 1;
-	for (; i >= 0; --i) {
+	int len = strlen(path);
+	int i = len - 1;
+	for (; i > 0; --i) {
 #if defined (_WIN32) || defined(_WIN64)
 		if (path[i] == '\\') {
 			i++;

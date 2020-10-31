@@ -80,18 +80,19 @@ int main(int argc, char** argv) {
     //type_table_print();
 #endif
 
+    const char* outfile = light_extensionless_filename(light_filename_from_path(argv[1]));
+    printf("%s\n", outfile);
 #if 1
     double ir_start = os_time_us();
     IR_Generator irgen = {0};
     ir_generate(&irgen, ast);
     double ir_elapsed = (os_time_us() - ir_start) / 1000.0;
     double generate_start = os_time_us();
-    X86_generate(&irgen);
+    X86_generate(&irgen, outfile);
     double generate_elapsed = (os_time_us() - generate_start) / 1000.0;
 #endif
 
 #if 0
-    const char* outfile = light_extensionless_filename(light_filename_from_path(argv[1]));
 
     double generate_start = os_time_us();
     backend_c_generate_top_level(ast, global_type_table, &global_scope, main_file_directory, outfile, compiler_path);

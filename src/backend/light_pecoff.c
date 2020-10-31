@@ -432,7 +432,7 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches, PECoff_Gene
 }
 
 void
-light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offset, 
+light_pecoff_emit(const char* out_filename, u8* in_stream, int in_stream_size_bytes, int entry_point_offset, 
     X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports, 
     X86_DataSeg_Patch* dseg_patches, IR_Data_Segment_Entry* dseg_entries)
 {
@@ -707,13 +707,17 @@ light_pecoff_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offse
     /*
         File write
     */
-    FILE* file = fopen("out1.exe", "wb");
-    if(!file)
     {
-        fprintf(stderr, "Could not open file out2.bin for writing\n");
-        return;
+        char filename[256] = { 0 };
+        sprintf(filename, "%s.exe", out_filename);
+        FILE* file = fopen(filename, "wb");
+        if(!file)
+        {
+            fprintf(stderr, "Could not open file %s for writing\n", out_filename);
+            return;
+        }
+        fwrite(stream, 1, at - stream, file);
+        fclose(file);
     }
-    fwrite(stream, 1, at - stream, file);
-    fclose(file);
 }
 #endif

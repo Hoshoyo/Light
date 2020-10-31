@@ -425,6 +425,7 @@ parse_command(Light_Parser* parser, Light_Scope* scope, u32* error, bool require
 			} else if (t->type == '(') {
 				// Syntatic sugar void proc call
 				Light_Ast* pcall = parse_expression(parser, scope, error);
+                ReturnIfError();
                 command = ast_new_comm_assignment(scope, 0, pcall, next, (Lexical_Range){next, pcall->lexical_range.end});
             } else if(t->type == '[') {
                 command = parse_comm_assignment(parser, scope, error);

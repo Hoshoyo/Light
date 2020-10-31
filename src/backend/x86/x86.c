@@ -348,6 +348,10 @@ x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
         // EDX needs to be zero to not cause integer overflow
         em->at = emit_arith_mr(0, ARITH_XOR, em->at, EDX, EDX, DIRECT, 0, 0);
     }
+    else
+    {
+        em->at = emit_arith_mr(0, ARITH_XOR, em->at, EDX, EDX, DIRECT, 0, 0);
+    }
 
     // mov to eax
     em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, 
@@ -974,7 +978,7 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
 
 #include "../../utils/os.h"
 int
-X86_generate(IR_Generator* gen)
+X86_generate(IR_Generator* gen, const char* filename)
 {
     X86_Emitter em = {0};
     em.base = (u8*)calloc(1, 1024 * 1024 * 16);
@@ -1025,7 +1029,7 @@ X86_generate(IR_Generator* gen)
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
-    light_pecoff_emit(em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports, em.dseg_patch, gen->dataseg);
+    light_pecoff_emit(filename, em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports, em.dseg_patch, gen->dataseg);
     //light_rawos_emit(em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports, em.dseg_patch, gen->dataseg);
 #else
     light_elf_emit(em.base, em.at - em.base, em.relative_patches, em.imports);

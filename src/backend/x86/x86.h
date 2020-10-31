@@ -39,4 +39,4 @@ typedef struct {
     int dseg_entry_index;
 } X86_DataSeg_Patch;
 
-int X86_generate(IR_Generator* gen);
+int X86_generate(IR_Generator* gen, const char* filename);
