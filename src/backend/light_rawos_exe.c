@@ -4,6 +4,7 @@
 #include <light_arena.h>
 #include <hoht.h>
 #include <stdlib.h>
+#include <stddef.h>
 
 typedef struct {
     char* symbol;

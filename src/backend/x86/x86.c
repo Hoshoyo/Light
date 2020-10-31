@@ -353,11 +353,21 @@ x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
         em->at = emit_arith_mr(0, ARITH_XOR, em->at, EDX, EDX, DIRECT, 0, 0);
     }
 
-    // mov to eax
+    bool op1_in_eax = (rop1 == AL || rop1 == AX || rop1 == EAX);
+    if(op1_in_eax) {
+        em->at = emit_push_reg(0, em->at, DIRECT, EAX, 0, 0);
+    }
+
+    // mov op2 to eax
     em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, 
         instr->byte_size * 8, x86_reg32_to_byte_size(EAX, instr->byte_size), rop2, 0, 0);
 
-    em->at = emit_mul(&info, em->at, instr->byte_size * 8, x86_ir_mul_to_x86_arith(instr), rop1, DIRECT, 0, 0);
+    if(op1_in_eax) {
+        em->at = emit_pop_reg(0, em->at, rop2);
+        em->at = emit_mul(&info, em->at, instr->byte_size * 8, x86_ir_mul_to_x86_arith(instr), rop2, DIRECT, 0, 0);
+    } else {
+        em->at = emit_mul(&info, em->at, instr->byte_size * 8, x86_ir_mul_to_x86_arith(instr), rop1, DIRECT, 0, 0);
+    }
 
     // move result that is in eax/edx to the destination register
     {

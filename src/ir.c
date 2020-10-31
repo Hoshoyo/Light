@@ -488,9 +488,9 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_li
     if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS)
         return ir_gen_expr_vector_access(gen, expr, load, inside_literal, outer_offset);
 
-    // TODO(psv): pointer arithmetic
-    if (expr->expr_binary.left->flags & AST_FLAG_EXPRESSION_LVALUE && !load)
-        return 0;
+    // pointer arithmetic
+    if (expr->expr_binary.left->type->kind == TYPE_KIND_POINTER)
+        return ir_gen_expr_vector_access(gen, expr, false, inside_literal, outer_offset);
     
     if(type_primitive_float(expr->expr_binary.left->type))
         return ir_gen_expr_binary_float(gen, expr, load, inside_literal, outer_offset);
