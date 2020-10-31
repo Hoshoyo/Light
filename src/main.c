@@ -81,7 +81,6 @@ int main(int argc, char** argv) {
 #endif
 
     const char* outfile = light_extensionless_filename(light_filename_from_path(argv[1]));
-    printf("%s\n", outfile);
 #if 1
     double ir_start = os_time_us();
     IR_Generator irgen = {0};

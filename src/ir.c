@@ -738,7 +738,7 @@ ir_gen_expr_proc_call(IR_Generator* gen, Light_Ast* expr, bool load, bool inside
         {
             Light_Ast* arg = expr->expr_proc_call.args[i];
             IR_Reg arg_r = ir_gen_expr(gen, arg, true, inside_literal, outer_offset);
-            int push_bytes = MIN(arg->type->size_bits / 8, type_pointer_size_bytes());
+            int push_bytes = MAX(MIN(arg->type->size_bits / 8, type_pointer_size_bytes()), type_pointer_size_bytes());
             iri_emit_push(gen, arg_r, (IR_Value){0}, push_bytes, type_primitive_float(arg->type));
             arg_stack_size += push_bytes;
             ir_free_reg(gen, arg_r);
