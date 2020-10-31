@@ -1198,6 +1198,7 @@ ir_gen_comm_assignment(IR_Generator* gen, Light_Ast_Comm_Assignment* comm)
 void
 ir_gen_commands(IR_Generator* gen, Light_Ast** commands, int comm_count)
 {
+    if (!commands) return;
     int stack_size_bytes = 0;
     {
         // TODO(psv): refactor this to a function
@@ -1240,8 +1241,10 @@ ir_gen_commands(IR_Generator* gen, Light_Ast** commands, int comm_count)
 static int
 calc_block_stack_size(Light_Ast* block)
 {
+    if (!block) return 0;
     int stack_size_bytes = 0;
     Light_Scope* scope = block->comm_block.block_scope;
+    if (!scope) return 0;
     for(int i = 0; i < scope->decl_count; ++i) {
         if(scope->decls[i]->kind == AST_DECL_VARIABLE)
         {
@@ -1256,8 +1259,11 @@ void
 ir_gen_comm_block(IR_Generator* gen, Light_Ast* body)
 {
     int stack_size = calc_block_stack_size(body);
-    iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR, 
-        (IR_Value){.type = IR_VALUE_S32, .v_s32 = stack_size}, type_pointer_size_bytes());
+    if (stack_size > 0)
+    {
+        iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR, 
+            (IR_Value){.type = IR_VALUE_S32, .v_s32 = stack_size}, type_pointer_size_bytes());
+    }
     ir_gen_commands(gen, body->comm_block.commands, body->comm_block.command_count);
 }
 
