@@ -12,7 +12,7 @@
 #include "ir.h"
 #define HOHT_IMPLEMENTATION
 #include <hoht.h>
-#include "backend/x86/x86.h"
+#include "backend/backend.h"
 
 Light_Ast** load_internal_modules(Light_Parser* parser, Light_Scope* global_scope);
 
@@ -24,6 +24,22 @@ int main(int argc, char** argv) {
     if(argc < 2) {
         fprintf(stderr, "usage: %s filename\n", argv[0]);
         return 1;
+    }
+    s32 backend = BACKEND_X86_PECOFF;
+    if(argc >= 3) {
+        char* backend_str = argv[2];
+        if(strcmp(backend_str, "-x86coff") == 0) {
+            backend = BACKEND_X86_PECOFF;
+        } else if(strcmp(backend_str, "-x86elf") == 0) {
+            backend = BACKEND_X86_ELF;
+        } else if(strcmp(backend_str, "-x86rawx") == 0) {
+            backend = BACKEND_X86_RAWX;
+        } else if(strcmp(backend_str, "-c") == 0) {
+            backend = BACKEND_C;
+        } else {
+            fprintf(stderr, "invalid backend '%s'\n", argv[2]);
+            return 1;
+        }
     }
 
     size_t compiler_path_size = 0;
@@ -81,46 +97,18 @@ int main(int argc, char** argv) {
 #endif
 
     const char* outfile = light_extensionless_filename(light_filename_from_path(argv[1]));
-#if 1
-    double ir_start = os_time_us();
-    IR_Generator irgen = {0};
-    ir_generate(&irgen, ast);
-    double ir_elapsed = (os_time_us() - ir_start) / 1000.0;
-    double generate_start = os_time_us();
-    X86_generate(&irgen, outfile);
-    double generate_elapsed = (os_time_us() - generate_start) / 1000.0;
-#endif
 
-#if 0
+    double backend_gen_time = 0.0;
+    backend_generate(backend, ast, &global_scope, main_file_directory, compiler_path, outfile, &backend_gen_time);
 
-    double generate_start = os_time_us();
-    backend_c_generate_top_level(ast, global_type_table, &global_scope, main_file_directory, outfile, compiler_path);
-    double generate_elapsed = (os_time_us() - generate_start) / 1000.0;
-
-    double gcc_start = os_time_us();
-    backend_c_compile_with_gcc(ast, outfile, main_file_directory);
-    double gcc_elapsed = (os_time_us() - gcc_start) / 1000.0;
-#else
     double total_elapsed = (os_time_us() - start) / 1000.0;
-    printf("- elapsed time:\n\n");
+    printf("- elapsed time: (backend: %s)\n\n", backend_to_string(backend));
     printf("  lexing:          %.2f ms\n", lexing_elapsed);
     printf("  parse:           %.2f ms\n", parse_elapsed);
     printf("  type check:      %.2f ms\n", tcheck_elapsed);
-    printf("  ir generation:   %.2f ms\n", ir_elapsed);
-    printf("  x86 generation:  %.2f ms\n", generate_elapsed);
+    printf("  x86 generation:  %.2f ms\n", backend_gen_time);
     printf("  total:           %.2f ms\n", total_elapsed);
     printf("\n");
-    //printf("  gcc backend:     %.2f ms\n", gcc_elapsed);
-#endif
-
-#if 0
-    Bytecode_State state = bytecode_gen_ast(ast);
-
-    light_vm_debug_dump_code(stdout, state.vmstate);
-
-    light_vm_execute(state.vmstate, 0, 1);
-    light_vm_debug_dump_registers(stdout, state.vmstate, LVM_PRINT_FLOATING_POINT_REGISTERS|LVM_PRINT_DECIMAL);
-#endif
 
     return 0;
 }

@@ -1,10 +1,20 @@
 #include "light_elf.h"
-#if defined(__linux__)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <light_array.h>
+#if defined(__linux__)
 #include <elf.h>
+#else
+#define ET_EXEC 2
+#define PT_LOAD 1
+#define PF_X (1 << 0)
+#define PF_R (1 << 2)
+#define SHT_PROGBITS 1
+#define SHT_STRTAB 3
+#define SHF_ALLOC (1 << 1)
+#define SHF_EXECINSTR (1 << 2)
+#endif
 
 static int align_delta(int offset, int align_to){
 	int rest = offset % align_to;
@@ -36,7 +46,7 @@ fill_relative_patches(int base_rva, int rva, X86_Patch* rel_patches)
 }
 
 void
-light_elf_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Import* imports)
+light_elf_emit(const char* output_filename, u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, X86_Import* imports)
 {
     unsigned char* stream = (unsigned char*)calloc(1, 1024*1024);
     unsigned char* at = stream;
@@ -155,14 +165,12 @@ light_elf_emit(u8* in_stream, int in_stream_size_bytes, X86_Patch* rel_patches, 
     file_offset += sizeof(str_sh);
     at += sizeof(str_sh);
 
-    FILE* file = fopen("out2.bin", "wb");
+    FILE* file = fopen(output_filename, "wb");
     if(!file)
     {
-        fprintf(stderr, "Could not open file out2.bin for writing\n");
+        fprintf(stderr, "Could not open file %s for writing\n", output_filename);
         return;
     }
     fwrite(stream, at - stream, 1, file);
     fclose(file);
 }
-
-#endif

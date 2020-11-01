@@ -7,6 +7,8 @@
 #include "../light_elf.h"
 #include "../light_pecoff.h"
 #include "../light_rawos_exe.h"
+#include "../backend.h"
+#include "../../utils/os.h"
 
 /*
     NOTE(psv): Apparently idata without any imports crashes the executable
@@ -986,9 +988,8 @@ x86_emit_instruction(X86_Emitter* em, IR_Instruction* instr, int index)
     return (Instr_Emit_Result){0};
 }
 
-#include "../../utils/os.h"
 int
-X86_generate(IR_Generator* gen, const char* filename)
+X86_generate(IR_Generator* gen, const char* filename, Light_Backend backend)
 {
     X86_Emitter em = {0};
     em.base = (u8*)calloc(1, 1024 * 1024 * 16);
@@ -1038,11 +1039,16 @@ X86_generate(IR_Generator* gen, const char* filename)
     }
 #endif
 
-#if defined(_WIN32) || defined(_WIN64)
-    light_pecoff_emit(filename, em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports, em.dseg_patch, gen->dataseg);
-    //light_rawos_emit(filename, em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports, em.dseg_patch, gen->dataseg);
-#else
-    light_elf_emit(em.base, em.at - em.base, em.relative_patches, em.imports);
-#endif
+    switch(backend) {
+        case BACKEND_X86_PECOFF:
+            light_pecoff_emit(filename, em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports, em.dseg_patch, gen->dataseg);
+            return 0;
+        case BACKEND_X86_ELF:
+            light_elf_emit(filename, em.base, em.at - em.base, em.relative_patches, em.imports);
+            return 0;
+        case BACKEND_X86_RAWX:
+            light_rawos_emit(filename, em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports, em.dseg_patch, gen->dataseg);
+            return 0;
+    }
     return 0;
 }

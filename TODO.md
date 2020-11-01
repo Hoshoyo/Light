@@ -1,6 +1,13 @@
 ## TODO
 
+### Backend x86
+- x86 functions returning void are causing a crash when not explicitly using return
+- x86 backend passing array as an argument is doing it by copy, i think
+
+### Others
+- taking address of a function type gives wrong result
 - returning integer in a function that returns ^u8 causes circular dependencies
+- function returning wrong type causes circular dependencies
 - null should be cast automatically to proc type
 - fix bug where passing array to function causes gcc warning and is also wrong
 - investigate dot operator when struct type is still not internalized
@@ -8,7 +15,6 @@
 - numeric literals better type inference
 - type max size now is 32bit
 - enum reflecting
-- function returning wrong type causes circular dependencies
 - incomplete struct literals
 - implement #type_value and #type
 - implement all language in bytecode
