@@ -3,6 +3,19 @@
 #include <stdio.h>
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
+#else
+#define IMAGE_REL_BASED_HIGHLOW 3
+#define IMAGE_FILE_MACHINE_I386 0x14c
+#define IMAGE_FILE_EXECUTABLE_IMAGE 2
+#define IMAGE_FILE_32BIT_MACHINE 0x100
+#define IMAGE_FILE_LARGE_ADDRESS_AWARE 0x20
+#define IMAGE_SCN_MEM_EXECUTE 0x20000000
+#define IMAGE_SCN_MEM_READ 0x40000000
+#define IMAGE_SCN_MEM_WRITE 0x80000000
+#define IMAGE_SCN_CNT_CODE 0x20
+#define IMAGE_SCN_CNT_INITIALIZED_DATA 0x40
+#define IMAGE_SCN_MEM_DISCARDABLE 0x2000000
+#endif
 #include <light_array.h>
 #include <light_arena.h>
 #include <hoht.h>
@@ -720,4 +733,3 @@ light_pecoff_emit(const char* out_filename, u8* in_stream, int in_stream_size_by
         fclose(file);
     }
 }
-#endif
