@@ -210,14 +210,14 @@ write_imports(u8* at, Import_Libs* libs, int load_address, int rva, RawOS_Import
 }
 
 void
-light_rawos_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offset, 
+light_rawos_emit(const char* out_filename, u8* in_stream, int in_stream_size_bytes, int entry_point_offset, 
     X86_Patch* rel_patches, X86_Data* data_seg, X86_Import* imports, 
     X86_DataSeg_Patch* dseg_patches, IR_Data_Segment_Entry* dseg_entries)
 {
     u8* stream = (u8*)calloc(1, 1024*1024*16);
     u8* at = stream;
 
-    const u32 load_address = 0x400000;
+    const u32 load_address = 0x40000000;
 
     RawOS_Header* header = (RawOS_Header*)at;
     header->magic[0] = 'R';
@@ -307,7 +307,9 @@ light_rawos_emit(u8* in_stream, int in_stream_size_bytes, int entry_point_offset
     /*
         File write
     */
-    FILE* file = fopen("out1.rawx", "wb");
+    char filename[256] = { 0 };
+    sprintf(filename, "%s.rawx", out_filename);
+    FILE* file = fopen(filename, "wb");
     if(!file)
     {
         fprintf(stderr, "Could not open file out1.rawx for writing\n");
