@@ -1,5 +1,6 @@
 #pragma once
 #include "../../ir.h"
+#include "../backend.h"
 
 typedef struct {
     Light_Ast* decl;
@@ -39,4 +40,4 @@ typedef struct {
     int dseg_entry_index;
 } X86_DataSeg_Patch;
 
-int X86_generate(IR_Generator* gen, const char* filename);
+int X86_generate(IR_Generator* gen, const char* filename, Light_Backend backend);
