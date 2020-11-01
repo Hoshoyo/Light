@@ -1201,19 +1201,6 @@ void
 ir_gen_commands(IR_Generator* gen, Light_Ast** commands, int comm_count)
 {
     if (!commands) return;
-    int stack_size_bytes = 0;
-    {
-        // TODO(psv): refactor this to a function
-        for(int i = 0; i < array_length(commands); ++i) {
-            if(commands[i]->kind == AST_DECL_VARIABLE)
-            {
-                int var_size_bytes = commands[i]->decl_variable.type->size_bits / 8;
-                stack_size_bytes += var_size_bytes;
-            }
-        }
-        iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR, 
-            (IR_Value){.type = IR_VALUE_S32, .v_s32 = stack_size_bytes}, type_pointer_size_bytes());
-    }
 
     // clear r0 to use in the variable initialization
     iri_emit_arith(gen, IR_XOR, IR_REG_PROC_RET, IR_REG_PROC_RET, IR_REG_PROC_RET, (IR_Value){0}, type_pointer_size_bytes());
@@ -1240,32 +1227,70 @@ ir_gen_commands(IR_Generator* gen, Light_Ast** commands, int comm_count)
     }
 }
 
+static int calc_block_stack_size(Light_Ast* block);
+static int calc_commands_stack_size(Light_Ast** commands);
+
+static int
+calc_command_stack_size(Light_Ast* comm)
+{
+    int stack_size_bytes = 0;
+    switch(comm->kind)
+    {
+        case AST_DECL_VARIABLE: {
+            int var_size_bytes = comm->decl_variable.type->size_bits / 8;
+            stack_size_bytes += var_size_bytes;
+        } break;
+        case AST_COMMAND_BLOCK: {
+            stack_size_bytes += calc_block_stack_size(comm);
+        } break;
+        case AST_COMMAND_IF: {
+            if(comm->comm_if.body_true && comm->comm_if.body_true->kind == AST_COMMAND_BLOCK)
+                stack_size_bytes += calc_block_stack_size(comm->comm_if.body_true);
+            if(comm->comm_if.body_false && comm->comm_if.body_false->kind == AST_COMMAND_BLOCK)
+                stack_size_bytes += calc_block_stack_size(comm->comm_if.body_false);
+        } break;
+        case AST_COMMAND_WHILE: {
+            if(comm->comm_while.body)
+                stack_size_bytes += calc_block_stack_size(comm->comm_while.body);
+        } break;
+        case AST_COMMAND_FOR: {
+            if(comm->comm_for.prologue)
+            {
+                stack_size_bytes += calc_commands_stack_size(comm->comm_for.prologue);
+            }
+            if(comm->comm_for.body)
+            {
+                stack_size_bytes += calc_block_stack_size(comm->comm_for.body);
+            }
+        } break;
+        default: break;
+    }
+    return stack_size_bytes;
+}
+
+static int
+calc_commands_stack_size(Light_Ast** commands)
+{
+    if (!commands) return 0;
+    int stack_size_bytes = 0;
+    for(int i = 0; i < array_length(commands); ++i)
+    {
+        Light_Ast* comm = commands[i];
+        stack_size_bytes += calc_command_stack_size(comm);
+    }
+    return stack_size_bytes;
+}
+
 static int
 calc_block_stack_size(Light_Ast* block)
 {
     if (!block) return 0;
-    int stack_size_bytes = 0;
-    Light_Scope* scope = block->comm_block.block_scope;
-    if (!scope) return 0;
-    for(int i = 0; i < scope->decl_count; ++i) {
-        if(scope->decls[i]->kind == AST_DECL_VARIABLE)
-        {
-            int var_size_bytes = scope->decls[i]->decl_variable.type->size_bits / 8;
-            stack_size_bytes += var_size_bytes;
-        }
-    }
-    return stack_size_bytes;
+    return calc_commands_stack_size(block->comm_block.commands);
 }
 
 void
 ir_gen_comm_block(IR_Generator* gen, Light_Ast* body)
 {
-    int stack_size = calc_block_stack_size(body);
-    if (stack_size > 0)
-    {
-        iri_emit_arith(gen, IR_SUB, IR_REG_STACK_PTR, IR_REG_NONE, IR_REG_STACK_PTR, 
-            (IR_Value){.type = IR_VALUE_S32, .v_s32 = stack_size}, type_pointer_size_bytes());
-    }
     ir_gen_commands(gen, body->comm_block.commands, body->comm_block.command_count);
 }
 
@@ -1362,15 +1387,8 @@ ir_calculate_proc_stack_size(Light_Ast* proc)
     Light_Scope* pscope = proc->decl_proc.body->comm_block.block_scope;
     if (!pscope) return 0; // procedure has no declarations
 
-    int stack_size_bytes = 0;
-    for(int i = 0; i < pscope->decl_count; ++i)
-    {
-        if(pscope->decls[i]->kind == AST_DECL_VARIABLE)
-        {
-            int var_size_bytes = pscope->decls[i]->decl_variable.type->size_bits / 8;
-            stack_size_bytes += var_size_bytes;
-        }
-    }
+    int stack_size_bytes = calc_block_stack_size(proc->decl_proc.body);
+
     // allocate stack space for the arguments in the stack
     for(int i = 0; i < proc->decl_proc.argument_count; ++i)
     {
