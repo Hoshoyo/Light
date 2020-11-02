@@ -995,6 +995,7 @@ int
 X86_generate(IR_Generator* gen, const char* filename, Light_Backend backend)
 {
     X86_Emitter em = {0};
+    em.backend = backend;
     em.base = (u8*)calloc(1, 1024 * 1024 * 16);
     em.at = em.base;
     em.relative_patches = array_new(X86_Patch);
