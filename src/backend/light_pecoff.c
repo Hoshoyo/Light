@@ -3,6 +3,19 @@
 #include <stdio.h>
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
+#else
+#define IMAGE_REL_BASED_HIGHLOW 3
+#define IMAGE_FILE_MACHINE_I386 0x14c
+#define IMAGE_FILE_EXECUTABLE_IMAGE 2
+#define IMAGE_FILE_32BIT_MACHINE 0x100
+#define IMAGE_FILE_LARGE_ADDRESS_AWARE 0x20
+#define IMAGE_SCN_MEM_EXECUTE 0x20000000
+#define IMAGE_SCN_MEM_READ 0x40000000
+#define IMAGE_SCN_MEM_WRITE 0x80000000
+#define IMAGE_SCN_CNT_CODE 0x20
+#define IMAGE_SCN_CNT_INITIALIZED_DATA 0x40
+#define IMAGE_SCN_MEM_DISCARDABLE 0x2000000
+#endif
 #include <light_array.h>
 #include <light_arena.h>
 #include <hoht.h>
@@ -224,8 +237,8 @@ import_libs(u8* stream_text_base, u8* text_base, X86_Import* imports)
         
         string libstr = MAKE_STR_LEN(imp->decl->decl_proc.extern_library_name->data + 1, imp->decl->decl_proc.extern_library_name->length - 2);
         string symstr = MAKE_STR_LEN(imp->decl->decl_proc.name->data, imp->decl->decl_proc.name->length);
-        u64 hashlib = fnv_1_hash(libstr.data, libstr.length);
-        u64 hashsymb = fnv_1_hash(symstr.data, symstr.length);
+        u64 hashlib = fnv_1_hash((const u8*)libstr.data, libstr.length);
+        u64 hashsymb = fnv_1_hash((const u8*)symstr.data, symstr.length);
 
         ILib* lentry = (ILib*)hoht_get_value_hashed(&htlibs, hashlib);
         if(!lentry)
@@ -720,4 +733,3 @@ light_pecoff_emit(const char* out_filename, u8* in_stream, int in_stream_size_by
         fclose(file);
     }
 }
-#endif

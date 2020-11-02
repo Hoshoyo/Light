@@ -8,8 +8,8 @@ typedef struct {
     char* data;
 } string;
 
-#define MAKE_STR(S, V) (string){ sizeof(S) - 1, V, S }
-#define MAKE_STR_LEN(S, L) (string){ L, 0, S }
+#define MAKE_STR(S, V) (string){ sizeof(S) - 1, V, (char*)(S) }
+#define MAKE_STR_LEN(S, L) (string){ L, 0, (char*)(S) }
 
 GENERATE_HASH_TABLE(String, string, string)
 
