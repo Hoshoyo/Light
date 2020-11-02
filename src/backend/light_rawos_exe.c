@@ -66,8 +66,8 @@ import_libs(u8* stream_text_base, u8* text_base, X86_Import* imports, int* symbo
         
         string libstr = MAKE_STR_LEN(imp->decl->decl_proc.extern_library_name->data + 1, imp->decl->decl_proc.extern_library_name->length - 2);
         string symstr = MAKE_STR_LEN(imp->decl->decl_proc.name->data, imp->decl->decl_proc.name->length);
-        u64 hashlib = fnv_1_hash(libstr.data, libstr.length);
-        u64 hashsymb = fnv_1_hash(symstr.data, symstr.length);
+        u64 hashlib = fnv_1_hash((const u8*)libstr.data, libstr.length);
+        u64 hashsymb = fnv_1_hash((const u8*)symstr.data, symstr.length);
 
         ILib* lentry = (ILib*)hoht_get_value_hashed(&htlibs, hashlib);
         if(!lentry)
@@ -298,7 +298,7 @@ light_rawos_emit(const char* out_filename, u8* in_stream, int in_stream_size_byt
     imp_section->virtual_address = last_section->virtual_address + last_section->size_bytes + align_delta(last_section->virtual_address + last_section->size_bytes, 0x1000);
     imp_section->file_ptr_to_data = (at - stream);
     RawOS_Import_Table* imp_table = (RawOS_Import_Table*)at;
-    Import_Libs* imp_libs = import_libs(code_ptr, in_stream, imports, &imp_table->symbol_count);
+    Import_Libs* imp_libs = import_libs(code_ptr, in_stream, imports, (int*)&imp_table->symbol_count);
     at += write_imports(at, imp_libs, load_address, imp_section->virtual_address, imp_table);
     patch_imports(imp_libs, imports, load_address);
     imp_section->size_bytes = (at - import_ptr);

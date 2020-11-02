@@ -1049,6 +1049,7 @@ X86_generate(IR_Generator* gen, const char* filename, Light_Backend backend)
         case BACKEND_X86_RAWX:
             light_rawos_emit(filename, em.base, em.at - em.base, entry_point_offset, em.relative_patches, em.data, em.imports, em.dseg_patch, gen->dataseg);
             return 0;
+        default: break;
     }
     return 0;
 }

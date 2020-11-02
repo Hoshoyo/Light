@@ -237,8 +237,8 @@ import_libs(u8* stream_text_base, u8* text_base, X86_Import* imports)
         
         string libstr = MAKE_STR_LEN(imp->decl->decl_proc.extern_library_name->data + 1, imp->decl->decl_proc.extern_library_name->length - 2);
         string symstr = MAKE_STR_LEN(imp->decl->decl_proc.name->data, imp->decl->decl_proc.name->length);
-        u64 hashlib = fnv_1_hash(libstr.data, libstr.length);
-        u64 hashsymb = fnv_1_hash(symstr.data, symstr.length);
+        u64 hashlib = fnv_1_hash((const u8*)libstr.data, libstr.length);
+        u64 hashsymb = fnv_1_hash((const u8*)symstr.data, symstr.length);
 
         ILib* lentry = (ILib*)hoht_get_value_hashed(&htlibs, hashlib);
         if(!lentry)

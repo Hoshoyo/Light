@@ -2,6 +2,8 @@
 #include "../ir.h"
 #include "../global_tables.h"
 #include "../utils/os.h"
+#include "x86/x86.h"
+#include "c/toplevel.h"
 
 const char*
 backend_to_string(Light_Backend backend)
@@ -33,7 +35,7 @@ backend_generate(Light_Backend backend, Light_Ast** ast, Light_Scope* global_sco
         } break;
         case BACKEND_C: {
             double generate_start = os_time_us();
-            backend_c_generate_top_level(ast, global_type_table, &global_scope, main_file_directory, output_filename, compiler_path);
+            backend_c_generate_top_level(ast, global_type_table, global_scope, main_file_directory, output_filename, compiler_path);
             double generate_elapsed = (os_time_us() - generate_start) / 1000.0;
 
             double gcc_start = os_time_us();
