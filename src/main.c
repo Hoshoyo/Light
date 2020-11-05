@@ -14,7 +14,7 @@
 #include <hoht.h>
 #include "backend/backend.h"
 
-Light_Ast** load_internal_modules(Light_Parser* parser, Light_Scope* global_scope);
+Light_Ast** load_internal_modules(Light_Parser* parser, Light_Scope* global_scope, Light_Backend backend);
 
 int main(int argc, char** argv) {
     double start = os_time_us();
@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
     u32 parser_error = 0;
     parse_init(&parser, &lexer, &global_scope, compiler_path, compiler_path_size, argv[1]);
 
-    Light_Ast** ast = load_internal_modules(&parser, &global_scope);
+    Light_Ast** ast = load_internal_modules(&parser, &global_scope, backend);
 
     double parse_start = os_time_us();
     double lexing_elapsed = 0.0;
@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
     }
     double tcheck_elapsed = (os_time_us() - tcheck_start) / 1000.0;
     
-#if 0
+#if 1
     ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //type_table_print();

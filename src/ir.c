@@ -315,6 +315,8 @@ ir_gen_expr_unary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_lit
 {
     bool lval = expr->flags & AST_FLAG_EXPRESSION_LVALUE;
 
+    if (expr->expr_unary.op == OP_UNARY_ADDRESSOF)
+        inside_literal = false;
     // when the operand is a variable and the op is address of,
     // the expression address must be loaded, instead of value
     IR_Reg t1 = ir_gen_expr(gen, expr->expr_unary.operand, (expr->expr_unary.op != OP_UNARY_ADDRESSOF), inside_literal, outer_offset);
@@ -447,7 +449,14 @@ ir_gen_expr_vector_access(IR_Generator* gen, Light_Ast* expr, bool load, bool in
         }
         else
         {
-            iri_emit_load(gen, t3, t3, (IR_Value){0}, type_pointer_size_bytes(), expr->type->size_bits / 8, type_primitive_float(expr->type));
+            if (expr->type->size_bits > type_pointer_size_bits())
+            {
+
+            }
+            else
+            {
+                iri_emit_load(gen, t3, t3, (IR_Value){0}, type_pointer_size_bytes(), expr->type->size_bits / 8, type_primitive_float(expr->type));
+            }
             return t3;
         }
     }
@@ -600,6 +609,22 @@ ir_gen_expr_binary(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_li
     iri_emit_arith(gen, instr_type, t1, t2, t3, (IR_Value){0}, byte_size);
 
     return t3;
+}
+
+IR_Reg
+ir_gen_expr_comp_generated(IR_Generator* gen, Light_Ast* expr)
+{
+    IR_Reg t = ir_new_reg(gen, expr->type);
+    switch(expr->expr_compiler_generated.kind)
+    {
+        case COMPILER_GENERATED_TYPE_VALUE_POINTER:
+        case COMPILER_GENERATED_USER_TYPE_INFO_POINTER:
+        case COMPILER_GENERATED_POINTER_TO_TYPE_INFO:
+            iri_emit_arith(gen, IR_XOR, t, t, t, (IR_Value){0}, type_pointer_size_bytes());
+        break;
+        default: assert(0);
+    }
+    return t;
 }
 
 IR_Reg
@@ -850,7 +875,7 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr, bool inside_literal, 
     {
         Light_Ast* e = expr->expr_literal_struct.struct_exprs[i];
         IR_Reg expt = ir_gen_expr(gen, e, true, true, offset);
-
+#if 1
         if (e->kind == AST_EXPRESSION_LITERAL_STRUCT || e->kind == AST_EXPRESSION_LITERAL_ARRAY)
         {
             // did everything already
@@ -864,6 +889,7 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr, bool inside_literal, 
             iri_emit_store(gen, expt, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8,
                 type_primitive_float(e->type));
         }
+#endif
         ir_free_reg(gen, expt);
     }
 
@@ -908,9 +934,12 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr, bool inside_literal, i
         {
             Light_Ast* e = expr->expr_literal_array.array_exprs[i];
             IR_Reg expt = ir_gen_expr(gen, e, true, true, offset);
+            IR_Reg copy_to = ir_new_temp(gen);
             if(e->flags & AST_FLAG_EXPRESSION_LVALUE)
             {
-                iri_emit_copy(gen, expt, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
+                iri_emit_mov(gen, IR_REG_STACK_BASE, copy_to, (IR_Value) { 0 }, type_pointer_size_bytes(), false);
+                iri_emit_arith(gen, IR_ADD, copy_to, IR_REG_NONE, copy_to, (IR_Value) { .type = IR_VALUE_S32, .v_s32 = offset }, type_pointer_size_bytes());
+                iri_emit_copy(gen, expt, copy_to, (IR_Value){.type = IR_VALUE_S32, .v_s32 = e->type->size_bits / 8}, type_pointer_size_bytes());
             }
             else
             {
@@ -918,6 +947,7 @@ ir_gen_expr_lit_array(IR_Generator* gen, Light_Ast* expr, bool inside_literal, i
                     type_primitive_float(e->type));
             }
             ir_free_reg(gen, expt);
+            ir_free_reg(gen, copy_to);
             offset += (e->type->size_bits / 8);
         }
     }
@@ -934,14 +964,15 @@ ir_gen_expr(IR_Generator* gen, Light_Ast* expr, bool load, bool inside_literal, 
 
     switch(expr->kind)
     {
-        case AST_EXPRESSION_LITERAL_PRIMITIVE: res =  ir_gen_expr_lit_prim(gen, expr); break;
-        case AST_EXPRESSION_VARIABLE:          res =  ir_gen_expr_variable(gen, expr, load, inside_literal, outer_offset); break;
-        case AST_EXPRESSION_BINARY:            res =  ir_gen_expr_binary(gen, expr, load, inside_literal, outer_offset); break;
-        case AST_EXPRESSION_UNARY:             res =  ir_gen_expr_unary(gen, expr, load, inside_literal, outer_offset); break;
-        case AST_EXPRESSION_PROCEDURE_CALL:    res =  ir_gen_expr_proc_call(gen, expr, load, inside_literal, outer_offset); break;
-        case AST_EXPRESSION_DOT:               res =  ir_gen_expr_dot(gen, expr, load, inside_literal, outer_offset); break;
-        case AST_EXPRESSION_LITERAL_ARRAY:     res =  ir_gen_expr_lit_array(gen, expr, inside_literal, outer_offset); break;
-        case AST_EXPRESSION_LITERAL_STRUCT:    res =  ir_gen_expr_lit_struct(gen, expr, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_COMPILER_GENERATED: res = ir_gen_expr_comp_generated(gen, expr); break;
+        case AST_EXPRESSION_LITERAL_PRIMITIVE:  res = ir_gen_expr_lit_prim(gen, expr); break;
+        case AST_EXPRESSION_VARIABLE:           res = ir_gen_expr_variable(gen, expr, load, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_BINARY:             res = ir_gen_expr_binary(gen, expr, load, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_UNARY:              res = ir_gen_expr_unary(gen, expr, load, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_PROCEDURE_CALL:     res = ir_gen_expr_proc_call(gen, expr, load, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_DOT:                res = ir_gen_expr_dot(gen, expr, load, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_LITERAL_ARRAY:      res = ir_gen_expr_lit_array(gen, expr, inside_literal, outer_offset); break;
+        case AST_EXPRESSION_LITERAL_STRUCT:     res = ir_gen_expr_lit_struct(gen, expr, inside_literal, outer_offset); break;
         default: break;
     }
     gen->instructions[array_length(gen->instructions) - 1].origin_node = expr;
