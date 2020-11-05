@@ -307,12 +307,10 @@ light_rawos_emit(const char* out_filename, u8* in_stream, int in_stream_size_byt
     /*
         File write
     */
-    char filename[256] = { 0 };
-    sprintf(filename, "%s.rawx", out_filename);
-    FILE* file = fopen(filename, "wb");
+    FILE* file = fopen(out_filename, "wb");
     if(!file)
     {
-        fprintf(stderr, "Could not open file out1.rawx for writing\n");
+        fprintf(stderr, "Could not open file %s for writing\n", out_filename);
         return;
     }
     fwrite(stream, 1, at - stream, file);
