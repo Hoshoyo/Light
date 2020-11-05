@@ -41,6 +41,12 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
+    char* output_filename = 0;
+    if(argc >= 5) {
+        if(strcmp(argv[3], "-o") == 0){
+            output_filename = argv[4];
+        }
+    }
 
     size_t compiler_path_size = 0;
     const char* compiler_path = light_path_from_filename(argv[0], &compiler_path_size);
@@ -96,10 +102,11 @@ int main(int argc, char** argv) {
     //type_table_print();
 #endif
 
-    const char* outfile = light_extensionless_filename(light_filename_from_path(argv[1]));
+    if(!output_filename)
+        output_filename = (char*)light_extensionless_filename(light_filename_from_path(argv[1]));
 
     double backend_gen_time = 0.0;
-    backend_generate(backend, ast, &global_scope, main_file_directory, compiler_path, outfile, &backend_gen_time);
+    backend_generate(backend, ast, &global_scope, main_file_directory, compiler_path, output_filename, &backend_gen_time);
 
     double total_elapsed = (os_time_us() - start) / 1000.0;
     printf("- elapsed time: (backend: %s)\n\n", backend_to_string(backend));
