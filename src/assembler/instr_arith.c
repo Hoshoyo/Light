@@ -179,7 +179,8 @@ u8*
 emit_and_test(u8* stream)
 {
     X64_Arithmetic_Instr instr = ARITH_CMP;
-    stream = emit_arith_mi(0, stream, ARITH_SUB, DIRECT, ESP, (Int_Value){.v32 = 123}, 0, 0);
+    //stream = emit_arith_mr
+    stream = emit_arith_mr(0, ARITH_CMP, stream, CX, BX, DIRECT, 0, 0);
 
 #if 0
     stream = emit_arith_mi(0, stream, instr, DIRECT, RAX, (Int_Value){.v64 = 0x12345678}, 0, 0);

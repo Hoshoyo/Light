@@ -111,6 +111,28 @@ emit_opcode(u8* stream, u8 opcode, int bitsize, X64_Register dest, X64_Register 
 }
 
 static u8*
+emit_opcode_2bytes(u8* stream, u16 opcode, int bitsize, X64_Register dest, X64_Register src)
+{
+    bool using_extended_register = register_is_extended(dest) || register_is_extended(src);
+
+	if(bitsize == 16)
+		*stream++ = 0x66; // operand size override
+    if(bitsize == 64 || using_extended_register)
+		*stream++ = make_rex(register_is_extended(dest), 0, register_is_extended(src), bitsize == 64);
+    else if(bitsize == 8)
+    {
+        if( dest == SPL || dest == BPL || dest == SIL || dest == DIL ||
+            src == SPL || src == BPL || src == SIL || src == DIL)
+        {
+            *stream++ = make_rex(0,0,0,0);
+        }
+    }
+    *(u16*)stream = opcode;
+	stream += sizeof(u16);
+    return stream;
+}
+
+static u8*
 emit_displacement(X64_Addressing_Mode mode, u8* stream, u8 disp8, uint32_t disp32)
 {
 	if(mode == INDIRECT_BYTE_DISPLACED)

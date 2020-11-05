@@ -7,8 +7,7 @@ emit_cmov_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode,
     u8* start = stream;
     s8 disp_offset = 0;
 
-    *stream++ = 0x0f;
-    stream = emit_opcode(stream, opcode, bitsize, dest, src);
+    stream = emit_opcode_2bytes(stream, 0x0f | (opcode << 8), bitsize, dest, src);
     *stream++ = make_modrm(mode, register_representation(src), register_representation(dest));
     disp_offset = stream - start;
     stream = emit_displacement(mode, stream, disp8, disp32);
@@ -27,6 +26,8 @@ emit_cmov_reg(Instr_Emit_Result* out_info, u8* stream, X64_Addressing_Mode mode,
 u8*
 emit_cmov_test(u8* stream)
 {
+    stream = emit_cmov_reg(0, stream, DIRECT, CMOVE, 16, AX, DX, 0, 0);
+    /*
     stream = emit_cmov_reg(0, stream, DIRECT, CMOVE, 32, EBX, ECX, 0, 0);
     stream = emit_cmov_reg(0, stream, DIRECT, CMOVNE, 32, EBX, ECX, 0, 0);
 	stream = emit_cmov_reg(0, stream, DIRECT, CMOVA, 32, EBX, ECX, 0, 0);
@@ -41,6 +42,7 @@ emit_cmov_test(u8* stream)
     stream = emit_cmov_reg(0, stream, INDIRECT, CMOVE, 32, EBX, ECX, 0, 0);
     stream = emit_cmov_reg(0, stream, INDIRECT_BYTE_DISPLACED, CMOVE, 32, EBX, ECX, 0x12, 0);
     stream = emit_cmov_reg(0, stream, INDIRECT_DWORD_DISPLACED, CMOVE, 32, EBX, ECX, 0, 0x12345678);
+    */
 
     return stream;
 }

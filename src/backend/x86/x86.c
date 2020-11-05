@@ -26,6 +26,8 @@ typedef struct {
     X86_DataSeg_Patch* dseg_patch;
 
     IR_Generator* ir_gen;
+
+    Light_Backend backend;
 } X86_Emitter;
 
 // Expect 32 bit register en
@@ -617,17 +619,18 @@ x86_emit_hlt(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
 
-#if defined (_WIN32) || defined(_WIN64)
-    em->at = emit_ret(&info, em->at, RET_NEAR);
-#elif defined (__linux__)
-    // mov ebx, eax
-    em->at = emit_mov_reg(&info, em->at, MOV_MR, DIRECT, 32, EBX, EAX, 0, 0);
-    // mov eax, 1
-    em->at = emit_mov_oi(0, em->at, EAX, (Int_Value){.v32 = 1});
-    // int 0x80
-    em->at = emit_int(0, em->at, 0x80);
-#endif
-
+    if(em->backend == BACKEND_X86_PECOFF) {
+        em->at = emit_ret(&info, em->at, RET_NEAR);
+    } else if(em->backend == BACKEND_X86_ELF || em->backend == BACKEND_X86_RAWX) {
+        // mov ebx, eax
+        em->at = emit_mov_reg(&info, em->at, MOV_MR, DIRECT, 32, EBX, EAX, 0, 0);
+        // mov eax, 1
+        em->at = emit_mov_oi(0, em->at, EAX, (Int_Value){.v32 = 1});
+        // int 0x80
+        em->at = emit_int(0, em->at, 0x80);
+    } else {
+        assert(0);
+    }
     return info;
 }
 
@@ -992,6 +995,7 @@ int
 X86_generate(IR_Generator* gen, const char* filename, Light_Backend backend)
 {
     X86_Emitter em = {0};
+    em.backend = backend;
     em.base = (u8*)calloc(1, 1024 * 1024 * 16);
     em.at = em.base;
     em.relative_patches = array_new(X86_Patch);
