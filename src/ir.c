@@ -1605,6 +1605,6 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
     ir_patch_dataseg_variables(gen);
 
     //FILE* ir_out = fopen("irout.txt", "w");
-    iri_print_instructions(stdout, gen);
+    //iri_print_instructions(stdout, gen);
     //fclose(ir_out);
 }

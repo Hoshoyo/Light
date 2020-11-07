@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
     }
     double tcheck_elapsed = (os_time_us() - tcheck_start) / 1000.0;
     
-#if 1
+#if 0
     ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //type_table_print();
