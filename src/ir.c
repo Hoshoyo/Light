@@ -882,7 +882,7 @@ ir_gen_expr_lit_struct(IR_Generator* gen, Light_Ast* expr, bool inside_literal, 
         }
         else if(e->flags & AST_FLAG_EXPRESSION_LVALUE)
         {
-            iri_emit_copy(gen, expt, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
+            //iri_emit_copy(gen, expt, IR_REG_STACK_BASE, (IR_Value){.type = IR_VALUE_S32, .v_s32 = offset}, e->type->size_bits / 8);
         }
         else
         {
@@ -1332,9 +1332,9 @@ ir_gen_comm_return(IR_Generator* gen, Light_Ast* comm)
     {
         IR_Reg t = ir_gen_expr(gen, comm->comm_return.expression, true, false, 0);
         ir_free_reg(gen, t);
-        iri_emit_mov(gen, t, IR_REG_PROC_RET, (IR_Value){0}, 
-            comm->comm_return.expression->type->size_bits / 8, 
-            type_primitive_float(comm->comm_return.expression->type));
+        bool fp = type_primitive_float(comm->comm_return.expression->type);
+        iri_emit_mov(gen, t, (fp) ? IR_REG_PROC_RETF : IR_REG_PROC_RET, (IR_Value){0}, 
+            comm->comm_return.expression->type->size_bits / 8, fp);
     }
 
 #if IR_TO_X86
@@ -1605,6 +1605,6 @@ void ir_generate(IR_Generator* gen, Light_Ast** ast) {
     ir_patch_dataseg_variables(gen);
 
     //FILE* ir_out = fopen("irout.txt", "w");
-    //iri_print_instructions(stdout, gen);
+    iri_print_instructions(stdout, gen);
     //fclose(ir_out);
 }
