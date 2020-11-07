@@ -961,11 +961,13 @@ type_infer_expr_proc_call(Light_Ast* expr, u32* error) {
             
             Light_Ast** struct_exprs = array_new(Light_Ast*);
 
-            Light_Ast* capacity_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs, (Lexical_Range){0});
-            Light_Ast* length_expr = ast_new_expr_literal_primitive_u64(expr->scope_at, (u64)count_trailing_exprs, (Lexical_Range){0});
+            // TODO(psv): 64 bit implementation
+            Light_Ast* capacity_expr = ast_new_expr_literal_primitive_u32(expr->scope_at, (u64)count_trailing_exprs, (Lexical_Range){0});
+            Light_Ast* length_expr = ast_new_expr_literal_primitive_u32(expr->scope_at, (u64)count_trailing_exprs, (Lexical_Range){0});
             Light_Ast* type_info_expr = ast_new_expr_compiler_generated(expr->scope_at, COMPILER_GENERATED_USER_TYPE_INFO_POINTER);
             Light_Ast* trailing_array_literal = ast_new_expr_literal_array(expr->scope_at, 0, trailing_exprs, (Lexical_Range){0});
-            Light_Ast* array_cast = ast_new_expr_unary(expr->scope_at, trailing_array_literal, 0, OP_UNARY_CAST, (Lexical_Range){0});
+            Light_Ast* array_addr = ast_new_expr_unary(expr->scope_at, trailing_array_literal, 0, OP_UNARY_ADDRESSOF, (Lexical_Range){0});
+            Light_Ast* array_cast = ast_new_expr_unary(expr->scope_at, array_addr, 0, OP_UNARY_CAST, (Lexical_Range){0});
             array_cast->expr_unary.type_to_cast = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_VOID));
 
             capacity_expr->flags |= AST_FLAG_COMPILER_GENERATED;

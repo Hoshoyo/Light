@@ -726,6 +726,27 @@ ast_print_expr_proc_call(Light_Ast* expr, u32 flags, s32 indent_level) {
 }
 
 s32
+ast_print_expression_compiler_generated(Light_Ast* expr, u32 flags, s32 indent_level) {
+    assert(expr->kind == AST_EXPRESSION_COMPILER_GENERATED);
+    FILE* out = ast_file_from_flags(flags);
+    s32 length = 0;
+
+    switch(expr->expr_compiler_generated.kind) {
+        case COMPILER_GENERATED_POINTER_TO_TYPE_INFO: {
+            length += fprintf(out, "<^type_info>");
+        } break;
+        case COMPILER_GENERATED_TYPE_VALUE_POINTER: {
+            length += fprintf(out, "<^value>");
+        } break;
+        case COMPILER_GENERATED_USER_TYPE_INFO_POINTER: {
+            length += fprintf(out, "<^user_type_info>");
+        } break;
+        default: break;
+    }
+    return length;
+}
+
+s32
 ast_print_expr_unary(Light_Ast* expr, u32 flags, s32 indent_level) {
     assert(expr->kind == AST_EXPRESSION_UNARY);
     FILE* out = ast_file_from_flags(flags);
@@ -795,6 +816,9 @@ ast_print_expression(Light_Ast* expr, u32 flags, s32 indent_level) {
         case AST_EXPRESSION_DOT:
             length += ast_print_expression(expr->expr_dot.left, flags, indent_level);
             length += fprintf(out, ".%.*s", TOKEN_STR(expr->expr_dot.identifier));
+            break;
+        case AST_EXPRESSION_COMPILER_GENERATED:
+            length += ast_print_expression_compiler_generated(expr, flags, indent_level);
             break;
         default: length += fprintf(out, "<invalid expression>"); break;
     }

@@ -751,20 +751,28 @@ Instr_Emit_Result
 x86_emit_movf(X86_Emitter* em, IR_Instruction* instr)
 {
     Instr_Emit_Result info = {0};
+    X64_XMM_Register src = instr->t1 - IR_REG_PROC_RETF;
     X64_XMM_Register rdst = instr->t3 - IR_REG_PROC_RETF;
 
-    X86_Data data = {.length_bytes = instr->byte_size};
-    if(instr->byte_size == 4)
-        memcpy(data.reg_size_data, &instr->imm.v_r32, 4);
-    else if(instr->byte_size == 8)
-        memcpy(data.reg_size_data, &instr->imm.v_r64, 8);
+    if (instr->t1 != IR_REG_NONE)
+    {
+        em->at = emit_movs_direct(&info, em->at, rdst, src, (instr->byte_size) == 32);
+    }
+    else
+    {
+        X86_Data data = {.length_bytes = instr->byte_size};
+        if(instr->byte_size == 4)
+            memcpy(data.reg_size_data, &instr->imm.v_r32, 4);
+        else if(instr->byte_size == 8)
+            memcpy(data.reg_size_data, &instr->imm.v_r64, 8);
 
-    int patch_offset = (em->at - em->base);
-    em->at = emit_movs_ds_to_reg(&info, em->at, rdst, instr->byte_size == 4, 0);
-    data.patch_offset = patch_offset + info.diplacement_offset;
-    em->data_offset += instr->byte_size;
+        int patch_offset = (em->at - em->base);
+        em->at = emit_movs_ds_to_reg(&info, em->at, rdst, instr->byte_size == 4, 0);
+        data.patch_offset = patch_offset + info.diplacement_offset;
+        em->data_offset += instr->byte_size;
 
-    array_push(em->data, data);
+        array_push(em->data, data);
+    }
 
     return info;
 }
