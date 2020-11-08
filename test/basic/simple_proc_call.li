@@ -1,0 +1,6 @@
+magic : () -> s32 {
+    return 42;
+}
+main : () -> s32 {
+    return magic();
+}

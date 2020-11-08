@@ -722,7 +722,7 @@ light_pecoff_emit(const char* out_filename, u8* in_stream, int in_stream_size_by
     */
     {
         char filename[256] = { 0 };
-        sprintf(filename, "%s.exe", out_filename);
+        sprintf(filename, "%s", out_filename);
         FILE* file = fopen(filename, "wb");
         if(!file)
         {

@@ -1,0 +1,13 @@
+Entity union {
+    a : s32;
+    b : [4]u8;
+}
+
+main : () -> s32 {
+    v : Entity;
+    v.b[0] = 0x78;
+    v.b[1] = 0x56;
+    v.b[2] = 0x34;
+    v.b[3] = 0x12;
+    return v.a;
+}

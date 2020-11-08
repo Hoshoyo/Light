@@ -1,0 +1,8 @@
+main : () -> s32 {
+    if true {
+        return 5;
+    } else {
+        return 7;
+    }
+    return 0;
+}

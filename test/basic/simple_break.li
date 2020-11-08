@@ -1,0 +1,10 @@
+main : () -> s32 {
+    a := 0;
+    while true {
+        if a > 1000 {
+            break;
+        }
+        a += 1;
+    }
+    return a;
+}

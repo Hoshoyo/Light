@@ -1,0 +1,6 @@
+sum : (a, b : s32) -> s32 {
+    return a + b;
+}
+main : () -> s32 {
+    return sum(33, 23);
+}

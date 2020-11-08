@@ -1,0 +1,15 @@
+
+main : () -> s32 {
+    result := 5;
+
+    {
+        in := 3;
+        {
+            inner := 12;
+            in += inner;
+        }
+        result += 2 * in; // 35
+    }
+
+    return result;
+}

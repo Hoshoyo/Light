@@ -1,0 +1,9 @@
+main : () -> s32 {
+    result := 0;
+    for y := 0; y < 10; y += 1 {
+        for x := 0; x < 10; x += 1 {
+            result += x + y;
+        }
+    }
+    return result;
+}
