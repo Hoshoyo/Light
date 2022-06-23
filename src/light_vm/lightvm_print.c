@@ -139,9 +139,11 @@ print_binary_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
 void
 print_push_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
     switch(instr.type) {
-        case LVM_PUSH:   fprintf(out, "PUSH "); break;
+        case LVM_PUSH:    fprintf(out, "PUSH "); break;
         case LVM_EXPUSHI: fprintf(out, "EXPUSHI "); break;
         case LVM_EXPUSHF: fprintf(out, "EXPUSHF "); break;
+        case LVM_FPUSH:   fprintf(out, "FPUSH "); break;
+        case LVM_FPOP:    fprintf(out, "FPOP "); break;
         default: fprintf(out, "Invalid push instruction"); break;
     }
     switch(instr.push.addr_mode) {
@@ -182,6 +184,69 @@ print_unary_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
             default: fprintf(out, "Invalid unary instruction"); break;
         }
         print_register(out, instr.unary.reg, instr.unary.byte_size);
+    }
+}
+
+void
+print_cvt_instruction(FILE* out, Light_VM_Instruction instr, u64 imm)
+{
+    switch(instr.type)
+    {
+        case LVM_CVT_R32_S32:   
+            fprintf(out, "cvtr32s32 "); 
+            print_register(out, instr.binary.dst_reg, 4);
+            fprintf(out, ", ");
+            print_float_register(out, instr.binary.src_reg);
+            break;
+        case LVM_CVT_R32_S64:   
+            fprintf(out, "cvtr32s64 "); 
+            print_register(out, instr.binary.dst_reg, 8);
+            fprintf(out, ", ");
+            print_float_register(out, instr.binary.src_reg);
+            break;
+        case LVM_CVT_S32_R32:   
+            fprintf(out, "cvts32r32 "); 
+            print_float_register(out, instr.binary.dst_reg);
+            fprintf(out, ", ");
+            print_register(out, instr.binary.src_reg, 4);
+            break;
+        case LVM_CVT_S32_R64:   
+            fprintf(out, "cvts32r64 ");
+            print_float_register(out, instr.binary.dst_reg);
+            fprintf(out, ", ");
+            print_register(out, instr.binary.src_reg, 4);
+            break;
+        case LVM_CVT_S64_R64:   
+            fprintf(out, "cvts64r64 "); 
+            print_float_register(out, instr.binary.dst_reg);
+            fprintf(out, ", ");
+            print_register(out, instr.binary.src_reg, 8);
+            break;
+        case LVM_CVT_S64_R32:   
+            fprintf(out, "cvts64r32 "); 
+            print_float_register(out, instr.binary.dst_reg);
+            fprintf(out, ", ");
+            print_register(out, instr.binary.src_reg, 8);
+            break;
+        case LVM_CVT_R32_R64:   
+            fprintf(out, "cvtr32r64 "); 
+            print_float_register(out, instr.binary.dst_reg);
+            fprintf(out, ", ");
+            print_float_register(out, instr.binary.src_reg);
+            break;
+        case LVM_CVT_R64_R32:   
+            fprintf(out, "cvtr64r32 "); 
+            print_float_register(out, instr.binary.dst_reg);
+            fprintf(out, ", ");
+            print_float_register(out, instr.binary.src_reg);
+            break;
+        case LVM_CVT_SEXT:   
+            fprintf(out, "cvtsext "); 
+            print_register(out, instr.sext.dst_reg, instr.sext.dst_size);
+            fprintf(out, ", ");
+            print_register(out, instr.sext.src_reg, instr.sext.src_size);
+            break;
+        default: fprintf(out, "Invalid convert instruction"); break;
     }
 }
 
@@ -277,6 +342,8 @@ print_float_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
 void
 print_float_branch_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
     switch(instr.type) {
+        case LVM_FBLE: fprintf(out, "FBLE "); break;
+        case LVM_FBGE: fprintf(out, "FBGE "); break;
         case LVM_FBEQ: fprintf(out, "FBEQ "); break;
         case LVM_FBNE: fprintf(out, "FBNE "); break;
         case LVM_FBGT: fprintf(out, "FBGT "); break;
@@ -317,6 +384,20 @@ print_cmpmov_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
         case LVM_MOVLE_U: fprintf(out, "MOVLEU "); break;
         case LVM_MOVGE_U: fprintf(out, "MOVGEU "); break;
         default: fprintf(out, "Invalid comparison move instruction"); break;
+    }
+    print_register(out, instr.unary.reg, instr.unary.byte_size);
+}
+
+void
+print_fcmpmov_instruction(FILE* out, Light_VM_Instruction instr, u64 imm) {
+    switch(instr.type) {
+        case LVM_FMOVEQ:   fprintf(out, "FMOVEQ "); break;
+        case LVM_FMOVNE:   fprintf(out, "FMOVNE "); break;
+        case LVM_FMOVLT:   fprintf(out, "FMOVLT "); break;
+        case LVM_FMOVGT:   fprintf(out, "FMOVGT "); break;
+        case LVM_FMOVLE:   fprintf(out, "FMOVLE "); break;
+        case LVM_FMOVGE:   fprintf(out, "FMOVGE "); break;
+        default: fprintf(out, "Invalid float comparison move instruction"); break;
     }
     print_register(out, instr.unary.reg, instr.unary.byte_size);
 }
@@ -406,6 +487,8 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm) 
             print_unary_instruction(out, instr, imm);
             break;
 
+        case LVM_FPUSH:
+        case LVM_FPOP:
         case LVM_PUSH:
         case LVM_EXPUSHI:
         case LVM_EXPUSHF:
@@ -413,6 +496,19 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm) 
             break;
 
         case LVM_EXPOP: fprintf(out, "EXPOP"); break;
+
+        // Convert instructions
+        case LVM_CVT_R32_S32:
+        case LVM_CVT_R32_S64:
+        case LVM_CVT_S32_R32:
+        case LVM_CVT_S32_R64:
+        case LVM_CVT_S64_R64:
+        case LVM_CVT_S64_R32:
+        case LVM_CVT_R32_R64:
+        case LVM_CVT_R64_R32:
+        case LVM_CVT_SEXT:
+            print_cvt_instruction(out, instr, imm);
+            break;
 
         // Comparison/Branch
         case LVM_BEQ:
@@ -440,6 +536,15 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm) 
         case LVM_MOVLE_U:
         case LVM_MOVGE_U:
             print_cmpmov_instruction(out, instr, imm);
+            break;
+
+        case LVM_FMOVEQ:
+        case LVM_FMOVNE:
+        case LVM_FMOVLT:
+        case LVM_FMOVGT:
+        case LVM_FMOVLE:
+        case LVM_FMOVGE:
+            print_fcmpmov_instruction(out, instr, imm);
             break;
 
         case LVM_FBEQ:

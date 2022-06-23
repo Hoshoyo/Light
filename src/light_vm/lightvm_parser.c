@@ -138,6 +138,18 @@ instruction_type(const char** at) {
         type = LVM_MOVLE_U;
     } else if(start_with("movgeu", *at, &count)) {
         type = LVM_MOVGE_U;
+    } else if(start_with("fmoveq", *at, &count)) {
+        type = LVM_FMOVEQ;
+    } else if(start_with("fmovne", *at, &count)) {
+        type = LVM_FMOVNE;
+    } else if(start_with("fmovlt", *at, &count)) {
+        type = LVM_FMOVLT;
+    } else if(start_with("fmovgt", *at, &count)) {
+        type = LVM_FMOVGT;
+    } else if(start_with("fmovle", *at, &count)) {
+        type = LVM_FMOVLE;
+    } else if(start_with("fmovge", *at, &count)) {
+        type = LVM_FMOVGE;
     } else if(start_with("mov", *at, &count)) {
         type = LVM_MOV;
     } else if(start_with("shl", *at, &count)) {
@@ -168,6 +180,24 @@ instruction_type(const char** at) {
         type = LVM_FCMP;
     } else if(start_with("cmp", *at, &count)) {
         type = LVM_CMP;
+    } else if(start_with("cvtr32s32", *at, &count)) {
+        type = LVM_CVT_R32_S32;
+    } else if(start_with("cvtr32s64", *at, &count)) {
+        type = LVM_CVT_R32_S64;
+    } else if(start_with("cvts32r32", *at, &count)) {
+        type = LVM_CVT_S32_R32;
+    } else if(start_with("cvts32r64", *at, &count)) {
+        type = LVM_CVT_S32_R64;
+    } else if(start_with("cvts64r64", *at, &count)) {
+        type = LVM_CVT_S64_R64;
+    } else if(start_with("cvts64r32", *at, &count)) {
+        type = LVM_CVT_S64_R32;
+    } else if(start_with("cvtr32r64", *at, &count)) {
+        type = LVM_CVT_R32_R64;
+    } else if(start_with("cvtr64r32", *at, &count)) {
+        type = LVM_CVT_R64_R32;
+    } else if(start_with("cvtsext", *at, &count)) {
+        type = LVM_CVT_SEXT;
     } else if(start_with("beq", *at, &count)) {
         type = LVM_BEQ;
     } else if(start_with("bne", *at, &count)) {
@@ -198,6 +228,10 @@ instruction_type(const char** at) {
         type = LVM_FBGT;
     } else if(start_with("fblt", *at, &count)) {
         type = LVM_FBLT;
+    } else if(start_with("fbge", *at, &count)) {
+        type = LVM_FBGT;
+    } else if(start_with("fble", *at, &count)) {
+        type = LVM_FBLT;
     } else if(start_with("call", *at, &count)) {
         type = LVM_CALL;
     } else if(start_with("ret", *at, &count)) {
@@ -205,7 +239,11 @@ instruction_type(const char** at) {
     } else if(start_with("pop", *at, &count)) {
         type = LVM_POP;
     } else if(start_with("push", *at, &count)) {
-        type = LVM_PUSH;
+        type = LVM_PUSH;    
+    } else if(start_with("fpop", *at, &count)) {
+        type = LVM_FPOP;
+    } else if(start_with("fpush", *at, &count)) {
+        type = LVM_FPUSH;
     } else if(start_with("expushi", *at, &count)) {
         type = LVM_EXPUSHI;
     } else if(start_with("expushf", *at, &count)) {
@@ -291,8 +329,7 @@ parse_number(const char** at, u8* size_bytes) {
     }
 
     return result;
-}
-            
+}            
 
 Light_VM_Instruction
 light_vm_instruction_get(const char* s, uint64_t* immediate) {
@@ -432,6 +469,35 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
             }
         } break;
 
+        case LVM_CVT_R32_S64:
+        case LVM_CVT_R32_S32: {
+            instruction.binary.dst_reg = get_register(&at, 0);
+            eat_whitespace(&at); EAT_COMMA; eat_whitespace(&at);
+            instruction.binary.src_reg = get_float_register(&at);
+        } break;
+        case LVM_CVT_S64_R32: 
+        case LVM_CVT_S64_R64: 
+        case LVM_CVT_S32_R64:  
+        case LVM_CVT_S32_R32: {
+            instruction.binary.dst_reg = get_float_register(&at);
+            eat_whitespace(&at); EAT_COMMA; eat_whitespace(&at);
+            instruction.binary.src_reg = get_register(&at, 0);
+        } break;
+        case LVM_CVT_R32_R64: 
+        case LVM_CVT_R64_R32: {
+            instruction.binary.dst_reg = get_float_register(&at);
+            eat_whitespace(&at); EAT_COMMA; eat_whitespace(&at);
+            instruction.binary.src_reg = get_float_register(&at);
+        } break;
+        case LVM_CVT_SEXT: {
+            u8 dst_size, src_size;
+            instruction.sext.dst_reg = get_register(&at, &dst_size);
+            eat_whitespace(&at); EAT_COMMA; eat_whitespace(&at);
+            instruction.sext.src_reg = get_register(&at, &src_size);
+            instruction.sext.dst_size = dst_size;
+            instruction.sext.src_size = src_size;
+        } break;
+
         // Unary instructions
         case LVM_MOVEQ:
         case LVM_MOVNE:
@@ -448,6 +514,25 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
             instruction.unary.reg = get_register(&at, &byte_size);
             instruction.unary.byte_size = byte_size;
         } break;
+
+        case LVM_FMOVEQ:
+        case LVM_FMOVNE:
+        case LVM_FMOVLT:
+        case LVM_FMOVGT:
+        case LVM_FMOVLE:
+        case LVM_FMOVGE: {
+            u8 byte_size = 0;
+            instruction.unary.reg = get_register(&at, &byte_size);
+            instruction.unary.byte_size = byte_size;
+        } break;
+
+        case LVM_FPUSH:
+        case LVM_FPOP: {
+            instruction.push.reg = get_float_register(&at);
+            instruction.push.byte_size = (instruction.push.reg < FR4) ? 4 : 8;
+            instruction.push.addr_mode = PUSH_ADDR_MODE_REGISTER;
+        } break;
+
         case LVM_NEG: {
             u8 byte_size = 0;
             instruction.unary.reg = get_register(&at, &byte_size);
@@ -496,6 +581,7 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
         // Comparison/Branch
         case LVM_CALL: case LVM_EXTCALL:
         case LVM_FBEQ: case LVM_FBNE: case LVM_FBGT: case LVM_FBLT:
+        case LVM_FBGE: case LVM_FBLE:
         case LVM_BEQ: case LVM_BNE: case LVM_BLT_S:
         case LVM_BGT_S: case LVM_BLE_S: case LVM_BGE_S:
         case LVM_BLT_U: case LVM_BGT_U: case LVM_BLE_U:

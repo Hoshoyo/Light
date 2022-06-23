@@ -526,6 +526,12 @@ light_vm_execute_float_branch_instruction(Light_VM_State* state, Light_VM_Instru
     bool branch = false;
 
     switch(instr.type) {
+        case LVM_FBGE: {
+            branch = state->rfloat_flags.equal || state->rfloat_flags.bigger_than;
+        } break;
+        case LVM_FBLE: {
+            branch = state->rfloat_flags.equal || state->rfloat_flags.less_than;
+        } break;
         case LVM_FBEQ:{
             branch = state->rfloat_flags.equal;
         }break;
@@ -627,6 +633,32 @@ light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction in
         default: assert(0); break;
     }
     state->registers[RSP] += instr.push.byte_size;
+}
+
+void
+light_vm_execute_fpush_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
+    void* dst = (void*)state->registers[RSP];
+    assert(instr.push.addr_mode == PUSH_ADDR_MODE_REGISTER);
+
+    switch(instr.push.byte_size) {
+        case 4: *(r32*)dst = state->f32registers[instr.push.reg]; break;
+        case 8: *(r64*)dst = state->f64registers[instr.push.reg]; break;
+        default: assert(0); break;
+    }
+    state->registers[RSP] += instr.push.byte_size;
+}
+
+void
+light_vm_execute_cvtsext_instruction(Light_VM_State* state, Light_VM_Instruction instr)
+{
+    switch(instr.sext.src_size)
+    {
+        case 1: state->registers[instr.sext.dst_reg] = (s64)(s8)state->registers[instr.sext.src_reg];  break;
+        case 2: state->registers[instr.sext.dst_reg] = (s64)(s16)state->registers[instr.sext.src_reg]; break;
+        case 4: state->registers[instr.sext.dst_reg] = (s64)(s32)state->registers[instr.sext.src_reg]; break;
+        case 8: state->registers[instr.sext.dst_reg] = (s64)state->registers[instr.sext.src_reg];      break;
+        default: assert(0); break;
+    }
 }
 
 void
@@ -768,6 +800,40 @@ light_vm_execute_cmpmov_instruction(Light_VM_State* state, Light_VM_Instruction 
     return true;
 }
 
+bool
+light_vm_execute_fcmpmov_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
+    bool value = false;
+    switch(instr.type) {
+        case LVM_FMOVEQ:{
+            value = (state->rfloat_flags.equal);
+        }break;
+        case LVM_FMOVNE:{
+            value = !(state->rfloat_flags.equal);
+        }break;
+        case LVM_FMOVLT: {
+            value = (state->rfloat_flags.less_than);
+        }break;
+        case LVM_FMOVGT:{
+            value = (state->rfloat_flags.bigger_than);
+        }break;
+        case LVM_FMOVLE:{
+            value = (state->rfloat_flags.less_than) || (state->rfloat_flags.equal);
+        }break;
+        case LVM_FMOVGE:{
+            value = (state->rfloat_flags.bigger_than) || (state->rfloat_flags.equal);
+        }break;
+        default: assert(0); break;
+    }
+
+    if(value) {
+        state->registers[instr.unary.reg] = 1;
+    } else {
+        state->registers[instr.unary.reg] = 0;
+    }
+
+    return true;
+}
+
 // Return if the branch is taken or not
 bool
 light_vm_execute_branch_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
@@ -870,6 +936,38 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             advance_ip = true;
             break;
 
+        // Convert
+        case LVM_CVT_R32_S64:
+        case LVM_CVT_R32_S32:
+            state->registers[instr.unary.reg] = (s32)state->f32registers[instr.unary.reg];
+            advance_ip = true;
+            break;
+        case LVM_CVT_S32_R32:
+            state->f32registers[instr.unary.reg] = (r32)state->registers[instr.unary.reg];
+            advance_ip = true;
+            break;
+        case LVM_CVT_S64_R64:
+        case LVM_CVT_S32_R64:
+            state->f64registers[instr.unary.reg] = (r64)state->registers[instr.unary.reg];
+            advance_ip = true;
+            break;
+        case LVM_CVT_S64_R32:
+            state->f32registers[instr.unary.reg] = (r32)state->registers[instr.unary.reg];
+            advance_ip = true;
+            break;
+        case LVM_CVT_R32_R64:
+            state->f64registers[instr.unary.reg] = (r64)state->f32registers[instr.unary.reg];
+            advance_ip = true;
+            break;
+        case LVM_CVT_R64_R32:
+            state->f32registers[instr.unary.reg] = (r32)state->f64registers[instr.unary.reg];
+            advance_ip = true;
+            break;
+        case LVM_CVT_SEXT: {
+            light_vm_execute_cvtsext_instruction(state, instr);
+            advance_ip = true;
+        } break;
+
         // Unary instructions
         case LVM_NOT:{
             state->registers[instr.unary.reg] = ~state->registers[instr.unary.reg];
@@ -888,10 +986,23 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             advance_ip = true;
         }break;
 
+        case LVM_FPUSH: {
+            light_vm_execute_fpush_instruction(state, instr);
+            advance_ip = true;
+        } break;
         case LVM_PUSH:{
             light_vm_execute_push_instruction(state, instr);
             advance_ip = true;
         }break;
+        case LVM_FPOP: {
+            switch(instr.push.byte_size) {
+                case 4: state->f32registers[instr.unary.reg] = *((r32*)state->registers[RSP] - 1); break;
+                case 8: state->f64registers[instr.unary.reg] = *((r64*)state->registers[RSP] - 1); break;
+                default: assert(0); break;
+            }
+            state->registers[RSP] -= instr.unary.byte_size;
+            advance_ip = true;
+        } break;
         case LVM_POP:{
             switch(instr.unary.byte_size) {
                 case 1: state->registers[instr.unary.reg] = (u64)*((u8*)state->registers[RSP] - 1); break;
@@ -930,6 +1041,15 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
         case LVM_MOVLE_U:
         case LVM_MOVGE_U:{
             advance_ip = light_vm_execute_cmpmov_instruction(state, instr);
+        }break;
+
+        case LVM_FMOVEQ:
+        case LVM_FMOVNE:
+        case LVM_FMOVLT:
+        case LVM_FMOVGT:
+        case LVM_FMOVLE:
+        case LVM_FMOVGE:{
+            advance_ip = light_vm_execute_fcmpmov_instruction(state, instr);
         }break;
 
         case LVM_FBEQ:

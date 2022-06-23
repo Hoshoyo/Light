@@ -36,6 +36,8 @@ int main(int argc, char** argv) {
             backend = BACKEND_X86_RAWX;
         } else if(strcmp(backend_str, "-c") == 0) {
             backend = BACKEND_C;
+        } else if(strcmp(backend_str, "-lightvm") == 0) {
+            backend = BACKEND_LIGHT_VM;
         } else {
             fprintf(stderr, "invalid backend '%s'\n", argv[2]);
             return 1;
@@ -102,7 +104,7 @@ int main(int argc, char** argv) {
     }
     double tcheck_elapsed = (os_time_us() - tcheck_start) / 1000.0;
     
-#if 0
+#if 1
     ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //type_table_print();

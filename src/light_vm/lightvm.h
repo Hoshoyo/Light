@@ -34,7 +34,7 @@ typedef enum {
 
     // Floating point
     LVM_FADD, LVM_FSUB, LVM_FMUL, LVM_FDIV, LVM_FMOV,
-    LVM_FBEQ, LVM_FBNE, LVM_FBGT, LVM_FBLT,
+    LVM_FBEQ, LVM_FBNE, LVM_FBGT, LVM_FBLT, LVM_FBGE, LVM_FBLE,
     LVM_FNEG,
 
     // Comparison/Branch
@@ -62,11 +62,30 @@ typedef enum {
     LVM_MOVLE_U,
     LVM_MOVGE_U,
 
+    LVM_FMOVEQ, 
+    LVM_FMOVNE, 
+    LVM_FMOVGT, 
+    LVM_FMOVLT, 
+    LVM_FMOVGE, 
+    LVM_FMOVLE,
+
+    // Convert
+    LVM_CVT_R32_S32,
+    LVM_CVT_R32_S64,
+    LVM_CVT_S32_R32,
+    LVM_CVT_S32_R64,
+    LVM_CVT_S64_R64,
+    LVM_CVT_S64_R32,
+    LVM_CVT_R32_R64,
+    LVM_CVT_R64_R32,
+    LVM_CVT_SEXT,
+
     // Jump
     LVM_JMP,   // Unconditionally
 
     // Proc
     LVM_CALL, LVM_PUSH, LVM_POP, LVM_RET,
+    LVM_FPUSH, LVM_FPOP,
     LVM_EXPUSHI, LVM_EXPUSHF, LVM_EXPOP,
     LVM_EXTCALL,
 
@@ -169,9 +188,17 @@ typedef struct {
 } Light_VM_Alloc_Instruction;
 
 typedef struct {
+    uint32_t dst_reg   : 4;
+    uint32_t src_reg   : 4;
+    uint32_t dst_size  : 4;
+    uint32_t src_size  : 4;
+} Light_VM_Instruction_SignExt;
+
+typedef struct {
     uint8_t type;
     uint8_t imm_size_bytes;
     union {
+        Light_VM_Instruction_SignExt    sext;
         Light_VM_Instruction_Binary     binary;
         Light_VM_Instruction_Unary      unary;
         Light_VM_Instruction_Float      ifloat;

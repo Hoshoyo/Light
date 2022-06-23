@@ -53,6 +53,12 @@ type_cast_is_valid(Light_Type* from, Light_Type* to) {
         return true;
     }
 
+    if(type_primitive_bool(to) && type_primitive_int(from) ||
+        type_primitive_int(to) && type_primitive_bool(from))
+    {
+        return true;
+    }
+
     return false;
 }
 

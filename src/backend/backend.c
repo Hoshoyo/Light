@@ -43,6 +43,9 @@ backend_generate(Light_Backend backend, Light_Ast** ast, Light_Scope* global_sco
             double gcc_elapsed = (os_time_us() - gcc_start) / 1000.0;
             if(gen_time_us) *gen_time_us = gcc_elapsed + generate_elapsed;
         } break;
+        case BACKEND_LIGHT_VM: {
+            lvm_generate(ast, global_scope);
+        } break;
         default: return 1;
     }
     return 0;

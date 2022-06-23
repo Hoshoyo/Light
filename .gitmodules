@@ -1,0 +1,3 @@
+[submodule "src/hassembler"]
+	path = src/hassembler
+	url = git@github.com:Hoshoyo/hassembler.git

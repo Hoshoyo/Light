@@ -13,18 +13,19 @@ int main(int argc, char** argv)
 	{
 		//stream = emit_mov_test(stream);
 		//stream = emit_add_test(stream);
-		//stream = emit_and_test(stream);
+		stream = emit_and_test(stream);
 		//stream = emit_shl_test(stream);
 		//stream = emit_float_test(stream);
 		//stream = emit_test_mul(stream);
 		//stream = emit_jmp_cond_test(stream);
-		stream = emit_cmov_test(stream);
+		//stream = emit_cmov_test(stream);
 	}
 
 	fwrite(code, 1, stream - code, out);
 	fclose(out);
 
-	system("ndisasm -b 32 test.bin");
+	//system("ndisasm -b 32 test.bin");
+	system("ndisasm -b 64 test.bin");
     return 0;
 }
 
