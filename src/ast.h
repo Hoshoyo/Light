@@ -289,6 +289,7 @@ typedef enum {
 	DECL_VARIABLE_FLAG_RESOLVED     = (1 << 3),
 
 	DECL_VARIABLE_FLAG_LOADED       = (1 << 4), // whether is loaded in a temporary already
+	DECL_VARIABLE_FLAG_ADDR_CALCULATED = (1 << 5),
 } Light_Decl_Variable_Flags;
 
 typedef struct {

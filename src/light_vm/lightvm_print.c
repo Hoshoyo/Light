@@ -57,6 +57,20 @@ void print_immediate(FILE* out, u8 byte_size, u64 imm) {
     }
 }
 
+void print_immediate_signed(FILE* out, u8 byte_size, u64 imm) {
+    switch(byte_size) {
+        case 1: 
+            fprintf(out, "%d", (s8)(imm & 0xff)); break;
+        case 2:
+            fprintf(out, "%d", (s16)(imm & 0xffff)); break;
+        case 4:
+            fprintf(out, "%d", (s32)(imm & 0xffffffff)); break;
+        case 8:
+            fprintf(out, "%lld", (s64)imm); break;
+        default: fprintf(out, "Invalid immediate byte size");
+    }
+}
+
 void
 print_binary_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
     switch(instr.type) {
@@ -117,8 +131,8 @@ print_binary_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
         case BIN_ADDR_MODE_REG_TO_MEM_OFFSETED:{
             fprintf(out, "[");
             print_register(out, instr.binary.dst_reg, 8);
-            fprintf(out, " + ");
-            print_immediate(out, instr.imm_size_bytes, immediate);
+            fprintf(out, (instr.binary.sign) ? " - " : " + ");
+            print_immediate_signed(out, instr.imm_size_bytes, immediate);
             fprintf(out, "], ");
             print_register(out, instr.binary.src_reg, instr.binary.bytesize);
         }break;
@@ -126,8 +140,8 @@ print_binary_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
             print_register(out, instr.binary.dst_reg, instr.binary.bytesize);
             fprintf(out, ", [");
             print_register(out, instr.binary.src_reg, 8);
-            fprintf(out, " + ");
-            print_immediate(out, instr.imm_size_bytes, immediate);
+            fprintf(out, (instr.binary.sign) ? " - " : " + ");
+            print_immediate_signed(out, instr.imm_size_bytes, immediate);
             fprintf(out, "]");
         }break;
         default: {
@@ -620,6 +634,8 @@ light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
 void 
 light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
     if(flags & LVM_PRINT_DECIMAL) {
+        
+        #if 0
         fprintf(out, "R0: %lld \t R1: %lld\n", state->registers[R0], state->registers[R1]);
         fprintf(out, "R2: %lld \t R3: %lld\n", state->registers[R2], state->registers[R3]);
         fprintf(out, "R4: %lld \t R5: %lld\n", state->registers[R4], state->registers[R5]);
@@ -627,6 +643,23 @@ light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
         fprintf(out, "\n");
         fprintf(out, "RSP: %lld \t RBP: %lld\n", state->registers[RSP], state->registers[RBP]);
         fprintf(out, "RIP: %lld \t RDP: %lld\n", state->registers[RIP], state->registers[RDP]);
+        #else
+        
+        fprintf(out, "R0: %lld | R0d: %d | R0w: %d | R0b: %d\n", state->registers[R0], (s32)state->registers[R0], (s16)state->registers[R0], (s8)state->registers[R0]);
+        fprintf(out, "R1: %lld | R1d: %d | R1w: %d | R1b: %d\n", state->registers[R1], (s32)state->registers[R1], (s16)state->registers[R1], (s8)state->registers[R1]);
+        fprintf(out, "R2: %lld | R2d: %d | R2w: %d | R2b: %d\n", state->registers[R2], (s32)state->registers[R2], (s16)state->registers[R2], (s8)state->registers[R2]);
+        fprintf(out, "R3: %lld | R3d: %d | R3w: %d | R3b: %d\n", state->registers[R3], (s32)state->registers[R3], (s16)state->registers[R3], (s8)state->registers[R3]);
+        fprintf(out, "R4: %lld | R4d: %d | R4w: %d | R4b: %d\n", state->registers[R4], (s32)state->registers[R4], (s16)state->registers[R4], (s8)state->registers[R4]);
+        fprintf(out, "R5: %lld | R5d: %d | R5w: %d | R5b: %d\n", state->registers[R5], (s32)state->registers[R5], (s16)state->registers[R5], (s8)state->registers[R5]);
+        fprintf(out, "R6: %lld | R6d: %d | R6w: %d | R6b: %d\n", state->registers[R6], (s32)state->registers[R6], (s16)state->registers[R6], (s8)state->registers[R6]);
+        fprintf(out, "R7: %lld | R7d: %d | R7w: %d | R7b: %d\n", state->registers[R7], (s32)state->registers[R7], (s16)state->registers[R7], (s8)state->registers[R7]);
+        fprintf(out, "\n");
+        fprintf(out, "RSP: %lld | RSPd: %d | RSPw: %d | RSPb: %d\n", state->registers[RSP], (s32)state->registers[RSP], (s16)state->registers[RSP], (s8)state->registers[RSP]);
+        fprintf(out, "RBP: %lld | RBPd: %d | RBPw: %d | RBPb: %d\n", state->registers[RBP], (s32)state->registers[RBP], (s16)state->registers[RBP], (s8)state->registers[RBP]);
+        fprintf(out, "RIP: %lld | RIPd: %d | RIPw: %d | RIPb: %d\n", state->registers[RIP], (s32)state->registers[RIP], (s16)state->registers[RIP], (s8)state->registers[RIP]);
+        fprintf(out, "RDP: %lld | RDPd: %d | RDPw: %d | RDPb: %d\n", state->registers[RDP], (s32)state->registers[RDP], (s16)state->registers[RDP], (s8)state->registers[RDP]);
+
+        #endif
     } else {
         fprintf(out, "R0: 0x%llx \t R1: 0x%llx\n", state->registers[R0], state->registers[R1]);
         fprintf(out, "R2: 0x%llx \t R3: 0x%llx\n", state->registers[R2], state->registers[R3]);
@@ -640,6 +673,8 @@ light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
         fprintf(out, "\n");
         fprintf(out, "FR0: %f \t FR1: %f\n", state->f32registers[FR0], state->f32registers[FR1]);
         fprintf(out, "FR2: %f \t FR3: %f\n", state->f32registers[FR2], state->f32registers[FR3]);
+        //fprintf(out, "FR4: %f \t FR5: %f\n", state->f64registers[FR4 - FR4], state->f64registers[FR5- FR4]);
+        //fprintf(out, "FR6: %f \t FR7: %f\n", state->f64registers[FR6 - FR4], state->f64registers[FR7- FR4]);
         fprintf(out, "FR4: %f \t FR5: %f\n", state->f64registers[FR4], state->f64registers[FR5]);
         fprintf(out, "FR6: %f \t FR7: %f\n", state->f64registers[FR6], state->f64registers[FR7]);
     }
