@@ -43,3 +43,37 @@ bar struct {
     a : s32;
     b : s32;
 }
+
+fooz : () -> s32 {
+    a := bar(2);
+    return a;
+}
+
+bar : (b : s32) -> s32 {
+    a : s32 = 32;
+    return a * b;
+}
+
+// ---
+
+foo : () -> s32 {
+    return factorial(5);
+}
+
+factorial : (value : s32) -> s32 {
+    if value == 1 
+        return 1;
+    return value * factorial(value-1);
+}
+
+/*
+factorial : (value : s32) -> s32 {
+    a := 1;
+    b := 1;
+    while a <= value {
+        b *= a;
+        a += 1;
+    } 
+    return b;
+}
+*/
