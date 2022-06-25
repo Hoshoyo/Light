@@ -24,6 +24,7 @@ bool        type_primitive_int(Light_Type* t);
 bool        type_primitive_float(Light_Type* t);
 bool        type_primitive_numeric(Light_Type* t);
 bool        type_primitive_bool(Light_Type* t);
+s64         type_struct_field_offset_bits(Light_Type* t, const char* field_name);
 
 Light_Ast*  type_value_expression(Light_Scope* scope, Light_Type* t);
 

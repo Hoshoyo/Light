@@ -113,6 +113,15 @@ Light_Type* type_get_bigger(Light_Type* t1, Light_Type* t2) {
     return (t1->size_bits > t2->size_bits) ? t1 : t2;
 }
 
+s64 type_struct_field_offset_bits(Light_Type* t, const char* field_name) {
+    t = type_alias_root(t);
+    for(int i = 0; i < t->struct_info.fields_count; ++i) {
+        if(t->struct_info.fields[i]->decl_variable.name->data == field_name)
+            return t->struct_info.offset_bits[i];
+    }
+    return -1;
+}
+
 static Light_Type*
 type_new_primitive(Light_Type_Primitive p) {
     Light_Type* result = type_alloc();

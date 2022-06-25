@@ -631,6 +631,42 @@ light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
     }
 }
 #elif defined(_WIN32) || defined(_WIN64)
+#include <light_array.h>
+void
+light_vm_debug_dump_variables(FILE* out, Light_VM_State* state, u32 flags)
+{
+    fprintf(out, "--- VARIABLES ---\n");
+    fprintf(out, "R0:  %llx\n", state->registers[R0]);
+    fprintf(out, "R1:  %llx\n", state->registers[R1]);
+    fprintf(out, "RBP: %llx\n", state->registers[RBP]);
+
+    for(int i = 0; i < array_length(state->debug_vars); ++i)
+    {
+        Light_VM_Debug_Variable d = state->debug_vars[i];
+        fprintf(out, "(%d | 0x%llx) %.*s: ", d.size_bytes, state->registers[RBP]  + d.rbp_offset, d.name_length, d.name);
+        if(state->registers[RBP])
+        {
+            char* addr = (char*)(state->registers[RBP]  + d.rbp_offset);
+            if(d.size_bytes % 4 == 0)
+            {
+                for(int j = 0; j < d.size_bytes / 4; j += 4)
+                {
+                    fprintf(out, "%d ", ((int*)addr)[j]);
+                }
+            }
+            else
+            {
+                for(int j = 0; j < d.size_bytes; ++j)
+                {
+                    fprintf(out, "%d ", addr[j]);
+                }
+            }
+        }
+        fprintf(stdout, "\n");
+    }
+    fprintf(out, "-----------------\n");
+}
+
 void 
 light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
     if(flags & LVM_PRINT_DECIMAL) {

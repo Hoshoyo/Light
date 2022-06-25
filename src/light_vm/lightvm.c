@@ -4,6 +4,7 @@
 #include <string.h>
 #include "lightvm.h"
 #include "common.h"
+#include <light_array.h>
 
 #define true 1
 #define false 0
@@ -26,6 +27,8 @@ light_vm_init() {
 
     state->stack.block = calloc(1, 1024 * 1024); // 1MB
     state->stack.size = 1024 * 1024;
+
+    state->debug_vars = array_new(Light_VM_Debug_Variable);
 
     return state;
 }
@@ -1171,6 +1174,8 @@ light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
             u64 imm = get_value_of_immediate(state, in, addr_of_imm);
             fprintf(stdout, PRINTF_S64 ": ", state->registers[RIP]);
             light_vm_print_instruction(stdout, in, imm);
+
+            //light_vm_debug_dump_variables(stdout, state, 0);
         }
 
         if(in.type == LVM_HLT) break;

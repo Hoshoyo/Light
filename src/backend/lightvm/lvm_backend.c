@@ -1,7 +1,8 @@
 #include "../../light_vm/lightvm.h"
 #include "../../ast.h"
-#include "../../type_table.h"
+#include "../../type.h"
 #include <assert.h>
+#include <light_array.h>
 
 /*
     ...
@@ -23,6 +24,7 @@
 static void lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs);
 static void lvm_mov_float_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_FRegisters reg, bool eval_deref);
 static void lvm_mov_ptr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs);
+static void lvm_mov_enum_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg);
 
 typedef enum {
     EXPR_RES_FLOAT32,
@@ -49,6 +51,7 @@ typedef struct {
     int size_bytes;
 } Stack_Info;
 
+static Expr_Result lvm_eval(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs);
 void lvm_generate_command(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_info);
 
 static int
@@ -90,13 +93,18 @@ static Light_VM_Registers
 return_reg_for_type(Light_Type* type)
 {
     type = type_alias_root(type);
-    assert(type->kind == TYPE_KIND_PRIMITIVE || type->kind == TYPE_KIND_POINTER);
-    if(type_primitive_int(type) || type_primitive_bool(type) || type->kind == TYPE_KIND_POINTER)
+    assert(type->kind == TYPE_KIND_PRIMITIVE || type->kind == TYPE_KIND_POINTER || type->kind == TYPE_KIND_ENUM);
+    if(type_primitive_int(type) || type_primitive_bool(type) || type->kind == TYPE_KIND_POINTER || type->kind == TYPE_KIND_ENUM)
         return R0;
     else if(type_primitive_float(type) && type->size_bits == 32)
         return FR0; // 32 bit
-    else
+    else if(type_primitive_float(type) && type->size_bits == 64)
         return FR4; // 64 bit
+    else
+    {
+        Unimplemented;
+        return R0;
+    }
 }
 
 bool
@@ -112,7 +120,6 @@ is_regsize_type(Light_Ast* expr)
             return true;
         case TYPE_KIND_STRUCT:
         case TYPE_KIND_UNION:
-            // TODO
         default: 
             return false;
     }
@@ -301,13 +308,17 @@ lvm_int_cast(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
                         default: Unreachable;
                     }
                 }
+                else if(operand_type->kind == TYPE_KIND_ENUM)
+                {
+                    lvm_mov_enum_expr_to_reg(state, expr->expr_unary.operand, reg);
+                }
                 else
                 {
-                    // Enum to s32/s64, pointer to s32/s64...
+                    // pointer to s32/s64...
                     Unimplemented;
                 }
             }break;
-            default: Unimplemented;
+            default: Unreachable;
         }
     }
 }
@@ -382,6 +393,66 @@ lvm_float_cast(Light_VM_State* state, Light_Ast* expr, Light_VM_FRegisters freg)
     }
 }
 
+static int
+enum_value_index(Light_Ast* expr)
+{
+    Light_Type* type = type_alias_root(expr->type);
+    if(expr->kind == AST_EXPRESSION_DOT)
+    {
+        for (int i = 0; i < array_length(type->enumerator.fields); ++i)
+        {
+            if(type->enumerator.fields[i]->decl_variable.name->data == expr->expr_dot.identifier->data)
+            {
+                return i;
+            }
+        }
+    }
+    Unreachable;
+    return -1;
+}
+
+static void
+lvm_mov_enum_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
+{
+    Light_Type* type = type_alias_root(expr->type);
+    assert(type->kind == TYPE_KIND_ENUM);
+    if(expr->kind == AST_EXPRESSION_DOT)
+    {
+        int index = enum_value_index(expr);
+        int64_t value = type->enumerator.evaluated_values[index];
+        light_vm_push_fmt(state, "mov r%d, %lld", reg, value);
+    }
+    else if(expr->kind == AST_EXPRESSION_VARIABLE)
+    {
+        lvm_mov_int_expr_to_reg(state, expr, reg, true);
+    }
+}
+
+static void
+lvm_eval_variable(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
+{
+    light_vm_push_fmt(state, "mov r%d, rbp", reg);
+    if(expr->expr_variable.decl->decl_variable.stack_offset < 0)
+        light_vm_push_fmt(state, "subs r%d, %d", reg, -expr->expr_variable.decl->decl_variable.stack_offset);
+    else
+        light_vm_push_fmt(state, "adds r%d, %d", reg, expr->expr_variable.decl->decl_variable.stack_offset);
+}
+
+static void
+lvm_eval_field_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
+{
+    Expr_Result res = lvm_eval(state, expr->expr_dot.left, reg, false);
+    if(type_alias_root(expr->expr_dot.left->type)->kind == TYPE_KIND_STRUCT)
+    {
+        s64 offset = type_struct_field_offset_bits(expr->expr_dot.left->type, expr->expr_dot.identifier->data);
+        light_vm_push_fmt(state, "adds r%d, %d", reg, (s32)offset);
+    }
+    else
+    {
+        Unimplemented;
+    }
+}
+
 static Expr_Result
 lvm_eval(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs)
 {
@@ -413,9 +484,98 @@ lvm_eval(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool ev
     {
         lvm_mov_ptr_expr_to_reg(state, expr, result.reg, eval_derefs);
     }
+    else if(type_alias_root(expr->type)->kind == TYPE_KIND_ENUM)
+    {
+        lvm_mov_enum_expr_to_reg(state, expr, result.reg);
+    }
+    else if(expr->kind == AST_EXPRESSION_VARIABLE)
+    {
+        lvm_eval_variable(state, expr, result.reg);
+    }
+    else if(expr->kind == AST_EXPRESSION_DOT)
+    {
+        lvm_eval_field_access(state, expr, result.reg);
+    }
     else
+    {
         Unimplemented; 
+    }
     return result;
+}
+static void
+lvm_mov_arr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs);
+
+static void
+lvm_eval_vector_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
+{
+    assert(expr->kind == AST_EXPRESSION_BINARY);
+    assert(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS);
+    if(expr->expr_binary.left->type->kind == TYPE_KIND_POINTER)
+        lvm_mov_ptr_expr_to_reg(state, expr->expr_binary.left, R0, true);
+    else
+        lvm_mov_arr_expr_to_reg(state, expr->expr_binary.left, R0, false);
+    light_vm_push(state, "push r0");                
+    lvm_mov_int_expr_to_reg(state, expr->expr_binary.right, R1, true);
+    light_vm_push(state, "pop r0");
+    if(expr->type->size_bits > 8)
+    {
+        light_vm_push(state, "xor r2, r2");
+        light_vm_push_fmt(state, "mov r2, %d", expr->type->size_bits / 8);
+        light_vm_push(state, "mulu r1, r2");
+    }
+    light_vm_push(state, "addu r0, r1");
+    if(reg != R0)
+        light_vm_push_fmt(state, "mov r%d, r0", reg);
+}
+
+static void
+lvm_mov_arr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs)
+{
+    assert(expr->type->kind == TYPE_KIND_ARRAY);
+
+    if(expr->kind == AST_EXPRESSION_LITERAL_ARRAY)
+    {
+        Unimplemented;
+    }
+    else if(expr->kind == AST_EXPRESSION_BINARY)
+    {
+        // Multidimensional array
+        lvm_eval_vector_access(state, expr, reg);
+    }
+    
+    else if(expr->kind == AST_EXPRESSION_VARIABLE)
+    {
+        if(eval_derefs)
+        {
+            // TODO(psv): This is a copy
+            Unimplemented;
+        }
+        else
+        {
+            light_vm_push_fmt(state, "mov r%d, rbp", reg);
+            if (expr->expr_variable.decl->decl_variable.stack_offset < 0)
+                light_vm_push_fmt(state, "subs r%d, %d", reg, -expr->expr_variable.decl->decl_variable.stack_offset);
+            else
+                light_vm_push_fmt(state, "adds r%d, %d", reg, expr->expr_variable.decl->decl_variable.stack_offset);
+        }
+    }
+    else if(expr->kind == AST_EXPRESSION_DOT)
+    {
+        Unimplemented;
+    }
+    else if(expr->kind == AST_EXPRESSION_PROCEDURE_CALL)
+    {
+        Unimplemented;
+    }
+    else if(expr->kind == AST_EXPRESSION_UNARY)
+    {
+        // TODO(psv): verify if this is really unreachable
+        Unreachable;
+    }
+    else
+    {
+        Unimplemented;
+    }
 }
 
 static void
@@ -485,12 +645,16 @@ lvm_mov_ptr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
     {
         Unimplemented;
     }
+    else
+    {
+        Unimplemented;
+    }
 }
 
 static void
 lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs)
 {
-    assert(expr->type->kind == TYPE_KIND_PRIMITIVE);
+    assert(type_alias_root(expr->type)->kind == TYPE_KIND_PRIMITIVE || type_alias_root(expr->type)->kind == TYPE_KIND_ENUM);
 
     {
         Light_VM_Instruction instr = {0};
@@ -542,28 +706,9 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
         {
             if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS)
             {
-                if(expr->expr_binary.left->type->kind == TYPE_KIND_POINTER)
-                    lvm_mov_ptr_expr_to_reg(state, expr->expr_binary.left, R0, false);
-                //else
-                //    lvm_mov_arr_expr_to_reg(state, expr->expr_binary.left, R0, false);
-                light_vm_push(state, "push r0");                
-                lvm_mov_int_expr_to_reg(state, expr->expr_binary.right, R1, true);
-                light_vm_push(state, "pop r0");
-                if(expr->type->size_bits > 8)
-                {
-                    light_vm_push(state, "xor r2, r2");
-                    light_vm_push_fmt(state, "mov r2, %d", expr->type->size_bits / 8);
-                    light_vm_push(state, "mulu r1, r2");
-                }
-                light_vm_push(state, "addu r0, r1");
-
-                if(eval_derefs || type_alias_root(expr->expr_binary.left->type)->kind == TYPE_KIND_POINTER)
-                {
-                    Expr_Result res = { .reg = reg, .type = EXPR_RES_REGISTER };
-                    lvm_gen_deref(state, res, (Location){.base = R0, .offset = 0}, expr->expr_binary.left->type->size_bits / 8);
-                }
-                else if(reg != R0)
-                    light_vm_push_fmt(state, "mov r%d, r0", reg);
+                lvm_eval_vector_access(state, expr, reg); 
+                if(eval_derefs)
+                    light_vm_push_fmt(state, "mov r%d, [r%d]", reg, reg);
             }
             else
             {
@@ -630,9 +775,6 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                         light_vm_push(state, "cmp r0, r1");
                         light_vm_push(state, (signed_) ? "movlts r0" : "movltu r0");
                     } break;
-                    case OP_BINARY_VECTOR_ACCESS: {
-                        Unimplemented;
-                    } break;
                     default: Unreachable;
                 }
                 if(reg != R0)            
@@ -667,7 +809,7 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                     lvm_int_cast(state, expr, reg);
                 } break;
                 case OP_UNARY_DEREFERENCE: {
-                    Expr_Result res = lvm_eval(state, expr->expr_unary.operand, reg, false);                    
+                    Expr_Result res = lvm_eval(state, expr->expr_unary.operand, reg, false);
                     if(eval_derefs || type_alias_root(expr->expr_unary.operand->type)->kind == TYPE_KIND_POINTER)
                         lvm_gen_deref(state, res, (Location){.base = reg, .offset = 0}, expr->type->size_bits / 8);
                 } break;
@@ -698,8 +840,10 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
             }
         }
         else if(expr->kind == AST_EXPRESSION_DOT)
-        {
-            Unimplemented;
+        {            
+            lvm_eval_field_access(state, expr, reg);
+            if(eval_derefs)
+                light_vm_push_fmt(state, "mov r%d, [r%d]", reg, reg);
         }
         else if(expr->kind == AST_EXPRESSION_PROCEDURE_CALL)
         {
@@ -745,28 +889,9 @@ lvm_mov_float_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_FRegi
         {
             if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS)
             {
-                if(expr->expr_binary.left->type->kind == TYPE_KIND_POINTER)
-                    lvm_mov_ptr_expr_to_reg(state, expr->expr_binary.left, R0, false);
-                //else
-                //    lvm_mov_arr_expr_to_reg(state, expr->expr_binary.left, R0, false);
-                light_vm_push(state, "push r0");                
-                lvm_mov_int_expr_to_reg(state, expr->expr_binary.right, R1, true);
-                light_vm_push(state, "pop r0");
-                if(expr->type->size_bits > 8)
-                {
-                    light_vm_push(state, "xor r2, r2");
-                    light_vm_push_fmt(state, "mov r2, %d", expr->type->size_bits / 8);
-                    light_vm_push(state, "mulu r1, r2");
-                }
-                light_vm_push(state, "addu r0, r1");
-
-                if(eval_derefs || type_alias_root(expr->expr_binary.left->type)->kind == TYPE_KIND_POINTER)
-                {
-                    Expr_Result res = { .reg = reg, .type = EXPR_RES_REGISTER };
-                    lvm_gen_deref(state, res, (Location){.base = R0, .offset = 0}, expr->expr_binary.left->type->size_bits / 8);
-                }
-                else if(reg != R0)
-                    light_vm_push_fmt(state, "mov r%d, r0", reg);
+                lvm_eval_vector_access(state, expr, R0); 
+                if(eval_derefs)
+                    light_vm_push_fmt(state, "fmov fr%d, [r0]", reg);               
             }
             else
             {
@@ -873,14 +998,6 @@ lvm_mov_float_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_FRegi
     }
 }
 
-// Always returns the result in the return register
-// R0 for integer, FR0 for float32 or FR4 for float64
-static Expr_Result
-lvm_gen_assignment_right(Light_VM_State* state, Light_Ast* expr)
-{
-    return lvm_eval(state, expr, return_reg_for_type(expr->type), true);
-}
-
 /* ---------------------------------------------------------------------*/
 /* ------------------------ Commands -----------------------------------*/
 /* ---------------------------------------------------------------------*/
@@ -890,7 +1007,7 @@ lvm_generate_comm_return(Light_Ast* comm, Light_VM_State* state)
 {
     Light_Ast* expr = comm->comm_return.expression;
     if(expr)
-        lvm_gen_assignment_right(state, expr);
+        lvm_eval(state, expr, return_reg_for_type(expr->type), true);
 }
 
 void
@@ -904,9 +1021,17 @@ lvm_generate_decl_variable(Light_Ast* comm, Light_VM_State* state, Stack_Info* s
         stack_info->offset -= align_(comm->decl_variable.type->size_bits / 8);
         stack_info->size_bytes += align_(comm->decl_variable.type->size_bits / 8);
 
+        Light_VM_Debug_Variable dbg_var = (Light_VM_Debug_Variable){
+            .name = comm->decl_variable.name->data, 
+            .name_length = comm->decl_variable.name->length,
+            .rbp_offset = comm->decl_variable.stack_offset,
+            .size_bytes = comm->decl_variable.type->size_bits / 8,
+        };
+        array_push(state->debug_vars, dbg_var);
+
         if(comm->decl_variable.assignment)
         {
-            Expr_Result right_res = lvm_gen_assignment_right(state, comm->decl_variable.assignment);
+            Expr_Result right_res = lvm_eval(state, comm->decl_variable.assignment, return_reg_for_type(comm->decl_variable.assignment->type), true);
             lvm_gen_copy(state, right_res, (Location){.base = RBP, .offset = comm->decl_variable.stack_offset}, comm->decl_variable.type->size_bits / 8);
         }
     }
@@ -922,7 +1047,7 @@ lvm_generate_comm_block(Light_Ast* comm, Light_VM_State* state, Stack_Info* stac
 void
 lvm_generate_comm_assignment(Light_Ast* comm, Light_VM_State* state)
 {
-    Expr_Result right_res = lvm_gen_assignment_right(state, comm->comm_assignment.rvalue);
+    Expr_Result right_res = lvm_eval(state, comm->comm_assignment.rvalue, return_reg_for_type(comm->comm_assignment.rvalue->type), true);
     lvm_push_result(state, right_res);
     Expr_Result left_res = lvm_eval(state, comm->comm_assignment.lvalue, R2, false);
     assert(left_res.type == EXPR_RES_REGISTER);

@@ -250,6 +250,13 @@ typedef struct {
     void* block;
 } Memory;
 
+typedef struct {
+    char*   name;
+    int32_t name_length;
+    int32_t size_bytes;
+    int32_t rbp_offset;
+} Light_VM_Debug_Variable;
+
 // State
 typedef struct {
     Light_VM_Flags_Register       rflags;
@@ -263,7 +270,10 @@ typedef struct {
     Memory                        stack;
     Memory                        heap;
     Memory                        code;
-    uint64_t                           code_offset;
+    uint64_t                      code_offset;
+
+    // Debug
+    Light_VM_Debug_Variable*      debug_vars;
 } Light_VM_State;
 
 typedef struct {
@@ -300,6 +310,7 @@ enum {
 void light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm);
 void light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, uint32_t flags);
 void light_vm_debug_dump_code(FILE* out, Light_VM_State* state);
+void light_vm_debug_dump_variables(FILE* out, Light_VM_State* state, uint32_t flags);
 
 // -------------------------------------
 // ----------- Execution ---------------
