@@ -1255,6 +1255,20 @@ lvm_generate_comm_while(Light_Ast* comm, Light_VM_State* state, Stack_Info* stac
 
     lvm_generate_command(comm->comm_while.body, state, stack_info);
 
+    // Patch continue
+    for(int i = array_length(state->loop_continue) - 1; i >= 0; --i)
+    {
+        if(state->loop_continue[i].break_continue_level == 1)
+        {
+            light_vm_patch_from_to_current_instruction(state, state->loop_continue[i]);
+            array_remove(state->loop_continue, i);
+        }
+        else
+        {
+            state->loop_continue[i].break_continue_level--;
+        }
+    }
+
     // Loop back to start at the end
     Light_VM_Instruction_Info loop_back = light_vm_push(state, "jmp 0xffffffff");
     light_vm_patch_immediate_distance(loop_back, start);
@@ -1267,6 +1281,20 @@ lvm_generate_comm_while(Light_Ast* comm, Light_VM_State* state, Stack_Info* stac
         if(state->short_circuit_jmps[i].short_circuit_index == -1)
             light_vm_patch_immediate_distance(state->short_circuit_jmps[i], while_end);
     array_clear(state->short_circuit_jmps);
+
+    // Patch breaks
+    for(int i = array_length(state->loop_breaks) - 1; i >= 0; --i)
+    {
+        if(state->loop_breaks[i].break_continue_level == 1)
+        {
+            light_vm_patch_from_to_current_instruction(state, state->loop_breaks[i]);
+            array_remove(state->loop_breaks, i);
+        }
+        else
+        {
+            state->loop_breaks[i].break_continue_level--;
+        }
+    }
 }
 
 void
@@ -1299,6 +1327,20 @@ lvm_generate_comm_for(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_
 
     lvm_generate_command(comm->comm_for.body, state, stack_info);
 
+    // Patch continue
+    for(int i = array_length(state->loop_continue) - 1; i >= 0; --i)
+    {
+        if(state->loop_continue[i].break_continue_level == 1)
+        {
+            light_vm_patch_from_to_current_instruction(state, state->loop_continue[i]);
+            array_remove(state->loop_continue, i);
+        }
+        else
+        {
+            state->loop_continue[i].break_continue_level--;
+        }
+    }
+
     // Epilogue
     for(int i = 0; i < array_length(comm->comm_for.epilogue); ++i)
         lvm_generate_command(comm->comm_for.epilogue[i], state, stack_info);
@@ -1315,6 +1357,36 @@ lvm_generate_comm_for(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_
         if(state->short_circuit_jmps[i].short_circuit_index == -1)
             light_vm_patch_immediate_distance(state->short_circuit_jmps[i], while_end);
     array_clear(state->short_circuit_jmps);
+
+    // Patch breaks
+    for(int i = array_length(state->loop_breaks) - 1; i >= 0; --i)
+    {
+        if(state->loop_breaks[i].break_continue_level == 1)
+        {
+            light_vm_patch_from_to_current_instruction(state, state->loop_breaks[i]);
+            array_remove(state->loop_breaks, i);
+        }
+        else
+        {
+            state->loop_breaks[i].break_continue_level--;
+        }
+    }
+}
+
+void
+lvm_generate_comm_break(Light_Ast* comm, Light_VM_State* state)
+{
+    Light_VM_Instruction_Info info = light_vm_push(state, "jmp 0xffffffff");
+    info.break_continue_level = (s32)comm->comm_break.level_value;
+    array_push(state->loop_breaks, info);
+}
+
+void
+lvm_generate_comm_continue(Light_Ast* comm, Light_VM_State* state)
+{
+    Light_VM_Instruction_Info info = light_vm_push(state, "jmp 0xffffffff");
+    info.break_continue_level = (s32)comm->comm_break.level_value;
+    array_push(state->loop_continue, info);
 }
 
 void
@@ -1329,8 +1401,8 @@ lvm_generate_command(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_i
         case AST_COMMAND_IF:         lvm_generate_comm_if(comm, state, stack_info); break;
         case AST_COMMAND_WHILE:      lvm_generate_comm_while(comm, state, stack_info); break;
         case AST_COMMAND_FOR:        lvm_generate_comm_for(comm, state, stack_info); break;
-        case AST_COMMAND_BREAK:
-        case AST_COMMAND_CONTINUE:
+        case AST_COMMAND_BREAK:      lvm_generate_comm_break(comm, state); break;
+        case AST_COMMAND_CONTINUE:   lvm_generate_comm_continue(comm, state); break;
         case AST_DECL_PROCEDURE: Unimplemented; break;
         default: Unimplemented;
     }
@@ -1385,6 +1457,8 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
 
     state->short_circuit_jmps = array_new(Light_VM_Instruction_Info);
     state->proc_bases = array_new(Light_VM_Instruction_Info);
+    state->loop_breaks = array_new(Light_VM_Instruction_Info);
+    state->loop_continue = array_new(Light_VM_Instruction_Info);
     state->proc_patch_calls = array_new(Patch_Procs);
 
     //light_vm_push(state, "mov r0, 33");

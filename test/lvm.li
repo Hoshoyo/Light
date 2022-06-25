@@ -2,10 +2,27 @@ foo : () -> s32 {
     return factorial(5);
 }
 
+/*
 factorial : (value : s32) -> s32 {
     b := 1;
     for a := 1; a <= value ; a += 1 {
+        if a == 2 continue;
         b *= a;
+    }
+    return b;
+}
+*/
+
+factorial : (value : s32) -> s32 {
+    b := 1;
+    a := 1;
+    while a <= value {
+        if a == 4 { 
+            a += 1;
+            continue;
+        }
+        b *= a;
+        a += 1;
     }
     return b;
 }
