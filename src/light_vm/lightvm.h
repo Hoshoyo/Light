@@ -257,6 +257,14 @@ typedef struct {
     int32_t rbp_offset;
 } Light_VM_Debug_Variable;
 
+typedef struct {
+    uint64_t   offset_address;
+    Light_VM_Instruction* absolute_address;
+    uint32_t   byte_size;           // instruction only
+    uint32_t   immediate_byte_size; // immediate value only
+    int32_t    short_circuit_index;
+} Light_VM_Instruction_Info;
+
 // State
 typedef struct {
     Light_VM_Flags_Register       rflags;
@@ -272,16 +280,15 @@ typedef struct {
     Memory                        code;
     uint64_t                      code_offset;
 
+    // For code generation
+    Light_VM_Instruction_Info*    short_circuit_jmps;
+    int32_t                       short_circuit;
+    int32_t                       short_circuit_current_true;
+    int32_t                       short_circuit_current_false;
+
     // Debug
     Light_VM_Debug_Variable*      debug_vars;
 } Light_VM_State;
-
-typedef struct {
-    uint64_t   offset_address;
-    Light_VM_Instruction* absolute_address;
-    uint32_t   byte_size;           // instruction only
-    uint32_t   immediate_byte_size; // immediate value only
-} Light_VM_Instruction_Info;
 
 Light_VM_State*           light_vm_init();
 void                      light_vm_free(Light_VM_State* state);
@@ -289,6 +296,7 @@ Light_VM_Instruction_Info light_vm_push_instruction(Light_VM_State* vm_state, Li
 Light_VM_Instruction_Info light_vm_push(Light_VM_State* vm_state, const char* instruction);
 Light_VM_Instruction_Info light_vm_push_fmt(Light_VM_State* vm_state, const char* instruction, ...);
 Light_VM_Instruction      light_vm_instruction_get(const char* s, uint64_t* immediate);
+Light_VM_Instruction_Info light_vm_current_instruction(Light_VM_State* state);
 void*                     light_vm_push_data_segment(Light_VM_State* vm_state, Light_VM_Data data);
 void*                     light_vm_push_bytes_data_segment(Light_VM_State* vm_state, uint8_t* bytes, int32_t byte_count);
 int64_t                   light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instruction_Info to);

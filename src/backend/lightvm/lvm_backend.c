@@ -729,6 +729,32 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                 if(eval_derefs)
                     light_vm_push_fmt(state, "mov r%d, [r%d]", reg, reg);
             }
+            else if(state->short_circuit && (expr->expr_binary.op == OP_BINARY_LOGIC_OR || expr->expr_binary.op == OP_BINARY_LOGIC_AND))
+            {
+                if(expr->expr_binary.op == OP_BINARY_LOGIC_OR)
+                {
+                    lvm_mov_int_expr_to_reg(state, expr->expr_binary.left, R0, true);
+                    if(expr->expr_binary.left->kind != OP_BINARY_LOGIC_AND && expr->expr_binary.left->kind != OP_BINARY_LOGIC_OR)
+                    {
+                        light_vm_push(state, "cmp r0, 0");
+                        Light_VM_Instruction_Info info = light_vm_push(state, "bne 0xffffffff");
+                        info.short_circuit_index = state->short_circuit_current_true;
+                        array_push(state->short_circuit_jmps, info);
+                    }
+                    lvm_mov_int_expr_to_reg(state, expr->expr_binary.right, R0, true);
+                    if(expr->expr_binary.right->kind != OP_BINARY_LOGIC_AND && expr->expr_binary.right->kind != OP_BINARY_LOGIC_OR)
+                    {
+                        light_vm_push(state, "cmp r0, 0");
+                        Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
+                        info.short_circuit_index = state->short_circuit_current_false;
+                        array_push(state->short_circuit_jmps, info);
+                    }
+                }
+                else
+                {
+
+                }
+            }
             else
             {
                 lvm_mov_int_expr_to_reg(state, expr->expr_binary.left, R0, true);
@@ -1079,6 +1105,56 @@ lvm_generate_comm_assignment(Light_Ast* comm, Light_VM_State* state)
 }
 
 void
+lvm_generate_comm_if(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_info)
+{
+    state->short_circuit = true;
+    state->short_circuit_current_true = 1;
+    state->short_circuit_current_false = -1;
+    lvm_mov_int_expr_to_reg(state, comm->comm_if.condition, R0, true);
+    state->short_circuit = false;
+
+    // If there is nothing in the array, that means no AND/OR were generated,
+    // in this case, just evaluate the final result and branch according to that.
+    // We can't do this by branching inside because there can ban casts to bool.
+    Light_VM_Instruction_Info base_case = {0};
+    if(array_length(state->short_circuit_jmps) == 0)
+    {
+        light_vm_push(state, "cmp r0, 0");
+        base_case = light_vm_push(state, "beq 0xffffffff");
+    }
+
+    for(int i = 0; i < array_length(state->short_circuit_jmps); ++i)
+    {
+        if(state->short_circuit_jmps[i].short_circuit_index == 1)
+        {
+            light_vm_patch_from_to_current_instruction(state, state->short_circuit_jmps[i]);
+        }
+    }
+    lvm_generate_command(comm->comm_if.body_true, state, stack_info);
+    Light_VM_Instruction_Info skip_true = light_vm_push(state, "jmp 0xffffffff");
+
+    Light_VM_Instruction_Info else_block = light_vm_current_instruction(state);
+    if(array_length(state->short_circuit_jmps) == 0)
+    {
+        light_vm_patch_immediate_distance(base_case, else_block);
+    }
+    if(comm->comm_if.body_false)
+    {
+        lvm_generate_command(comm->comm_if.body_false, state, stack_info);
+    }
+    
+    for(int i = 0; i < array_length(state->short_circuit_jmps); ++i)
+    {
+        if(state->short_circuit_jmps[i].short_circuit_index == -1)
+        {
+            light_vm_patch_immediate_distance(state->short_circuit_jmps[i], else_block);
+        }
+    }
+    array_clear(state->short_circuit_jmps);
+    light_vm_patch_from_to_current_instruction(state, skip_true);
+}
+
+void
 lvm_generate_command(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_info)
 {
     switch(comm->kind)
@@ -1087,7 +1163,7 @@ lvm_generate_command(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_i
         case AST_COMMAND_RETURN:     lvm_generate_comm_return(comm, state); break;
         case AST_COMMAND_ASSIGNMENT: lvm_generate_comm_assignment(comm, state); break;
         case AST_COMMAND_BLOCK:      lvm_generate_comm_block(comm, state, stack_info); break;
-
+        case AST_COMMAND_IF:         lvm_generate_comm_if(comm, state, stack_info); break;
         case AST_DECL_PROCEDURE: Unimplemented; break;
         default: Unimplemented;
     }
@@ -1139,6 +1215,8 @@ int
 lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
 {
     Light_VM_State* state = light_vm_init();
+
+    state->short_circuit_jmps = array_new(Light_VM_Instruction_Info);
 
     //light_vm_push(state, "mov r0, 33");
     //light_vm_push(state, "push r0");

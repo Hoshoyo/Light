@@ -175,6 +175,12 @@ light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instr
     return ((u8*)to.absolute_address - (u8*)from.absolute_address);
 }
 
+Light_VM_Instruction_Info
+light_vm_current_instruction(Light_VM_State* state)
+{
+    return (Light_VM_Instruction_Info){ .absolute_address = (Light_VM_Instruction*)((u8*)state->code.block + state->code_offset) };
+}
+
 uint64_t
 light_vm_offset_from_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info from) {
     int64_t diff = (u8*)from.absolute_address - (u8*)state->code.block + state->code_offset;

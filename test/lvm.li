@@ -1,8 +1,13 @@
 foo : () -> s32 {
-    a : [2]bar;
-    a[1].a = 3;
-    a[0].b = 5;
-    return a[1].a + a[0].b;
+    if true
+        return 5;
+    else
+        return 6;
+
+    //a : [2]bar;
+    //a[1].a = 3;
+    //a[0].b = 5;
+    //return a[1].a + a[0].b;
 
     //a : bar;
     //b : ^bar;
