@@ -602,8 +602,16 @@ lvm_eval_proc_call(Light_VM_State* state, Light_Ast* expr)
 {
     assert(expr->kind == AST_EXPRESSION_PROCEDURE_CALL);
 
-    // TODO(psv): arguments
+    s32 arg_size = 0;
+    for(int i = expr->expr_proc_call.arg_count-1; i >= 0; --i)
+    {
+        Light_Ast* arg = expr->expr_proc_call.args[i];
+        Expr_Result res = lvm_eval(state, arg, return_reg_for_type(arg->type), true);
+        lvm_push_result(state, res);
+        arg_size += PTRSIZE;
+    }
     
+    // Evaluate and generate the call instruction
     Light_Ast* caller = expr->expr_proc_call.caller_expr;
     if(caller->kind == AST_EXPRESSION_VARIABLE && caller->expr_variable.decl->kind == AST_DECL_PROCEDURE)
     {
@@ -619,6 +627,9 @@ lvm_eval_proc_call(Light_VM_State* state, Light_Ast* expr)
         lvm_eval(state, expr->expr_proc_call.caller_expr, R0, true);
         light_vm_push(state, "call r0");
     }
+
+    // restore the arguments space
+    light_vm_push_fmt(state, "adds rsp, %d", arg_size);
 }
 
 static void
@@ -1275,13 +1286,9 @@ lvm_generate_proc_decl(Light_Ast* proc, Light_Scope* global_scope, Light_VM_Stat
 
         // Equivalent to the 'leave' instruction in x86-64,
         // this puts the stack in the same state as it was before the function call.
+        light_vm_push_fmt(state, "adds rsp, %d", stack_info.size_bytes);
         light_vm_push(state, "pop rbp");
-        light_vm_push(state, "mov rsp, rbp");
-
-        if(proc->decl_proc.flags & DECL_PROC_FLAG_MAIN)
-            light_vm_push(state, "hlt");
-        else
-            light_vm_push(state, "ret");
+        light_vm_push(state, "ret");
     }
 }
 

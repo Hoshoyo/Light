@@ -9,6 +9,8 @@
 #define true 1
 #define false 0
 
+#define PTRSIZE 8
+
 extern u16 cmp_flags_8(u8 l, u8 r);
 extern u16 cmp_flags_16(u16 l, u16 r);
 extern u16 cmp_flags_32(u32 l, u32 r);
@@ -622,7 +624,7 @@ void
 light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((u8*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
 
-    state->registers[RSP] -= instr.push.byte_size;
+    state->registers[RSP] -= PTRSIZE;
 
     void* dst = (void*)state->registers[RSP];
     void* src = 0;
@@ -658,7 +660,7 @@ light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction in
 
 void
 light_vm_execute_fpush_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
-    state->registers[RSP] -= instr.push.byte_size;
+    state->registers[RSP] -= PTRSIZE;
 
     void* dst = (void*)state->registers[RSP];
     assert(instr.push.addr_mode == PUSH_ADDR_MODE_REGISTER);
@@ -962,28 +964,28 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
         // Convert
         case LVM_CVT_R32_S64:
         case LVM_CVT_R32_S32:
-            state->registers[instr.unary.reg] = (s32)state->f32registers[instr.unary.reg];
+            state->registers[instr.binary.dst_reg] = (s32)state->f32registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_S32_R32:
-            state->f32registers[instr.unary.reg] = (r32)state->registers[instr.unary.reg];
+            state->f32registers[instr.binary.dst_reg] = (r32)state->registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_S64_R64:
         case LVM_CVT_S32_R64:
-            state->f64registers[instr.unary.reg + FR4] = (r64)state->registers[instr.unary.reg];
+            state->f64registers[instr.binary.dst_reg + FR4] = (r64)state->registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_S64_R32:
-            state->f32registers[instr.unary.reg] = (r32)state->registers[instr.unary.reg];
+            state->f32registers[instr.binary.dst_reg] = (r32)state->registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_R32_R64:
-            state->f64registers[instr.unary.reg + FR4] = (r64)state->f32registers[instr.unary.reg];
+            state->f64registers[instr.binary.dst_reg + FR4] = (r64)state->f32registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_R64_R32:
-            state->f32registers[instr.unary.reg] = (r32)state->f64registers[instr.unary.reg];
+            state->f32registers[instr.binary.dst_reg] = (r32)state->f64registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_SEXT: {
@@ -1023,7 +1025,7 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
                 case 8: state->f64registers[instr.unary.reg] = *((r64*)state->registers[RSP]); break;
                 default: assert(0); break;
             }
-            state->registers[RSP] += instr.unary.byte_size;
+            state->registers[RSP] += PTRSIZE;
             advance_ip = true;
         } break;
         case LVM_POP:{
@@ -1034,7 +1036,7 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
                 case 8: state->registers[instr.unary.reg] = *((u64*)state->registers[RSP]); break;
                 default: assert(0); break;
             }
-            state->registers[RSP] += instr.unary.byte_size;
+            state->registers[RSP] += PTRSIZE;
             advance_ip = true;
         } break;
 
@@ -1187,6 +1189,6 @@ light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
 
         light_vm_execute_instruction(state, in);
 
-        //light_vm_debug_dump_variables(stdout, state, 0);
+        light_vm_debug_dump_variables(stdout, state, 0);
     }
 }
