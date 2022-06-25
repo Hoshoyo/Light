@@ -438,20 +438,43 @@ lvm_eval_variable(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg
         light_vm_push_fmt(state, "adds r%d, %d", reg, expr->expr_variable.decl->decl_variable.stack_offset);
 }
 
+// Given an integer register and a dot field accessing expression of a struct or union
+// retreives the address of that struct's data in memory in the register.
+// Performs dereferencing in case the left side of the expression is a pointer type.
+// Example: value.x
 static void
 lvm_eval_field_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
 {
-    Expr_Result res = lvm_eval(state, expr->expr_dot.left, reg, false);
-    if(type_alias_root(expr->expr_dot.left->type)->kind == TYPE_KIND_STRUCT)
+    Light_Type* left_type = type_alias_root(expr->expr_dot.left->type);
+    Expr_Result res = lvm_eval(state, expr->expr_dot.left, reg, left_type->kind == TYPE_KIND_POINTER);
+
+    if(left_type->kind == TYPE_KIND_POINTER)
+    {
+        if(type_alias_root(left_type->pointer_to)->kind == TYPE_KIND_STRUCT)
+        {
+            s64 offset = type_struct_field_offset_bits(left_type->pointer_to, expr->expr_dot.identifier->data);
+            light_vm_push_fmt(state, "adds r%d, %d", reg, (s32)offset);
+        }
+        else
+        {
+            // Offset of an union is always 0, therefore no need to add anything
+            assert(type_alias_root(left_type->pointer_to)->kind == TYPE_KIND_UNION);
+        }
+    }
+    else if(left_type->kind == TYPE_KIND_STRUCT)
     {
         s64 offset = type_struct_field_offset_bits(expr->expr_dot.left->type, expr->expr_dot.identifier->data);
         light_vm_push_fmt(state, "adds r%d, %d", reg, (s32)offset);
     }
     else
     {
-        Unimplemented;
+        // Offset of an union is always 0, therefore no need to add anything
+        assert(left_type->kind == TYPE_KIND_UNION);
     }
 }
+
+static void
+lvm_eval_vector_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg);
 
 static Expr_Result
 lvm_eval(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs)
@@ -496,6 +519,10 @@ lvm_eval(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool ev
     {
         lvm_eval_field_access(state, expr, result.reg);
     }
+    else if(expr->kind == AST_EXPRESSION_BINARY && expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS)
+    {
+        lvm_eval_vector_access(state, expr, result.reg);
+    }
     else
     {
         Unimplemented; 
@@ -503,7 +530,7 @@ lvm_eval(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool ev
     return result;
 }
 static void
-lvm_mov_arr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs);
+lvm_mov_arr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg);
 
 static void
 lvm_eval_vector_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
@@ -513,7 +540,7 @@ lvm_eval_vector_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Register
     if(expr->expr_binary.left->type->kind == TYPE_KIND_POINTER)
         lvm_mov_ptr_expr_to_reg(state, expr->expr_binary.left, R0, true);
     else
-        lvm_mov_arr_expr_to_reg(state, expr->expr_binary.left, R0, false);
+        lvm_mov_arr_expr_to_reg(state, expr->expr_binary.left, R0);
     light_vm_push(state, "push r0");                
     lvm_mov_int_expr_to_reg(state, expr->expr_binary.right, R1, true);
     light_vm_push(state, "pop r0");
@@ -529,7 +556,7 @@ lvm_eval_vector_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Register
 }
 
 static void
-lvm_mov_arr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs)
+lvm_mov_arr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
 {
     assert(expr->type->kind == TYPE_KIND_ARRAY);
 
@@ -545,23 +572,15 @@ lvm_mov_arr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
     
     else if(expr->kind == AST_EXPRESSION_VARIABLE)
     {
-        if(eval_derefs)
-        {
-            // TODO(psv): This is a copy
-            Unimplemented;
-        }
+        light_vm_push_fmt(state, "mov r%d, rbp", reg);
+        if (expr->expr_variable.decl->decl_variable.stack_offset < 0)
+            light_vm_push_fmt(state, "subs r%d, %d", reg, -expr->expr_variable.decl->decl_variable.stack_offset);
         else
-        {
-            light_vm_push_fmt(state, "mov r%d, rbp", reg);
-            if (expr->expr_variable.decl->decl_variable.stack_offset < 0)
-                light_vm_push_fmt(state, "subs r%d, %d", reg, -expr->expr_variable.decl->decl_variable.stack_offset);
-            else
-                light_vm_push_fmt(state, "adds r%d, %d", reg, expr->expr_variable.decl->decl_variable.stack_offset);
-        }
+            light_vm_push_fmt(state, "adds r%d, %d", reg, expr->expr_variable.decl->decl_variable.stack_offset);
     }
     else if(expr->kind == AST_EXPRESSION_DOT)
     {
-        Unimplemented;
+        lvm_eval_field_access(state, expr, reg);
     }
     else if(expr->kind == AST_EXPRESSION_PROCEDURE_CALL)
     {
@@ -889,9 +908,9 @@ lvm_mov_float_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_FRegi
         {
             if(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS)
             {
-                lvm_eval_vector_access(state, expr, R0); 
+                lvm_eval_vector_access(state, expr, reg); 
                 if(eval_derefs)
-                    light_vm_push_fmt(state, "fmov fr%d, [r0]", reg);               
+                    light_vm_push_fmt(state, "fmov fr%d, [r%d]", reg, reg);
             }
             else
             {
@@ -988,8 +1007,10 @@ lvm_mov_float_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_FRegi
             }
         }
         else if(expr->kind == AST_EXPRESSION_DOT)
-        {
-            Unimplemented;
+        {            
+            lvm_eval_field_access(state, expr, reg);
+            if(eval_derefs)
+                light_vm_push_fmt(state, "fmov fr%d, [r%d]", reg, reg);
         }
         else if(expr->kind == AST_EXPRESSION_PROCEDURE_CALL)
         {
@@ -1066,6 +1087,7 @@ lvm_generate_command(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_i
         case AST_COMMAND_RETURN:     lvm_generate_comm_return(comm, state); break;
         case AST_COMMAND_ASSIGNMENT: lvm_generate_comm_assignment(comm, state); break;
         case AST_COMMAND_BLOCK:      lvm_generate_comm_block(comm, state, stack_info); break;
+
         case AST_DECL_PROCEDURE: Unimplemented; break;
         default: Unimplemented;
     }
