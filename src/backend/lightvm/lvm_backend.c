@@ -1236,7 +1236,7 @@ lvm_generate_comm_while(Light_Ast* comm, Light_VM_State* state, Stack_Info* stac
     state->short_circuit_current_true = 1;
     state->short_circuit_current_false = -1;
     Light_VM_Instruction_Info start = light_vm_current_instruction(state);
-    lvm_mov_int_expr_to_reg(state, comm->comm_if.condition, R0, true);
+    lvm_mov_int_expr_to_reg(state, comm->comm_while.condition, R0, true);
     state->short_circuit = false;
 
     // If there is nothing in the array, that means no AND/OR were generated,
@@ -1270,6 +1270,54 @@ lvm_generate_comm_while(Light_Ast* comm, Light_VM_State* state, Stack_Info* stac
 }
 
 void
+lvm_generate_comm_for(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_info)
+{
+    // Prologue
+    for(int i = 0; i < array_length(comm->comm_for.prologue); ++i)
+        lvm_generate_command(comm->comm_for.prologue[i], state, stack_info);
+    
+    state->short_circuit = true;
+    state->short_circuit_current_true = 1;
+    state->short_circuit_current_false = -1;
+    Light_VM_Instruction_Info start = light_vm_current_instruction(state);
+    lvm_mov_int_expr_to_reg(state, comm->comm_for.condition, R0, true);
+    state->short_circuit = false;
+
+    // If there is nothing in the array, that means no AND/OR were generated,
+    // in this case, just evaluate the final result and branch according to that.
+    // We can't do this by branching inside because there can ban casts to bool.
+    Light_VM_Instruction_Info base_case = {0};
+    if(array_length(state->short_circuit_jmps) == 0)
+    {
+        light_vm_push(state, "cmp r0, 0");
+        base_case = light_vm_push(state, "beq 0xffffffff");
+    }
+
+    for(int i = 0; i < array_length(state->short_circuit_jmps); ++i)
+        if(state->short_circuit_jmps[i].short_circuit_index == 1)
+            light_vm_patch_from_to_current_instruction(state, state->short_circuit_jmps[i]);
+
+    lvm_generate_command(comm->comm_for.body, state, stack_info);
+
+    // Epilogue
+    for(int i = 0; i < array_length(comm->comm_for.epilogue); ++i)
+        lvm_generate_command(comm->comm_for.epilogue[i], state, stack_info);
+
+    // Loop back to start at the end
+    Light_VM_Instruction_Info loop_back = light_vm_push(state, "jmp 0xffffffff");
+    light_vm_patch_immediate_distance(loop_back, start);
+
+    // Outside the loop patch what it still needs to patch
+    Light_VM_Instruction_Info while_end = light_vm_current_instruction(state);
+    if(array_length(state->short_circuit_jmps) == 0)
+        light_vm_patch_immediate_distance(base_case, while_end);
+    for(int i = 0; i < array_length(state->short_circuit_jmps); ++i)
+        if(state->short_circuit_jmps[i].short_circuit_index == -1)
+            light_vm_patch_immediate_distance(state->short_circuit_jmps[i], while_end);
+    array_clear(state->short_circuit_jmps);
+}
+
+void
 lvm_generate_command(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_info)
 {
     switch(comm->kind)
@@ -1280,7 +1328,7 @@ lvm_generate_command(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_i
         case AST_COMMAND_BLOCK:      lvm_generate_comm_block(comm, state, stack_info); break;
         case AST_COMMAND_IF:         lvm_generate_comm_if(comm, state, stack_info); break;
         case AST_COMMAND_WHILE:      lvm_generate_comm_while(comm, state, stack_info); break;
-        case AST_COMMAND_FOR:
+        case AST_COMMAND_FOR:        lvm_generate_comm_for(comm, state, stack_info); break;
         case AST_COMMAND_BREAK:
         case AST_COMMAND_CONTINUE:
         case AST_DECL_PROCEDURE: Unimplemented; break;

@@ -263,6 +263,7 @@ typedef struct {
     uint32_t   byte_size;           // instruction only
     uint32_t   immediate_byte_size; // immediate value only
     int32_t    short_circuit_index;
+    int32_t    break_level;
 } Light_VM_Instruction_Info;
 
 typedef struct {
@@ -293,6 +294,8 @@ typedef struct {
 
     Light_VM_Instruction_Info*    proc_bases;
     Patch_Procs*                  proc_patch_calls;
+
+    Light_VM_Instruction_Info*    loop_breaks;
 
     // Debug
     Light_VM_Debug_Variable*      debug_vars;
