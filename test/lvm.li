@@ -1,17 +1,18 @@
 foo : () -> s32 {
-    return factorial(5);
+    a : [4]s32;
+    a[factorial(2)] = 3;
+    return a[2];
+    //return factorial(2);
 }
 
-/*
 factorial : (value : s32) -> s32 {
     b := 1;
-    for a := 1; a <= value ; a += 1 {
-        if a == 2 continue;
+    for a :s32= 1; a <= value ; a += 1 {
         b *= a;
     }
     return b;
 }
-*/
+/*
 
 factorial : (value : s32) -> s32 {
     b := 1;
@@ -26,3 +27,4 @@ factorial : (value : s32) -> s32 {
     }
     return b;
 }
+*/

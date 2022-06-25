@@ -543,6 +543,7 @@ lvm_eval_vector_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Register
         lvm_mov_arr_expr_to_reg(state, expr->expr_binary.left, R0);
     light_vm_push(state, "push r0");                
     lvm_mov_int_expr_to_reg(state, expr->expr_binary.right, R1, true);
+    lvm_truncate_int_reg(state, expr->expr_binary.right->type, R1);
     light_vm_push(state, "pop r0");
     if(expr->type->size_bits > 8)
     {
@@ -834,66 +835,69 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                 lvm_mov_int_expr_to_reg(state, expr->expr_binary.right, R1, true);
                 light_vm_push(state, "pop r0");
                 bool signed_ = type_primitive_sint(expr->type);
+                Light_VM_Instruction_Info bin_instr = {0};
                 switch(expr->expr_binary.op)
                 {
                     case OP_BINARY_PLUS: {                    
-                        light_vm_push(state, type_primitive_sint(expr->type) ? "adds r0, r1" : "addu r0, r1");
+                        bin_instr = light_vm_push(state, type_primitive_sint(expr->type) ? "adds r0, r1" : "addu r0, r1");
                     } break;
                     case OP_BINARY_MINUS: {
-                        light_vm_push(state, type_primitive_sint(expr->type) ? "subs r0, r1" : "subu r0, r1");
+                        bin_instr = light_vm_push(state, type_primitive_sint(expr->type) ? "subs r0, r1" : "subu r0, r1");
                     } break;
                     case OP_BINARY_MULT: {
-                        light_vm_push(state, type_primitive_sint(expr->type) ? "muls r0, r1" : "mulu r0, r1");
+                        bin_instr = light_vm_push(state, type_primitive_sint(expr->type) ? "muls r0, r1" : "mulu r0, r1");
                     } break;
                     case OP_BINARY_DIV: {
-                        light_vm_push(state, type_primitive_sint(expr->type) ? "divs r0, r1" : "divu r0, r1");
+                        bin_instr = light_vm_push(state, type_primitive_sint(expr->type) ? "divs r0, r1" : "divu r0, r1");
                     } break;
                     case OP_BINARY_MOD: {
-                        light_vm_push(state, type_primitive_sint(expr->type) ? "mods r0, r1" : "modu r0, r1");
+                        bin_instr = light_vm_push(state, type_primitive_sint(expr->type) ? "mods r0, r1" : "modu r0, r1");
                     } break;
                     case OP_BINARY_LOGIC_OR:
                     case OP_BINARY_OR: {
-                        light_vm_push(state, "or r0, r1");
+                        bin_instr = light_vm_push(state, "or r0, r1");
                     } break;
                     case OP_BINARY_LOGIC_AND:
                     case OP_BINARY_AND: {
-                        light_vm_push(state, "and r0, r1");
+                        bin_instr = light_vm_push(state, "and r0, r1");
                     } break;
                     case OP_BINARY_XOR: {
-                        light_vm_push(state, "xor r0, r1");
+                        bin_instr = light_vm_push(state, "xor r0, r1");
                     } break;
                     case OP_BINARY_SHL: {
-                        light_vm_push(state, "shl r0, r1");
+                        bin_instr = light_vm_push(state, "shl r0, r1");
                     } break;
                     case OP_BINARY_SHR: {
-                        light_vm_push(state, "shr r0, r1");
+                        bin_instr = light_vm_push(state, "shr r0, r1");
                     } break;
                     case OP_BINARY_EQUAL: {
-                        light_vm_push(state, "cmp r0, r1");
+                        bin_instr = light_vm_push(state, "cmp r0, r1");
                         light_vm_push(state, "moveq r0");
                     } break;
                     case OP_BINARY_NOT_EQUAL: {
-                        light_vm_push(state, "cmp r0, r1");
+                        bin_instr = light_vm_push(state, "cmp r0, r1");
                         light_vm_push(state, "movne r0");
                     } break;
                     case OP_BINARY_LE: {
-                        light_vm_push(state, "cmp r0, r1");
+                        bin_instr = light_vm_push(state, "cmp r0, r1");
                         light_vm_push(state, (signed_) ? "movles r0" : "movleu r0");
                     } break;
                     case OP_BINARY_GE: {
-                        light_vm_push(state, "cmp r0, r1");
+                        bin_instr = light_vm_push(state, "cmp r0, r1");
                         light_vm_push(state, (signed_) ? "movges r0" : "movgeu r0");
                     } break;
                     case OP_BINARY_GT: {
-                        light_vm_push(state, "cmp r0, r1");
+                        bin_instr = light_vm_push(state, "cmp r0, r1");
                         light_vm_push(state, (signed_) ? "movgts r0" : "movgtu r0");
                     } break;
                     case OP_BINARY_LT: {
-                        light_vm_push(state, "cmp r0, r1");
+                        bin_instr = light_vm_push(state, "cmp r0, r1");
                         light_vm_push(state, (signed_) ? "movlts r0" : "movltu r0");
                     } break;
                     default: Unreachable;
-                }
+                }                
+                ((Light_VM_Instruction*)bin_instr.absolute_address)->binary.bytesize = expr->type->size_bits / 8;
+
                 if(reg != R0)            
                     light_vm_push_fmt(state, "mov r%d, r0", reg);
             }
@@ -905,13 +909,13 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                 case OP_UNARY_PLUS: break;
                 case OP_UNARY_MINUS: {
                     lvm_mov_int_expr_to_reg(state, expr->expr_unary.operand, R0, true);
-                    light_vm_push(state, "neg r0");
+                    light_vm_push_fmt(state, "neg r0%s", register_size_suffix(expr->type->size_bits / 8));
                     if(reg != R0)            
                         light_vm_push_fmt(state, "mov r%d, r0", reg);
                 } break;
                 case OP_UNARY_LOGIC_NOT: {
                     lvm_mov_int_expr_to_reg(state, expr->expr_unary.operand, R0, true);
-                    light_vm_push(state, "cmp r0, 0");
+                    light_vm_push(state, "cmp r0b, 0");
                     light_vm_push(state, "moveq r0");
                     if(reg != R0)            
                         light_vm_push_fmt(state, "mov r%d, r0", reg);

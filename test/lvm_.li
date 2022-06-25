@@ -100,3 +100,15 @@ factorial : (value : s32) -> s32 {
     } */
     return b;
 }
+
+foo : () -> s32 {
+    return factorial(5);
+}
+
+factorial : (value : s32) -> s32 {
+    b := 1;
+    for a := 1; a <= value ; a += 1 {
+        b *= a;
+    }
+    return b;
+}

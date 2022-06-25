@@ -638,6 +638,7 @@ light_vm_debug_dump_variables(FILE* out, Light_VM_State* state, u32 flags)
     fprintf(out, "--- VARIABLES ---\n");
     fprintf(out, "R0:  %llx\n", state->registers[R0]);
     fprintf(out, "R1:  %llx\n", state->registers[R1]);
+    fprintf(out, "R2:  %llx\n", state->registers[R2]);
     fprintf(out, "RBP: %llx\n", state->registers[RBP]);
     fprintf(out, "RSP: %llx\n", state->registers[RSP]);
 
@@ -650,7 +651,7 @@ light_vm_debug_dump_variables(FILE* out, Light_VM_State* state, u32 flags)
             char* addr = (char*)(state->registers[RBP]  + d.rbp_offset);
             if(d.size_bytes % 4 == 0)
             {
-                for(int j = 0; j < d.size_bytes / 4; j += 4)
+                for(int j = 0; j < d.size_bytes; j += 4)
                 {
                     fprintf(out, "%d ", ((int*)addr)[j]);
                 }
