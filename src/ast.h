@@ -328,6 +328,8 @@ typedef struct {
 	int32_t            ir_instr_index;         // Could be either index of the instruction or index in the data segment
 	
 	Light_Token*       extern_library_name;
+
+	void* lvm_base_instruction;
 } Light_Ast_Decl_Procedure;
 
 typedef struct {

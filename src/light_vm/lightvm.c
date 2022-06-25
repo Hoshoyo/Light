@@ -751,10 +751,11 @@ void
 light_vm_execute_call_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((u8*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
 
+    state->registers[RSP] -= sizeof(u64);
+
     // Push return value
     u64* dst = (u64*)state->registers[RSP];
     *dst = (u64)((u8*)state->registers[RIP] + sizeof(instr) + instr.imm_size_bytes);
-    state->registers[RSP] += sizeof(u64);
 
     // Jump to destination address
     switch(instr.branch.addr_mode) {
@@ -1104,8 +1105,8 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
         } break;
         case LVM_RET: {
             // Pop RIP
-            state->registers[RIP] = *((u64*)state->registers[RSP] - 1);
-            state->registers[RSP] -= sizeof(u64);
+            state->registers[RIP] = *((u64*)state->registers[RSP]);
+            state->registers[RSP] += sizeof(u64);
         } break;
 
         case LVM_COPY:{
@@ -1180,12 +1181,12 @@ light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
             u64 imm = get_value_of_immediate(state, in, addr_of_imm);
             fprintf(stdout, PRINTF_S64 ": ", state->registers[RIP]);
             light_vm_print_instruction(stdout, in, imm);
-
-            //light_vm_debug_dump_variables(stdout, state, 0);
         }
 
         if(in.type == LVM_HLT) break;
 
         light_vm_execute_instruction(state, in);
+
+        //light_vm_debug_dump_variables(stdout, state, 0);
     }
 }

@@ -1,37 +1,8 @@
 foo : () -> s32 {
-    //if ((5 == 5) && true) && (false && (4 > 3))
-    if (true && true) && (true && (false || true))
-        return 5;
-    else
-        return 6;
-
-    //a : [2]bar;
-    //a[1].a = 3;
-    //a[0].b = 5;
-    //return a[1].a + a[0].b;
-
-    //a : bar;
-    //b : ^bar;
-    //a.b = 4;
-    //b = &a;
-    //return b.b;
-
-    //b : bar;
-    //b.b = 3.14;
-    //b.a = 4;
-    //return b.b;
-
-    //f := 4.32;
-    //g : ^r32 = &f;
-    //return g[0];
-
-    //j : [4][2]r32;
-    //j[1][0] = 3.5;
-    //j[1][1] = 4.2;
-    //return j[1][0];
+    return bar();
 }
 
-bar struct {
-    a : s32;
-    b : s32;
+bar : () -> s32 {
+    a : s32 = 4;
+    return 5 * a;
 }

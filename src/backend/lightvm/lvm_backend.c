@@ -598,6 +598,30 @@ lvm_mov_arr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
 }
 
 static void
+lvm_eval_proc_call(Light_VM_State* state, Light_Ast* expr)
+{
+    assert(expr->kind == AST_EXPRESSION_PROCEDURE_CALL);
+
+    // TODO(psv): arguments
+    
+    Light_Ast* caller = expr->expr_proc_call.caller_expr;
+    if(caller->kind == AST_EXPRESSION_VARIABLE && caller->expr_variable.decl->kind == AST_DECL_PROCEDURE)
+    {
+        Light_VM_Instruction_Info call_instr = light_vm_push(state, "call 0xffffffff");
+        Patch_Procs pp = {
+            .from = call_instr,
+            .to_decl = caller->expr_variable.decl
+        };
+        array_push(state->proc_patch_calls, pp);
+    }
+    else
+    {
+        lvm_eval(state, expr->expr_proc_call.caller_expr, R0, true);
+        light_vm_push(state, "call r0");
+    }
+}
+
+static void
 lvm_mov_ptr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs)
 {
     assert(expr->type->kind == TYPE_KIND_POINTER);
@@ -740,7 +764,7 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                     if(expr->expr_binary.left->kind != AST_EXPRESSION_BINARY || 
                         (expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_AND && expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_OR))
                     {
-                        light_vm_push(state, "cmp r0, 0");
+                        light_vm_push(state, "cmp r0b, 0");
                         Light_VM_Instruction_Info info = light_vm_push(state, "bne 0xffffffff");
                         info.short_circuit_index = state->short_circuit_current_true;
                         array_push(state->short_circuit_jmps, info);
@@ -754,7 +778,7 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                     if(expr->expr_binary.left->kind != AST_EXPRESSION_BINARY || 
                         (expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_AND && expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_OR))
                     {
-                        light_vm_push(state, "cmp r0, 0");
+                        light_vm_push(state, "cmp r0b, 0");
                         Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
                         info.short_circuit_index = state->short_circuit_current_false;
                         array_push(state->short_circuit_jmps, info);
@@ -769,7 +793,7 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                     if(expr->expr_binary.left->kind != AST_EXPRESSION_BINARY || 
                         (expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_AND && expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_OR))
                     {
-                        light_vm_push(state, "cmp r0, 0");
+                        light_vm_push(state, "cmp r0b, 0");
                         Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
                         info.short_circuit_index = state->short_circuit_current_false;
                         array_push(state->short_circuit_jmps, info);
@@ -783,7 +807,7 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                     if(expr->expr_binary.left->kind != AST_EXPRESSION_BINARY || 
                         (expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_AND && expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_OR))
                     {
-                        light_vm_push(state, "cmp r0, 0");
+                        light_vm_push(state, "cmp r0b, 0");
                         Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
                         info.short_circuit_index = state->short_circuit_current_false;
                         array_push(state->short_circuit_jmps, info);
@@ -927,7 +951,9 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
         }
         else if(expr->kind == AST_EXPRESSION_PROCEDURE_CALL)
         {
-            Unimplemented;
+            lvm_eval_proc_call(state, expr);
+            if(reg != R0)
+                light_vm_push_fmt(state, "mov r%d, r0", reg);
         }
     }
 }
@@ -1085,11 +1111,16 @@ lvm_mov_float_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_FRegi
 /* ---------------------------------------------------------------------*/
 
 void
-lvm_generate_comm_return(Light_Ast* comm, Light_VM_State* state)
+lvm_generate_comm_return(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_info)
 {
     Light_Ast* expr = comm->comm_return.expression;
     if(expr)
         lvm_eval(state, expr, return_reg_for_type(expr->type), true);
+
+    if(stack_info->size_bytes > 0)
+        light_vm_push_fmt(state, "adds rsp, %d", stack_info->size_bytes);
+    light_vm_push(state, "pop rbp");
+    light_vm_push(state, "ret");
 }
 
 void
@@ -1195,55 +1226,63 @@ lvm_generate_command(Light_Ast* comm, Light_VM_State* state, Stack_Info* stack_i
     switch(comm->kind)
     {
         case AST_DECL_VARIABLE:      lvm_generate_decl_variable(comm, state, stack_info); break;
-        case AST_COMMAND_RETURN:     lvm_generate_comm_return(comm, state); break;
+        case AST_COMMAND_RETURN:     lvm_generate_comm_return(comm, state, stack_info); break;
         case AST_COMMAND_ASSIGNMENT: lvm_generate_comm_assignment(comm, state); break;
         case AST_COMMAND_BLOCK:      lvm_generate_comm_block(comm, state, stack_info); break;
         case AST_COMMAND_IF:         lvm_generate_comm_if(comm, state, stack_info); break;
+        case AST_COMMAND_FOR:
+        case AST_COMMAND_BREAK:
+        case AST_COMMAND_CONTINUE:
+        case AST_COMMAND_WHILE:
         case AST_DECL_PROCEDURE: Unimplemented; break;
         default: Unimplemented;
     }
-}
-
-// Generates a procedure body, return value if on R0 or FR0/FR4, depending on
-// the type of return.
-void
-lvm_generate_body(Light_Ast* body, Light_VM_State* state)
-{
-    // Saves the previous stack frame base to return
-    light_vm_push(state, "push rbp");
-    light_vm_push(state, "mov rbp, rsp");
-    // Allocate space in the stack for the temporary variables
-    Light_VM_Instruction_Info stack_alloc = light_vm_push(state, "subs rsp, 0xffffffff");
-
-    Stack_Info stack_info = {0};
-    for(int i = 0; i < body->comm_block.command_count; ++i)
-    {
-        Light_Ast* comm = body->comm_block.commands[i];
-        lvm_generate_command(comm, state, &stack_info);
-    }
-
-    // Patch the value of the instruction
-    light_vm_patch_instruction_immediate(stack_alloc, stack_info.size_bytes);
-
-    // Equivalent to the 'leave' instruction in x86-64,
-    // this puts the stack in the same state as it was before the function call.
-    light_vm_push(state, "pop rbp");
-    light_vm_push(state, "mov rsp, rbp");
-    //light_vm_push(state, "ret");
 }
 
 /* ---------------------------------------------------------------------*/
 /* ------------------------ Declarations -------------------------------*/
 /* ---------------------------------------------------------------------*/
 
-int
+void
 lvm_generate_proc_decl(Light_Ast* proc, Light_Scope* global_scope, Light_VM_State* state)
 {
     stack_for_arguments(proc);
     
-    lvm_generate_body(proc->decl_proc.body, state);
+    Light_Ast* body = proc->decl_proc.body;
 
-    return 0;
+    if(body)
+    {
+        // Saves the previous stack frame base to return
+        Light_VM_Instruction_Info base = light_vm_push(state, "push rbp");
+        light_vm_push(state, "mov rbp, rsp");
+
+        // Allocate space in the stack for the temporary variables
+        Light_VM_Instruction_Info stack_alloc = light_vm_push(state, "subs rsp, 0xffffffff");
+
+        // Saves the first instruction for other procedures to call this.
+        array_push(state->proc_bases, base);
+        proc->decl_proc.lvm_base_instruction = &state->proc_bases[array_length(state->proc_bases) -1];
+
+        Stack_Info stack_info = {0};
+        for(int i = 0; i < body->comm_block.command_count; ++i)
+        {
+            Light_Ast* comm = body->comm_block.commands[i];
+            lvm_generate_command(comm, state, &stack_info);
+        }
+
+        // Patch the value of the instruction
+        light_vm_patch_instruction_immediate(stack_alloc, stack_info.size_bytes);
+
+        // Equivalent to the 'leave' instruction in x86-64,
+        // this puts the stack in the same state as it was before the function call.
+        light_vm_push(state, "pop rbp");
+        light_vm_push(state, "mov rsp, rbp");
+
+        if(proc->decl_proc.flags & DECL_PROC_FLAG_MAIN)
+            light_vm_push(state, "hlt");
+        else
+            light_vm_push(state, "ret");
+    }
 }
 
 int
@@ -1252,12 +1291,31 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     Light_VM_State* state = light_vm_init();
 
     state->short_circuit_jmps = array_new(Light_VM_Instruction_Info);
+    state->proc_bases = array_new(Light_VM_Instruction_Info);
+    state->proc_patch_calls = array_new(Patch_Procs);
 
     //light_vm_push(state, "mov r0, 33");
     //light_vm_push(state, "push r0");
     //light_vm_push(state, "push r0");
 
-    lvm_generate_proc_decl(ast[0], global_scope, state);
+    Light_VM_Instruction_Info start = light_vm_push(state, "call 0xff");
+    light_vm_push(state, "hlt");
+    light_vm_patch_from_to_current_instruction(state, start);
+
+    // Generate all procedures
+    for(int i = 0; i < array_length(ast); ++i)
+    {
+        if(ast[i]->kind == AST_DECL_PROCEDURE)
+            lvm_generate_proc_decl(ast[i], global_scope, state);
+    }
+
+    for(int i = 0; i < array_length(state->proc_patch_calls); ++i)
+    {
+        Light_VM_Instruction_Info to = *(Light_VM_Instruction_Info*)((Light_Ast*)state->proc_patch_calls[i].to_decl)->decl_proc.lvm_base_instruction;
+        light_vm_patch_immediate_distance(state->proc_patch_calls[i].from, to);
+    }
+    array_free(state->proc_bases);
+    array_free(state->proc_patch_calls);
 
     light_vm_push(state, "hlt");
     light_vm_debug_dump_code(stdout, state);

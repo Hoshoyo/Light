@@ -265,6 +265,11 @@ typedef struct {
     int32_t    short_circuit_index;
 } Light_VM_Instruction_Info;
 
+typedef struct {
+    Light_VM_Instruction_Info from;
+    void* to_decl;
+} Patch_Procs;
+
 // State
 typedef struct {
     Light_VM_Flags_Register       rflags;
@@ -285,6 +290,9 @@ typedef struct {
     int32_t                       short_circuit;
     int32_t                       short_circuit_current_true;
     int32_t                       short_circuit_current_false;
+
+    Light_VM_Instruction_Info*    proc_bases;
+    Patch_Procs*                  proc_patch_calls;
 
     // Debug
     Light_VM_Debug_Variable*      debug_vars;

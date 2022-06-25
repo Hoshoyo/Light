@@ -639,6 +639,7 @@ light_vm_debug_dump_variables(FILE* out, Light_VM_State* state, u32 flags)
     fprintf(out, "R0:  %llx\n", state->registers[R0]);
     fprintf(out, "R1:  %llx\n", state->registers[R1]);
     fprintf(out, "RBP: %llx\n", state->registers[RBP]);
+    fprintf(out, "RSP: %llx\n", state->registers[RSP]);
 
     for(int i = 0; i < array_length(state->debug_vars); ++i)
     {
