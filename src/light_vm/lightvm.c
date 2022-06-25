@@ -1189,6 +1189,6 @@ light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
 
         light_vm_execute_instruction(state, in);
 
-        light_vm_debug_dump_variables(stdout, state, 0);
+        //light_vm_debug_dump_variables(stdout, state, 0);
     }
 }

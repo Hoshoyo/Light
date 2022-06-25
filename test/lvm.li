@@ -1,8 +1,9 @@
 foo : () -> s32 {
-    return bar(3, 4.0);
+    a := bar(2);
+    return a;
 }
 
-bar : (a : s32, b : r32) -> s32 {
-    //a := 3;
-    return 5 * a + (b -> s32);
+bar : (b : s32) -> s32 {
+    a : s32 = 32;
+    return a * b;
 }

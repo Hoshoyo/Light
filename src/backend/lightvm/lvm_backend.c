@@ -57,7 +57,7 @@ void lvm_generate_command(Light_Ast* comm, Light_VM_State* state, Stack_Info* st
 static int
 align_(uint64_t v)
 {
-    v = v + (PTRSIZE - (v % PTRSIZE));
+    v = v + ((PTRSIZE - (v % PTRSIZE)) % PTRSIZE);
     return (int)v;
 }
 static int
@@ -697,7 +697,9 @@ lvm_mov_ptr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
     }
     else if(expr->kind == AST_EXPRESSION_PROCEDURE_CALL)
     {
-        Unimplemented;
+        lvm_eval_proc_call(state, expr);
+        if(reg != R0)
+            light_vm_push_fmt(state, "mov r%d, r0", reg);
     }
     else
     {
@@ -1112,7 +1114,9 @@ lvm_mov_float_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_FRegi
         }
         else if(expr->kind == AST_EXPRESSION_PROCEDURE_CALL)
         {
-            Unimplemented;
+            lvm_eval_proc_call(state, expr);
+            if(reg != return_reg_for_type(expr->type))
+                light_vm_push_fmt(state, "fmov fr%d, fr%d", reg, return_reg_for_type(expr->type));
         }
     }
 }
@@ -1274,7 +1278,7 @@ lvm_generate_proc_decl(Light_Ast* proc, Light_Scope* global_scope, Light_VM_Stat
         array_push(state->proc_bases, base);
         proc->decl_proc.lvm_base_instruction = &state->proc_bases[array_length(state->proc_bases) -1];
 
-        Stack_Info stack_info = {0};
+        Stack_Info stack_info = { .offset = -PTRSIZE };
         for(int i = 0; i < body->comm_block.command_count; ++i)
         {
             Light_Ast* comm = body->comm_block.commands[i];
