@@ -733,16 +733,26 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
             {
                 if(expr->expr_binary.op == OP_BINARY_LOGIC_OR)
                 {
+                    int prev_false = state->short_circuit_current_false--;
+                    int this_false = state->short_circuit_current_false;
+
                     lvm_mov_int_expr_to_reg(state, expr->expr_binary.left, R0, true);
-                    if(expr->expr_binary.left->kind != OP_BINARY_LOGIC_AND && expr->expr_binary.left->kind != OP_BINARY_LOGIC_OR)
+                    if(expr->expr_binary.left->kind != AST_EXPRESSION_BINARY || 
+                        (expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_AND && expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_OR))
                     {
                         light_vm_push(state, "cmp r0, 0");
                         Light_VM_Instruction_Info info = light_vm_push(state, "bne 0xffffffff");
                         info.short_circuit_index = state->short_circuit_current_true;
                         array_push(state->short_circuit_jmps, info);
                     }
+                    for(int i = 0; i < array_length(state->short_circuit_jmps); ++i)
+                        if(state->short_circuit_jmps[i].short_circuit_index == this_false)
+                            light_vm_patch_from_to_current_instruction(state, state->short_circuit_jmps[i]);
+                    state->short_circuit_current_false = prev_false;
+
                     lvm_mov_int_expr_to_reg(state, expr->expr_binary.right, R0, true);
-                    if(expr->expr_binary.right->kind != OP_BINARY_LOGIC_AND && expr->expr_binary.right->kind != OP_BINARY_LOGIC_OR)
+                    if(expr->expr_binary.left->kind != AST_EXPRESSION_BINARY || 
+                        (expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_AND && expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_OR))
                     {
                         light_vm_push(state, "cmp r0, 0");
                         Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
@@ -752,7 +762,32 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                 }
                 else
                 {
+                    int prev_true = state->short_circuit_current_true++;
+                    int this_true = state->short_circuit_current_true;
 
+                    lvm_mov_int_expr_to_reg(state, expr->expr_binary.left, R0, true);
+                    if(expr->expr_binary.left->kind != AST_EXPRESSION_BINARY || 
+                        (expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_AND && expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_OR))
+                    {
+                        light_vm_push(state, "cmp r0, 0");
+                        Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
+                        info.short_circuit_index = state->short_circuit_current_false;
+                        array_push(state->short_circuit_jmps, info);
+                    }
+                    for(int i = 0; i < array_length(state->short_circuit_jmps); ++i)
+                        if(state->short_circuit_jmps[i].short_circuit_index == this_true)
+                            light_vm_patch_from_to_current_instruction(state, state->short_circuit_jmps[i]);
+                    state->short_circuit_current_true = prev_true;
+
+                    lvm_mov_int_expr_to_reg(state, expr->expr_binary.right, R0, true);
+                    if(expr->expr_binary.left->kind != AST_EXPRESSION_BINARY || 
+                        (expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_AND && expr->expr_binary.left->expr_binary.op != OP_BINARY_LOGIC_OR))
+                    {
+                        light_vm_push(state, "cmp r0, 0");
+                        Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
+                        info.short_circuit_index = state->short_circuit_current_false;
+                        array_push(state->short_circuit_jmps, info);
+                    }
                 }
             }
             else

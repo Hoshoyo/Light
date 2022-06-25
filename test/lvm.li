@@ -1,5 +1,6 @@
 foo : () -> s32 {
-    if true
+    //if ((5 == 5) && true) && (false && (4 > 3))
+    if (true && true) && (true && (false || true))
         return 5;
     else
         return 6;
