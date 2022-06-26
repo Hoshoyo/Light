@@ -604,9 +604,9 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
 
         case LVM_COPY:{
             u8 dst = get_register(&at, 0);
-            EAT_COMMA;
+            EAT_COMMA; eat_whitespace(&at);
             u8 src = get_register(&at, 0);
-            EAT_COMMA;
+            EAT_COMMA; eat_whitespace(&at);
             u8 size = get_register(&at, 0);
             instruction.copy.dst_reg = dst;
             instruction.copy.src_reg = src;

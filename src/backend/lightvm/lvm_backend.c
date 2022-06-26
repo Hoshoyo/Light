@@ -25,11 +25,13 @@ static void lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Ligh
 static void lvm_mov_float_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_FRegisters reg, bool eval_deref);
 static void lvm_mov_ptr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs);
 static void lvm_mov_enum_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg);
+static void lvm_eval_proc_call(Light_VM_State* state, Light_Ast* expr);
 
 typedef enum {
     EXPR_RES_FLOAT32,
     EXPR_RES_FLOAT64,
     EXPR_RES_REGISTER,
+    EXPR_RES_INDIRECT_REG,
 } Expr_Result_Type;
 
 typedef struct {
@@ -93,18 +95,17 @@ static Light_VM_Registers
 return_reg_for_type(Light_Type* type)
 {
     type = type_alias_root(type);
-    assert(type->kind == TYPE_KIND_PRIMITIVE || type->kind == TYPE_KIND_POINTER || type->kind == TYPE_KIND_ENUM);
+    //assert(type->kind == TYPE_KIND_PRIMITIVE || type->kind == TYPE_KIND_POINTER || type->kind == TYPE_KIND_ENUM);
     if(type_primitive_int(type) || type_primitive_bool(type) || type->kind == TYPE_KIND_POINTER || type->kind == TYPE_KIND_ENUM)
         return R0;
     else if(type_primitive_float(type) && type->size_bits == 32)
         return FR0; // 32 bit
     else if(type_primitive_float(type) && type->size_bits == 64)
         return FR4; // 64 bit
-    else
-    {
-        Unimplemented;
+    else if(type->kind == TYPE_KIND_PRIMITIVE && type->primitive == TYPE_PRIMITIVE_VOID)
         return R0;
-    }
+    else
+        return R0;
 }
 
 bool
@@ -172,6 +173,21 @@ lvm_gen_copy(Light_VM_State* state, Expr_Result rvalue, Location location, uint6
         else
             light_vm_push_fmt(state, "fmov [r%d %s %d], fr%d", 
                 location.base, "+", location.offset, rvalue.freg);
+    }
+    else if(rvalue.type == EXPR_RES_INDIRECT_REG)
+    {
+        Light_VM_Registers dst = R5;
+        if(rvalue.reg == dst)
+            dst = R6;
+
+        light_vm_push_fmt(state, "mov r%d, r%d", dst, location.base);
+        if(location.offset < 0)
+            light_vm_push_fmt(state, "subs r%d, %d", dst, -location.offset);
+        else
+            light_vm_push_fmt(state, "adds r%d, %d", dst, location.offset);
+
+        light_vm_push_fmt(state, "mov r7, %lld", size_bytes);
+        light_vm_push_fmt(state, "copy r%d, r%d, r7", dst, rvalue.reg);
     }
     else
     {
@@ -463,7 +479,7 @@ lvm_eval_field_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers
     }
     else if(left_type->kind == TYPE_KIND_STRUCT)
     {
-        s64 offset = type_struct_field_offset_bits(expr->expr_dot.left->type, expr->expr_dot.identifier->data);
+        s64 offset = type_struct_field_offset_bits(expr->expr_dot.left->type, expr->expr_dot.identifier->data) / 8;
         light_vm_push_fmt(state, "adds r%d, %d", reg, (s32)offset);
     }
     else
@@ -471,6 +487,34 @@ lvm_eval_field_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers
         // Offset of an union is always 0, therefore no need to add anything
         assert(left_type->kind == TYPE_KIND_UNION);
     }
+}
+
+static void
+lvm_eval_literal_struct(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
+{
+    assert(expr->kind == AST_EXPRESSION_LITERAL_STRUCT);
+
+    light_vm_push_fmt(state, "subs rsp, %d", expr->type->size_bits / 8);
+    light_vm_push(state, "push rsp");
+
+    if(!expr->expr_literal_struct.named)
+    {
+        Light_Type* type = type_alias_root(expr->type);
+        for(int i = 0; i < type->struct_info.fields_count; ++i)
+        {
+            Light_Ast* inexpr = expr->expr_literal_struct.struct_exprs[i];
+            Expr_Result r = lvm_eval(state, inexpr, R0, true);
+
+            int64_t off = type->struct_info.offset_bits[i] / 8;
+            light_vm_push(state, "mov r4, rsp");
+
+            lvm_gen_copy(state, r, (Location){.base = R4, .offset = off + 8 }, inexpr->type->size_bits / 8);
+        }
+    }
+
+    // Address of the literal temporary
+    light_vm_push_fmt(state, "pop r%d", reg);
+    light_vm_push_fmt(state, "adds r%d, %d", reg, PTRSIZE);
 }
 
 static void
@@ -522,6 +566,15 @@ lvm_eval(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool ev
     else if(expr->kind == AST_EXPRESSION_BINARY && expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS)
     {
         lvm_eval_vector_access(state, expr, result.reg);
+    }
+    else if(expr->kind == AST_EXPRESSION_PROCEDURE_CALL)
+    {
+        lvm_eval_proc_call(state, expr);
+    }
+    else if(expr->kind == AST_EXPRESSION_LITERAL_STRUCT)
+    {
+        lvm_eval_literal_struct(state, expr, result.reg);
+        result.type = EXPR_RES_INDIRECT_REG;
     }
     else
     {
@@ -598,39 +651,57 @@ lvm_mov_arr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
     }
 }
 
+void __stdcall
+dostuff(u32 value)
+{
+    printf("Hello %u\n", value);
+}
+
 static void
 lvm_eval_proc_call(Light_VM_State* state, Light_Ast* expr)
 {
     assert(expr->kind == AST_EXPRESSION_PROCEDURE_CALL);
 
-    s32 arg_size = 0;
-    for(int i = expr->expr_proc_call.arg_count-1; i >= 0; --i)
+    if(expr->expr_proc_call.caller_expr->type->function.flags & TYPE_FUNCTION_STDCALL)
     {
-        Light_Ast* arg = expr->expr_proc_call.args[i];
-        Expr_Result res = lvm_eval(state, arg, return_reg_for_type(arg->type), true);
-        lvm_push_result(state, res);
-        arg_size += PTRSIZE;
-    }
-    
-    // Evaluate and generate the call instruction
-    Light_Ast* caller = expr->expr_proc_call.caller_expr;
-    if(caller->kind == AST_EXPRESSION_VARIABLE && caller->expr_variable.decl->kind == AST_DECL_PROCEDURE)
-    {
-        Light_VM_Instruction_Info call_instr = light_vm_push(state, "call 0xffffffff");
-        Patch_Procs pp = {
-            .from = call_instr,
-            .to_decl = caller->expr_variable.decl
-        };
-        array_push(state->proc_patch_calls, pp);
+        //Unimplemented;
+        light_vm_push(state, "mov r1, 1");
+        light_vm_push(state, "expushi r1");
+        light_vm_push_fmt(state, "mov r2, 0x%llx", (void*)dostuff);
+        light_vm_push(state, "extcall r2");
+        light_vm_push(state, "expop");
     }
     else
     {
-        lvm_eval(state, expr->expr_proc_call.caller_expr, R0, true);
-        light_vm_push(state, "call r0");
-    }
+        s32 arg_size = 0;
+        for(int i = expr->expr_proc_call.arg_count-1; i >= 0; --i)
+        {
+            Light_Ast* arg = expr->expr_proc_call.args[i];
+            Expr_Result res = lvm_eval(state, arg, return_reg_for_type(arg->type), true);
+            lvm_push_result(state, res);
+            arg_size += PTRSIZE;
+        }
+        
+        // Evaluate and generate the call instruction
+        Light_Ast* caller = expr->expr_proc_call.caller_expr;
+        if(caller->kind == AST_EXPRESSION_VARIABLE && caller->expr_variable.decl->kind == AST_DECL_PROCEDURE)
+        {
+            Light_VM_Instruction_Info call_instr = light_vm_push(state, "call 0xffffffff");
+            Patch_Procs pp = {
+                .from = call_instr,
+                .to_decl = caller->expr_variable.decl
+            };
+            array_push(state->proc_patch_calls, pp);
+        }
+        else
+        {
+            lvm_eval(state, expr->expr_proc_call.caller_expr, R0, true);
+            light_vm_push(state, "call r0");
+        }
 
-    // restore the arguments space
-    light_vm_push_fmt(state, "adds rsp, %d", arg_size);
+        // restore the arguments space
+        light_vm_push_fmt(state, "adds rsp, %d", arg_size);
+    }
 }
 
 static void
@@ -1137,7 +1208,10 @@ lvm_generate_comm_return(Light_Ast* comm, Light_VM_State* state, Stack_Info* sta
         lvm_eval(state, expr, return_reg_for_type(expr->type), true);
 
     if(stack_info->size_bytes > 0)
-        light_vm_push_fmt(state, "adds rsp, %d", stack_info->size_bytes);
+    {
+        //light_vm_push_fmt(state, "adds rsp, %d", stack_info->size_bytes);
+        light_vm_push(state, "mov rsp, rbp"); // @Test
+    }
     light_vm_push(state, "pop rbp");
     light_vm_push(state, "ret");
 }
@@ -1180,13 +1254,17 @@ void
 lvm_generate_comm_assignment(Light_Ast* comm, Light_VM_State* state)
 {
     Expr_Result right_res = lvm_eval(state, comm->comm_assignment.rvalue, return_reg_for_type(comm->comm_assignment.rvalue->type), true);
-    lvm_push_result(state, right_res);
-    Expr_Result left_res = lvm_eval(state, comm->comm_assignment.lvalue, R2, false);
-    assert(left_res.type == EXPR_RES_REGISTER);
-    assert(!lvm_result_equal(right_res, left_res));
-    lvm_pop_result(state, right_res);
 
-    lvm_gen_copy(state, right_res, (Location){.base = R2, .offset = 0}, comm->comm_assignment.rvalue->type->size_bits / 8);
+    if(comm->comm_assignment.lvalue)
+    {
+        lvm_push_result(state, right_res);
+        Expr_Result left_res = lvm_eval(state, comm->comm_assignment.lvalue, R2, false);
+        assert(left_res.type == EXPR_RES_REGISTER);
+        assert(!lvm_result_equal(right_res, left_res));
+        lvm_pop_result(state, right_res);
+
+        lvm_gen_copy(state, right_res, (Location){.base = R2, .offset = 0}, comm->comm_assignment.rvalue->type->size_bits / 8);
+    }
 }
 
 void
@@ -1448,7 +1526,8 @@ lvm_generate_proc_decl(Light_Ast* proc, Light_Scope* global_scope, Light_VM_Stat
 
         // Equivalent to the 'leave' instruction in x86-64,
         // this puts the stack in the same state as it was before the function call.
-        light_vm_push_fmt(state, "adds rsp, %d", stack_info.size_bytes);
+        //light_vm_push_fmt(state, "adds rsp, %d", stack_info.size_bytes);
+        light_vm_push_fmt(state, "mov rsp, rbp"); // @Test
         light_vm_push(state, "pop rbp");
         light_vm_push(state, "ret");
     }

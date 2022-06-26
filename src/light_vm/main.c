@@ -123,7 +123,7 @@ void example6(Light_VM_State* state) {
     light_vm_push(state, "mov r0, 0x5"); // r0 = 5
     light_vm_push(state, "mov r3, 0x4131999a");
     light_vm_push(state, "push r3");
-    light_vm_push(state, "fmov fr0, [rsp - 0x8]");
+    light_vm_push(state, "fmov fr0, [rsp]");
     light_vm_push(state, "expushi r1");
     light_vm_push(state, "expushi r0");
     light_vm_push(state, "expushf fr0");
@@ -263,18 +263,18 @@ void example11(Light_VM_State* state) {
 int main() {
     Light_VM_State* state = light_vm_init();
 
-    example1(state);
-    example2(state);
-    example3(state);
-    example4(state);
-    example5(state);
+    //example1(state);
+    //example2(state);
+    //example3(state);
+    //example4(state);
+    //example5(state);
     example6(state);
-    example7(state);
-    example8(state);
-    example9(state);
-    example10(state);
-    example11(state);
-    light_vm_debug_dump_registers(stdout, state, LVM_PRINT_FLAGS_REGISTER|LVM_PRINT_DECIMAL);
+    //example7(state);
+    //example8(state);
+    //example9(state);
+    //example10(state);
+    //example11(state);
+    light_vm_debug_dump_registers(stdout, state, LVM_PRINT_FLAGS_REGISTER|LVM_PRINT_DECIMAL|LVM_PRINT_FLOATING_POINT_REGISTERS);
 
     //Light_VM_Instruction_Info from = {0};
     //from.absolute_address = state->code.block - 0x02;
