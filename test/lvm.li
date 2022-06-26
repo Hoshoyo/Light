@@ -1,11 +1,16 @@
+tar struct {
+    c : s32;
+    d : s32;
+}
+
 bar struct {
     a : s32;
-    b : s32;
+    b : tar;
 }
 
 foo : () -> s32 {
-    a := bar:{1, 2};
-    return a.b;
+    a := bar:{1, tar:{2, 3}};
+    return a.b.c;
+    //a := bar:{1, 2};
+    //return a.b;
 }
-
-//memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("C");

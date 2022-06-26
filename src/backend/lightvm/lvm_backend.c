@@ -40,6 +40,7 @@ typedef struct {
         Light_VM_Registers  reg;
         Light_VM_FRegisters freg;
     };
+    int temp_release_size_bytes;
 } Expr_Result;
 
 typedef struct {
@@ -188,6 +189,9 @@ lvm_gen_copy(Light_VM_State* state, Expr_Result rvalue, Location location, uint6
 
         light_vm_push_fmt(state, "mov r7, %lld", size_bytes);
         light_vm_push_fmt(state, "copy r%d, r%d, r7", dst, rvalue.reg);
+
+        if(rvalue.temp_release_size_bytes > 0)
+            light_vm_push_fmt(state, "adds rsp, %d", rvalue.temp_release_size_bytes);
     }
     else
     {
@@ -508,13 +512,12 @@ lvm_eval_literal_struct(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
             int64_t off = type->struct_info.offset_bits[i] / 8;
             light_vm_push(state, "mov r4, rsp");
 
-            lvm_gen_copy(state, r, (Location){.base = R4, .offset = off + 8 }, inexpr->type->size_bits / 8);
+            lvm_gen_copy(state, r, (Location){.base = R4, .offset = off + PTRSIZE + r.temp_release_size_bytes }, inexpr->type->size_bits / 8);
         }
     }
 
     // Address of the literal temporary
     light_vm_push_fmt(state, "pop r%d", reg);
-    light_vm_push_fmt(state, "adds r%d, %d", reg, PTRSIZE);
 }
 
 static void
@@ -575,6 +578,7 @@ lvm_eval(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool ev
     {
         lvm_eval_literal_struct(state, expr, result.reg);
         result.type = EXPR_RES_INDIRECT_REG;
+        result.temp_release_size_bytes = expr->type->size_bits / 8;
     }
     else
     {
@@ -1222,7 +1226,7 @@ lvm_generate_decl_variable(Light_Ast* comm, Light_VM_State* state, Stack_Info* s
     if(!(comm->decl_variable.flags & DECL_VARIABLE_FLAG_ADDR_CALCULATED))
     {
         comm->decl_variable.stack_index = stack_info->index++;
-        comm->decl_variable.stack_offset = stack_info->offset;
+        comm->decl_variable.stack_offset = stack_info->offset - align_(comm->decl_variable.type->size_bits / 8);
         comm->decl_variable.flags |= DECL_VARIABLE_FLAG_ADDR_CALCULATED;
         stack_info->offset -= align_(comm->decl_variable.type->size_bits / 8);
         stack_info->size_bytes += align_(comm->decl_variable.type->size_bits / 8);
@@ -1514,7 +1518,7 @@ lvm_generate_proc_decl(Light_Ast* proc, Light_Scope* global_scope, Light_VM_Stat
         array_push(state->proc_bases, base);
         proc->decl_proc.lvm_base_instruction = &state->proc_bases[array_length(state->proc_bases) -1];
 
-        Stack_Info stack_info = { .offset = -PTRSIZE };
+        Stack_Info stack_info = { .offset = 0 };
         for(int i = 0; i < body->comm_block.command_count; ++i)
         {
             Light_Ast* comm = body->comm_block.commands[i];

@@ -624,9 +624,7 @@ void
 light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((u8*)state->registers[RIP]) + sizeof(Light_VM_Instruction); // address of immediate
 
-    state->registers[RSP] -= PTRSIZE;
-
-    void* dst = (void*)state->registers[RSP];
+    void* dst = (void*)(state->registers[RSP] - PTRSIZE);
     void* src = 0;
 
     switch(instr.push.addr_mode) {
@@ -655,7 +653,9 @@ light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction in
         case 4: *(u32*)dst = *(u32*)src; break;
         case 8: *(u64*)dst = *(u64*)src; break;
         default: assert(0); break;
-    }  
+    }
+
+    state->registers[RSP] -= PTRSIZE;
 }
 
 void
