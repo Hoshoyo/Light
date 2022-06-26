@@ -521,6 +521,31 @@ lvm_eval_literal_struct(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
 }
 
 static void
+lvm_eval_literal_array(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
+{
+    assert(expr->kind == AST_EXPRESSION_LITERAL_ARRAY);
+
+    light_vm_push_fmt(state, "subs rsp, %d", expr->type->size_bits / 8);
+    light_vm_push(state, "push rsp");
+
+    int64_t off = 0;
+    for(int i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i)
+    {
+        Light_Ast* inexpr = expr->expr_literal_array.array_exprs[i];
+        Light_Type* type = type_alias_root(inexpr->type);
+        Expr_Result r = lvm_eval(state, inexpr, R0, true);
+
+        light_vm_push(state, "mov r4, rsp");
+        lvm_gen_copy(state, r, (Location){.base = R4, .offset = off + PTRSIZE + r.temp_release_size_bytes }, inexpr->type->size_bits / 8);
+
+        off += type->size_bits / 8;
+    }
+
+    // Address of the literal temporary
+    light_vm_push_fmt(state, "pop r%d", reg);
+}
+
+static void
 lvm_eval_vector_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg);
 
 static Expr_Result
@@ -577,6 +602,12 @@ lvm_eval(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool ev
     else if(expr->kind == AST_EXPRESSION_LITERAL_STRUCT)
     {
         lvm_eval_literal_struct(state, expr, result.reg);
+        result.type = EXPR_RES_INDIRECT_REG;
+        result.temp_release_size_bytes = expr->type->size_bits / 8;
+    }
+    else if(expr->kind == AST_EXPRESSION_LITERAL_ARRAY)
+    {
+        lvm_eval_literal_array(state, expr, result.reg);
         result.type = EXPR_RES_INDIRECT_REG;
         result.temp_release_size_bytes = expr->type->size_bits / 8;
     }

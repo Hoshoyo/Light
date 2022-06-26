@@ -1,16 +1,5 @@
-tar struct {
-    c : s32;
-    d : s32;
-}
-
-bar struct {
-    a : s32;
-    b : tar;
-}
 
 foo : () -> s32 {
-    a := bar:{1, tar:{2, 3}};
-    return a.b.c;
-    //a := bar:{1, 2};
-    //return a.b;
+    a := [[1,2],[3,4],[5,6]];
+    return a[1][1];
 }
