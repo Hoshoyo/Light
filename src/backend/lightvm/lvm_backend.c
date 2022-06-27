@@ -341,6 +341,10 @@ lvm_int_cast(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg)
             default: Unreachable;
         }
     }
+    else
+    {
+        lvm_eval(state, expr->expr_unary.operand, reg, true);
+    }
 }
 
 static uint32_t
@@ -411,6 +415,10 @@ lvm_float_cast(Light_VM_State* state, Light_Ast* expr, Light_VM_FRegisters freg)
             default: Unreachable;
         }
     }
+    else
+    {
+        lvm_eval(state, expr->expr_unary.operand, freg, true);
+    }
 }
 
 static int
@@ -472,7 +480,7 @@ lvm_eval_field_access(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers
     {
         if(type_alias_root(left_type->pointer_to)->kind == TYPE_KIND_STRUCT)
         {
-            s64 offset = type_struct_field_offset_bits(left_type->pointer_to, expr->expr_dot.identifier->data);
+            s64 offset = type_struct_field_offset_bits(left_type->pointer_to, expr->expr_dot.identifier->data) / 8;
             light_vm_push_fmt(state, "adds r%d, %d", reg, (s32)offset);
         }
         else
@@ -560,6 +568,8 @@ lvm_eval(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool ev
     {
         if(expr->kind == AST_EXPRESSION_BINARY && type_primitive_float(expr->expr_binary.left->type))
             lvm_mov_float_expr_to_reg(state, expr, result.reg, eval_derefs);
+        else if(expr->kind == AST_EXPRESSION_BINARY && expr->expr_binary.left->type->kind == TYPE_KIND_POINTER)
+            lvm_mov_ptr_expr_to_reg(state, expr, result.reg, eval_derefs);
         else
             lvm_mov_int_expr_to_reg(state, expr, result.reg, eval_derefs);
     }
@@ -651,7 +661,7 @@ lvm_mov_arr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
 
     if(expr->kind == AST_EXPRESSION_LITERAL_ARRAY)
     {
-        Unimplemented;
+        lvm_eval_literal_array(state, expr, reg);
     }
     else if(expr->kind == AST_EXPRESSION_BINARY)
     {
@@ -742,7 +752,7 @@ lvm_eval_proc_call(Light_VM_State* state, Light_Ast* expr)
 static void
 lvm_mov_ptr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registers reg, bool eval_derefs)
 {
-    assert(expr->type->kind == TYPE_KIND_POINTER);
+    assert(expr->type->kind == TYPE_KIND_POINTER || expr->type->kind == TYPE_KIND_PRIMITIVE);
 
     if(expr->kind == AST_EXPRESSION_LITERAL_PRIMITIVE)
     {
@@ -752,15 +762,39 @@ lvm_mov_ptr_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
     }
     else if(expr->kind == AST_EXPRESSION_BINARY)
     {
-        // Pointer arithmetic
-        Unimplemented;
+        Expr_Result lres = lvm_eval(state, expr->expr_binary.left, R0, eval_derefs);
+        light_vm_push(state, "push r0");
+        Expr_Result rres = lvm_eval(state, expr->expr_binary.right, R1, eval_derefs);
+
+        light_vm_push(state, "pop r0");
+        switch(expr->expr_binary.op)
+        {
+            case OP_BINARY_PLUS: {
+                light_vm_push_fmt(state, "mulu r1, %u", expr->type->pointer_to->size_bits / 8);
+                light_vm_push(state, "addu r0, r1");
+            } break;
+            case OP_BINARY_MINUS: {
+                light_vm_push_fmt(state, "mulu r1, %u", expr->type->pointer_to->size_bits / 8);
+                light_vm_push(state, "subu r0, r1");
+            } break;
+            case OP_BINARY_EQUAL: {
+                light_vm_push(state, "cmp r0, r1");
+                light_vm_push(state, "moveq r0");
+            } break;
+            case OP_BINARY_NOT_EQUAL: {
+                light_vm_push(state, "cmp r0, r1");
+                light_vm_push(state, "movne r0");
+            } break;
+            default: Unreachable;
+        }
     }
     else if(expr->kind == AST_EXPRESSION_UNARY)
     {
         switch(expr->expr_unary.op)
         {
             case OP_UNARY_CAST: {
-                Unimplemented;
+                // Pointers cast to any other thing don't change, so keep as it is
+                lvm_eval(state, expr->expr_unary.operand, reg, eval_derefs);
             } break;
             case OP_UNARY_ADDRESSOF: {
                 lvm_eval(state, expr->expr_unary.operand, R0, false);
@@ -1036,7 +1070,7 @@ lvm_mov_int_expr_to_reg(Light_VM_State* state, Light_Ast* expr, Light_VM_Registe
                     lvm_int_cast(state, expr, reg);
                 } break;
                 case OP_UNARY_DEREFERENCE: {
-                    Expr_Result res = lvm_eval(state, expr->expr_unary.operand, reg, false);
+                    Expr_Result res = lvm_eval(state, expr->expr_unary.operand, reg, eval_derefs);
                     if(eval_derefs || type_alias_root(expr->expr_unary.operand->type)->kind == TYPE_KIND_POINTER)
                         lvm_gen_deref(state, res, (Location){.base = reg, .offset = 0}, expr->type->size_bits / 8);
                 } break;
