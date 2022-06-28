@@ -29,8 +29,15 @@ static bool is_hex_number(char c) {
 }
 
 static u8
-get_float_register(const char** at) {
+get_float_register(const char** at, bool* is64bit) {
     u8 reg = 0;
+    if(**at == 'e')
+    {
+        (*at)++;
+        *is64bit = true;
+    }
+    else
+        *is64bit = false;
     assert(**at == 'f');
     (*at)++;
     assert(**at == 'r');
@@ -38,6 +45,7 @@ get_float_register(const char** at) {
     assert(is_number(**at));
     reg = **at + FR0 - '0';
     (*at)++;
+    assert(reg >= FR0 && reg <= FR7);
 
     return reg;
 }
@@ -57,16 +65,16 @@ get_register(const char** at, u8* byte_size) {
     } else {
         if(**at == 's') { // rsp
             (*at)++;
-            reg = RSP;
+            reg = LRSP;
         } else if(**at == 'b') { // rbp
             (*at)++;
-            reg = RBP;
+            reg = LRBP;
         } else if(**at == 'i') { // rip
             (*at)++;
-            reg = RIP;
+            reg = LRIP;
         } else if(**at == 'd') { // rdp
             (*at)++;
-            reg = RDP;
+            reg = LRDP;
         }
         assert(**at == 'p');
         (*at)++;
@@ -288,7 +296,6 @@ u8 hexdigit_to_u8(u8 d) {
     return d - '0';
 }
 
-
 static u64
 parse_int_hex(const char* text, int length) {
     u64 res = 0;
@@ -331,6 +338,19 @@ parse_number(const char** at, u8* size_bytes) {
     return result;
 }            
 
+static bool
+is_positive(uint64_t value, uint8_t size_bytes) {
+    switch(size_bytes)
+    {
+        case 1: return (value & 0x80) == 0;
+        case 2: return (value & 0x8000) == 0;
+        case 4: return (value & 0x8000000) == 0;
+        case 8: return (value & 0x800000000000000) == 0;
+        default: assert(0);
+    }
+    return 0;
+}
+
 Light_VM_Instruction
 light_vm_instruction_get(const char* s, uint64_t* immediate) {
     Light_VM_Instruction instruction = {0};
@@ -368,10 +388,15 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
                     instruction.binary.dst_reg = get_register(&at, 0);
                     eat_whitespace(&at);
                     if(*at == '+' || *at == '-') {
-                        if(*at == '-') instruction.binary.sign = 1;
+                        bool negative = (*at == '-');
                         at++;
                         eat_whitespace(&at);
                         *immediate = parse_number(&at, &instruction.imm_size_bytes);
+                        assert(instruction.imm_size_bytes <= 4);
+                        if(negative) {
+                            assert(is_positive(*immediate, instruction.imm_size_bytes));
+                            *immediate *= -1;
+                        }
                         instruction.binary.addr_mode = BIN_ADDR_MODE_REG_TO_MEM_OFFSETED;
                     } else {
                         instruction.binary.addr_mode = BIN_ADDR_MODE_REG_TO_MEM;
@@ -399,10 +424,15 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
                         instruction.binary.src_reg = get_register(&at, 0);
                         eat_whitespace(&at);
                         if(*at == '+' || *at == '-') {
-                            if(*at == '-') instruction.binary.sign = 1;
+                            bool negative = (*at == '-');
                             at++;
                             eat_whitespace(&at);
                             *immediate = parse_number(&at, &instruction.imm_size_bytes);
+                            assert(instruction.imm_size_bytes <= 4);
+                            if(negative) {
+                                assert(is_positive(*immediate, instruction.imm_size_bytes));
+                                *immediate *= -1;
+                            }
                             instruction.binary.addr_mode = BIN_ADDR_MODE_REG_OFFSETED_TO_REG;
                         } else {
                             instruction.binary.addr_mode = BIN_ADDR_MODE_MEM_TO_REG;
@@ -432,10 +462,15 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
                 instruction.ifloat.dst_reg = get_register(&at, 0);
                 eat_whitespace(&at);
                 if(*at == '+' || *at == '-') {
-                    if(*at == '-') instruction.ifloat.sign = 1;
+                    bool negative = (*at == '-');
                     at++;
                     eat_whitespace(&at);
                     *immediate = parse_number(&at, &instruction.imm_size_bytes);
+                    assert(instruction.imm_size_bytes <= 4);
+                    if(negative) {
+                        assert(is_positive(*immediate, instruction.imm_size_bytes));
+                        *immediate *= -1;
+                    }
                     instruction.ifloat.addr_mode = FLOAT_ADDR_MODE_REG_TO_MEM_OFFSETED;
                 } else {
                     instruction.ifloat.addr_mode = FLOAT_ADDR_MODE_REG_TO_MEM;
@@ -443,19 +478,28 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
                 assert(*at == ']');
                 at++;
                 EAT_COMMA;
-                instruction.ifloat.src_reg = get_float_register(&at);
+                bool is64bit = false;
+                instruction.ifloat.src_reg = get_float_register(&at, &is64bit);
+                instruction.ifloat.is64bit = is64bit;
             } else {
-                instruction.ifloat.dst_reg = get_float_register(&at);
+                bool is64bit = false;
+                instruction.ifloat.dst_reg = get_float_register(&at, &is64bit);
+                instruction.ifloat.is64bit = is64bit;
                 EAT_COMMA;
                 if(*at == '[') {
                     at++;
                     instruction.ifloat.src_reg = get_register(&at, 0);
                     eat_whitespace(&at);
                     if(*at == '+' || *at == '-') {
-                        if(*at == '-') instruction.ifloat.sign = 1;
+                        bool negative = (*at == '-');
                         at++;
                         eat_whitespace(&at);
                         *immediate = parse_number(&at, &instruction.imm_size_bytes);
+                        assert(instruction.imm_size_bytes <= 4);
+                        if(negative) {
+                            assert(is_positive(*immediate, instruction.imm_size_bytes));
+                            *immediate *= -1;
+                        }
                         instruction.ifloat.addr_mode = FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG;
                     } else {
                         instruction.ifloat.addr_mode = FLOAT_ADDR_MODE_MEM_TO_REG;
@@ -463,7 +507,9 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
                     assert(*at == ']');
                     at++;
                 } else {
-                    instruction.ifloat.src_reg = get_float_register(&at);
+                    bool is64bit = false;
+                    instruction.ifloat.src_reg = get_float_register(&at, &is64bit);
+                    instruction.ifloat.is64bit = is64bit;
                     instruction.ifloat.addr_mode = FLOAT_ADDR_MODE_REG_TO_REG;
                 }
             }
@@ -471,23 +517,29 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
 
         case LVM_CVT_R32_S64:
         case LVM_CVT_R32_S32: {
+            bool is64bit = false;
             instruction.binary.dst_reg = get_register(&at, 0);
             eat_whitespace(&at); EAT_COMMA; eat_whitespace(&at);
-            instruction.binary.src_reg = get_float_register(&at);
+            instruction.binary.src_reg = get_float_register(&at, &is64bit);
+            assert(!is64bit);
         } break;
         case LVM_CVT_S64_R32: 
         case LVM_CVT_S64_R64: 
         case LVM_CVT_S32_R64:  
         case LVM_CVT_S32_R32: {
-            instruction.binary.dst_reg = get_float_register(&at);
+            bool is64bit = false;
+            instruction.binary.dst_reg = get_float_register(&at, &is64bit);
             eat_whitespace(&at); EAT_COMMA; eat_whitespace(&at);
             instruction.binary.src_reg = get_register(&at, 0);
+            assert((is64bit && LVM_CVT_S64_R64) || (is64bit && LVM_CVT_S32_R64) || (!is64bit && LVM_CVT_S64_R32) || (!is64bit && LVM_CVT_S32_R32));
         } break;
         case LVM_CVT_R32_R64: 
         case LVM_CVT_R64_R32: {
-            instruction.binary.dst_reg = get_float_register(&at);
+            bool lis64bit = false, ris64bit = false;
+            instruction.binary.dst_reg = get_float_register(&at, &lis64bit);
             eat_whitespace(&at); EAT_COMMA; eat_whitespace(&at);
-            instruction.binary.src_reg = get_float_register(&at);
+            instruction.binary.src_reg = get_float_register(&at, &ris64bit);
+            assert((lis64bit && LVM_CVT_R32_R64) || (ris64bit && LVM_CVT_R64_R32));
         } break;
         case LVM_CVT_SEXT: {
             u8 dst_size, src_size;
@@ -528,8 +580,9 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
 
         case LVM_FPUSH:
         case LVM_FPOP: {
-            instruction.push.reg = get_float_register(&at);
-            instruction.push.byte_size = (instruction.push.reg < FR4) ? 4 : 8;
+            bool is64bit = false;
+            instruction.push.reg = get_float_register(&at, &is64bit);
+            instruction.push.byte_size = (is64bit) ? 8 : 4;
             instruction.push.addr_mode = PUSH_ADDR_MODE_REGISTER;
         } break;
 
@@ -539,8 +592,9 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
             instruction.unary.byte_size = byte_size;
         } break;
         case LVM_FNEG: {
-            instruction.unary.reg = get_float_register(&at);
-            instruction.unary.byte_size = (instruction.unary.reg < FR4) ? 4 : 8;
+            bool is64bit = false;
+            instruction.unary.reg = get_float_register(&at, &is64bit);
+            instruction.unary.byte_size = (is64bit) ? 8 : 4;
         } break;
 
         case LVM_PUSH: case LVM_EXPUSHI: case LVM_EXPUSHF: {
@@ -557,7 +611,9 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
                     instruction.push.addr_mode = PUSH_ADDR_MODE_IMMEDIATE_INDIRECT;
                 } else {
                     if(type == LVM_EXPUSHF) {
-                        instruction.push.reg = get_float_register(&at);
+                        bool is64bit = false;
+                        instruction.push.reg = get_float_register(&at, &is64bit);
+                        byte_size = (is64bit) ? 8 : 4;
                     } else {
                         instruction.push.reg = get_register(&at, &byte_size);
                     }
@@ -568,8 +624,9 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
                 at++;
             } else {
                 if(type == LVM_EXPUSHF) {
-                    instruction.push.reg = get_float_register(&at);
-
+                    bool is64bit = false;
+                    instruction.push.reg = get_float_register(&at, &is64bit);
+                    byte_size = (is64bit) ? 8 : 4;
                 } else {
                     instruction.push.reg = get_register(&at, &byte_size);
                 }

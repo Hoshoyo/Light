@@ -5,20 +5,25 @@
 extern "C" {
 #endif
 
+// 32-bit floating point registers
 typedef enum {
-    // Floating point registers
-    FR0, FR1, FR2, FR3, // 32 bit
-    FR4, FR5, FR6, FR7, // 64 bit
-    FREG_COUNT,
-} Light_VM_FRegisters;
+    FR0, FR1, FR2, FR3, FR4, FR5, FR6, FR7,
+    FREG_COUNT
+} LVM_F32_Register;
+
+// 64-bit floating point registers
+typedef enum {
+    EFR0, EFR1, EFR2, EFR3, EFR4, EFR5, EFR6, EFR7,
+    FREG_COUNT
+} LVM_F64_Register;
 
 typedef enum {
     // General purpose registers
     R0, R1, R2, R3, R4, R5, R6, R7,
     // Special registers
-    RSP, RBP, RIP, RDP,
+    LRSP, LRBP, LRIP, LRDP,
     R_COUNT,
-} Light_VM_Registers;
+} LVM_Register;
 
 typedef enum {
     LVM_NOP = 0,
@@ -95,7 +100,40 @@ typedef enum {
     LVM_ASSERT,
 
     LVM_HLT, // Halt
-} Light_VM_Instruction_Type;
+} LVM_Instr_Type;
+
+typedef enum {
+    BIN_ADDR_MODE_REG_TO_REG,          // mov rax, rbx
+    BIN_ADDR_MODE_REG_TO_MEM,          // mov [rax], rbx
+    BIN_ADDR_MODE_REG_TO_IMM_MEM,      // mov [0x1234], rbx
+    BIN_ADDR_MODE_REG_TO_MEM_OFFSETED, // mov [rax + 0x42], rbx
+    BIN_ADDR_MODE_REG_OFFSETED_TO_REG, // mov rax, [rbx + 0x42]
+    BIN_ADDR_MODE_MEM_TO_REG,          // mov rax, [rbx]
+    BIN_ADDR_MODE_MEM_IMM_TO_REG,      // mov rax, [0x1234]
+    BIN_ADDR_MODE_IMM_TO_REG,          // mov rax, 0x1234
+} LVM_Binary_Addressing_Mode;
+
+typedef enum {
+    FLOAT_ADDR_MODE_REG_TO_REG,          // fadd fr0, fr1
+    FLOAT_ADDR_MODE_REG_TO_MEM,          // fadd [r0], fr2
+    FLOAT_ADDR_MODE_MEM_TO_REG,          // fadd fr0, [r1]
+    FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG, // fadd fr0, [r1 + 0x23]
+    FLOAT_ADDR_MODE_REG_TO_MEM_OFFSETED, // fadd [r0 + 0x12], fr3
+} LVM_Float_Addressing_Mode;
+
+typedef enum {
+    BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE,  // call 0x1234567
+    BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE,  // call 0x32
+    BRANCH_ADDR_MODE_REGISTER,            // call r0
+    BRANCH_ADDR_MODE_REGISTER_INDIRECT,   // call [r0]
+} LVM_Call_Addressing_Mode;
+
+typedef enum {
+    PUSH_ADDR_MODE_IMMEDIATE,
+    PUSH_ADDR_MODE_IMMEDIATE_INDIRECT,
+    PUSH_ADDR_MODE_REGISTER,
+    PUSH_ADDR_MODE_REGISTER_INDIRECT,
+} LVM_Push_Addressing_Mode;
 
 typedef struct {
     uint32_t carry    : 1;
@@ -110,45 +148,11 @@ typedef struct {
     uint32_t equal       : 1;
 } Light_VM_Float_Flags_Register;
 
-typedef enum {
-    BIN_ADDR_MODE_REG_TO_REG,          // mov rax, rbx
-    BIN_ADDR_MODE_REG_TO_MEM,          // mov [rax], rbx
-    BIN_ADDR_MODE_REG_TO_IMM_MEM,      // mov [0x1234], rbx
-    BIN_ADDR_MODE_REG_TO_MEM_OFFSETED, // mov [rax + 0x42], rbx
-    BIN_ADDR_MODE_REG_OFFSETED_TO_REG, // mov rax, [rbx + 0x42]
-    BIN_ADDR_MODE_MEM_TO_REG,          // mov rax, [rbx]
-    BIN_ADDR_MODE_MEM_IMM_TO_REG,      // mov rax, [0x1234]
-    BIN_ADDR_MODE_IMM_TO_REG,          // mov rax, 0x1234
-} Light_VM_Binary_Addressing_Mode;
-
-typedef enum {
-    FLOAT_ADDR_MODE_REG_TO_REG,          // fadd fr0, fr1
-    FLOAT_ADDR_MODE_REG_TO_MEM,          // fadd [r0], fr2
-    FLOAT_ADDR_MODE_MEM_TO_REG,          // fadd fr0, [r1]
-    FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG, // fadd fr0, [r1 + 0x23]
-    FLOAT_ADDR_MODE_REG_TO_MEM_OFFSETED, // fadd [r0 + 0x12], fr3
-} Light_VM_Float_Addressing_Mode;
-
-typedef enum {
-    BRANCH_ADDR_MODE_IMMEDIATE_ABSOLUTE,  // call 0x1234567
-    BRANCH_ADDR_MODE_IMMEDIATE_RELATIVE,  // call 0x32
-    BRANCH_ADDR_MODE_REGISTER,            // call r0
-    BRANCH_ADDR_MODE_REGISTER_INDIRECT,   // call [r0]
-} Light_VM_Call_Addressing_Mode;
-
-typedef enum {
-    PUSH_ADDR_MODE_IMMEDIATE,
-    PUSH_ADDR_MODE_IMMEDIATE_INDIRECT,
-    PUSH_ADDR_MODE_REGISTER,
-    PUSH_ADDR_MODE_REGISTER_INDIRECT,
-} Light_VM_Push_Addressing_Mode;
-
 typedef struct {
     uint32_t src_reg     : 4;
     uint32_t dst_reg     : 4;
     uint32_t bytesize    : 4;
     uint32_t addr_mode   : 4;
-    uint32_t sign        : 1; // 0 positive, 1 negative
 } Light_VM_Instruction_Binary;
 
 typedef struct {
@@ -165,8 +169,8 @@ typedef struct {
 typedef struct {
     uint32_t src_reg     : 4;
     uint32_t dst_reg     : 4;
-    uint32_t sign        : 4; // 0 positive, 1 negative
     uint32_t addr_mode   : 4;
+    uint32_t is64bit     : 1;
 } Light_VM_Instruction_Float;
 
 typedef struct {
@@ -179,13 +183,13 @@ typedef struct {
     uint32_t dst_reg        : 4;
     uint32_t src_reg        : 4;
     uint32_t size_bytes_reg : 4;
-} Light_VM_Copy_Instruction;
+} Light_VM_Instruction_Copy;
 
 typedef struct {
     uint32_t dst_reg   : 4;
     uint32_t size_reg  : 4;
     uint32_t byte_size : 4;
-} Light_VM_Alloc_Instruction;
+} Light_VM_Instruction_Alloc;
 
 typedef struct {
     uint32_t dst_reg   : 4;
@@ -204,8 +208,8 @@ typedef struct {
         Light_VM_Instruction_Float      ifloat;
         Light_VM_Instruction_Branch     branch;
         Light_VM_Instruction_Push       push;
-        Light_VM_Copy_Instruction       copy;
-        Light_VM_Alloc_Instruction      alloc;
+        Light_VM_Instruction_Copy       copy;
+        Light_VM_Instruction_Alloc    alloc;
     };
 } Light_VM_Instruction;
 
@@ -220,13 +224,13 @@ typedef struct {
         uint16_t   unsigned_word;
         uint32_t   unsigned_dword;
         uint64_t   unsigned_qword;
-        int8_t    signed_byte;
-        int16_t   signed_word;
-        int32_t   signed_dword;
-        int64_t   signed_qword;
-        float   float32;
-        double   float64;
-        void* ptr;
+        int8_t     signed_byte;
+        int16_t    signed_word;
+        int32_t    signed_dword;
+        int64_t    signed_qword;
+        float      float32;
+        double     float64;
+        void*      ptr;
     };
 } Light_VM_Data;
 
@@ -246,30 +250,21 @@ typedef struct {
 } Light_VM_EXT_Stack;
 
 typedef struct {
-    int32_t   size;
-    void* block;
+    int32_t size_bytes;
+    void*   block;
 } Memory;
 
 typedef struct {
-    char*   name;
-    int32_t name_length;
-    int32_t size_bytes;
-    int32_t rbp_offset;
-} Light_VM_Debug_Variable;
+    uint64_t              offset_address;   // The address offset from the beginning of the code section.
+    Light_VM_Instruction* absolute_address; // The absolute address when loaded into memory of the instruction.
 
-typedef struct {
-    uint64_t   offset_address;
-    Light_VM_Instruction* absolute_address;
-    uint32_t   byte_size;           // instruction only
-    uint32_t   immediate_byte_size; // immediate value only
-    int32_t    short_circuit_index;
-    int32_t    break_continue_level;
+    uint32_t   byte_size;                   // Size in bytes of the instruction only, without counting immediate values.
+    uint32_t   immediate_byte_size;         // Size in bytes of the immediate value that follows the instruction, 0 if none follows.
+
+    // Used in code generation
+    int32_t    short_circuit_index;         // The short circuit index when the instruction is generated, later will be patched to jump to the appropriate place.
+    int32_t    break_continue_level;        // The level of break or continue that the instruction needs to jump, is patched by the loop code generation.
 } Light_VM_Instruction_Info;
-
-typedef struct {
-    Light_VM_Instruction_Info from;
-    void* to_decl;
-} Patch_Procs;
 
 // State
 typedef struct {
@@ -280,26 +275,13 @@ typedef struct {
     float                         f32registers[FREG_COUNT];
     Light_VM_EXT_Stack            ext_stack;
     Memory                        data;
-    uint64_t                      data_offset;
     Memory                        stack;
     Memory                        heap;
     Memory                        code;
+
+    // Used in code generation
+    uint64_t                      data_offset;
     uint64_t                      code_offset;
-
-    // For code generation
-    Light_VM_Instruction_Info*    short_circuit_jmps;
-    int32_t                       short_circuit;
-    int32_t                       short_circuit_current_true;
-    int32_t                       short_circuit_current_false;
-
-    Light_VM_Instruction_Info*    proc_bases;
-    Patch_Procs*                  proc_patch_calls;
-
-    Light_VM_Instruction_Info*    loop_breaks;
-    Light_VM_Instruction_Info*    loop_continue;
-
-    // Debug
-    Light_VM_Debug_Variable*      debug_vars;
 } Light_VM_State;
 
 Light_VM_State*           light_vm_init();
