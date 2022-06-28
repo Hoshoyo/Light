@@ -6,8 +6,6 @@
 #include "common.h"
 #include <light_array.h>
 
-#define PTRSIZE 8
-
 extern u16 cmp_flags_8(u8 l, u8 r);
 extern u16 cmp_flags_16(u16 l, u16 r);
 extern u16 cmp_flags_32(u32 l, u32 r);
@@ -596,7 +594,7 @@ void
 light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((u8*)state->registers[LRIP]) + sizeof(Light_VM_Instruction); // address of immediate
 
-    void* dst = (void*)(state->registers[LRSP] - PTRSIZE);
+    void* dst = (void*)(state->registers[LRSP] - LVM_PTRSIZE);
     void* src = 0;
 
     switch(instr.push.addr_mode) {
@@ -627,12 +625,12 @@ light_vm_execute_push_instruction(Light_VM_State* state, Light_VM_Instruction in
         default: assert(0); break;
     }
 
-    state->registers[LRSP] -= PTRSIZE;
+    state->registers[LRSP] -= LVM_PTRSIZE;
 }
 
 void
 light_vm_execute_fpush_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
-    state->registers[LRSP] -= PTRSIZE;
+    state->registers[LRSP] -= LVM_PTRSIZE;
 
     void* dst = (void*)state->registers[LRSP];
     assert(instr.push.addr_mode == PUSH_ADDR_MODE_REGISTER);
@@ -710,7 +708,7 @@ light_vm_execute_expush_instruction(Light_VM_State* state, Light_VM_Instruction 
             dst = &state->ext_stack.float_values[state->ext_stack.float_arg_count];
             state->ext_stack.float_index[state->ext_stack.float_arg_count] = total_arg_count;
             state->ext_stack.float_arg_count++;
-            if(float_32_register(instr.push.reg)) {
+            if(instr.push.byte_size == 8) {
                 *dst = (u64)*(u32*)src;
             } else {
                 *dst = *(u64*)src;
@@ -997,7 +995,7 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
                 case 8: state->f64registers[instr.unary.reg] = *((r64*)state->registers[LRSP]); break;
                 default: assert(0); break;
             }
-            state->registers[LRSP] += PTRSIZE;
+            state->registers[LRSP] += LVM_PTRSIZE;
             advance_ip = true;
         } break;
         case LVM_POP:{
@@ -1008,7 +1006,7 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
                 case 8: state->registers[instr.unary.reg] = *((u64*)state->registers[LRSP]); break;
                 default: assert(0); break;
             }
-            state->registers[LRSP] += PTRSIZE;
+            state->registers[LRSP] += LVM_PTRSIZE;
             advance_ip = true;
         } break;
 

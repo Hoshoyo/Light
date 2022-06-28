@@ -96,6 +96,18 @@ bool type_primitive_float(Light_Type* t) {
     return (t->kind == TYPE_KIND_PRIMITIVE) &&
         (t->primitive == TYPE_PRIMITIVE_R32 || t->primitive == TYPE_PRIMITIVE_R64);
 }
+bool type_primitive_float32(Light_Type* t) {
+    if(t->kind == TYPE_KIND_ALIAS) {
+        t = type_alias_root(t);
+    }
+    return (t->kind == TYPE_KIND_PRIMITIVE) && (t->primitive == TYPE_PRIMITIVE_R32);
+}
+bool type_primitive_float64(Light_Type* t) {
+    if(t->kind == TYPE_KIND_ALIAS) {
+        t = type_alias_root(t);
+    }
+    return (t->kind == TYPE_KIND_PRIMITIVE) && (t->primitive == TYPE_PRIMITIVE_R64);
+}
 bool type_primitive_numeric(Light_Type* t) {
     return (type_primitive_int(t) || type_primitive_float(t));
 }
@@ -104,6 +116,10 @@ bool type_primitive_bool(Light_Type* t) {
         t = type_alias_root(t);
     }
     return t == type_primitive_get(TYPE_PRIMITIVE_BOOL);
+}
+
+bool type_pointer(Light_Type* t) {
+    return type_alias_root(t)->kind == TYPE_KIND_POINTER;
 }
 
 Light_Type* type_get_bigger(Light_Type* t1, Light_Type* t2) {

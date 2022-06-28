@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#define LVM_PTRSIZE 8
+
 // 32-bit floating point registers
 typedef enum {
     FR0, FR1, FR2, FR3, FR4, FR5, FR6, FR7,
@@ -14,7 +16,7 @@ typedef enum {
 // 64-bit floating point registers
 typedef enum {
     EFR0, EFR1, EFR2, EFR3, EFR4, EFR5, EFR6, EFR7,
-    FREG_COUNT
+    EFREG_COUNT
 } LVM_F64_Register;
 
 typedef enum {
@@ -271,7 +273,7 @@ typedef struct {
     Light_VM_Flags_Register       rflags;
     Light_VM_Float_Flags_Register rfloat_flags;
     uint64_t                      registers[R_COUNT];
-    double                        f64registers[FREG_COUNT];
+    double                        f64registers[EFREG_COUNT];
     float                         f32registers[FREG_COUNT];
     Light_VM_EXT_Stack            ext_stack;
     Memory                        data;
