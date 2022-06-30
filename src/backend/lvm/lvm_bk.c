@@ -9,6 +9,9 @@
 #define LVM_RETURN_F32_REGISTER FR0
 #define LVM_RETURN_F64_REGISTER EFR0
 
+#define EXPR_FLAG_DEREFERENCE (1 << 0)
+#define EXPR_FLAG_ASSIGNMENT_ROOT (1 << 1) // Indicates any dereference operations should not dereference
+
 #define Unimplemented assert(0 && "Unimplemented")
 #define Unreachable assert(0 && "Unreachable")
 
@@ -22,6 +25,7 @@ typedef struct {
 typedef struct {
     // Current generation state for short circuit
     bool                          short_circuit;
+    bool                          short_circuit_if;
     int32_t                       short_circuit_current_true;
     int32_t                       short_circuit_current_false;
 
@@ -42,19 +46,24 @@ typedef struct {
 
 typedef enum {
     EXPR_RESULT_REG,
-    EXPR_RESULT_REG_INDIRECT,
     EXPR_RESULT_F64_REG,
     EXPR_RESULT_F32_REG,
 } Expr_Result_Type;
 typedef struct {
     Expr_Result_Type type;
     s32              size_bytes;
+    s32              temp_release_size_bytes;
     union {
         LVM_Register     reg;
         LVM_F32_Register freg;
         LVM_F64_Register efreg;
     };
 } Expr_Result;
+
+typedef struct {
+    LVM_Register base;
+    s32          offset;
+} Location;
 
 // -------------------------------------------------
 // Misc
@@ -108,10 +117,36 @@ mk_bin_instr(LVM_Instr_Type type, Expr_Result left, Expr_Result right)
     return instr;
 }
 
+static Light_VM_Instruction
+mk_un_instr(LVM_Instr_Type type, Expr_Result r)
+{
+    return (Light_VM_Instruction) { 
+        .type = type,
+        .unary.byte_size = r.size_bytes,
+        .unary.reg = r.reg,
+    };
+}
+
 // -------------------------------------------------
 // Generation
 
 static Expr_Result lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags);
+static void        lvmgen_command(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm);
+
+static void
+mask_top_bits(Light_VM_State* state, Expr_Result r)
+{
+    if(r.type == EXPR_RESULT_REG)
+    {
+        switch(r.size_bytes)
+        {
+            case 1: light_vm_push_fmt(state, "and r%d, 0xff", r.reg); break;
+            case 2: light_vm_push_fmt(state, "and r%d, 0xffff", r.reg); break;
+            case 4: light_vm_push_fmt(state, "and r%d, 0xffffffff", r.reg); break;
+            default: break;
+        }
+    }
+}
 
 static void
 lvmg_move_to(Light_VM_State* state, Expr_Result from, int to_reg_index)
@@ -131,8 +166,7 @@ lvmg_move_to(Light_VM_State* state, Expr_Result from, int to_reg_index)
             if(from.efreg != to_reg_index)
                 light_vm_push_fmt(state, "fmov efr%d, efr%d", to_reg_index, from.efreg);
         } break;
-        case EXPR_RESULT_REG_INDIRECT:
-            Unimplemented;
+        default: Unreachable;
     }
 }
 
@@ -141,7 +175,6 @@ lvmg_push_result(Light_VM_State* state, Expr_Result r)
 {
     switch(r.type)
     {
-        case EXPR_RESULT_REG_INDIRECT:
         case EXPR_RESULT_REG: {
             light_vm_push_fmt(state, "push r%d", r.reg);
         } break;
@@ -168,7 +201,6 @@ lvmg_pop_next(Light_VM_State* state, Expr_Result r, Expr_Result* out)
     r = lvmg_next(r);
     switch(r.type)
     {
-        case EXPR_RESULT_REG_INDIRECT:
         case EXPR_RESULT_REG: {
             out->reg = r.reg;
             light_vm_push_fmt(state, "pop r%d", r.reg);
@@ -185,18 +217,129 @@ lvmg_pop_next(Light_VM_State* state, Expr_Result r, Expr_Result* out)
     }
 }
 
-static void
-mask_top_bits(Light_VM_State* state, Expr_Result r)
+static Expr_Result
+lvmg_reg_for_type(Light_Type* type)
 {
-    if(r.type == EXPR_RESULT_REG || r.type == EXPR_RESULT_REG_INDIRECT)
+    Expr_Result result = {0};
+    if(type_primitive_float32(type))
     {
-        switch(r.size_bytes)
+        result.reg = FR0;
+        result.type = EXPR_RESULT_F32_REG;
+        result.size_bytes = 4;
+    }
+    else if(type_primitive_float64(type))
+    {
+        result.reg = EFR0;
+        result.type = EXPR_RESULT_F64_REG;
+        result.size_bytes = 8;
+    }
+    else
+    {
+        result.reg = R0;
+        result.type = EXPR_RESULT_REG;
+        result.size_bytes = type->size_bits / BITS_IN_BYTE;
+    }
+    return result;
+}
+
+static void
+lvmg_copy(Light_VM_State* state, Expr_Result rvalue, Location location)
+{
+    if(rvalue.type == EXPR_RESULT_REG)
+    {
+        if(rvalue.size_bytes <= 8)
         {
-            case 1: light_vm_push_fmt(state, "and r%d, 0xff", r.reg); break;
-            case 2: light_vm_push_fmt(state, "and r%d, 0xffff", r.reg); break;
-            case 4: light_vm_push_fmt(state, "and r%d, 0xffffffff", r.reg); break;
-            default: break;
+            if(location.offset < 0)
+                light_vm_push_fmt(state, "mov [r%d %s %d], r%d%s", 
+                    location.base, "-", -location.offset, rvalue.reg, register_size_suffix(rvalue.size_bytes));
+            else
+                light_vm_push_fmt(state, "mov [r%d %s %d], r%d%s", 
+                    location.base, "+", location.offset, rvalue.reg, register_size_suffix(rvalue.size_bytes));
         }
+        else
+        {
+            LVM_Register dst = R5;
+            if(rvalue.reg == dst)
+                dst = R6;
+
+            light_vm_push_fmt(state, "mov r%d, r%d", dst, location.base);
+            if(location.offset < 0)
+                light_vm_push_fmt(state, "subs r%d, %d", dst, -location.offset);
+            else
+                light_vm_push_fmt(state, "adds r%d, %d", dst, location.offset);
+
+            light_vm_push_fmt(state, "mov r7, %lld", rvalue.size_bytes);
+            light_vm_push_fmt(state, "copy r%d, r%d, r7", dst, rvalue.reg);
+
+            if(rvalue.temp_release_size_bytes > 0)
+                light_vm_push_fmt(state, "adds rsp, %d", rvalue.temp_release_size_bytes);
+        }
+    }
+    else if(rvalue.type == EXPR_RESULT_F32_REG)
+    {
+        if(location.offset < 0)
+            light_vm_push_fmt(state, "fmov [r%d %s %d], fr%d", 
+                location.base, "-", -location.offset, rvalue.freg);
+        else
+            light_vm_push_fmt(state, "fmov [r%d %s %d], fr%d", 
+                location.base, "+", location.offset, rvalue.freg);
+    }
+    else if(rvalue.type == EXPR_RESULT_F64_REG)
+    {
+        if(location.offset < 0)
+            light_vm_push_fmt(state, "fmov [r%d %s %d], efr%d", 
+                location.base, "-", -location.offset, rvalue.efreg);
+        else
+            light_vm_push_fmt(state, "fmov [r%d %s %d], efr%d", 
+                location.base, "+", location.offset, rvalue.efreg);
+    }
+    else
+    {
+        Unreachable;
+    }
+}
+
+static void
+lvmg_deref(Light_VM_State* state, Expr_Result rvalue, Location location)
+{
+    if(rvalue.type == EXPR_RESULT_REG)
+    {
+        if(rvalue.size_bytes <= 8)
+        {
+            if(location.offset < 0)
+                light_vm_push_fmt(state, "mov r%d%s, [r%d %s %d]", 
+                    rvalue.reg, register_size_suffix(rvalue.size_bytes), location.base, "-", -location.offset);
+            else
+                light_vm_push_fmt(state, "mov r%d%s, [r%d %s %d]", 
+                    rvalue.reg, register_size_suffix(rvalue.size_bytes), location.base, "+", location.offset);
+        }
+        else
+        {
+            // Keep the way that it is, someone will make a copy to the
+            // proper location later.
+        }
+    }
+    else if(rvalue.type == EXPR_RESULT_F32_REG)
+    {
+        if(location.offset < 0)
+            light_vm_push_fmt(state, "fmov fr%d, [r%d %s %d]", 
+                rvalue.freg, location.base, "-", -location.offset);
+        else
+            light_vm_push_fmt(state, "fmov fr%d, [r%d %s %d]", 
+                rvalue.freg, location.base, "+", location.offset);
+    }
+    else if(rvalue.type == EXPR_RESULT_F64_REG)
+    {
+        if(location.offset < 0)
+            light_vm_push_fmt(state, "fmov efr%d, [r%d %s %d]", 
+                rvalue.efreg, location.base, "-", -location.offset);
+        else
+            light_vm_push_fmt(state, "fmov efr%d, [r%d %s %d]", 
+                rvalue.efreg, location.base, "+", location.offset);
+    }
+    else
+    {
+        Unreachable;
     }
 }
 
@@ -214,7 +357,48 @@ lvmgen_expr_literal_primitive(Light_VM_State* state, LVM_Generator* gen, Light_A
     }
     else if(type_primitive_int(expr->type))
     {
-        light_vm_push_fmt(state, "mov r0%s, %d", register_size_suffix(expr->type->size_bits / BITS_IN_BYTE), expr->expr_literal_primitive.value_bool);
+        Light_VM_Instruction instr = {0};
+        switch(expr->type->primitive)
+        {
+            case TYPE_PRIMITIVE_BOOL:
+            case TYPE_PRIMITIVE_U8:
+            case TYPE_PRIMITIVE_S8: {
+                instr.type = LVM_MOV;
+                instr.imm_size_bytes = 1;
+                instr.binary.bytesize = 1;
+                instr.binary.dst_reg = result.reg;
+                instr.binary.addr_mode = BIN_ADDR_MODE_IMM_TO_REG;
+                light_vm_push_instruction(state, instr, expr->expr_literal_primitive.value_u8);                
+            } break;
+            case TYPE_PRIMITIVE_U16:
+            case TYPE_PRIMITIVE_S16: {
+                instr.type = LVM_MOV;
+                instr.imm_size_bytes = 2;
+                instr.binary.bytesize = 2;
+                instr.binary.dst_reg = result.reg;
+                instr.binary.addr_mode = BIN_ADDR_MODE_IMM_TO_REG;
+                light_vm_push_instruction(state, instr, expr->expr_literal_primitive.value_u16);                
+            } break;
+            case TYPE_PRIMITIVE_U32:
+            case TYPE_PRIMITIVE_S32: {
+                instr.type = LVM_MOV;
+                instr.imm_size_bytes = 4;
+                instr.binary.bytesize = 4;
+                instr.binary.dst_reg = result.reg;
+                instr.binary.addr_mode = BIN_ADDR_MODE_IMM_TO_REG;
+                light_vm_push_instruction(state, instr, expr->expr_literal_primitive.value_u32);                
+            } break;
+            case TYPE_PRIMITIVE_U64:
+            case TYPE_PRIMITIVE_S64: {
+                instr.type = LVM_MOV;
+                instr.imm_size_bytes = 8;
+                instr.binary.bytesize = 8;
+                instr.binary.dst_reg = result.reg;
+                instr.binary.addr_mode = BIN_ADDR_MODE_IMM_TO_REG;
+                light_vm_push_instruction(state, instr, expr->expr_literal_primitive.value_u64);                
+            } break;
+            default: Unreachable; break;
+        }
         result.type = EXPR_RESULT_REG;
         result.reg = R0;
         result.size_bytes = expr->type->size_bits / BITS_IN_BYTE;
@@ -251,10 +435,89 @@ lvmgen_expr_literal_primitive(Light_VM_State* state, LVM_Generator* gen, Light_A
 }
 
 static Expr_Result
+lvmgen_expr_binary_compare(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+    assert(expr->kind == AST_EXPRESSION_BINARY);
+    Expr_Result result = {0};
+
+    flags |= EXPR_FLAG_DEREFERENCE;
+
+    Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags);
+    lvmg_push_result(state, left);
+
+    Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, flags);
+    lvmg_pop_next(state, right, &left);
+
+    result = (Expr_Result) {
+        .type = EXPR_RESULT_REG,
+        .size_bytes = 1,
+        .reg = R0,
+    };
+
+    Light_Type* subtype = type_alias_root(expr->expr_binary.left->type);
+    if(type_primitive_sint(subtype) || subtype->kind == TYPE_KIND_ENUM)
+    {
+        light_vm_push_instruction(state, mk_bin_instr(LVM_CMP, left, right), 0); 
+        switch(expr->expr_binary.op)
+        {
+            case OP_BINARY_LT:         light_vm_push_fmt(state, "movlts r%d", result.reg); break;
+            case OP_BINARY_LE:         light_vm_push_fmt(state, "movles r%d", result.reg); break;
+            case OP_BINARY_GT:         light_vm_push_fmt(state, "movgts r%d", result.reg); break;
+            case OP_BINARY_GE:         light_vm_push_fmt(state, "movges r%d", result.reg); break;
+            case OP_BINARY_EQUAL:      light_vm_push_fmt(state, "moveq r%d", result.reg);  break;
+            case OP_BINARY_NOT_EQUAL:  light_vm_push_fmt(state, "movne r%d", result.reg);  break;
+            default: Unreachable;
+        }
+    }
+    else if(type_primitive_uint(subtype))
+    {
+        light_vm_push_instruction(state, mk_bin_instr(LVM_CMP, left, right), 0); 
+        switch(expr->expr_binary.op)
+        {
+            case OP_BINARY_LT:         light_vm_push_fmt(state, "movltu r%d", result.reg); break;
+            case OP_BINARY_LE:         light_vm_push_fmt(state, "movleu r%d", result.reg); break;
+            case OP_BINARY_GT:         light_vm_push_fmt(state, "movgtu r%d", result.reg); break;
+            case OP_BINARY_GE:         light_vm_push_fmt(state, "movgeu r%d", result.reg); break;
+            case OP_BINARY_EQUAL:      light_vm_push_fmt(state, "moveq r%d", result.reg);  break;
+            case OP_BINARY_NOT_EQUAL:  light_vm_push_fmt(state, "movne r%d", result.reg);  break;
+            default: Unreachable;
+        }
+    }
+    else if(type_primitive_float32(subtype) || type_primitive_float64(subtype))
+    {
+        light_vm_push_instruction(state, mk_bin_instr(LVM_FCMP, left, right), 0); 
+        switch(expr->expr_binary.op)
+        {
+            case OP_BINARY_LT:         light_vm_push_fmt(state, "fmovlt r%d", result.reg); break;
+            case OP_BINARY_LE:         light_vm_push_fmt(state, "fmovle r%d", result.reg); break;
+            case OP_BINARY_GT:         light_vm_push_fmt(state, "fmovgt r%d", result.reg); break;
+            case OP_BINARY_GE:         light_vm_push_fmt(state, "fmovge r%d", result.reg); break;
+            case OP_BINARY_EQUAL:      light_vm_push_fmt(state, "fmoveq r%d", result.reg);  break;
+            case OP_BINARY_NOT_EQUAL:  light_vm_push_fmt(state, "fmovne r%d", result.reg);  break;
+            default: Unreachable;
+        }
+    }
+    else if(type_pointer(subtype) || subtype->kind == TYPE_KIND_FUNCTION || type_primitive_bool(subtype))
+    {
+        light_vm_push_instruction(state, mk_bin_instr(LVM_CMP, left, right), 0); 
+        switch(expr->expr_binary.op)
+        {
+            case OP_BINARY_EQUAL:      light_vm_push_fmt(state, "moveq r%d", result.reg); break;
+            case OP_BINARY_NOT_EQUAL:  light_vm_push_fmt(state, "movne r%d", result.reg); break;
+            default: Unreachable;
+        }
+    }
+
+    return result;
+}
+
+static Expr_Result
 lvmgen_expr_binary_arithmetic(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
     assert(expr->kind == AST_EXPRESSION_BINARY);
     Expr_Result result = {0};
+
+    flags |= EXPR_FLAG_DEREFERENCE;
 
     Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags);
     lvmg_push_result(state, left);
@@ -329,6 +592,104 @@ lvmgen_expr_binary_arithmetic(Light_VM_State* state, LVM_Generator* gen, Light_A
 }
 
 static Expr_Result
+lvmgen_expr_binary_logical(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+    Expr_Result result = {
+        .reg = R0,
+        .size_bytes = 1,
+        .type = EXPR_RESULT_REG,
+    };
+    assert(type_primitive_bool(expr->expr_binary.left->type) && type_primitive_bool(expr->expr_binary.right->type));
+
+    bool sc = gen->short_circuit;
+    int prev_false;
+    int this_false;
+    int prev_true;
+    int this_true;
+    if(!sc) 
+    { 
+        gen->short_circuit = true;
+        gen->short_circuit_current_true = 1;
+        gen->short_circuit_current_false = -1;
+        this_true = 1;
+        this_false = -1;
+    }
+
+    if(gen->short_circuit)
+    {
+        if(expr->expr_binary.op == OP_BINARY_LOGIC_AND)
+        {
+            prev_true = gen->short_circuit_current_true++;
+            this_true = gen->short_circuit_current_true;
+
+            Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags|EXPR_FLAG_DEREFERENCE);
+            {
+                light_vm_push_fmt(state, "cmp r%db, 0", left.reg);
+                Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
+                info.short_circuit_index = gen->short_circuit_current_false;
+                array_push(gen->short_circuit_jmps, info);
+            }
+
+            for(int i = array_length(gen->short_circuit_jmps) - 1; i >= 0; --i)
+                if(gen->short_circuit_jmps[i].short_circuit_index == this_true)
+                {
+                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
+                    array_remove(gen->short_circuit_jmps, i);
+                }
+            gen->short_circuit_current_true = prev_true;
+
+            Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, flags|EXPR_FLAG_DEREFERENCE);
+            {
+                light_vm_push_fmt(state, "cmp r%db, 0", right.reg);
+                Light_VM_Instruction_Info info2 = light_vm_push(state, "beq 0xffffffff");
+                info2.short_circuit_index = gen->short_circuit_current_false;
+                array_push(gen->short_circuit_jmps, info2);
+            }
+        }
+        else
+        {
+            prev_false = gen->short_circuit_current_false--;
+            this_false = gen->short_circuit_current_false;
+
+            Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags|EXPR_FLAG_DEREFERENCE);
+            {
+                light_vm_push_fmt(state, "cmp r%db, 0", left.reg);
+                Light_VM_Instruction_Info info = light_vm_push(state, "bne 0xffffffff");
+                info.short_circuit_index = gen->short_circuit_current_true;
+                array_push(gen->short_circuit_jmps, info);
+            }
+
+            for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0 ; --i)
+                if(gen->short_circuit_jmps[i].short_circuit_index == this_false)
+                {
+                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
+                    array_remove(gen->short_circuit_jmps, i);
+                }
+            gen->short_circuit_current_false = prev_false;
+
+            Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, flags|EXPR_FLAG_DEREFERENCE);
+            {
+                light_vm_push_fmt(state, "cmp r%db, 0", right.reg);
+                Light_VM_Instruction_Info info2 = light_vm_push(state, "beq 0xffffffff");
+                info2.short_circuit_index = gen->short_circuit_current_false;
+                array_push(gen->short_circuit_jmps, info2);
+            }
+        }
+    }
+
+    if(!gen->short_circuit_if && !sc)
+    {
+        Light_VM_Instruction_Info end_branch = light_vm_current_instruction(state);
+        for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
+            light_vm_patch_immediate_distance(gen->short_circuit_jmps[i], end_branch);
+    }
+
+    if(!sc) array_clear(gen->short_circuit_jmps);
+
+    return result;
+}
+
+static Expr_Result
 lvmgen_expr_binary(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
     assert(expr->kind == AST_EXPRESSION_BINARY);
@@ -351,19 +712,159 @@ lvmgen_expr_binary(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u
 
         case OP_BINARY_LOGIC_AND:
         case OP_BINARY_LOGIC_OR:
+            result = lvmgen_expr_binary_logical(state, gen, expr, flags);
+            break;
 
         case OP_BINARY_LT:
         case OP_BINARY_GT:
         case OP_BINARY_LE:
         case OP_BINARY_GE:
-
         case OP_BINARY_EQUAL:
         case OP_BINARY_NOT_EQUAL:
+            result = lvmgen_expr_binary_compare(state, gen, expr, flags);
+            break;
 
         case OP_BINARY_VECTOR_ACCESS:
+            Unimplemented;
 
         default: Unreachable;
     }
+    return result;
+}
+
+static Expr_Result
+lvmgen_expr_unary(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+    assert(expr->kind == AST_EXPRESSION_UNARY);
+    Expr_Result result = {0};
+
+    switch(expr->expr_unary.op)
+    {
+        case OP_UNARY_PLUS: {
+            result = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+        } break;
+        case OP_UNARY_MINUS: {
+            result = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+            Light_VM_Instruction instr = mk_un_instr(type_primitive_float(expr->type) ? LVM_FNEG : LVM_NEG, result);
+            light_vm_push_instruction(state, instr, 0);
+        } break;
+        case OP_UNARY_LOGIC_NOT: {
+            assert(type_primitive_bool(expr->type));
+            if(gen->short_circuit)
+            {
+                Unimplemented;
+            }
+            else
+            {
+                result = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+                light_vm_push_fmt(state, "cmp r%db, 0", result.reg);
+                light_vm_push_fmt(state, "moveq r%d", result.reg);
+            }
+        } break;
+        case OP_UNARY_BITWISE_NOT: {
+            assert(type_primitive_int(expr->type));
+            result = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+            Light_VM_Instruction instr = mk_un_instr(LVM_NOT, result);
+            light_vm_push_instruction(state, instr, 0);
+        } break;
+        case OP_UNARY_CAST: {
+            Unimplemented;
+        } break;
+        case OP_UNARY_ADDRESSOF: {
+            if(expr->expr_unary.operand->kind == AST_EXPRESSION_UNARY && expr->expr_unary.operand->expr_unary.op == OP_UNARY_DEREFERENCE)
+                result = lvmgen_expr(state, gen, expr->expr_unary.operand->expr_unary.operand, flags);
+            else
+            {
+                result = lvmgen_expr(state, gen, expr->expr_unary.operand, flags & ~EXPR_FLAG_DEREFERENCE);
+                result.type = EXPR_RESULT_REG;
+            }
+        } break;
+        case OP_UNARY_DEREFERENCE: {
+            if(expr->expr_unary.operand->kind == AST_EXPRESSION_UNARY && expr->expr_unary.operand->expr_unary.op == OP_UNARY_ADDRESSOF)
+                result = lvmgen_expr(state, gen, expr->expr_unary.operand->expr_unary.operand, (flags|EXPR_FLAG_DEREFERENCE) & ~EXPR_FLAG_ASSIGNMENT_ROOT);
+            else
+                result = lvmgen_expr(state, gen, expr->expr_unary.operand, (flags|EXPR_FLAG_DEREFERENCE) & ~EXPR_FLAG_ASSIGNMENT_ROOT);
+            if(flags & EXPR_FLAG_DEREFERENCE)
+            {
+                Expr_Result r = lvmg_reg_for_type(expr->type);
+                lvmg_deref(state, r, (Location){.base = result.reg, .offset = 0});
+                result = r;
+            }
+        } break;
+        default: Unreachable;
+    }
+
+    return result;
+}
+
+static Expr_Result
+lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+    assert(expr->kind == AST_EXPRESSION_VARIABLE);
+    Expr_Result result = {0};
+
+    Light_Ast* decl = expr->expr_variable.decl;
+    if(decl->decl_variable.storage_class == STORAGE_CLASS_STACK)
+    {
+        if((flags & EXPR_FLAG_DEREFERENCE) && (expr->type->size_bits <= (LVM_PTRSIZE * BITS_IN_BYTE)))
+        {
+            if(type_primitive_float(expr->type))
+            {
+                if(type_primitive_float32(expr->type))
+                {
+                    result.reg = FR0;
+                    result.type = EXPR_RESULT_F32_REG;
+                    result.size_bytes = 4;
+                }
+                else
+                {
+                    result.reg = EFR0;
+                    result.type = EXPR_RESULT_F64_REG;
+                    result.size_bytes = 8;
+                }
+                Light_VM_Instruction instr = {
+                    .type = LVM_FMOV,
+                    .imm_size_bytes = 4,
+                    .ifloat.addr_mode = FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG,
+                    .ifloat.dst_reg = result.reg,
+                    .ifloat.src_reg = LRBP,
+                };
+                light_vm_push_instruction(state, instr, expr->expr_variable.decl->decl_variable.stack_offset);
+            }
+            else
+            {
+                result.reg = R0;
+                result.type = EXPR_RESULT_REG;
+                result.size_bytes = expr->type->size_bits / BITS_IN_BYTE;
+
+                Light_VM_Instruction instr = {
+                    .type = LVM_MOV,
+                    .imm_size_bytes = 4,
+                    .binary.bytesize = expr->type->size_bits / BITS_IN_BYTE,
+                    .binary.addr_mode = BIN_ADDR_MODE_REG_OFFSETED_TO_REG,
+                    .binary.dst_reg = result.reg,
+                    .binary.src_reg = LRBP,
+                };
+                light_vm_push_instruction(state, instr, expr->expr_variable.decl->decl_variable.stack_offset);
+            }
+        }
+        else
+        {
+            result.reg = R0;
+            result.type = EXPR_RESULT_REG;
+            result.size_bytes = LVM_PTRSIZE;
+            light_vm_push_fmt(state, "mov r%d, rbp", result.reg);
+            if(expr->expr_variable.decl->decl_variable.stack_offset < 0)
+                light_vm_push_fmt(state, "subs r%d, %d", result.reg, -expr->expr_variable.decl->decl_variable.stack_offset);
+            else
+                light_vm_push_fmt(state, "adds r%d, %d", result.reg, expr->expr_variable.decl->decl_variable.stack_offset);
+        }
+    }
+    else
+    {
+        Unimplemented;
+    }
+
     return result;
 }
 
@@ -373,12 +874,10 @@ lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flag
     Expr_Result result = {0};
     switch(expr->kind)
     {
-        case AST_EXPRESSION_LITERAL_PRIMITIVE:
-            result = lvmgen_expr_literal_primitive(state, gen, expr, flags); break;
-        case AST_EXPRESSION_BINARY:
-            result = lvmgen_expr_binary(state, gen, expr, flags); break;
-        case AST_EXPRESSION_UNARY:
-        case AST_EXPRESSION_VARIABLE:
+        case AST_EXPRESSION_LITERAL_PRIMITIVE: result = lvmgen_expr_literal_primitive(state, gen, expr, flags); break;
+        case AST_EXPRESSION_BINARY:            result = lvmgen_expr_binary(state, gen, expr, flags); break;
+        case AST_EXPRESSION_UNARY:             result = lvmgen_expr_unary(state, gen, expr, flags); break;
+        case AST_EXPRESSION_VARIABLE:          result = lvmgen_expr_variable(state, gen, expr, flags); break;
         case AST_EXPRESSION_PROCEDURE_CALL:
         case AST_EXPRESSION_DOT:
         case AST_EXPRESSION_LITERAL_ARRAY:
@@ -391,12 +890,108 @@ lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flag
 }
 
 static void
+lvmgen_decl_variable(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* decl)
+{
+    if(!(decl->decl_variable.flags & DECL_VARIABLE_FLAG_ADDR_CALCULATED))
+    {
+        decl->decl_variable.stack_index  = stack_info->index++;
+        decl->decl_variable.stack_offset = stack_info->offset - align_to_ptrsize(decl->decl_variable.type->size_bits / 8);
+        decl->decl_variable.flags        |= DECL_VARIABLE_FLAG_ADDR_CALCULATED;
+        stack_info->offset               -= align_to_ptrsize(decl->decl_variable.type->size_bits / 8);
+        stack_info->size_bytes           += align_to_ptrsize(decl->decl_variable.type->size_bits / 8);
+
+        if(decl->decl_variable.assignment)
+        {
+            Expr_Result right_res = lvmgen_expr(state, gen, decl->decl_variable.assignment, EXPR_FLAG_DEREFERENCE);
+            if(decl->decl_variable.storage_class == STORAGE_CLASS_STACK)
+            {
+                lvmg_copy(state, right_res, (Location){ .base = LRBP, .offset = decl->decl_variable.stack_offset});
+            }
+            else
+            {
+                Unimplemented;
+            }
+        }
+    }
+}
+
+static void
+lvmgen_comm_assignment(Light_VM_State* state, LVM_Generator* gen, Light_Ast* comm)
+{
+    Expr_Result right_res = lvmgen_expr(state, gen, comm->comm_assignment.rvalue, EXPR_FLAG_DEREFERENCE);
+
+    if(comm->comm_assignment.lvalue)
+    {
+        lvmg_push_result(state, right_res);
+        Expr_Result left_res = lvmgen_expr(state, gen, comm->comm_assignment.lvalue, EXPR_FLAG_ASSIGNMENT_ROOT);
+        assert(left_res.type == EXPR_RESULT_REG);
+        lvmg_pop_next(state, right_res, &right_res);
+
+        lvmg_copy(state, right_res, (Location){.base = left_res.reg, .offset = 0});
+    }
+}
+
+void
+lvmgen_comm_if(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm)
+{
+    gen->short_circuit = true;
+    gen->short_circuit_if = true;
+    gen->short_circuit_current_true = 1;
+    gen->short_circuit_current_false = -1;
+    Expr_Result res = lvmgen_expr(state, gen, comm->comm_if.condition, EXPR_FLAG_DEREFERENCE);
+    assert(res.type == EXPR_RESULT_REG);
+    gen->short_circuit = false;
+    gen->short_circuit_if = false;
+
+    // If there is nothing in the array, that means no AND/OR were generated,
+    // in this case, just evaluate the final result and branch according to that.
+    // We can't do this by branching inside because there can ban casts to bool.
+    Light_VM_Instruction_Info base_case = {0};
+    if(array_length(gen->short_circuit_jmps) == 0)
+    {
+        light_vm_push_fmt(state, "cmp r%db, 0", res.reg);
+        base_case = light_vm_push(state, "beq 0xffffffff");
+    }
+
+    for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
+        if(gen->short_circuit_jmps[i].short_circuit_index == 1)
+            light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
+
+    lvmgen_command(state, gen, stack_info, comm->comm_if.body_true);
+    Light_VM_Instruction_Info skip_true = light_vm_push(state, "jmp 0xffffffff");
+
+    Light_VM_Instruction_Info else_block = light_vm_current_instruction(state);
+    if(array_length(gen->short_circuit_jmps) == 0)
+    {
+        light_vm_patch_immediate_distance(base_case, else_block);
+    }
+    if(comm->comm_if.body_false)
+    {
+        lvmgen_command(state, gen, stack_info, comm->comm_if.body_false);
+    }
+    
+    for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
+        if(gen->short_circuit_jmps[i].short_circuit_index == -1)
+            light_vm_patch_immediate_distance(gen->short_circuit_jmps[i], else_block);
+
+    array_clear(gen->short_circuit_jmps);
+    light_vm_patch_from_to_current_instruction(state, skip_true);
+}
+
+static void
+lvmgen_comm_block(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm)
+{
+    for(int i = 0; i < comm->comm_block.command_count; ++i)
+        lvmgen_command(state, gen, stack_info, comm->comm_block.commands[i]);
+}
+
+static void
 lvmgen_comm_return(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm)
 {
     Light_Ast* expr = comm->comm_return.expression;
     if(expr)
     {
-        Expr_Result r = lvmgen_expr(state, gen, expr, 0);
+        Expr_Result r = lvmgen_expr(state, gen, expr, EXPR_FLAG_DEREFERENCE);
         lvmg_move_to(state, r, LVM_RETURN_REGISTER);
     }
 
@@ -412,11 +1007,11 @@ lvmgen_command(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info
     switch(comm->kind)
     {
         case AST_COMMAND_RETURN:     lvmgen_comm_return(state, gen, stack_info, comm); break;
+        case AST_DECL_VARIABLE:      lvmgen_decl_variable(state, gen, stack_info, comm); break;
+        case AST_COMMAND_ASSIGNMENT: lvmgen_comm_assignment(state, gen, comm); break;
+        case AST_COMMAND_BLOCK:      lvmgen_comm_block(state, gen, stack_info, comm); break;
+        case AST_COMMAND_IF:         lvmgen_comm_if(state, gen, stack_info, comm); break;
         /*
-        case AST_DECL_VARIABLE:      lvmgen_decl_variable(comm, state, stack_info); break;
-        case AST_COMMAND_ASSIGNMENT: lvmgen_comm_assignment(comm, state); break;
-        case AST_COMMAND_BLOCK:      lvmgen_comm_block(comm, state, stack_info); break;
-        case AST_COMMAND_IF:         lvmgen_comm_if(comm, state, stack_info); break;
         case AST_COMMAND_WHILE:      lvmgen_comm_while(comm, state, stack_info); break;
         case AST_COMMAND_FOR:        lvmgen_comm_for(comm, state, stack_info); break;
         case AST_COMMAND_BREAK:      lvmgen_comm_break(comm, state); break;
