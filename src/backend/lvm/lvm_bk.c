@@ -11,6 +11,7 @@
 
 #define EXPR_FLAG_DEREFERENCE (1 << 0)
 #define EXPR_FLAG_ASSIGNMENT_ROOT (1 << 1) // Indicates any dereference operations should not dereference
+#define EXPR_FLAG_INVERTED_SHORT_CIRCUIT (1 << 2)
 
 #define Unimplemented assert(0 && "Unimplemented")
 #define Unreachable assert(0 && "Unreachable")
@@ -615,7 +616,69 @@ lvmgen_expr_binary_logical(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
         this_false = -1;
     }
 
-    if(gen->short_circuit)
+    if(flags & EXPR_FLAG_INVERTED_SHORT_CIRCUIT)
+    {
+        flags &= ~EXPR_FLAG_INVERTED_SHORT_CIRCUIT;
+        if(expr->expr_binary.op == OP_BINARY_LOGIC_OR)
+        {
+            prev_true = gen->short_circuit_current_true++;
+            this_true = gen->short_circuit_current_true;
+
+            Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags|EXPR_FLAG_DEREFERENCE);
+            {
+                light_vm_push_fmt(state, "cmp r%db, 1", left.reg);
+                Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
+                info.short_circuit_index = gen->short_circuit_current_false;
+                array_push(gen->short_circuit_jmps, info);
+            }
+
+            for(int i = array_length(gen->short_circuit_jmps) - 1; i >= 0; --i)
+                if(gen->short_circuit_jmps[i].short_circuit_index == this_true)
+                {
+                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
+                    array_remove(gen->short_circuit_jmps, i);
+                }
+            gen->short_circuit_current_true = prev_true;
+
+            Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, flags|EXPR_FLAG_DEREFERENCE);
+            {
+                light_vm_push_fmt(state, "cmp r%db, 1", right.reg);
+                Light_VM_Instruction_Info info2 = light_vm_push(state, "beq 0xffffffff");
+                info2.short_circuit_index = gen->short_circuit_current_false;
+                array_push(gen->short_circuit_jmps, info2);
+            }
+        }
+        else
+        {
+            prev_false = gen->short_circuit_current_false--;
+            this_false = gen->short_circuit_current_false;
+
+            Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags|EXPR_FLAG_DEREFERENCE);
+            {
+                light_vm_push_fmt(state, "cmp r%db, 1", left.reg);
+                Light_VM_Instruction_Info info = light_vm_push(state, "bne 0xffffffff");
+                info.short_circuit_index = gen->short_circuit_current_true;
+                array_push(gen->short_circuit_jmps, info);
+            }
+
+            for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0 ; --i)
+                if(gen->short_circuit_jmps[i].short_circuit_index == this_false)
+                {
+                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
+                    array_remove(gen->short_circuit_jmps, i);
+                }
+            gen->short_circuit_current_false = prev_false;
+
+            Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, flags|EXPR_FLAG_DEREFERENCE);
+            {
+                light_vm_push_fmt(state, "cmp r%db, 1", right.reg);
+                Light_VM_Instruction_Info info2 = light_vm_push(state, "beq 0xffffffff");
+                info2.short_circuit_index = gen->short_circuit_current_false;
+                array_push(gen->short_circuit_jmps, info2);
+            }
+        }
+    }
+    else
     {
         if(expr->expr_binary.op == OP_BINARY_LOGIC_AND)
         {
@@ -750,9 +813,14 @@ lvmgen_expr_unary(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u3
         } break;
         case OP_UNARY_LOGIC_NOT: {
             assert(type_primitive_bool(expr->type));
-            if(gen->short_circuit)
+            if(expr->expr_unary.operand->kind == AST_EXPRESSION_UNARY && expr->expr_unary.operand->expr_unary.op == OP_UNARY_LOGIC_NOT)
             {
-                Unimplemented;
+                result = lvmgen_expr(state, gen, expr->expr_unary.operand->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+            }
+            else if(gen->short_circuit && expr->expr_unary.operand->kind == AST_EXPRESSION_BINARY && 
+                (expr->expr_unary.operand->expr_binary.op == OP_BINARY_LOGIC_AND || expr->expr_unary.operand->expr_binary.op == OP_BINARY_LOGIC_OR))
+            {
+                result = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE|EXPR_FLAG_INVERTED_SHORT_CIRCUIT);
             }
             else
             {

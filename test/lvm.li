@@ -1,10 +1,7 @@
-foo : () -> bool {
-    return (true && false) || (true == true);
-    /*
-    if (true && false) || (true == true) {
+foo : () -> s32 {
+    if !!!(!true || !true) {
         return 12;
     } else {
         return 1;
     }
-    */
 }
