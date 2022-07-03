@@ -1,7 +1,13 @@
 foo : () -> s32 {
-    a : [5]s8 = ['h','e','l','l','o'];
-    MessageBoxA(0, &a[0], &a[0], 0);
+    a := "hello";
+    MessageBoxA(0, "hello".data, a.data, 0);
     return 0;
 }
 
-MessageBoxA:(win : u64, text : ^s8, caption : ^s8, type : u32) -> void #extern("user32");
+string struct {
+    capacity : u32;
+    length   : u32;
+    data     : ^u8;
+}
+
+MessageBoxA:(win : u64, text : ^u8, caption : ^u8, type : u32) -> void #extern("user32");
