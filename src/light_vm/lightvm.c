@@ -932,22 +932,36 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             break;
 
         // Convert
+        case LVM_CVT_U64_R32: 
+            state->f32registers[instr.binary.src_reg] = (u64)state->registers[instr.binary.dst_reg];
+            advance_ip = true;
+            break;
+        case LVM_CVT_U64_R64:
+            state->f64registers[instr.binary.src_reg] = (u64)state->registers[instr.binary.dst_reg];
+            advance_ip = true;
+            break;
         case LVM_CVT_R32_S64:
+            state->registers[instr.binary.dst_reg] = (s64)state->f32registers[instr.binary.src_reg];
+            advance_ip = true;
+            break;
         case LVM_CVT_R32_S32:
             state->registers[instr.binary.dst_reg] = (s32)state->f32registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_S32_R32:
-            state->f32registers[instr.binary.dst_reg] = (r32)state->registers[instr.binary.src_reg];
+            state->f32registers[instr.binary.dst_reg] = (r32)(s32)state->registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_S64_R64:
+            state->f64registers[instr.binary.dst_reg + FR4] = (r64)(s64)state->registers[instr.binary.src_reg];
+            advance_ip = true;
+            break;
         case LVM_CVT_S32_R64:
-            state->f64registers[instr.binary.dst_reg + FR4] = (r64)state->registers[instr.binary.src_reg];
+            state->f64registers[instr.binary.dst_reg + FR4] = (r64)(s32)state->registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_S64_R32:
-            state->f32registers[instr.binary.dst_reg] = (r32)state->registers[instr.binary.src_reg];
+            state->f32registers[instr.binary.dst_reg] = (r32)(s64)state->registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_R32_R64:

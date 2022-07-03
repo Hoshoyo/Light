@@ -206,6 +206,18 @@ print_cvt_instruction(FILE* out, Light_VM_Instruction instr, u64 imm)
 {
     switch(instr.type)
     {
+        case LVM_CVT_U64_R32:
+            fprintf(out, "cvtu64r32 "); 
+            print_float_register(out, instr.binary.dst_reg);
+            fprintf(out, ", ");
+            print_register(out, instr.binary.src_reg, 8);
+            break;
+        case LVM_CVT_U64_R64:
+            fprintf(out, "cvtu64r64 "); 
+            print_float_register(out, instr.binary.dst_reg);
+            fprintf(out, ", ");
+            print_register(out, instr.binary.src_reg, 8);
+            break;
         case LVM_CVT_R32_S32:   
             fprintf(out, "cvtr32s32 "); 
             print_register(out, instr.binary.dst_reg, 4);
@@ -511,7 +523,9 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm) 
 
         case LVM_EXPOP: fprintf(out, "EXPOP"); break;
 
-        // Convert instructions
+        // Convert instructions        
+        case LVM_CVT_U64_R32:
+        case LVM_CVT_U64_R64:
         case LVM_CVT_R32_S32:
         case LVM_CVT_R32_S64:
         case LVM_CVT_S32_R32:

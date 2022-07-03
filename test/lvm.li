@@ -1,7 +1,6 @@
-foo : () -> s32 {
-    a := [1,2,3];
-    //a := hey:{1,2};
-    return a[1];
+foo : () -> r32 {
+    a : s32 = -1;
+    return (a -> u64) -> r32;
 }
 
 hey struct {

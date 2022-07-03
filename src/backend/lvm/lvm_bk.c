@@ -413,6 +413,28 @@ lvmg_deref_auto(Light_VM_State* state, Light_Type* type, LVM_Register ptr_reg)
     return result;
 }
 
+static void
+lvmg_int_to_int_reg(Light_VM_State* state, Light_Type* type, Light_Type* type_to, LVM_Register src, LVM_Register dst)
+{
+    // Upcast/safe, when signed, sign extend
+    if(type_to->size_bits > type->size_bits)
+    {
+        Light_VM_Instruction instr = {
+            .type = LVM_CVT_SEXT,
+            .sext.dst_reg = dst,
+            .sext.src_reg = src,
+            .sext.dst_size = type_to->size_bits / 8,
+            .sext.src_size = type->size_bits / 8
+        };
+        light_vm_push_instruction(state, instr, 0);
+    }
+    // Downcast/unsafe can lose data
+    else if(type_to->size_bits < type->size_bits)
+    {
+        lvmg_truncate_reg(state, type_to, dst);
+    }
+}
+
 static Expr_Result
 lvmgen_expr_literal_primitive(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
@@ -851,6 +873,176 @@ lvmgen_expr_binary_vector_access(Light_VM_State* state, LVM_Generator* gen, Ligh
     return left;
 }
 
+static uint32_t
+size_mask(int size_bits)
+{
+    switch(size_bits)
+    {
+        case 8:  return 0xff;
+        case 16: return 0xffff;
+        case 32: return 0xffffffff;
+        case 64: return 0xffffffffffffffff;
+        default: return 0;
+    }
+}
+
+static Expr_Result
+lvmgen_expr_cast(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+    assert(expr->kind == AST_EXPRESSION_UNARY && expr->expr_unary.op == OP_UNARY_CAST);
+
+    Light_Type* operand_type = type_alias_root(expr->expr_unary.operand->type);
+    Light_Type* cast_type = type_alias_root(expr->expr_unary.type_to_cast);
+
+    if(operand_type->kind == TYPE_KIND_ENUM)
+    {
+        operand_type = operand_type->enumerator.type_hint;
+        if(operand_type == 0)
+            operand_type = type_primitive_get(TYPE_PRIMITIVE_U32);
+    }
+    if(cast_type->kind == TYPE_KIND_ENUM)
+    {
+        cast_type = cast_type->enumerator.type_hint;
+        if(cast_type == 0)
+            cast_type = type_primitive_get(TYPE_PRIMITIVE_U32);
+    }
+
+    Expr_Result result = lvmg_reg_for_type(cast_type);
+
+    if(operand_type != cast_type)
+    {
+        if(cast_type->kind == TYPE_KIND_PRIMITIVE)
+        {
+            switch(cast_type->primitive)
+            {
+                case TYPE_PRIMITIVE_R64:
+                case TYPE_PRIMITIVE_R32: {
+                    if(operand_type->kind == TYPE_KIND_PRIMITIVE)
+                    {
+                        switch(operand_type->primitive)
+                        {
+                            case TYPE_PRIMITIVE_U64: {
+                                Expr_Result r = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+                                light_vm_push_fmt(state, (cast_type->primitive == TYPE_PRIMITIVE_R32) ? "cvtu64r32 fr%d, r%d" : "cvtu64r64 efr%d, r%d", result.freg, r.reg);
+                            } break;
+                            case TYPE_PRIMITIVE_U32:
+                            case TYPE_PRIMITIVE_U16:
+                            case TYPE_PRIMITIVE_U8: {
+                                Expr_Result r = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+                                light_vm_push_fmt(state, "and r0, 0x%x", size_mask(operand_type->size_bits));
+                                light_vm_push_fmt(state, (cast_type->primitive == TYPE_PRIMITIVE_R32) ? "cvts64r32 fr%d, r%d" : "cvts64r64 efr%d, r%d", result.freg, r.reg);
+                            } break;              
+                            case TYPE_PRIMITIVE_S64:
+                            case TYPE_PRIMITIVE_S32:
+                            case TYPE_PRIMITIVE_S16:
+                            case TYPE_PRIMITIVE_S8: {
+                                Expr_Result r = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+                                if((cast_type->primitive == TYPE_PRIMITIVE_R32))
+                                {
+                                    light_vm_push_fmt(state, (cast_type->primitive == TYPE_PRIMITIVE_S64 || cast_type->primitive == TYPE_PRIMITIVE_U64) ? 
+                                        "cvts64r32 fr%d, r%d" : "cvts32r32 fr%d, r%d", result.freg, r.reg);
+                                }
+                                else
+                                {
+                                    light_vm_push_fmt(state, (cast_type->primitive == TYPE_PRIMITIVE_S64 || cast_type->primitive == TYPE_PRIMITIVE_U64) ? 
+                                        "cvts64r64 fr%d, r%d" : "cvts32r64 fr%d, r%d", result.freg, r.reg);
+                                }
+                            } break;
+                            case TYPE_PRIMITIVE_R32: {
+                                if(cast_type->primitive == TYPE_PRIMITIVE_R64)
+                                {
+                                    Expr_Result r = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+                                    light_vm_push_fmt(state, "cvtr32r64 efr%d, fr%d", result.efreg, r.freg);
+                                }
+                            } break;
+                            case TYPE_PRIMITIVE_R64: {
+                                if(cast_type->primitive == TYPE_PRIMITIVE_R32)
+                                {
+                                    Expr_Result r = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+                                    light_vm_push_fmt(state, "cvtr64r32 fr%d, efr%d", result.freg, r.efreg);
+                                }
+                            } break;
+                            default: Unreachable;
+                        }
+                    }
+                    else
+                    {
+                        // Cannot cast types other than integer types to floating point
+                        Unreachable;
+                    }
+                } break;
+                case TYPE_PRIMITIVE_BOOL:
+                case TYPE_PRIMITIVE_U8:
+                case TYPE_PRIMITIVE_U16:
+                case TYPE_PRIMITIVE_U32:
+                case TYPE_PRIMITIVE_U64:
+                case TYPE_PRIMITIVE_S8:
+                case TYPE_PRIMITIVE_S16:
+                case TYPE_PRIMITIVE_S32:
+                case TYPE_PRIMITIVE_S64: {
+                    if(operand_type->kind == TYPE_KIND_PRIMITIVE)
+                    {
+                        switch(operand_type->primitive)
+                        {   
+                            case TYPE_PRIMITIVE_BOOL:
+                            case TYPE_PRIMITIVE_U64:    // possible data loss
+                            case TYPE_PRIMITIVE_U32:
+                            case TYPE_PRIMITIVE_U16:
+                            case TYPE_PRIMITIVE_U8:                 
+                            case TYPE_PRIMITIVE_S64:    // possible data loss
+                            case TYPE_PRIMITIVE_S32:
+                            case TYPE_PRIMITIVE_S16:
+                            case TYPE_PRIMITIVE_S8: {
+                                Expr_Result r = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+                                lvmg_int_to_int_reg(state, operand_type, cast_type, r.reg, result.reg);
+                            } break;
+                            case TYPE_PRIMITIVE_R32:{
+                                // R32 -> S32/S64
+                                Expr_Result r = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+                                assert(r.type == EXPR_RESULT_F32_REG);
+                                light_vm_push_fmt(state, (cast_type->primitive == TYPE_PRIMITIVE_S64 || cast_type->primitive == TYPE_PRIMITIVE_U64) ? 
+                                    "cvtr32s64 r%d, fr%d" : "cvtr32s32 r%d, fr%d", result.reg, r.freg);
+                                lvmg_truncate_reg(state, cast_type, result.reg);
+                            } break;
+                            case TYPE_PRIMITIVE_R64: {
+                                // R64 -> S32/S64
+                                Expr_Result r = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+                                assert(r.type == EXPR_RESULT_F64_REG);
+                                light_vm_push_fmt(state, (cast_type->primitive == TYPE_PRIMITIVE_S64 || cast_type->primitive == TYPE_PRIMITIVE_U64) ?
+                                    "cvtr32s64 r%d, efr%d" : "cvtr32s32 r%d, efr%d", result.reg, r.efreg);
+                                lvmg_truncate_reg(state, cast_type, result.reg);
+                            } break;
+                            default: Unreachable;
+                        }
+                    }
+                    else if (operand_type->kind == TYPE_KIND_POINTER)
+                    {
+                        // ptr -> int
+                        Expr_Result r = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+                        lvmg_int_to_int_reg(state, operand_type, cast_type, r.reg, result.reg);
+                    }
+                    else
+                    {
+                        Unreachable;
+                    }
+                }break;
+                default: Unreachable;
+            }
+        }
+        else if (cast_type->kind == TYPE_KIND_POINTER)
+        {
+            // int -> ptr this is a no-op.
+            return lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+        }
+    }
+    else
+    {
+        return lvmgen_expr(state, gen, expr->expr_unary.operand, flags);
+    }
+
+    return result;
+}
+
 static Expr_Result
 lvmgen_expr_binary(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
@@ -936,7 +1128,7 @@ lvmgen_expr_unary(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u3
             light_vm_push_instruction(state, instr, 0);
         } break;
         case OP_UNARY_CAST: {
-            Unimplemented;
+            result = lvmgen_expr_cast(state, gen, expr, flags);
         } break;
         case OP_UNARY_ADDRESSOF: {
             if(expr->expr_unary.operand->kind == AST_EXPRESSION_UNARY && expr->expr_unary.operand->expr_unary.op == OP_UNARY_DEREFERENCE)

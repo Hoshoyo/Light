@@ -204,6 +204,10 @@ instruction_type(const char** at) {
         type = LVM_CVT_R32_R64;
     } else if(start_with("cvtr64r32", *at, &count)) {
         type = LVM_CVT_R64_R32;
+    } else if(start_with("cvtu64r32", *at, &count)) {
+        type = LVM_CVT_U64_R32;
+    } else if(start_with("cvtu64r64", *at, &count)) {
+        type = LVM_CVT_U64_R64;
     } else if(start_with("cvtsext", *at, &count)) {
         type = LVM_CVT_SEXT;
     } else if(start_with("beq", *at, &count)) {
@@ -523,6 +527,8 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
             instruction.binary.src_reg = get_float_register(&at, &is64bit);
             assert(!is64bit);
         } break;
+        case LVM_CVT_U64_R64: 
+        case LVM_CVT_U64_R32: 
         case LVM_CVT_S64_R32: 
         case LVM_CVT_S64_R64: 
         case LVM_CVT_S32_R64:  
@@ -531,7 +537,8 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
             instruction.binary.dst_reg = get_float_register(&at, &is64bit);
             eat_whitespace(&at); EAT_COMMA; eat_whitespace(&at);
             instruction.binary.src_reg = get_register(&at, 0);
-            assert((is64bit && LVM_CVT_S64_R64) || (is64bit && LVM_CVT_S32_R64) || (!is64bit && LVM_CVT_S64_R32) || (!is64bit && LVM_CVT_S32_R32));
+            assert((is64bit && LVM_CVT_S64_R64) || (is64bit && LVM_CVT_S32_R64) || (!is64bit && LVM_CVT_S64_R32) || (!is64bit && LVM_CVT_S32_R32) ||
+                (is64bit && LVM_CVT_U64_R64) || (!is64bit && LVM_CVT_U64_R32));
         } break;
         case LVM_CVT_R32_R64: 
         case LVM_CVT_R64_R32: {
