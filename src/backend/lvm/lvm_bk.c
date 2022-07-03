@@ -394,6 +394,24 @@ lvmg_deref(Light_VM_State* state, Expr_Result rvalue, Location location)
 }
 
 static Expr_Result
+lvmg_deref_auto(Light_VM_State* state, Light_Type* type, LVM_Register ptr_reg)
+{
+    Expr_Result result = {
+        .reg = ptr_reg,
+        .size_bytes = LVM_PTRSIZE,
+        .type = EXPR_RESULT_REG,
+    };
+    type = type_alias_root(type);
+    if(type->kind == TYPE_KIND_PRIMITIVE || type->kind == TYPE_KIND_POINTER)
+    {
+        Expr_Result r = lvmg_reg_for_type(type);
+        lvmg_deref(state, r, (Location){.base = ptr_reg, .offset = 0});
+        return r;
+    }
+    return result;
+}
+
+static Expr_Result
 lvmgen_expr_literal_primitive(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
     Expr_Result result = {0};
@@ -825,16 +843,10 @@ lvmgen_expr_binary_vector_access(Light_VM_State* state, LVM_Generator* gen, Ligh
 
     if (flags & EXPR_FLAG_DEREFERENCE)
     {
-        if((expr->type->size_bits / BITS_IN_BYTE) <= LVM_PTRSIZE)
-        {
-            Expr_Result r = lvmg_reg_for_type(expr->type);
-            lvmg_deref(state, r, (Location){.base = left.reg, .offset = 0});
-            return r;
-        }
-        return left;
+        return lvmg_deref_auto(state, expr->type, left.reg);
     }
-    else 
-        return left;
+
+    return left;
 }
 
 static Expr_Result
@@ -1072,11 +1084,47 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
     return lvmg_reg_for_type(expr->type);
 }
 
-
+// Given an integer register and a dot field accessing expression of a struct or union
+// retreives the address of that struct's data in memory in the register.
+// Performs dereferencing in case the left side of the expression is a pointer type.
+// Example: value.x
 static Expr_Result
 lvmgen_expr_dot(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
+    Light_Type* left_type = type_alias_root(expr->expr_dot.left->type);
+    u32 f = (flags & ~EXPR_FLAG_DEREFERENCE) | ((left_type->kind == TYPE_KIND_POINTER) ? EXPR_FLAG_DEREFERENCE : 0);
+    Expr_Result res = lvmgen_expr(state, gen, expr->expr_dot.left, f);
 
+    if(left_type->kind == TYPE_KIND_POINTER)
+    {
+        if(type_alias_root(left_type->pointer_to)->kind == TYPE_KIND_STRUCT)
+        {
+            s64 offset = type_struct_field_offset_bits(left_type->pointer_to, expr->expr_dot.identifier->data) / BITS_IN_BYTE;
+            light_vm_push_fmt(state, "adds r%d, %d", res.reg, (s32)offset);
+        }
+        else
+        {
+            // Offset of an union is always 0, therefore no need to add anything
+            assert(type_alias_root(left_type->pointer_to)->kind == TYPE_KIND_UNION);
+        }
+    }
+    else if(left_type->kind == TYPE_KIND_STRUCT)
+    {
+        s64 offset = type_struct_field_offset_bits(expr->expr_dot.left->type, expr->expr_dot.identifier->data) / BITS_IN_BYTE;
+        light_vm_push_fmt(state, "adds r%d, %d", res.reg, (s32)offset);
+    }
+    else
+    {
+        // Offset of an union is always 0, therefore no need to add anything
+        assert(left_type->kind == TYPE_KIND_UNION);
+    }
+
+    if (flags & EXPR_FLAG_DEREFERENCE)
+    {
+        return lvmg_deref_auto(state, expr->type, res.reg);
+    }
+
+    return res;
 }
 
 static Expr_Result
@@ -1090,7 +1138,7 @@ lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flag
         case AST_EXPRESSION_UNARY:             result = lvmgen_expr_unary(state, gen, expr, flags); break;
         case AST_EXPRESSION_VARIABLE:          result = lvmgen_expr_variable(state, gen, expr, flags); break;
         case AST_EXPRESSION_PROCEDURE_CALL:    result = lvmgen_expr_proc_call(state, gen, expr, flags); break;
-        case AST_EXPRESSION_DOT:               //result = lvmgen_expr_dot(state, gen, expr, flags); break;
+        case AST_EXPRESSION_DOT:               result = lvmgen_expr_dot(state, gen, expr, flags); break;
         case AST_EXPRESSION_LITERAL_ARRAY:
         case AST_EXPRESSION_LITERAL_STRUCT:
             light_vm_push(state, "mov r0, 1");
