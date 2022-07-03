@@ -1,34 +1,7 @@
-foo : () -> r32 {
-    a : s32 = -1;
-    return (a -> u64) -> r32;
+foo : () -> s32 {
+    a : [5]s8 = ['h','e','l','l','o'];
+    MessageBoxA(0, &a[0], &a[0], 0);
+    return 0;
 }
 
-hey struct {
-    a : s32;
-    b : s32;
-}
-
-/*
-factorial: (v : s32) -> s32 {
-    if v == 1 return 1;
-    return v * factorial(v - 1);
-}
-
-factorial2: (v : s32) -> s32 {
-    r := 1;
-    for i := 1; i <= v; i += 1 {
-        r *= i;
-    }
-    return r;
-}
-
-
-
-r0 = 16
-r1 = rbp-0x40+16
-r2 = 16
-
-
-
-33
-*/
+MessageBoxA:(win : u64, text : ^s8, caption : ^s8, type : u32) -> void #extern("user32");

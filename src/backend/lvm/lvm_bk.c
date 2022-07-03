@@ -3,6 +3,26 @@
 #include "../../type.h"
 #include <assert.h>
 #include <light_array.h>
+#include "../../../include/hoht.h"
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#endif
+
+typedef struct {
+    const char* symbol;
+    int         symbol_length;
+    void*       proc_address;
+} External_Symbol;
+
+typedef struct {
+    const char* name;
+    int         name_length;
+    Hoht_Table  symbols;
+
+#if defined(_WIN32) || defined(_WIN64)
+    HANDLE lib_handle;
+#endif
+} External_Lib;
 
 #define BITS_IN_BYTE 8
 #define LVM_RETURN_REGISTER R0
@@ -35,6 +55,8 @@ typedef struct {
     Light_VM_Instruction_Info*    proc_bases;
     Light_VM_Instruction_Info*    loop_breaks;
     Light_VM_Instruction_Info*    loop_continue;
+
+    Hoht_Table external_table;
 } LVM_Generator;
 
 // Used to calculate the stack size and current offset
@@ -1166,7 +1188,7 @@ lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr,
     Light_Ast* decl = expr->expr_variable.decl;
     if(decl->decl_variable.storage_class == STORAGE_CLASS_STACK)
     {
-        if((flags & EXPR_FLAG_DEREFERENCE) && (expr->type->size_bits <= (LVM_PTRSIZE * BITS_IN_BYTE)))
+        if((flags & EXPR_FLAG_DEREFERENCE) && (expr->type->kind == TYPE_KIND_PRIMITIVE || expr->type->kind == TYPE_KIND_POINTER))
         {
             if(type_primitive_float(expr->type))
             {
@@ -1235,12 +1257,81 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
 
     if(expr->expr_proc_call.caller_expr->type->function.flags & TYPE_FUNCTION_STDCALL)
     {
-        //Unimplemented;
-        light_vm_push(state, "mov r1, 1");
-        light_vm_push(state, "expushi r1");
-        //light_vm_push_fmt(state, "mov r2, 0x%llx", (void*)dostuff);
-        light_vm_push(state, "extcall r2");
-        light_vm_push(state, "expop");
+        #if 0
+        //light_vm_push(state, "mov r1, 0");
+        //light_vm_push(state, "expushi r1");
+        //light_vm_push_fmt(state, "mov r2, 0x%llx", (void*)MessageBoxA);
+        //light_vm_push(state, "extcall r2");
+        //light_vm_push(state, "expop");
+        #else
+        if(expr->expr_proc_call.caller_expr->kind == AST_EXPRESSION_VARIABLE)
+        {
+            Light_Ast* decl = expr->expr_proc_call.caller_expr->expr_variable.decl;
+            assert(decl->kind == AST_DECL_PROCEDURE);
+
+            Light_Token* token = decl->decl_proc.extern_library_name;
+
+            u64 lib_hash = fnv_1_hash(token->raw_data, token->raw_data_length);
+            External_Lib* lib = hoht_get_value_hashed(&gen->external_table, lib_hash);
+            if(!lib)
+            {
+                void* lname = calloc(1, token->raw_data_length + 1);
+                memcpy(lname, token->raw_data, token->raw_data_length);
+                External_Lib nlib = {
+                    .name = token->raw_data,
+                    .name_length = token->raw_data_length,
+                    #if defined(_WIN32) || defined(_WIN64)
+                    .lib_handle = LoadLibraryA(lname)
+                    #endif
+                };
+                free(lname);
+                hoht_new(&nlib.symbols, 32, sizeof(External_Symbol), 0.5f, malloc, free);
+                int idx = hoht_push_hashed(&gen->external_table, lib_hash, &nlib);
+                lib = hoht_get_value_from_index(&gen->external_table, idx);
+            }
+
+            u64 symbol_hash = fnv_1_hash(decl->decl_proc.name->data, decl->decl_proc.name->length);
+            External_Symbol* symbol = hoht_get_value_hashed(&lib->symbols, symbol_hash);
+            if(!symbol)
+            {
+                void* s = calloc(1, decl->decl_proc.name->length + 1);
+                memcpy(s, decl->decl_proc.name->data, decl->decl_proc.name->length);
+                External_Symbol sym = {
+                    .symbol = decl->decl_proc.name->data,
+                    .symbol_length = decl->decl_proc.name->length,
+                    #if defined(_WIN32) || defined(_WIN64)
+                    .proc_address = GetProcAddress(lib->lib_handle, s),
+                    #endif
+                };
+                free(s);
+                int idx = hoht_push_hashed(&lib->symbols, symbol_hash, &sym);
+                symbol = hoht_get_value_from_index(&lib->symbols, idx);
+            }
+            
+            s32 arg_size = 0;
+            for(int i = 0; i < expr->expr_proc_call.arg_count; ++i)
+            {
+                Light_Ast* arg = expr->expr_proc_call.args[i];
+                Expr_Result res = lvmgen_expr(state, gen, arg, EXPR_FLAG_DEREFERENCE);
+                if(res.type == EXPR_RESULT_REG)
+                    light_vm_push_fmt(state, "expushi r%d", res.reg);
+                else if(res.type == EXPR_RESULT_F32_REG)
+                    light_vm_push_fmt(state, "expushf fr%d", res.freg);
+                else if(res.type == EXPR_RESULT_F64_REG)
+                    light_vm_push_fmt(state, "expushf efr%d", res.efreg);
+            }
+            
+            light_vm_push_fmt(state, "mov r2, 0x%llx", symbol->proc_address);
+            light_vm_push(state, "extcall r2");
+
+            for(int i = expr->expr_proc_call.arg_count-1; i >= 0; --i)
+                light_vm_push(state, "expop");
+        }
+        else
+        {
+            Unimplemented;
+        }
+        #endif
     }
     else
     {
@@ -1762,6 +1853,12 @@ lvmgen_proc_decl(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
 }
 
 void
+lvm_init_symbols(LVM_Generator* gen)
+{
+    hoht_new(&gen->external_table, 512, sizeof(External_Lib), 0.5f, malloc, free);
+}
+
+void
 lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
 {
     // -------------------------------------
@@ -1774,6 +1871,8 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     gen.loop_breaks        = array_new(Light_VM_Instruction_Info);
     gen.loop_continue      = array_new(Light_VM_Instruction_Info);
     gen.proc_patch_calls   = array_new(Patch_Procs);
+
+    lvm_init_symbols(&gen);
 
     // -------------------------------------
     // Generate the code
