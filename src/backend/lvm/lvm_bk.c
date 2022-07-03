@@ -189,6 +189,28 @@ lvmg_push_result(Light_VM_State* state, Expr_Result r)
     }
 }
 
+static void
+lvmg_truncate_reg(Light_VM_State* state, Light_Type* type, LVM_Register reg)
+{
+    switch(type->primitive)
+    {
+        case TYPE_PRIMITIVE_S32:
+        case TYPE_PRIMITIVE_U32:
+            light_vm_push_fmt(state, "and r%d, 0xffffffff", reg);
+            break;
+        case TYPE_PRIMITIVE_S16:
+        case TYPE_PRIMITIVE_U16:
+            light_vm_push_fmt(state, "and r%d, 0xffff", reg);
+            break;
+        case TYPE_PRIMITIVE_BOOL:
+        case TYPE_PRIMITIVE_S8:
+        case TYPE_PRIMITIVE_U8:
+            light_vm_push_fmt(state, "and r%d, 0xff", reg);
+            break;
+        default: break;
+    }
+}
+
 static Expr_Result
 lvmg_next(Expr_Result r)
 {
@@ -216,6 +238,33 @@ lvmg_pop_next(Light_VM_State* state, Expr_Result r, Expr_Result* out)
         } break;
         default: Unreachable;
     }
+}
+
+LVM_Register
+lvmg_reg_new(Expr_Result r1, Expr_Result r2)
+{
+    assert(r1.type == r2.type);
+    if(r1.type == EXPR_RESULT_REG)
+    {
+        for(LVM_Register r = R0; r <= R7; ++r)
+            if(r != r1.reg && r != r2.reg)
+                return r;
+    }
+    else if(r1.type == EXPR_RESULT_F32_REG)
+    {
+        for(LVM_F32_Register r = FR0; r <= FR7; ++r)
+            if(r != r1.reg && r != r2.reg)
+                return r;
+    }
+    else if(r1.type == EXPR_RESULT_F64_REG)
+    {
+        for(LVM_F64_Register r = EFR0; r <= EFR7; ++r)
+            if(r != r1.reg && r != r2.reg)
+                return r;
+    }
+
+    Unreachable;
+    return R0;
 }
 
 static Expr_Result
@@ -753,6 +802,42 @@ lvmgen_expr_binary_logical(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
 }
 
 static Expr_Result
+lvmgen_expr_binary_vector_access(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+    assert(expr->kind == AST_EXPRESSION_BINARY);
+    assert(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS);
+    Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags|EXPR_FLAG_DEREFERENCE);
+    lvmg_push_result(state, left);
+
+    Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, flags|EXPR_FLAG_DEREFERENCE);
+    lvmg_truncate_reg(state, expr->expr_binary.right->type, right.reg);
+
+    lvmg_pop_next(state, right, &left);
+
+    if(expr->type->size_bits > BITS_IN_BYTE)
+    {
+        LVM_Register idx = lvmg_reg_new(left, right);
+        light_vm_push_fmt(state, "xor r%d, r%d", idx, idx);
+        light_vm_push_fmt(state, "mov r%d, %d", idx, expr->type->size_bits / BITS_IN_BYTE);
+        light_vm_push_fmt(state, "mulu r%d, r%d", right.reg, idx);
+    }
+    light_vm_push_fmt(state, "addu r%d, r%d", left.reg, right.reg);
+
+    if (flags & EXPR_FLAG_DEREFERENCE)
+    {
+        if((expr->type->size_bits / BITS_IN_BYTE) <= LVM_PTRSIZE)
+        {
+            Expr_Result r = lvmg_reg_for_type(expr->type);
+            lvmg_deref(state, r, (Location){.base = left.reg, .offset = 0});
+            return r;
+        }
+        return left;
+    }
+    else 
+        return left;
+}
+
+static Expr_Result
 lvmgen_expr_binary(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
     assert(expr->kind == AST_EXPRESSION_BINARY);
@@ -788,7 +873,8 @@ lvmgen_expr_binary(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u
             break;
 
         case OP_BINARY_VECTOR_ACCESS:
-            Unimplemented;
+            result = lvmgen_expr_binary_vector_access(state, gen, expr, flags);
+            break;
 
         default: Unreachable;
     }
@@ -937,6 +1023,63 @@ lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr,
 }
 
 static Expr_Result
+lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+    assert(expr->kind == AST_EXPRESSION_PROCEDURE_CALL);
+
+    if(expr->expr_proc_call.caller_expr->type->function.flags & TYPE_FUNCTION_STDCALL)
+    {
+        //Unimplemented;
+        light_vm_push(state, "mov r1, 1");
+        light_vm_push(state, "expushi r1");
+        //light_vm_push_fmt(state, "mov r2, 0x%llx", (void*)dostuff);
+        light_vm_push(state, "extcall r2");
+        light_vm_push(state, "expop");
+    }
+    else
+    {
+        s32 arg_size = 0;
+        for(int i = expr->expr_proc_call.arg_count-1; i >= 0; --i)
+        {
+            Light_Ast* arg = expr->expr_proc_call.args[i];
+            Expr_Result res = lvmgen_expr(state, gen, arg, EXPR_FLAG_DEREFERENCE);
+            lvmg_push_result(state, res);
+            arg_size += LVM_PTRSIZE;
+        }
+        
+        // Evaluate and generate the call instruction
+        Light_Ast* caller = expr->expr_proc_call.caller_expr;
+        if(caller->kind == AST_EXPRESSION_VARIABLE && caller->expr_variable.decl->kind == AST_DECL_PROCEDURE)
+        {
+            Light_VM_Instruction_Info call_instr = light_vm_push(state, "call 0xffffffff");
+            Patch_Procs pp = {
+                .from = call_instr,
+                .to_decl = caller->expr_variable.decl
+            };
+            array_push(gen->proc_patch_calls, pp);
+        }
+        else
+        {
+            Expr_Result r = lvmgen_expr(state, gen, expr->expr_proc_call.caller_expr, EXPR_FLAG_DEREFERENCE);
+            assert(r.type == EXPR_RESULT_REG);
+            light_vm_push_fmt(state, "call r%d", r.reg);
+        }
+
+        // restore the arguments space
+        light_vm_push_fmt(state, "adds rsp, %d", arg_size);
+    }
+
+    return lvmg_reg_for_type(expr->type);
+}
+
+
+static Expr_Result
+lvmgen_expr_dot(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+
+}
+
+static Expr_Result
 lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
     Expr_Result result = {0};
@@ -946,8 +1089,8 @@ lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flag
         case AST_EXPRESSION_BINARY:            result = lvmgen_expr_binary(state, gen, expr, flags); break;
         case AST_EXPRESSION_UNARY:             result = lvmgen_expr_unary(state, gen, expr, flags); break;
         case AST_EXPRESSION_VARIABLE:          result = lvmgen_expr_variable(state, gen, expr, flags); break;
-        case AST_EXPRESSION_PROCEDURE_CALL:
-        case AST_EXPRESSION_DOT:
+        case AST_EXPRESSION_PROCEDURE_CALL:    result = lvmgen_expr_proc_call(state, gen, expr, flags); break;
+        case AST_EXPRESSION_DOT:               //result = lvmgen_expr_dot(state, gen, expr, flags); break;
         case AST_EXPRESSION_LITERAL_ARRAY:
         case AST_EXPRESSION_LITERAL_STRUCT:
             light_vm_push(state, "mov r0, 1");
@@ -993,7 +1136,7 @@ lvmgen_comm_assignment(Light_VM_State* state, LVM_Generator* gen, Light_Ast* com
         lvmg_push_result(state, right_res);
         Expr_Result left_res = lvmgen_expr(state, gen, comm->comm_assignment.lvalue, EXPR_FLAG_ASSIGNMENT_ROOT);
         assert(left_res.type == EXPR_RESULT_REG);
-        lvmg_pop_next(state, right_res, &right_res);
+        lvmg_pop_next(state, left_res, &right_res);
 
         lvmg_copy(state, right_res, (Location){.base = left_res.reg, .offset = 0});
     }
@@ -1329,7 +1472,7 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
         if(ast[i]->kind == AST_DECL_PROCEDURE)
             lvmgen_proc_decl(state, &gen, ast[i]);
     }
-    
+
     light_vm_push(state, "ret");
 
     // -------------------------------------
