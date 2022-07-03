@@ -131,6 +131,7 @@ print_binary_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
         case BIN_ADDR_MODE_REG_TO_MEM_OFFSETED:{
             fprintf(out, "[");
             print_register(out, instr.binary.dst_reg, 8);
+            fprintf(out, " + ");
             print_immediate_signed(out, instr.imm_size_bytes, immediate);
             fprintf(out, "], ");
             print_register(out, instr.binary.src_reg, instr.binary.bytesize);
@@ -139,6 +140,7 @@ print_binary_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
             print_register(out, instr.binary.dst_reg, instr.binary.bytesize);
             fprintf(out, ", [");
             print_register(out, instr.binary.src_reg, 8);
+            fprintf(out, " + ");
             print_immediate_signed(out, instr.imm_size_bytes, immediate);
             fprintf(out, "]");
         }break;

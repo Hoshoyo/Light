@@ -293,18 +293,20 @@ lvmg_reg_for_type(Light_Type* type)
 }
 
 static void
-lvmg_copy(Light_VM_State* state, Expr_Result rvalue, Location location)
+lvmg_copy(Light_VM_State* state, Expr_Result rvalue, Location location, Light_Type* rvaltype)
 {
+    rvaltype = type_alias_root(rvaltype);
+    
     if(rvalue.type == EXPR_RESULT_REG)
     {
-        if(rvalue.size_bytes <= 8)
+        if(rvaltype->kind == TYPE_KIND_PRIMITIVE || rvaltype->kind == TYPE_KIND_POINTER)
         {
             if(location.offset < 0)
                 light_vm_push_fmt(state, "mov [r%d %s %d], r%d%s", 
-                    location.base, "-", -location.offset, rvalue.reg, register_size_suffix(rvalue.size_bytes));
+                    location.base, "-", -location.offset, rvalue.reg, register_size_suffix(rvaltype->size_bits / BITS_IN_BYTE));
             else
                 light_vm_push_fmt(state, "mov [r%d %s %d], r%d%s", 
-                    location.base, "+", location.offset, rvalue.reg, register_size_suffix(rvalue.size_bytes));
+                    location.base, "+", location.offset, rvalue.reg, register_size_suffix(rvaltype->size_bits / BITS_IN_BYTE));
         }
         else
         {
@@ -318,7 +320,7 @@ lvmg_copy(Light_VM_State* state, Expr_Result rvalue, Location location)
             else
                 light_vm_push_fmt(state, "adds r%d, %d", dst, location.offset);
 
-            light_vm_push_fmt(state, "mov r7, %lld", rvalue.size_bytes);
+            light_vm_push_fmt(state, "mov r7, %lld", rvaltype->size_bits / BITS_IN_BYTE);
             light_vm_push_fmt(state, "copy r%d, r%d, r7", dst, rvalue.reg);
 
             if(rvalue.temp_release_size_bytes > 0)
@@ -1128,6 +1130,80 @@ lvmgen_expr_dot(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 
 }
 
 static Expr_Result
+lvmgen_expr_literal_array(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+    assert(expr->kind == AST_EXPRESSION_LITERAL_ARRAY);
+
+    light_vm_push_fmt(state, "subs rsp, %d", expr->type->size_bits / BITS_IN_BYTE);
+    light_vm_push(state, "push rsp");
+
+    int64_t off = 0;
+    for(int i = 0; i < array_length(expr->expr_literal_array.array_exprs); ++i)
+    {
+        Light_Ast* inexpr = expr->expr_literal_array.array_exprs[i];
+        Light_Type* type = type_alias_root(inexpr->type);
+        Expr_Result r = lvmgen_expr(state, gen, inexpr, flags|EXPR_FLAG_DEREFERENCE);
+        LVM_Register aux = lvmg_reg_new(r, r);
+
+        light_vm_push_fmt(state, "mov r%d, rsp", aux);
+        lvmg_copy(state, r, (Location){.base = aux, .offset = off + LVM_PTRSIZE + r.temp_release_size_bytes }, inexpr->type);
+
+        off += type->size_bits / BITS_IN_BYTE;
+    }
+
+    Expr_Result result = {
+        .reg = R0,
+        .size_bytes = LVM_PTRSIZE,
+        .type = EXPR_RESULT_REG,
+        .temp_release_size_bytes = expr->type->size_bits / BITS_IN_BYTE,
+    };
+    // Address of the literal temporary
+    light_vm_push_fmt(state, "pop r%d", result.reg);
+
+    return result;
+}
+
+static Expr_Result
+lvmgen_expr_literal_struct(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+    assert(expr->kind == AST_EXPRESSION_LITERAL_STRUCT);
+
+    light_vm_push_fmt(state, "subs rsp, %d", expr->type->size_bits / BITS_IN_BYTE);
+    light_vm_push(state, "push rsp");
+
+    if(!expr->expr_literal_struct.named)
+    {
+        Light_Type* type = type_alias_root(expr->type);
+        for(int i = 0; i < type->struct_info.fields_count; ++i)
+        {
+            Light_Ast* inexpr = expr->expr_literal_struct.struct_exprs[i];
+            Expr_Result r = lvmgen_expr(state, gen, inexpr, flags|EXPR_FLAG_DEREFERENCE);
+
+            int64_t off = type->struct_info.offset_bits[i] / BITS_IN_BYTE;
+            LVM_Register aux = lvmg_reg_new(r, r);
+            light_vm_push_fmt(state, "mov r%d, rsp", aux);
+
+            lvmg_copy(state, r, (Location){.base = aux, .offset = off + LVM_PTRSIZE + r.temp_release_size_bytes }, inexpr->type);
+        }
+    }
+    else
+    {
+        Unimplemented;
+    }
+
+    Expr_Result result = {
+        .reg = R0,
+        .size_bytes = LVM_PTRSIZE,
+        .type = EXPR_RESULT_REG,
+        .temp_release_size_bytes = expr->type->size_bits / BITS_IN_BYTE,
+    };
+    // Address of the literal temporary
+    light_vm_push_fmt(state, "pop r%d", result.reg);
+
+    return result;
+}
+
+static Expr_Result
 lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
     Expr_Result result = {0};
@@ -1139,10 +1215,8 @@ lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flag
         case AST_EXPRESSION_VARIABLE:          result = lvmgen_expr_variable(state, gen, expr, flags); break;
         case AST_EXPRESSION_PROCEDURE_CALL:    result = lvmgen_expr_proc_call(state, gen, expr, flags); break;
         case AST_EXPRESSION_DOT:               result = lvmgen_expr_dot(state, gen, expr, flags); break;
-        case AST_EXPRESSION_LITERAL_ARRAY:
-        case AST_EXPRESSION_LITERAL_STRUCT:
-            light_vm_push(state, "mov r0, 1");
-            break;
+        case AST_EXPRESSION_LITERAL_ARRAY:     result = lvmgen_expr_literal_array(state, gen, expr, flags); break;
+        case AST_EXPRESSION_LITERAL_STRUCT:    result = lvmgen_expr_literal_struct(state, gen, expr, flags); break;
         default: Unreachable;
     }
     return result;
@@ -1164,7 +1238,7 @@ lvmgen_decl_variable(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stac
             Expr_Result right_res = lvmgen_expr(state, gen, decl->decl_variable.assignment, EXPR_FLAG_DEREFERENCE);
             if(decl->decl_variable.storage_class == STORAGE_CLASS_STACK)
             {
-                lvmg_copy(state, right_res, (Location){ .base = LRBP, .offset = decl->decl_variable.stack_offset});
+                lvmg_copy(state, right_res, (Location){ .base = LRBP, .offset = decl->decl_variable.stack_offset}, decl->decl_variable.type);
             }
             else
             {
@@ -1186,7 +1260,7 @@ lvmgen_comm_assignment(Light_VM_State* state, LVM_Generator* gen, Light_Ast* com
         assert(left_res.type == EXPR_RESULT_REG);
         lvmg_pop_next(state, left_res, &right_res);
 
-        lvmg_copy(state, right_res, (Location){.base = left_res.reg, .offset = 0});
+        lvmg_copy(state, right_res, (Location){.base = left_res.reg, .offset = 0}, comm->comm_assignment.lvalue->type);
     }
 }
 
