@@ -39,14 +39,14 @@ lvm_ext_call proc
 
     ; preserve registers
     sub rsp, 64
-    mov [rsp], r8
-    mov [rsp + 8], rdi
-    mov [rsp + 16], rsi
-    mov [rsp + 24], r15
-    mov [rsp + 32], r14
-    mov [rsp + 40], r13
-    mov [rsp + 48], r12
-    mov [rsp + 56], rbx
+    mov [rbp - 64], r8
+    mov [rbp - 56], rdi
+    mov [rbp - 48], rsi
+    mov [rbp - 40], r15
+    mov [rbp - 32], r14
+    mov [rbp - 24], r13
+    mov [rbp - 16], r12
+    mov [rbp - 8], rbx
 
     mov r10, rdx        ; r10 = funcptr
 
@@ -167,6 +167,7 @@ end_reg_args:
     and r15, 1   ; r15 = count % 2
     shl r15, 3   ; 1 * 8 or 0 * 8
     sub rsp, r15 ; stack must be 16 byte aligned, so if odd number of pushed arguments, adjust.
+    mov rdi, r15
 
 pushing_args_to_stack:
     mov r15d, r11d
@@ -202,17 +203,16 @@ push_float:
 no_more_args:
     sub rsp, 32 ; 32 bytes of shadow space
     call r10
-    add rsp, 32
 
     ; restore registers saved
-    mov r8, [rsp]
-    mov rsi, [rsp + 8]
-    mov rdi, [rsp + 16]
-    mov r15, [rsp + 24]
-    mov r14, [rsp + 32]
-    mov r13, [rsp + 40]
-    mov r12, [rsp + 48]
-    mov rbx, [rsp + 56]
+    mov r8,  [rbp - 64]
+    mov rsi, [rbp - 56]
+    mov rdi, [rbp - 48]
+    mov r15, [rbp - 40]
+    mov r14, [rbp - 32]
+    mov r13, [rbp - 24]
+    mov r12, [rbp - 16]
+    mov rbx, [rbp - 8]
 
     movdqa xmmword ptr[r8], xmm0
 

@@ -1,6 +1,9 @@
 foo : () -> s32 {
-    a := "hello";
-    MessageBoxA(0, "hello".data, a.data, 0);
+    //MessageBoxA(0, "hello\0".data, "world\0".data, 0);
+    v := "hello\n";
+    written : u32;
+    h := GetStdHandle(-11 -> u32);
+    WriteConsoleA(h, v.data, v.length, &written, 0);
     return 0;
 }
 
@@ -11,3 +14,5 @@ string struct {
 }
 
 MessageBoxA:(win : u64, text : ^u8, caption : ^u8, type : u32) -> void #extern("user32");
+WriteConsoleA:(handle: ^void, data: ^u8, length : u32, written : ^u32, reserved : u64) -> bool #extern("kernel32");
+GetStdHandle:(h : u32) -> ^void #extern("kernel32");

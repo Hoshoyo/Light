@@ -39,12 +39,12 @@ lvm_ext_call:
 
     ; preserve registers
     sub rsp, 48
-    mov [rsp], rdx
-    mov [rsp + 8], r15
-    mov [rsp + 16], r14
-    mov [rsp + 24], r13
-    mov [rsp + 32], r12
-    mov [rsp + 40], rbx
+    mov [rbp - 48], rdx
+    mov [rbp - 40], r15
+    mov [rbp - 32], r14
+    mov [rbp - 24], r13
+    mov [rbp - 16], r12
+    mov [rbp - 8], rbx
 
     mov r10, rsi        ; r10 = funcptr
 
@@ -237,12 +237,12 @@ no_more_args:
     call r10
 
     ; restore registers saved
-    mov rdx, [rsp]
-    mov r15, [rsp + 8]
-    mov r14, [rsp + 16]
-    mov r13, [rsp + 24]
-    mov r12, [rsp + 32]
-    mov rbx, [rsp + 40]
+    mov rdx, [rbp - 48]
+    mov r15, [rbp - 40]
+    mov r14, [rbp - 32]
+    mov r13, [rbp - 24]
+    mov r12, [rbp - 16]
+    mov rbx, [rbp - 8]
 
     movq [rdx], xmm0
 
