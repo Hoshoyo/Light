@@ -120,6 +120,7 @@ typedef struct {
     u32              flags;
 	char*            filepath;
 	u8*              raw_data;
+	u8*              original_data;
 } Light_Token;
 
 typedef enum {

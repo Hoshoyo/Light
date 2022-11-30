@@ -59,6 +59,8 @@ typedef struct {
 
     s32 release_size_bytes;
 
+    Light_VM_DebugInfo* debug_info;
+
     Hoht_Table external_table;
 } LVM_Generator;
 
@@ -1543,9 +1545,23 @@ lvmgen_expr_literal_struct(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
     return result;
 }
 
+static void
+push_lexical_range(LVM_Generator* gen, uint64_t code_offset, Lexical_Range* lrange)
+{
+    Light_VM_DebugInfo info = {
+        .address_offset = code_offset,
+        .lexical_start = lrange->start->original_data,
+        .lexical_length = (int)(lrange->end->original_data - lrange->start->original_data + lrange->end->length),
+    };
+    if (!info.lexical_start)
+        info.lexical_start = lrange->start->data;
+    array_push(gen->debug_info, info);
+}
+
 static Expr_Result
 lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
+    push_lexical_range(gen, state->code_offset, &expr->lexical_range);
     Expr_Result result = {0};
     switch(expr->kind)
     {
@@ -1847,7 +1863,8 @@ lvmgen_comm_return(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_
 static void
 lvmgen_command(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm)
 {
-    printf("%.*s\n", (int)(comm->lexical_range.end->data - comm->lexical_range.start->data + comm->lexical_range.end->length), comm->lexical_range.start->data);
+    push_lexical_range(gen, state->code_offset, &comm->lexical_range);
+
     switch(comm->kind)
     {
         case AST_COMMAND_RETURN:     lvmgen_comm_return(state, gen, stack_info, comm); break;
@@ -1870,6 +1887,8 @@ static void
 lvmgen_proc_decl(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
 {
     assert(proc->kind == AST_DECL_PROCEDURE);
+
+    push_lexical_range(gen, state->code_offset, &proc->decl_proc.decl_lexical_range);
 
     // Generate the stack for the arguments
     int offset = 2 * LVM_PTRSIZE;
@@ -1944,6 +1963,7 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     gen.loop_breaks        = array_new(Light_VM_Instruction_Info);
     gen.loop_continue      = array_new(Light_VM_Instruction_Info);
     gen.proc_patch_calls   = array_new(Patch_Procs);
+    gen.debug_info         = array_new(Light_VM_DebugInfo);
     gen.release_size_bytes = 0;
 
     lvm_init_symbols(&gen);
@@ -1980,7 +2000,7 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
 
     // -------------------------------------
     // Debug printout
-    light_vm_debug_dump_code(stdout, state);
+    light_vm_debug_dump_code(stdout, state, gen.debug_info);
     light_vm_execute(state, 0, true);
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL|LVM_PRINT_FLOATING_POINT_REGISTERS);
 }

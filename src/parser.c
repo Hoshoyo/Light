@@ -660,6 +660,11 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
         return decl_var;
     }
 
+    Lexical_Range decl_range = {
+        .start = name,
+        .end = lexer_peek_n(parser->lexer, -1),
+    };
+
     if(!(flags & DECL_PROC_FLAG_EXTERN)) {
         body = parse_comm_block(parser, args_scope, error);
         ReturnIfError();
@@ -681,6 +686,8 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 
     result->lexical_range.start = name;
     result->lexical_range.end = lexer_peek_n(parser->lexer, -1);
+
+    result->decl_proc.decl_lexical_range = decl_range;
 
     return result;
 }

@@ -270,6 +270,12 @@ typedef struct {
     int32_t    break_continue_level;        // The level of break or continue that the instruction needs to jump, is patched by the loop code generation.
 } Light_VM_Instruction_Info;
 
+typedef struct {
+    uint64_t    address_offset;
+    const char* lexical_start;
+    int32_t     lexical_length;
+} Light_VM_DebugInfo;
+
 // State
 typedef struct {
     Light_VM_Flags_Register       rflags;
@@ -315,7 +321,7 @@ enum {
 }; 
 void light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm);
 void light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, uint32_t flags);
-void light_vm_debug_dump_code(FILE* out, Light_VM_State* state);
+void light_vm_debug_dump_code(FILE* out, Light_VM_State* state, Light_VM_DebugInfo* debug_info);
 void light_vm_debug_dump_variables(FILE* out, Light_VM_State* state, uint32_t flags);
 
 // -------------------------------------

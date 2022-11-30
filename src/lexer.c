@@ -143,6 +143,7 @@ token_number(u8* at, s32 line, s32 column) {
     r.line = line;
     r.column = column;
     r.data = at;
+    r.original_data = at;
 
     bool floating = false;
 
@@ -271,6 +272,7 @@ token_next(Light_Lexer* lexer) {
 	r.data = at;
 	r.line = (s32)lexer->line;
 	r.column = (s32)lexer->column;
+    r.original_data = at;
 
 	switch (*at) {
 		case 0: return (Light_Token) { 0 };
@@ -958,6 +960,7 @@ token_new_identifier_from_string(const char* str, int length) {
     token->length = length;
     token->flags = 0;
     token->filepath = 0;
+    token->original_data = (u8*)str;
     token->data = (u8*)lexer_internalize_identifier(str, length);;
     return token;
 }

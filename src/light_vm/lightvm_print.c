@@ -1,6 +1,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "lightvm.h"
 #include "ast.h"
+#include "light_array.h"
 #include <assert.h>
 
 void
@@ -689,9 +690,23 @@ light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
 #endif
 
 void
-light_vm_debug_dump_code(FILE* out, Light_VM_State* state) {
+light_vm_debug_dump_code(FILE* out, Light_VM_State* state, Light_VM_DebugInfo* debug_info) {
+    s32 dbg_index = 0;
     for(u64 i = 0 ;;) {
         u64 imm = 0;
+
+
+        if (array_length(debug_info) > 0 && dbg_index < array_length(debug_info))
+        {
+            while (i == debug_info[dbg_index].address_offset)
+            {
+                fprintf(out, "%.*s\n", debug_info[dbg_index].lexical_length, debug_info[dbg_index].lexical_start);
+                ++dbg_index;
+            }
+            if(i > debug_info[dbg_index].address_offset)
+                ++dbg_index;
+        }
+
         Light_VM_Instruction inst = *(Light_VM_Instruction*)((u8*)state->code.block + i);
         i += sizeof(Light_VM_Instruction);
 
@@ -713,6 +728,7 @@ light_vm_debug_dump_code(FILE* out, Light_VM_State* state) {
                 break;
             default: break;
         }
+        fprintf(out, "  ");
         light_vm_print_instruction(out, inst, imm);
         i += inst.imm_size_bytes;
     }

@@ -308,6 +308,11 @@ typedef struct {
 	int32_t  field_index;  			// Only relevant when DECL_VARIABLE_FLAG_STRUCT_FIELD is set
 } Light_Ast_Decl_Variable;
 
+typedef struct Lexical_Range {
+	Light_Token* start;
+	Light_Token* end;
+} Lexical_Range;
+
 typedef enum {
     DECL_PROC_FLAG_FOREIGN  = (1 << 0),
     DECL_PROC_FLAG_MAIN     = (1 << 1),
@@ -328,6 +333,8 @@ typedef struct {
 	int32_t            ir_instr_index;         // Could be either index of the instruction or index in the data segment
 	
 	Light_Token*       extern_library_name;
+
+	Lexical_Range      decl_lexical_range;
 
 	void* lvm_base_instruction;
 } Light_Ast_Decl_Procedure;
@@ -391,11 +398,6 @@ typedef enum {
 	AST_FLAG_EXPRESSION_LVALUE = (1 << 6),
 	AST_FLAG_COMPILER_GENERATED = (1 << 7),
 } Light_Ast_Flags;
-
-typedef struct Lexical_Range {
-	Light_Token* start;
-	Light_Token* end;
-} Lexical_Range;
 
 typedef struct Light_Ast_t {
     Light_Ast_Type kind;
