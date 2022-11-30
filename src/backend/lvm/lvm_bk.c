@@ -32,6 +32,7 @@ typedef struct {
 #define EXPR_FLAG_DEREFERENCE (1 << 0)
 #define EXPR_FLAG_ASSIGNMENT_ROOT (1 << 1) // Indicates any dereference operations should not dereference
 #define EXPR_FLAG_INVERTED_SHORT_CIRCUIT (1 << 2)
+#define EXPR_FLAG_DEREFERENCE_INDIRECT (1 << 3) // Dereference again
 
 #define Unimplemented assert(0 && "Unimplemented")
 #define Unreachable assert(0 && "Unreachable")
@@ -150,6 +151,13 @@ mk_un_instr(LVM_Instr_Type type, Expr_Result r)
         .unary.byte_size = r.size_bytes,
         .unary.reg = r.reg,
     };
+}
+
+static bool
+return_type_requires_stackspace(Light_Type* ret_type)
+{
+    ret_type = type_alias_root(ret_type);
+    return (ret_type->kind == TYPE_KIND_STRUCT || ret_type->kind == TYPE_KIND_ARRAY || ret_type->kind == TYPE_KIND_UNION);
 }
 
 // -------------------------------------------------
@@ -697,8 +705,14 @@ lvmgen_expr_binary_arithmetic(Light_VM_State* state, LVM_Generator* gen, Light_A
         right.size_bytes = left.size_bytes;
         switch(expr->expr_binary.op)
         {
-            case OP_BINARY_PLUS:  light_vm_push_instruction(state, mk_bin_instr(LVM_ADD_U, left, right), 0); break;
-            case OP_BINARY_MINUS: light_vm_push_instruction(state, mk_bin_instr(LVM_SUB_U, left, right), 0); break;
+            case OP_BINARY_PLUS: {
+                light_vm_push_fmt(state, "mulu r%d, %d", right.reg, expr->type->pointer_to->size_bits / 8);
+                light_vm_push_instruction(state, mk_bin_instr(LVM_ADD_U, left, right), 0);
+            } break;
+            case OP_BINARY_MINUS: {
+                light_vm_push_fmt(state, "mulu r%d, %d", right.reg, expr->type->pointer_to->size_bits / 8);
+                light_vm_push_instruction(state, mk_bin_instr(LVM_SUB_U, left, right), 0);
+            } break;
             default: Unreachable;
         }
     }
@@ -875,7 +889,7 @@ lvmgen_expr_binary_vector_access(Light_VM_State* state, LVM_Generator* gen, Ligh
 {
     assert(expr->kind == AST_EXPRESSION_BINARY);
     assert(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS);
-    Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags|EXPR_FLAG_DEREFERENCE);
+    Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags|EXPR_FLAG_DEREFERENCE|EXPR_FLAG_DEREFERENCE_INDIRECT);
     lvmg_push_result(state, left);
 
     Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, flags|EXPR_FLAG_DEREFERENCE);
@@ -1241,10 +1255,13 @@ lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr,
             result.type = EXPR_RESULT_REG;
             result.size_bytes = LVM_PTRSIZE;
             light_vm_push_fmt(state, "mov r%d, rbp", result.reg);
+            
             if(expr->expr_variable.decl->decl_variable.stack_offset < 0)
                 light_vm_push_fmt(state, "subs r%d, %d", result.reg, -expr->expr_variable.decl->decl_variable.stack_offset);
             else
                 light_vm_push_fmt(state, "adds r%d, %d", result.reg, expr->expr_variable.decl->decl_variable.stack_offset);
+            if (flags & EXPR_FLAG_DEREFERENCE_INDIRECT)
+                light_vm_push_fmt(state, "mov r%d, [r%d]", result.reg, result.reg);
         }
     }
     else
@@ -1338,12 +1355,20 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
     else
     {
         s32 arg_size = 0;
+
         for(int i = expr->expr_proc_call.arg_count-1; i >= 0; --i)
         {
             Light_Ast* arg = expr->expr_proc_call.args[i];
             Expr_Result res = lvmgen_expr(state, gen, arg, EXPR_FLAG_DEREFERENCE);
             lvmg_push_result(state, res);
             arg_size += LVM_PTRSIZE;
+        }
+
+        Light_Type* return_type = type_alias_root(expr->type);
+        if(return_type_requires_stackspace(return_type))
+        {
+            light_vm_push_fmt(state, "subs rsp, %d", return_type->size_bits / BITS_IN_BYTE);
+            arg_size += (return_type->size_bits / BITS_IN_BYTE);
         }
         
         // Evaluate and generate the call instruction
@@ -1803,7 +1828,14 @@ lvmgen_comm_return(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_
     if(expr)
     {
         Expr_Result r = lvmgen_expr(state, gen, expr, EXPR_FLAG_DEREFERENCE);
-        lvmg_move_to(state, r, LVM_RETURN_REGISTER);
+        if(return_type_requires_stackspace(expr->type))
+        {
+            lvmg_copy(state, gen, r, (Location){.base = LRBP, .offset = 2 * LVM_PTRSIZE }, expr->type);
+            light_vm_push_fmt(state, "mov r%d, rbp", LVM_RETURN_REGISTER);
+            light_vm_push_fmt(state, "addu r%d, %d", LVM_RETURN_REGISTER, 2 * LVM_PTRSIZE);
+        }   
+        else         
+            lvmg_move_to(state, r, LVM_RETURN_REGISTER);
     }
 
     if(stack_info->size_bytes > 0)
@@ -1815,6 +1847,7 @@ lvmgen_comm_return(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_
 static void
 lvmgen_command(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm)
 {
+    printf("%.*s\n", (int)(comm->lexical_range.end->data - comm->lexical_range.start->data + comm->lexical_range.end->length), comm->lexical_range.start->data);
     switch(comm->kind)
     {
         case AST_COMMAND_RETURN:     lvmgen_comm_return(state, gen, stack_info, comm); break;
@@ -1840,6 +1873,14 @@ lvmgen_proc_decl(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
 
     // Generate the stack for the arguments
     int offset = 2 * LVM_PTRSIZE;
+
+    // There is stack space for holding the return value
+    Light_Type* ret_type = type_alias_root(proc->decl_proc.return_type);
+    if(return_type_requires_stackspace(ret_type))
+    {
+        offset += (ret_type->size_bits / BITS_IN_BYTE);
+    }
+
     for(int i = 0; i < proc->decl_proc.argument_count; ++i)
     {
         Light_Ast* var = proc->decl_proc.arguments[i];
@@ -1848,7 +1889,7 @@ lvmgen_proc_decl(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
         var->decl_variable.stack_index = i;
         var->decl_variable.stack_offset = offset;
         var->decl_variable.stack_argument_offset = offset;
-        offset += align_to_ptrsize(var->type->size_bits / BITS_IN_BYTE);
+        offset += align_to_ptrsize(var->decl_variable.type->size_bits / BITS_IN_BYTE);
     }
     
     // Generate body code
@@ -1939,7 +1980,7 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
 
     // -------------------------------------
     // Debug printout
-    //light_vm_debug_dump_code(stdout, state);
-    light_vm_execute(state, 0, false);
+    light_vm_debug_dump_code(stdout, state);
+    light_vm_execute(state, 0, true);
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL|LVM_PRINT_FLOATING_POINT_REGISTERS);
 }

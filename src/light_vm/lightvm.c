@@ -1160,6 +1160,24 @@ light_vm_reset(Light_VM_State* state) {
 }
 
 void
+dump_shit(Light_VM_State* state)
+{
+    uint64_t baseptr = state->registers[LRBP];
+    uint64_t stackptr = state->registers[LRSP];
+    
+    for (int i = -64; i < 64; i += 4)
+    {
+        int value = *(int*)((char*)baseptr + i);
+        if (i == 0)
+            printf("[%d] ** %d (%x)\n", i, value, value);
+        else if (baseptr + i == stackptr)
+            printf("[%d] -> %d (%x)\n", i, value, value);
+        else
+            printf("[%d]    %d (%x)\n", i, value, value);
+    }
+}
+
+void
 light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
     light_vm_reset(state);
 
@@ -1179,8 +1197,11 @@ light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
 
         if(in.type == LVM_HLT) break;
 
+        //system("cls");
         light_vm_execute_instruction(state, in);
-
+        
+        //dump_shit(state);
         //light_vm_debug_dump_variables(stdout, state, 0);
     }
 }
+

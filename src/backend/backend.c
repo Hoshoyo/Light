@@ -39,7 +39,7 @@ backend_generate(Light_Backend backend, Light_Ast** ast, Light_Scope* global_sco
             double generate_elapsed = (os_time_us() - generate_start) / 1000.0;
 
             double gcc_start = os_time_us();
-            backend_c_compile_with_gcc(ast, output_filename, main_file_directory);
+            backend_c_compile_with_cl(ast, output_filename, main_file_directory);
             double gcc_elapsed = (os_time_us() - gcc_start) / 1000.0;
             if(gen_time_us) *gen_time_us = gcc_elapsed + generate_elapsed;
         } break;
