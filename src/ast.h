@@ -111,6 +111,7 @@ typedef struct Light_Scope_t {
 	int32_t           id;
 	int32_t           level;
 	int32_t           decl_count;
+	int32_t           type_infer_queue_count;
 
 	struct Symbol_Table_t*      symb_table;
 
@@ -221,6 +222,7 @@ typedef enum {
 
 typedef struct {
 	Light_Expr_Directive_Type type;
+	bool                      generated_bytecode;
 	Light_Token*              directive_token;
 	union {
 		struct Light_Ast_t*  expr;
@@ -290,6 +292,7 @@ typedef enum {
 
 	DECL_VARIABLE_FLAG_LOADED       = (1 << 4), // whether is loaded in a temporary already
 	DECL_VARIABLE_FLAG_ADDR_CALCULATED = (1 << 5),
+	DECL_VARIABLE_FLAG_PROC_ARGUMENT = (1 << 6),
 } Light_Decl_Variable_Flags;
 
 typedef struct {
@@ -397,6 +400,7 @@ typedef enum {
 	AST_FLAG_ALLOW_BASE_ENUM = (1 << 5), // This flags allows type inference to not error out if a variable with enum type is seen
 	AST_FLAG_EXPRESSION_LVALUE = (1 << 6),
 	AST_FLAG_COMPILER_GENERATED = (1 << 7),
+	AST_FLAG_TYPE_CHECKED = (1 << 8),
 } Light_Ast_Flags;
 
 typedef struct Light_Ast_t {
@@ -576,6 +580,7 @@ typedef struct Light_Type_t{
 
 // Scope
 Light_Scope* light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags);
+Light_Scope* find_proc_scope(Light_Scope* scope_at);
 
 // Ast
 // Declarations
@@ -596,8 +601,17 @@ Light_Ast* ast_new_comm_assignment(Light_Scope* scope, Light_Ast* lvalue, Light_
 
 // Expressions
 Light_Ast* ast_new_expr_literal_primitive(Light_Scope* scope, Light_Token* token, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_s64(Light_Scope* scope, s64 val, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_s32(Light_Scope* scope, s32 val, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_s16(Light_Scope* scope, s16 val, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_s8(Light_Scope* scope, s8 val, Lexical_Range lrange);
 Light_Ast* ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val, Lexical_Range lrange);
 Light_Ast* ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_u16(Light_Scope* scope, u16 val, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_u8(Light_Scope* scope, u8 val, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_r32(Light_Scope* scope, r32 val, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_r64(Light_Scope* scope, r64 val, Lexical_Range lrange);
+Light_Ast* ast_new_expr_literal_primitive_bool(Light_Scope* scope, bool val, Lexical_Range lrange);
 Light_Ast* ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** array_exprs, Lexical_Range lrange);
 Light_Ast* ast_new_expr_literal_struct(Light_Scope* scope, Light_Token* name, Light_Token* token, Light_Ast** struct_exprs, bool named, Light_Scope* struct_scope, Lexical_Range lrange);
 Light_Ast* ast_new_expr_unary(Light_Scope* scope, Light_Ast* operand, Light_Token* op_token, Light_Operator_Unary op, Lexical_Range lrange);

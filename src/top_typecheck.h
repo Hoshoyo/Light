@@ -7,6 +7,7 @@ typedef enum {
     TYPE_FATAL    = (1 << 0),
     TYPE_ERROR    = (1 << 1),
     TYPE_WARNING  = (1 << 2),
+    TYPE_QUEUED   = (1 << 3),
 } Light_Type_Error;
 
 #define TYPE_STRONG(T) !((T)->flags & TYPE_FLAG_WEAK)

@@ -378,10 +378,12 @@ type_infer_propagate(Light_Type* type, Light_Ast* expr, u32* error) {
             assert(TYPE_STRONG(expr->type));
             //return expr->type;
             break;
-        case AST_EXPRESSION_DIRECTIVE:
-            // TODO(psv):
-            assert(0);
-            break;
+        case AST_EXPRESSION_DIRECTIVE: {
+            if(expr->expr_directive.type == EXPR_DIRECTIVE_RUN)
+                type_infer_propagate(type, expr->expr_directive.expr, error);
+            else   
+                assert(0);
+        } break;
         case AST_EXPRESSION_COMPILER_GENERATED:
             break;
         default: assert(0); break;
@@ -1285,7 +1287,20 @@ type_infer_expr_directive(Light_Ast* expr, u32* error) {
             assert(0);
         } break;
 
-        case EXPR_DIRECTIVE_RUN:
+        case EXPR_DIRECTIVE_RUN: {
+            Light_Type* type = type_infer_expression(expr->expr_directive.expr, error);
+            if (type)
+            {
+                type = type_infer_propagate(0, expr->expr_directive.expr, error);
+                if(type && type->flags & TYPE_FLAG_INTERNALIZED) {
+                    // transform this node into a literal with the size of the type                
+                    if(eval_directive_run(expr))
+                        return expr->type;
+                    else
+                        return 0;
+                }
+            }
+        } break;
         case EXPR_DIRECTIVE_COMPILE:
         // TODO(psv): other directives
         default: assert(0); break;

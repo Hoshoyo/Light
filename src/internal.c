@@ -3,8 +3,8 @@
 
 static const char module_base_str_64bit[] = 
 "string struct {\n"
-    "capacity : u64;\n"
-    "length   : u64;\n"
+    "capacity : u32;\n"
+    "length   : u32;\n"
     "data     : ^u8;\n"
 "}\n";
 

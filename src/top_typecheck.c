@@ -16,10 +16,27 @@
 void typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* error);
 void typecheck_information_pass_command(Light_Ast* node, u32 flags, u32* error);
 
+static Light_Scope* 
+typecheck_procbody_scope_from_scope(Light_Scope* scope) {
+    while(scope) {
+        if(scope->flags & SCOPE_PROCEDURE_BODY) {
+            assert(scope->creator_node->kind == AST_DECL_PROCEDURE);
+            return scope;
+        }
+        scope = scope->parent;
+    }
+    return 0;
+}
+
 static bool
 typecheck_push_to_infer_queue(Light_Ast* node) {
     if(node->flags & AST_FLAG_INFER_QUEUED)
         return false; // already in infer queue
+    
+    Light_Scope* decl_scope = typecheck_procbody_scope_from_scope(node->scope_at);
+    if(decl_scope)
+        decl_scope->type_infer_queue_count++;
+
     array_push(global_infer_queue, node);
     node->flags |= AST_FLAG_INFER_QUEUED;
     node->infer_queue_index = array_length(global_infer_queue) - 1;
@@ -30,6 +47,10 @@ static bool
 typecheck_remove_from_infer_queue(Light_Ast* node) {
     if(!(node->flags & AST_FLAG_INFER_QUEUED))
         return false; // not in infer queue
+
+    Light_Scope* decl_scope = typecheck_procbody_scope_from_scope(node->scope_at);
+    if(decl_scope && decl_scope->type_infer_queue_count > 0)
+        decl_scope->type_infer_queue_count--;
 
     global_infer_queue[array_length(global_infer_queue) - 1]->infer_queue_index = node->infer_queue_index;
     array_remove(global_infer_queue, node->infer_queue_index);
@@ -591,6 +612,7 @@ typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* err
 void
 typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error) {
     Light_Scope* scope = node->scope_at;
+    node->flags |= AST_FLAG_TYPE_CHECKED;
 
     u32 error = 0;
     switch(node->kind) {

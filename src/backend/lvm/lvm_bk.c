@@ -32,7 +32,6 @@ typedef struct {
 #define EXPR_FLAG_DEREFERENCE (1 << 0)
 #define EXPR_FLAG_ASSIGNMENT_ROOT (1 << 1) // Indicates any dereference operations should not dereference
 #define EXPR_FLAG_INVERTED_SHORT_CIRCUIT (1 << 2)
-#define EXPR_FLAG_DEREFERENCE_INDIRECT (1 << 3) // Dereference again
 
 #define Unimplemented assert(0 && "Unimplemented")
 #define Unreachable assert(0 && "Unreachable")
@@ -891,7 +890,7 @@ lvmgen_expr_binary_vector_access(Light_VM_State* state, LVM_Generator* gen, Ligh
 {
     assert(expr->kind == AST_EXPRESSION_BINARY);
     assert(expr->expr_binary.op == OP_BINARY_VECTOR_ACCESS);
-    Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags|EXPR_FLAG_DEREFERENCE|EXPR_FLAG_DEREFERENCE_INDIRECT);
+    Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, flags|EXPR_FLAG_DEREFERENCE);
     lvmg_push_result(state, left);
 
     Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, flags|EXPR_FLAG_DEREFERENCE);
@@ -1262,7 +1261,7 @@ lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr,
                 light_vm_push_fmt(state, "subs r%d, %d", result.reg, -expr->expr_variable.decl->decl_variable.stack_offset);
             else
                 light_vm_push_fmt(state, "adds r%d, %d", result.reg, expr->expr_variable.decl->decl_variable.stack_offset);
-            if (flags & EXPR_FLAG_DEREFERENCE_INDIRECT)
+            if (expr->expr_variable.decl->decl_variable.flags & DECL_VARIABLE_FLAG_PROC_ARGUMENT)
                 light_vm_push_fmt(state, "mov r%d, [r%d]", result.reg, result.reg);
         }
     }
@@ -1548,14 +1547,17 @@ lvmgen_expr_literal_struct(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
 static void
 push_lexical_range(LVM_Generator* gen, uint64_t code_offset, Lexical_Range* lrange)
 {
-    Light_VM_DebugInfo info = {
-        .address_offset = code_offset,
-        .lexical_start = lrange->start->original_data,
-        .lexical_length = (int)(lrange->end->original_data - lrange->start->original_data + lrange->end->length),
-    };
-    if (!info.lexical_start)
-        info.lexical_start = lrange->start->data;
-    array_push(gen->debug_info, info);
+    if(lrange->start && lrange->end)
+    {
+        Light_VM_DebugInfo info = {
+            .address_offset = code_offset,
+            .lexical_start = lrange->start->original_data,
+            .lexical_length = (int)(lrange->end->original_data - lrange->start->original_data + lrange->end->length),
+        };
+        if (!info.lexical_start)
+            info.lexical_start = lrange->start->data;
+        array_push(gen->debug_info, info);
+    }
 }
 
 static Expr_Result
@@ -2001,6 +2003,94 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     // -------------------------------------
     // Debug printout
     light_vm_debug_dump_code(stdout, state, gen.debug_info);
-    light_vm_execute(state, 0, true);
+    light_vm_execute(state, 0, false);
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL|LVM_PRINT_FLOATING_POINT_REGISTERS);
+}
+
+typedef struct {
+    bool            valid;
+    Light_VM_State* state;
+    LVM_Generator   generator;
+    Light_VM_Instruction_Info start;
+} Runtime_Generator;
+
+static Runtime_Generator g_runtime_generator;
+
+void
+init_runtime_generator()
+{
+    if(!g_runtime_generator.valid)
+    {
+        Light_VM_State* state = light_vm_init();
+
+        LVM_Generator gen = {0};
+        gen.short_circuit_jmps = array_new(Light_VM_Instruction_Info);
+        gen.proc_bases         = array_new(Light_VM_Instruction_Info);
+        gen.loop_breaks        = array_new(Light_VM_Instruction_Info);
+        gen.loop_continue      = array_new(Light_VM_Instruction_Info);
+        gen.proc_patch_calls   = array_new(Patch_Procs);
+        gen.debug_info         = array_new(Light_VM_DebugInfo);
+        gen.release_size_bytes = 0;
+
+        lvm_init_symbols(&gen);
+
+        g_runtime_generator.state = state;
+        g_runtime_generator.generator = gen;
+
+        Light_VM_Instruction_Info start = light_vm_push(state, "call 0xffffffff");
+        light_vm_push(state, "hlt");
+        light_vm_patch_from_to_current_instruction(state, start);
+
+        g_runtime_generator.valid = true;
+        g_runtime_generator.start = start;
+    }
+    else
+    {
+        light_vm_patch_from_to_current_instruction(g_runtime_generator.state, g_runtime_generator.start);
+    }
+}
+
+void*
+lvm_generate_and_run_directive(Light_Ast* expr, bool generate)
+{
+    init_runtime_generator();
+
+    Expr_Result r = { 0 };
+    if (generate)
+    {
+        r = lvmgen_expr(g_runtime_generator.state, &g_runtime_generator.generator, expr, EXPR_FLAG_DEREFERENCE);
+        light_vm_push(g_runtime_generator.state, "ret");
+    }
+
+    for(int i = 0; i < array_length(g_runtime_generator.generator.proc_patch_calls); ++i)
+    {
+        Light_VM_Instruction_Info* info = (Light_VM_Instruction_Info*)((Light_Ast*)g_runtime_generator.generator.proc_patch_calls[i].to_decl)->decl_proc.lvm_base_instruction;
+        if(!info)
+        {
+            Light_Ast* proc_decl = (Light_Ast*)g_runtime_generator.generator.proc_patch_calls[i].to_decl;
+            if(proc_decl->flags & AST_FLAG_TYPE_CHECKED && 
+               proc_decl->decl_proc.body && 
+               proc_decl->decl_proc.body->kind == AST_COMMAND_BLOCK &&
+               proc_decl->decl_proc.body->comm_block.block_scope->type_infer_queue_count == 0)
+            {
+                // Generate code for this procedure and then patch it
+                lvmgen_proc_decl(g_runtime_generator.state, &g_runtime_generator.generator, proc_decl);
+                info = (Light_VM_Instruction_Info*)proc_decl->decl_proc.lvm_base_instruction;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+        light_vm_patch_immediate_distance(g_runtime_generator.generator.proc_patch_calls[i].from, *info);
+    }
+
+    light_vm_execute(g_runtime_generator.state, 0, true);
+
+    if(r.type == EXPR_RESULT_REG)
+        return (void*)&g_runtime_generator.state->registers[r.reg];
+    else if(r.type == EXPR_RESULT_F32_REG)
+        return (void*)&g_runtime_generator.state->f32registers[r.freg];
+    else if(r.type == EXPR_RESULT_F64_REG)
+        return (void*)&g_runtime_generator.state->f64registers[r.efreg];
 }

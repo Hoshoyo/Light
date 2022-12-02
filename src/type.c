@@ -166,8 +166,7 @@ type_new_primitive(Light_Type_Primitive p) {
 
 uint32_t
 type_pointer_size_bits() {
-    //return 32;
-    return 64;
+    return g_compilation_settings.bitsize;
 }
 
 uint32_t

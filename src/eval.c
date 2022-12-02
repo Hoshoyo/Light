@@ -4,6 +4,7 @@
 #include "type_infer.h"
 #include "error.h"
 #include "utils/utils.h"
+#include "backend/backend.h"
 #include <stdio.h>
 #include <light_array.h>
 
@@ -351,4 +352,73 @@ eval_directive_sizeof(Light_Ast* directive) {
 	} else {
 		assert(0);
 	}
+}
+
+static Light_Ast*
+eval_make_primitive_literal_from_type(Light_Scope* scope, Light_Type* type, void* memory)
+{
+	switch(type->primitive)
+	{
+		case TYPE_PRIMITIVE_S8:
+			return ast_new_expr_literal_primitive_s8(scope, *(s8*)memory, (Lexical_Range){0});
+		case TYPE_PRIMITIVE_S16:
+			return ast_new_expr_literal_primitive_s16(scope, *(s16*)memory, (Lexical_Range){0});
+		case TYPE_PRIMITIVE_S32:
+			return ast_new_expr_literal_primitive_s32(scope, *(s32*)memory, (Lexical_Range){0});
+		case TYPE_PRIMITIVE_S64:
+			return ast_new_expr_literal_primitive_s64(scope, *(s64*)memory, (Lexical_Range){0});
+		case TYPE_PRIMITIVE_U8:
+			return ast_new_expr_literal_primitive_u8(scope, *(u8*)memory, (Lexical_Range){0});
+		case TYPE_PRIMITIVE_U16:
+			return ast_new_expr_literal_primitive_u16(scope, *(u16*)memory, (Lexical_Range){0});
+		case TYPE_PRIMITIVE_U32:
+			return ast_new_expr_literal_primitive_u32(scope, *(u32*)memory, (Lexical_Range){0});
+		case TYPE_PRIMITIVE_U64:
+			return ast_new_expr_literal_primitive_u64(scope, *(u64*)memory, (Lexical_Range){0});
+		case TYPE_PRIMITIVE_BOOL:
+			return ast_new_expr_literal_primitive_bool(scope, *(bool*)memory, (Lexical_Range){0});
+		case TYPE_PRIMITIVE_R32:
+			return ast_new_expr_literal_primitive_r32(scope, *(r32*)memory, (Lexical_Range){0});
+		case TYPE_PRIMITIVE_R64:
+			return ast_new_expr_literal_primitive_r64(scope, *(r64*)memory, (Lexical_Range){0});
+		default: assert(0);
+	}
+	return 0;
+}
+
+/*
+static Light_Ast*
+eval_make_struct_literal_from_type(Light_Scope* scope, Light_Type* type, void* memory)
+{
+	ast_new_expr_literal_struct(scope, 0, 0, exprs, false, )
+}*/
+
+Light_Ast*
+eval_make_literal_from_type(Light_Scope* scope, Light_Type* type, void* memory) {
+	switch(type_alias_root(type)->kind)
+	{
+		case TYPE_KIND_PRIMITIVE:
+			return eval_make_primitive_literal_from_type(scope, type, memory);
+		//case TYPE_KIND_STRUCT:
+		//	return eval_make_struct_literal_from_type(scope, type, memory);
+		default: assert(0);
+	}
+	return 0;
+}
+
+bool
+eval_directive_run(Light_Ast* directive) {
+	Light_Ast* expr = directive->expr_directive.expr;
+
+	void* literal_data = lvm_generate_and_run_directive(expr, !directive->expr_directive.generated_bytecode);
+	directive->expr_directive.generated_bytecode = true;
+
+	if(literal_data)
+	{
+		Light_Ast* literal = eval_make_literal_from_type(directive->scope_at, expr->type, literal_data);
+		*directive = *literal;
+		return true;
+	}
+	else
+		return false;
 }

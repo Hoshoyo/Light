@@ -32,6 +32,7 @@ light_scope_new(Light_Ast* creator_node, Light_Scope* parent, uint32_t flags) {
     scope->decls = array_new(Light_Ast*);
     scope->flags = flags;
     scope->level = parent->level + 1;
+    scope->type_infer_queue_count = 0;
 
     return scope;
 }
@@ -214,24 +215,65 @@ ast_new_expr_literal_array(Light_Scope* scope, Light_Token* token, Light_Ast** a
     return result;
 }
 
-// TODO(psv): refactor to be more generic
 Light_Ast*
-ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val, Lexical_Range lrange) {
+ast_new_expr_literal_primitive_s8(Light_Scope* scope, s8 val, Lexical_Range lrange) {
+    Light_Ast* result = ast_new_expr_literal_primitive_s64(scope, val, lrange);
+    result->type = type_primitive_get(TYPE_PRIMITIVE_S8);
+    return result;
+}
+
+Light_Ast*
+ast_new_expr_literal_primitive_s16(Light_Scope* scope, s16 val, Lexical_Range lrange) {
+    Light_Ast* result = ast_new_expr_literal_primitive_s64(scope, val, lrange);
+    result->type = type_primitive_get(TYPE_PRIMITIVE_S16);
+    return result;
+}
+
+Light_Ast*
+ast_new_expr_literal_primitive_s32(Light_Scope* scope, s32 val, Lexical_Range lrange) {
+    Light_Ast* result = ast_new_expr_literal_primitive_s64(scope, val, lrange);
+    result->type = type_primitive_get(TYPE_PRIMITIVE_S32);
+    return result;
+}
+
+Light_Ast*
+ast_new_expr_literal_primitive_s64(Light_Scope* scope, s64 val, Lexical_Range lrange) {
     Light_Ast* result = light_alloc(sizeof(Light_Ast));
 
     result->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
     result->scope_at = scope;
-    result->type = type_primitive_get(TYPE_PRIMITIVE_U32);
+    result->type = type_primitive_get(TYPE_PRIMITIVE_S64);
     result->flags = AST_FLAG_EXPRESSION;
     result->id = ast_new_id();
     result->lexical_range = lrange;
 
-    result->expr_literal_primitive.type = LITERAL_DEC_UINT;
+    result->expr_literal_primitive.type = LITERAL_DEC_SINT;
     result->expr_literal_primitive.flags = 0;
     result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
     result->expr_literal_primitive.token = 0;
-    result->expr_literal_primitive.value_u32 = val;
+    result->expr_literal_primitive.value_s64 = val;
 
+    return result;
+}
+
+Light_Ast*
+ast_new_expr_literal_primitive_u8(Light_Scope* scope, u8 val, Lexical_Range lrange) {
+    Light_Ast* result = ast_new_expr_literal_primitive_u64(scope, val, lrange);
+    result->type = type_primitive_get(TYPE_PRIMITIVE_U8);
+    return result;
+}
+
+Light_Ast*
+ast_new_expr_literal_primitive_u16(Light_Scope* scope, u16 val, Lexical_Range lrange) {
+    Light_Ast* result = ast_new_expr_literal_primitive_u64(scope, val, lrange);
+    result->type = type_primitive_get(TYPE_PRIMITIVE_U16);
+    return result;
+}
+
+Light_Ast*
+ast_new_expr_literal_primitive_u32(Light_Scope* scope, u32 val, Lexical_Range lrange) {
+    Light_Ast* result = ast_new_expr_literal_primitive_u64(scope, val, lrange);
+    result->type = type_primitive_get(TYPE_PRIMITIVE_U32);
     return result;
 }
 
@@ -251,6 +293,66 @@ ast_new_expr_literal_primitive_u64(Light_Scope* scope, u64 val, Lexical_Range lr
     result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
     result->expr_literal_primitive.token = 0;
     result->expr_literal_primitive.value_u64 = val;
+
+    return result;
+}
+
+Light_Ast*
+ast_new_expr_literal_primitive_bool(Light_Scope* scope, bool val, Lexical_Range lrange) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
+    result->scope_at = scope;
+    result->type = type_primitive_get(TYPE_PRIMITIVE_BOOL);
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+    result->lexical_range = lrange;
+
+    result->expr_literal_primitive.type = LITERAL_BOOL;
+    result->expr_literal_primitive.flags = 0;
+    result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
+    result->expr_literal_primitive.token = 0;
+    result->expr_literal_primitive.value_bool = val;
+
+    return result;
+}
+
+Light_Ast*
+ast_new_expr_literal_primitive_r32(Light_Scope* scope, r32 val, Lexical_Range lrange) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
+    result->scope_at = scope;
+    result->type = type_primitive_get(TYPE_PRIMITIVE_R32);
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+    result->lexical_range = lrange;
+
+    result->expr_literal_primitive.type = LITERAL_FLOAT;
+    result->expr_literal_primitive.flags = 0;
+    result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
+    result->expr_literal_primitive.token = 0;
+    result->expr_literal_primitive.value_r32 = val;
+
+    return result;
+}
+
+Light_Ast*
+ast_new_expr_literal_primitive_r64(Light_Scope* scope, r64 val, Lexical_Range lrange) {
+    Light_Ast* result = light_alloc(sizeof(Light_Ast));
+
+    result->kind = AST_EXPRESSION_LITERAL_PRIMITIVE;
+    result->scope_at = scope;
+    result->type = type_primitive_get(TYPE_PRIMITIVE_R64);
+    result->flags = AST_FLAG_EXPRESSION;
+    result->id = ast_new_id();
+    result->lexical_range = lrange;
+
+    result->expr_literal_primitive.type = LITERAL_FLOAT;
+    result->expr_literal_primitive.flags = 0;
+    result->expr_literal_primitive.storage_class = STORAGE_CLASS_REGISTER;
+    result->expr_literal_primitive.token = 0;
+    result->expr_literal_primitive.value_r64 = val;
 
     return result;
 }

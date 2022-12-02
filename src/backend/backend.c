@@ -13,6 +13,7 @@ backend_to_string(Light_Backend backend)
         case BACKEND_X86_PECOFF:    return "x86 pecoff";
         case BACKEND_X86_RAWX:      return "x86 rawx";
         case BACKEND_C:             return "C";
+        case BACKEND_LIGHT_VM:      return "Light VM";
         default: return "invalid backend";
     }
 }

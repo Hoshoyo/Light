@@ -16,6 +16,8 @@
 
 Light_Ast** load_internal_modules(Light_Parser* parser, Light_Scope* global_scope, Light_Backend backend);
 
+Compilation_Settings g_compilation_settings = {.bitsize = 32};
+
 int main(int argc, char** argv) {
     double start = os_time_us();
 
@@ -26,18 +28,24 @@ int main(int argc, char** argv) {
         return 1;
     }
     s32 backend = BACKEND_X86_PECOFF;
+    g_compilation_settings.bitsize = 32;
     if(argc >= 3) {
         char* backend_str = argv[2];
         if(strcmp(backend_str, "-x86coff") == 0) {
             backend = BACKEND_X86_PECOFF;
+            g_compilation_settings.bitsize = 32;
         } else if(strcmp(backend_str, "-x86elf") == 0) {
             backend = BACKEND_X86_ELF;
+            g_compilation_settings.bitsize = 32;
         } else if(strcmp(backend_str, "-x86rawx") == 0) {
             backend = BACKEND_X86_RAWX;
+            g_compilation_settings.bitsize = 32;
         } else if(strcmp(backend_str, "-c") == 0) {
             backend = BACKEND_C;
+            g_compilation_settings.bitsize = 64;
         } else if(strcmp(backend_str, "-lightvm") == 0) {
             backend = BACKEND_LIGHT_VM;
+            g_compilation_settings.bitsize = 64;
         } else {
             fprintf(stderr, "invalid backend '%s'\n", argv[2]);
             return 1;
@@ -104,7 +112,7 @@ int main(int argc, char** argv) {
     }
     double tcheck_elapsed = (os_time_us() - tcheck_start) / 1000.0;
     
-#if 1
+#if 0
     ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //ast_print(ast, LIGHT_AST_PRINT_STDOUT, 0);
     //type_table_print();

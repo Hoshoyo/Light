@@ -543,6 +543,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
                     multiple_args = true;
                     lexer_next(lexer);
                     arg_decl = ast_new_decl_variable(args_scope, name, 0, 0, STORAGE_CLASS_STACK, 0, (Lexical_Range){name, name});
+                    arg_decl->decl_variable.flags |= DECL_VARIABLE_FLAG_PROC_ARGUMENT;
                     array_push(arguments, arg_decl);   // defer filling type
                     array_push(args_types, 0);         // defer filling this
                 } else {
@@ -957,7 +958,7 @@ Light_Ast* parse_expr_literal(Light_Parser* parser, Light_Scope* scope, u32* err
             cast->flags |= AST_FLAG_COMPILER_GENERATED;
             cast->expr_unary.type_to_cast = type_new_pointer(type_primitive_get(TYPE_PRIMITIVE_U8));
 
-            result = ast_new_expr_literal_struct(scope, string_token, first, 0, false, 0, (Lexical_Range){0});
+            result = ast_new_expr_literal_struct(scope, string_token, first, 0, false, 0, (Lexical_Range) { .start = string_token, .end = string_token });
             result->expr_literal_struct.struct_exprs = array_new(Light_Ast*);
             result->flags |= AST_FLAG_COMPILER_GENERATED;
 
@@ -1136,6 +1137,11 @@ parse_expr_directive(Light_Parser* parser, Light_Scope* scope, u32* error) {
         ReturnIfError();
         lrange.end = directive;
         return ast_new_expr_directive(scope, EXPR_DIRECTIVE_SIZEOF, directive, 0, type, lrange);
+    } else if(directive->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_RUN].data) {
+        Light_Ast* expression = parse_expression(parser, scope, error);
+        ReturnIfError();
+        lrange.end = expression->lexical_range.end;
+        return ast_new_expr_directive(scope, EXPR_DIRECTIVE_RUN, directive, expression, 0, lrange);
     } else {
         *error |= parser_error_fatal(parser, directive, "invalid directive expression '%.*s'\n", TOKEN_STR(directive));
         ReturnIfError();
