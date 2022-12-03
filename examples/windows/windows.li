@@ -32,17 +32,18 @@ WNDCLASSEXA struct {
     cb_size       : u32;
     /* Win 3.x */
     style        : u32;
-    wndproc      : (^void, u32, ^u32, ^u32) -> ^void;
+    //wndproc      : (^void, u32, ^u32, ^u32) -> ^void;
+    wndproc      :  (^void, u32, ^u32, ^u32) -> ^void #extern;
     cb_cls_extra : s32;
     cb_wnd_extra : s32;
-    h_instance   : s32;
-    h_icon       : s32;
-    h_cursor     : s32;
-    h_brush      : s32;
+    h_instance   : ^void;
+    h_icon       : ^void;
+    h_cursor     : ^void;
+    h_brush      : ^void;
     menu_name    : ^u8;
     class_name   : ^u8;
     /* Win 4.0 */
-    icon_sm      : s32;
+    icon_sm      : ^void;
 }
 
 Window_Info struct {

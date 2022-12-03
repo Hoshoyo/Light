@@ -54,8 +54,8 @@ read_entire_file : (filename : string, allocator : (u64)->^void) -> string {
 
     close(descriptor);
 
-    result.length = file_info.st_size -> u64;
-    result.capacity = file_info.st_size -> u64;
+    result.length = file_info.st_size -> u32;
+    result.capacity = file_info.st_size -> u32;
     result.data = memory -> ^u8;
 
     return result;

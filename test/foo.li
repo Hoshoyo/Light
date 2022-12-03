@@ -1,6 +1,7 @@
 #import "../modules/print.li"
 #import "../modules/hash_table.li"
 #import "../modules/io.li"
+#import "../modules/base.li"
 
 fnv_1_hash:(s : ^u8, length : u64) -> u64 {
 	hash :u64= 14695981039346656037;
@@ -34,7 +35,7 @@ hash_table_new:(initial_count : s64, element_size : s64) -> Hash_Table {
 	return table;
 }
 
-hash_table_add:(table : ^Hash_Table, key : ^void, key_size_bytes : u64, data : ^void) -> u64 {
+hash_table_add:(table : ^Hash_Table, key : ^void, key_size_bytes : u32, data : ^void) -> u64 {
 
 	hash := fnv_1_hash(key, key_size_bytes -> u64);
 	index := hash % table.max_entries -> u64;

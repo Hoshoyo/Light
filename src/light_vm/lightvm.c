@@ -697,9 +697,9 @@ light_vm_execute_expush_instruction(Light_VM_State* state, Light_VM_Instruction 
             state->ext_stack.int_index[state->ext_stack.int_arg_count] = total_arg_count;
             state->ext_stack.int_arg_count++;
             switch(instr.push.byte_size) {
-                case 1: *dst = (u64)*(u8*)src; break;
-                case 2: *dst = (u64)*(u16*)src; break;
-                case 4: *dst = (u64)*(u32*)src; break;
+                case 1: *dst = (u64)(*(u8*)src & 0xff); break;
+                case 2: *dst = (u64)(*(u16*)src & 0xffff); break;
+                case 4: *dst = (u64)(*(u32*)src & 0xffffffff); break;
                 case 8: *dst = *(u64*)src; break;
                 default: assert(0); break;
             }
@@ -709,7 +709,7 @@ light_vm_execute_expush_instruction(Light_VM_State* state, Light_VM_Instruction 
             state->ext_stack.float_index[state->ext_stack.float_arg_count] = total_arg_count;
             state->ext_stack.float_arg_count++;
             if(instr.push.byte_size == 8) {
-                *dst = (u64)*(u32*)src;
+                *dst = (u64)(*(u32*)src & 0xffffffff);
             } else {
                 *dst = *(u64*)src;
             }
@@ -970,6 +970,14 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             break;
         case LVM_CVT_R64_R32:
             state->f32registers[instr.binary.dst_reg] = (r32)state->f64registers[instr.binary.src_reg];
+            advance_ip = true;
+            break;
+        case LVM_CVT_R64_S64:
+            state->f64registers[instr.binary.dst_reg + FR4] = (r64)(s64)state->registers[instr.binary.src_reg];
+            advance_ip = true;
+            break;
+        case LVM_CVT_R64_S32:
+            state->f64registers[instr.binary.dst_reg + FR4] = (r64)(s32)state->registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_SEXT: {

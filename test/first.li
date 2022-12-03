@@ -1,0 +1,51 @@
+#import "../examples/windows/windows.li"
+
+main : () -> s32 {
+    window_class : WNDCLASSEXA;
+	window_class.cb_size = #size_of WNDCLASSEXA -> u32;
+	window_class.style = 0;
+	window_class.wndproc = DefWindowProcA;//null -> (^void, u32, ^u32, ^u32) -> ^void;
+	window_class.cb_cls_extra = 0;
+	window_class.cb_wnd_extra = 0;
+	window_class.h_instance = null;
+	window_class.h_icon = null;
+	window_class.h_cursor = null;
+	window_class.h_brush = null;
+	window_class.menu_name = null;
+	window_class.class_name = "MyClass\0".data;
+	window_class.icon_sm = null;
+
+	RegisterClassExA(&window_class);
+    //if RegisterClassExA(&window_class) == 0
+    //    return GetLastError();
+
+	w := CreateWindowExA(0x00000100|0x00000200, 
+			window_class.class_name, 
+			"MyWindow\0".data, 
+			0x00C00000|0x00080000|0x00040000|0x00020000|0x00010000|0x10000000, 
+        	100, 
+			100, 
+			1024, 
+			768, 
+			null, 
+			null, 
+			null, 
+			null);
+	
+	if w == null
+		return GetLastError();
+	
+	msg : MSG;
+    while GetMessageA(&msg, w, 0, 0) != 0
+    {
+
+    }
+
+    //a := #run foo();
+    return 55;
+}
+
+window_callback : (window : ^void, msg : u32, lparam: ^u32, wparam: ^u32) -> ^void #extern {
+	MessageBoxA(null, "Hello\0".data, "World\0".data, 0);
+    return DefWindowProcA(window, msg, lparam, wparam);
+}

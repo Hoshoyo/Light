@@ -41,6 +41,7 @@ typedef struct {
 typedef struct {
     Light_VM_Instruction_Info from;
     void* to_decl;
+    bool absolute;
 } Patch_Procs;
 
 typedef struct {
@@ -332,7 +333,7 @@ lvmg_copy(Light_VM_State* state, LVM_Generator* gen, Expr_Result rvalue, Locatio
     
     if(rvalue.type == EXPR_RESULT_REG)
     {
-        if(rvaltype->kind == TYPE_KIND_PRIMITIVE || rvaltype->kind == TYPE_KIND_POINTER)
+        if(rvaltype->kind == TYPE_KIND_PRIMITIVE || rvaltype->kind == TYPE_KIND_POINTER || rvaltype->kind == TYPE_KIND_FUNCTION)
         {
             if(location.offset < 0)
                 light_vm_push_fmt(state, "mov [r%d %s %d], r%d%s", 
@@ -1051,7 +1052,7 @@ lvmgen_expr_cast(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32
                                 Expr_Result r = lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
                                 assert(r.type == EXPR_RESULT_F64_REG);
                                 light_vm_push_fmt(state, (cast_type->primitive == TYPE_PRIMITIVE_S64 || cast_type->primitive == TYPE_PRIMITIVE_U64) ?
-                                    "cvtr32s64 r%d, efr%d" : "cvtr32s32 r%d, efr%d", result.reg, r.efreg);
+                                    "cvtr64s64 r%d, efr%d" : "cvtr64s32 r%d, efr%d", result.reg, r.efreg);
                                 lvmg_truncate_reg(state, cast_type, result.reg);
                             } break;
                             default: Unreachable;
@@ -1206,63 +1207,96 @@ lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr,
     Expr_Result result = {0};
 
     Light_Ast* decl = expr->expr_variable.decl;
-    if(decl->decl_variable.storage_class == STORAGE_CLASS_STACK)
+    if (decl->kind == AST_DECL_VARIABLE)
     {
-        if((flags & EXPR_FLAG_DEREFERENCE) && (expr->type->kind == TYPE_KIND_PRIMITIVE || expr->type->kind == TYPE_KIND_POINTER))
+        if(decl->decl_variable.storage_class == STORAGE_CLASS_STACK)
         {
-            if(type_primitive_float(expr->type))
+            if((flags & EXPR_FLAG_DEREFERENCE) && (expr->type->kind == TYPE_KIND_PRIMITIVE || expr->type->kind == TYPE_KIND_POINTER))
             {
-                if(type_primitive_float32(expr->type))
+                if(type_primitive_float(expr->type))
                 {
-                    result.reg = FR0;
-                    result.type = EXPR_RESULT_F32_REG;
-                    result.size_bytes = 4;
+                    if(type_primitive_float32(expr->type))
+                    {
+                        result.reg = FR0;
+                        result.type = EXPR_RESULT_F32_REG;
+                        result.size_bytes = 4;
+                    }
+                    else
+                    {
+                        result.reg = EFR0;
+                        result.type = EXPR_RESULT_F64_REG;
+                        result.size_bytes = 8;
+                    }
+                    Light_VM_Instruction instr = {
+                        .type = LVM_FMOV,
+                        .imm_size_bytes = 4,
+                        .ifloat.addr_mode = FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG,
+                        .ifloat.dst_reg = result.reg,
+                        .ifloat.src_reg = LRBP,
+                    };
+                    light_vm_push_instruction(state, instr, expr->expr_variable.decl->decl_variable.stack_offset);
                 }
                 else
                 {
-                    result.reg = EFR0;
-                    result.type = EXPR_RESULT_F64_REG;
-                    result.size_bytes = 8;
+                    result.reg = R0;
+                    result.type = EXPR_RESULT_REG;
+                    result.size_bytes = expr->type->size_bits / BITS_IN_BYTE;
+
+                    Light_VM_Instruction instr = {
+                        .type = LVM_MOV,
+                        .imm_size_bytes = 4,
+                        .binary.bytesize = expr->type->size_bits / BITS_IN_BYTE,
+                        .binary.addr_mode = BIN_ADDR_MODE_REG_OFFSETED_TO_REG,
+                        .binary.dst_reg = result.reg,
+                        .binary.src_reg = LRBP,
+                    };
+                    light_vm_push_instruction(state, instr, expr->expr_variable.decl->decl_variable.stack_offset);
                 }
-                Light_VM_Instruction instr = {
-                    .type = LVM_FMOV,
-                    .imm_size_bytes = 4,
-                    .ifloat.addr_mode = FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG,
-                    .ifloat.dst_reg = result.reg,
-                    .ifloat.src_reg = LRBP,
-                };
-                light_vm_push_instruction(state, instr, expr->expr_variable.decl->decl_variable.stack_offset);
             }
             else
             {
                 result.reg = R0;
                 result.type = EXPR_RESULT_REG;
-                result.size_bytes = expr->type->size_bits / BITS_IN_BYTE;
+                result.size_bytes = LVM_PTRSIZE;
+                light_vm_push_fmt(state, "mov r%d, rbp", result.reg);
+            
+                if(expr->expr_variable.decl->decl_variable.stack_offset < 0)
+                    light_vm_push_fmt(state, "subs r%d, %d", result.reg, -expr->expr_variable.decl->decl_variable.stack_offset);
+                else
+                    light_vm_push_fmt(state, "adds r%d, %d", result.reg, expr->expr_variable.decl->decl_variable.stack_offset);
 
-                Light_VM_Instruction instr = {
-                    .type = LVM_MOV,
-                    .imm_size_bytes = 4,
-                    .binary.bytesize = expr->type->size_bits / BITS_IN_BYTE,
-                    .binary.addr_mode = BIN_ADDR_MODE_REG_OFFSETED_TO_REG,
-                    .binary.dst_reg = result.reg,
-                    .binary.src_reg = LRBP,
-                };
-                light_vm_push_instruction(state, instr, expr->expr_variable.decl->decl_variable.stack_offset);
+                Light_Ast* dd = expr->expr_variable.decl;
+                Light_Type* tt = type_alias_root(dd->decl_variable.type);
+                if ((dd->decl_variable.flags & DECL_VARIABLE_FLAG_PROC_ARGUMENT) && (tt->kind == TYPE_KIND_STRUCT || tt->kind == TYPE_KIND_ARRAY || tt->kind == TYPE_KIND_UNION))
+                    light_vm_push_fmt(state, "mov r%d, [r%d]", result.reg, result.reg);
+                if (tt->kind == TYPE_KIND_FUNCTION && flags & EXPR_FLAG_DEREFERENCE)
+                    light_vm_push_fmt(state, "mov r%d, [r%d]", result.reg, result.reg);
             }
         }
         else
         {
-            result.reg = R0;
-            result.type = EXPR_RESULT_REG;
-            result.size_bytes = LVM_PTRSIZE;
-            light_vm_push_fmt(state, "mov r%d, rbp", result.reg);
-            
-            if(expr->expr_variable.decl->decl_variable.stack_offset < 0)
-                light_vm_push_fmt(state, "subs r%d, %d", result.reg, -expr->expr_variable.decl->decl_variable.stack_offset);
-            else
-                light_vm_push_fmt(state, "adds r%d, %d", result.reg, expr->expr_variable.decl->decl_variable.stack_offset);
-            if (expr->expr_variable.decl->decl_variable.flags & DECL_VARIABLE_FLAG_PROC_ARGUMENT)
-                light_vm_push_fmt(state, "mov r%d, [r%d]", result.reg, result.reg);
+            Unimplemented;
+        }
+    }
+    else if (decl->kind == AST_DECL_CONSTANT) 
+    {
+        return lvmgen_expr(state, gen, decl->decl_constant.value, flags);
+    }
+    else if (decl->kind == AST_DECL_PROCEDURE)
+    {
+        // light_vm_patch_instruction_immediate
+        //Light_VM_Instruction_Info mov_instr = light_vm_push_fmt(state, "mov r%d, 0xffffffffffffffff", result.reg);
+        if(decl->decl_proc.lvm_base_instruction)
+            light_vm_push_fmt(state, "mov r%d, 0x%llx", result.reg, (uint64_t)decl->decl_proc.lvm_base_instruction);
+        else
+        {
+            Light_VM_Instruction_Info call_instr = light_vm_push_fmt(state, "mov r%d, 0xffffffffffffffff", result.reg);
+            Patch_Procs pp = {
+                .from = call_instr,
+                .to_decl = decl,
+                .absolute = true
+            };
+            array_push(gen->proc_patch_calls, pp);
         }
     }
     else
@@ -1283,70 +1317,98 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
         if(expr->expr_proc_call.caller_expr->kind == AST_EXPRESSION_VARIABLE)
         {
             Light_Ast* decl = expr->expr_proc_call.caller_expr->expr_variable.decl;
-            assert(decl->kind == AST_DECL_PROCEDURE);
-
-            Light_Token* token = decl->decl_proc.extern_library_name;
-
-            u64 lib_hash = fnv_1_hash(token->raw_data, token->raw_data_length);
-            External_Lib* lib = hoht_get_value_hashed(&gen->external_table, lib_hash);
-            if(!lib)
+            if (decl->kind == AST_DECL_PROCEDURE)
             {
-                void* lname = calloc(1, token->raw_data_length + 1);
-                memcpy(lname, token->raw_data, token->raw_data_length);
-                External_Lib nlib = {
-                    .name = token->raw_data,
-                    .name_length = token->raw_data_length,
-                    #if defined(_WIN32) || defined(_WIN64)
-                    .lib_handle = LoadLibraryA(lname)
-                    #endif
-                };
-                free(lname);
-                hoht_new(&nlib.symbols, 32, sizeof(External_Symbol), 0.5f, malloc, free);
-                int idx = hoht_push_hashed(&gen->external_table, lib_hash, &nlib);
-                lib = hoht_get_value_from_index(&gen->external_table, idx);
-            }
+                Light_Token* token = decl->decl_proc.extern_library_name;
 
-            u64 symbol_hash = fnv_1_hash(decl->decl_proc.name->data, decl->decl_proc.name->length);
-            External_Symbol* symbol = hoht_get_value_hashed(&lib->symbols, symbol_hash);
-            if(!symbol)
-            {
-                void* s = calloc(1, decl->decl_proc.name->length + 1);
-                memcpy(s, decl->decl_proc.name->data, decl->decl_proc.name->length);
-                External_Symbol sym = {
-                    .symbol = decl->decl_proc.name->data,
-                    .symbol_length = decl->decl_proc.name->length,
-                    #if defined(_WIN32) || defined(_WIN64)
-                    .proc_address = GetProcAddress(lib->lib_handle, s),
-                    #endif
-                };
-                free(s);
-                int idx = hoht_push_hashed(&lib->symbols, symbol_hash, &sym);
-                symbol = hoht_get_value_from_index(&lib->symbols, idx);
-            }
+                u64 lib_hash = fnv_1_hash(token->raw_data, token->raw_data_length);
+                External_Lib* lib = hoht_get_value_hashed(&gen->external_table, lib_hash);
+                if(!lib)
+                {
+                    void* lname = calloc(1, token->raw_data_length + 1);
+                    memcpy(lname, token->raw_data, token->raw_data_length);
+                    External_Lib nlib = {
+                        .name = token->raw_data,
+                        .name_length = token->raw_data_length,
+                        #if defined(_WIN32) || defined(_WIN64)
+                        .lib_handle = LoadLibraryA(lname)
+                        #endif
+                    };
+                    free(lname);
+                    hoht_new(&nlib.symbols, 32, sizeof(External_Symbol), 0.5f, malloc, free);
+                    int idx = hoht_push_hashed(&gen->external_table, lib_hash, &nlib);
+                    lib = hoht_get_value_from_index(&gen->external_table, idx);
+                }
 
-            s32 start_release = gen->release_size_bytes;
-            s32 arg_size = 0;
-            for(int i = 0; i < expr->expr_proc_call.arg_count; ++i)
-            {
-                Light_Ast* arg = expr->expr_proc_call.args[i];
-                Expr_Result res = lvmgen_expr(state, gen, arg, EXPR_FLAG_DEREFERENCE);
+                u64 symbol_hash = fnv_1_hash(decl->decl_proc.name->data, decl->decl_proc.name->length);
+                External_Symbol* symbol = hoht_get_value_hashed(&lib->symbols, symbol_hash);
+                if(!symbol)
+                {
+                    void* s = calloc(1, decl->decl_proc.name->length + 1);
+                    memcpy(s, decl->decl_proc.name->data, decl->decl_proc.name->length);
+                    External_Symbol sym = {
+                        .symbol = decl->decl_proc.name->data,
+                        .symbol_length = decl->decl_proc.name->length,
+                        #if defined(_WIN32) || defined(_WIN64)
+                        .proc_address = GetProcAddress(lib->lib_handle, s),
+                        #endif
+                    };
+                    free(s);
+                    int idx = hoht_push_hashed(&lib->symbols, symbol_hash, &sym);
+                    symbol = hoht_get_value_from_index(&lib->symbols, idx);
+                }
 
-                if(res.type == EXPR_RESULT_REG)
-                    light_vm_push_fmt(state, "expushi r%d", res.reg);
-                else if(res.type == EXPR_RESULT_F32_REG)
-                    light_vm_push_fmt(state, "expushf fr%d", res.freg);
-                else if(res.type == EXPR_RESULT_F64_REG)
-                    light_vm_push_fmt(state, "expushf efr%d", res.efreg);
-            }
+                s32 start_release = gen->release_size_bytes;
+                s32 arg_size = 0;
+                for(int i = 0; i < expr->expr_proc_call.arg_count; ++i)
+                {
+                    Light_Ast* arg = expr->expr_proc_call.args[i];
+                    Expr_Result res = lvmgen_expr(state, gen, arg, EXPR_FLAG_DEREFERENCE);
+
+                    if(res.type == EXPR_RESULT_REG)
+                        light_vm_push_fmt(state, "expushi r%d%s", res.reg, register_size_suffix(res.size_bytes));
+                    else if(res.type == EXPR_RESULT_F32_REG)
+                        light_vm_push_fmt(state, "expushf fr%d", res.freg);
+                    else if(res.type == EXPR_RESULT_F64_REG)
+                        light_vm_push_fmt(state, "expushf efr%d", res.efreg);
+                }
             
-            light_vm_push_fmt(state, "mov r2, 0x%llx", symbol->proc_address);
-            light_vm_push(state, "extcall r2");
+                light_vm_push_fmt(state, "mov r2, 0x%llx", symbol->proc_address);
+                light_vm_push(state, "extcall r2");
 
-            for(int i = expr->expr_proc_call.arg_count-1; i >= 0; --i)
-                light_vm_push(state, "expop");
+                for(int i = expr->expr_proc_call.arg_count-1; i >= 0; --i)
+                    light_vm_push(state, "expop");
 
-            light_vm_push_fmt(state, "adds rsp, %d", gen->release_size_bytes - start_release);
-            gen->release_size_bytes = start_release;
+                light_vm_push_fmt(state, "adds rsp, %d", gen->release_size_bytes - start_release);
+                gen->release_size_bytes = start_release;
+            }
+            else if(decl->kind == AST_DECL_VARIABLE)
+            {
+                s32 start_release = gen->release_size_bytes;
+                s32 arg_size = 0;
+
+                for (int i = 0; i < expr->expr_proc_call.arg_count; ++i)
+                {
+                    Light_Ast* arg = expr->expr_proc_call.args[i];
+                    Expr_Result res = lvmgen_expr(state, gen, arg, EXPR_FLAG_DEREFERENCE);
+
+                    if (res.type == EXPR_RESULT_REG)
+                        light_vm_push_fmt(state, "expushi r%d%s", res.reg, register_size_suffix(res.size_bytes));
+                    else if (res.type == EXPR_RESULT_F32_REG)
+                        light_vm_push_fmt(state, "expushf fr%d", res.freg);
+                    else if (res.type == EXPR_RESULT_F64_REG)
+                        light_vm_push_fmt(state, "expushf efr%d", res.efreg);
+                }
+
+                Expr_Result caller = lvmgen_expr(state, gen, expr->expr_proc_call.caller_expr, EXPR_FLAG_DEREFERENCE);
+                light_vm_push_fmt(state, "extcall r%d", caller.reg);
+
+                for (int i = expr->expr_proc_call.arg_count - 1; i >= 0; --i)
+                    light_vm_push(state, "expop");
+
+                light_vm_push_fmt(state, "adds rsp, %d", gen->release_size_bytes - start_release);
+                gen->release_size_bytes = start_release;
+            }
         }
         else
         {
@@ -1362,7 +1424,7 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
             Light_Ast* arg = expr->expr_proc_call.args[i];
             Expr_Result res = lvmgen_expr(state, gen, arg, EXPR_FLAG_DEREFERENCE);
             lvmg_push_result(state, res);
-            arg_size += LVM_PTRSIZE;
+            arg_size += (LVM_PTRSIZE + gen->release_size_bytes);
         }
 
         Light_Type* return_type = type_alias_root(expr->type);
@@ -1392,6 +1454,7 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
 
         // restore the arguments space
         light_vm_push_fmt(state, "adds rsp, %d", arg_size);
+        gen->release_size_bytes = 0;
     }
 
     return lvmg_reg_for_type(expr->type);
@@ -1638,7 +1701,8 @@ lvmgen_comm_if(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info
     // in this case, just evaluate the final result and branch according to that.
     // We can't do this by branching inside because there can ban casts to bool.
     Light_VM_Instruction_Info base_case = {0};
-    if(array_length(gen->short_circuit_jmps) == 0)
+    bool no_short_circuit = array_length(gen->short_circuit_jmps) == 0;
+    if(no_short_circuit)
     {
         light_vm_push_fmt(state, "cmp r%db, 0", res.reg);
         base_case = light_vm_push(state, "beq 0xffffffff");
@@ -1652,7 +1716,7 @@ lvmgen_comm_if(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info
     Light_VM_Instruction_Info skip_true = light_vm_push(state, "jmp 0xffffffff");
 
     Light_VM_Instruction_Info else_block = light_vm_current_instruction(state);
-    if(array_length(gen->short_circuit_jmps) == 0)
+    if(no_short_circuit)
     {
         light_vm_patch_immediate_distance(base_case, else_block);
     }
@@ -1686,7 +1750,8 @@ lvmgen_comm_while(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_i
     // in this case, just evaluate the final result and branch according to that.
     // We can't do this by branching inside because there can ban casts to bool.
     Light_VM_Instruction_Info base_case = {0};
-    if(array_length(gen->short_circuit_jmps) == 0)
+    bool no_short_circuit = array_length(gen->short_circuit_jmps) == 0;
+    if(no_short_circuit)
     {
         light_vm_push(state, "cmp r0, 0");
         base_case = light_vm_push(state, "beq 0xffffffff");
@@ -1718,7 +1783,7 @@ lvmgen_comm_while(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_i
 
     // Outside the loop patch what it still needs to patch
     Light_VM_Instruction_Info while_end = light_vm_current_instruction(state);
-    if(array_length(gen->short_circuit_jmps) == 0)
+    if(no_short_circuit)
         light_vm_patch_immediate_distance(base_case, while_end);
     for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
         if(gen->short_circuit_jmps[i].short_circuit_index == -1)
@@ -1744,8 +1809,11 @@ static void
 lvmgen_comm_for(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm)
 {
     // Prologue
-    for(int i = 0; i < array_length(comm->comm_for.prologue); ++i)
-        lvmgen_command(state, gen, stack_info, comm->comm_for.prologue[i]);
+    if (comm->comm_for.prologue)
+    {
+        for(int i = 0; i < array_length(comm->comm_for.prologue); ++i)
+            lvmgen_command(state, gen, stack_info, comm->comm_for.prologue[i]);
+    }
     
     gen->short_circuit = true;
     gen->short_circuit_current_true = 1;
@@ -1758,7 +1826,8 @@ lvmgen_comm_for(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_inf
     // in this case, just evaluate the final result and branch according to that.
     // We can't do this by branching inside because there can ban casts to bool.
     Light_VM_Instruction_Info base_case = {0};
-    if(array_length(gen->short_circuit_jmps) == 0)
+    bool no_short_circuit = array_length(gen->short_circuit_jmps) == 0;
+    if(no_short_circuit)
     {
         light_vm_push(state, "cmp r0, 0");
         base_case = light_vm_push(state, "beq 0xffffffff");
@@ -1794,7 +1863,7 @@ lvmgen_comm_for(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_inf
 
     // Outside the loop patch what it still needs to patch
     Light_VM_Instruction_Info while_end = light_vm_current_instruction(state);
-    if(array_length(gen->short_circuit_jmps) == 0)
+    if(no_short_circuit)
         light_vm_patch_immediate_distance(base_case, while_end);
     for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
         if(gen->short_circuit_jmps[i].short_circuit_index == -1)
@@ -1988,8 +2057,60 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     // Perform all patching needed
     for(int i = 0; i < array_length(gen.proc_patch_calls); ++i)
     {
-        Light_VM_Instruction_Info to = *(Light_VM_Instruction_Info*)((Light_Ast*)gen.proc_patch_calls[i].to_decl)->decl_proc.lvm_base_instruction;
-        light_vm_patch_immediate_distance(gen.proc_patch_calls[i].from, to);
+        Light_VM_Instruction_Info* to = (Light_VM_Instruction_Info*)((Light_Ast*)gen.proc_patch_calls[i].to_decl)->decl_proc.lvm_base_instruction;
+        if (gen.proc_patch_calls[i].absolute)
+        {
+            if(to)
+                light_vm_patch_instruction_immediate(gen.proc_patch_calls[i].from, (int64_t)to->absolute_address);
+            else
+            {
+                Light_Ast* decl = (Light_Ast*)gen.proc_patch_calls[i].to_decl;
+                Light_Token* token = decl->decl_proc.extern_library_name;
+
+                u64 lib_hash = fnv_1_hash(token->raw_data, token->raw_data_length);
+                External_Lib* lib = hoht_get_value_hashed(&gen.external_table, lib_hash);
+                if (!lib)
+                {
+                    void* lname = calloc(1, token->raw_data_length + 1);
+                    memcpy(lname, token->raw_data, token->raw_data_length);
+                    External_Lib nlib = {
+                        .name = token->raw_data,
+                        .name_length = token->raw_data_length,
+                        #if defined(_WIN32) || defined(_WIN64)
+                        .lib_handle = LoadLibraryA(lname)
+                        #endif
+                    };
+                    free(lname);
+                    hoht_new(&nlib.symbols, 32, sizeof(External_Symbol), 0.5f, malloc, free);
+                    int idx = hoht_push_hashed(&gen.external_table, lib_hash, &nlib);
+                    lib = hoht_get_value_from_index(&gen.external_table, idx);
+                }
+
+                u64 symbol_hash = fnv_1_hash(decl->decl_proc.name->data, decl->decl_proc.name->length);
+                External_Symbol* symbol = hoht_get_value_hashed(&lib->symbols, symbol_hash);
+                if (!symbol)
+                {
+                    void* s = calloc(1, decl->decl_proc.name->length + 1);
+                    memcpy(s, decl->decl_proc.name->data, decl->decl_proc.name->length);
+                    External_Symbol sym = {
+                        .symbol = decl->decl_proc.name->data,
+                        .symbol_length = decl->decl_proc.name->length,
+                        #if defined(_WIN32) || defined(_WIN64)
+                        .proc_address = GetProcAddress(lib->lib_handle, s),
+                        #endif
+                    };
+                    free(s);
+                    int idx = hoht_push_hashed(&lib->symbols, symbol_hash, &sym);
+                    symbol = hoht_get_value_from_index(&lib->symbols, idx);
+                }
+
+                light_vm_patch_instruction_immediate(gen.proc_patch_calls[i].from, (int64_t)symbol->proc_address);
+            }
+        }
+        else
+        {
+            light_vm_patch_immediate_distance(gen.proc_patch_calls[i].from, *to);
+        }
     }
 
     // -------------------------------------
@@ -2003,7 +2124,7 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     // -------------------------------------
     // Debug printout
     light_vm_debug_dump_code(stdout, state, gen.debug_info);
-    light_vm_execute(state, 0, false);
+    light_vm_execute(state, 0, true);
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL|LVM_PRINT_FLOATING_POINT_REGISTERS);
 }
 
@@ -2086,6 +2207,7 @@ lvm_generate_and_run_directive(Light_Ast* expr, bool generate)
     }
 
     light_vm_execute(g_runtime_generator.state, 0, true);
+    //light_vm_debug_dump_registers(stdout, g_runtime_generator.state, LVM_PRINT_DECIMAL);
 
     if(r.type == EXPR_RESULT_REG)
         return (void*)&g_runtime_generator.state->registers[r.reg];

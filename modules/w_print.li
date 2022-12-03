@@ -13,8 +13,14 @@ string_equal:(s1 : string, s2 : string) -> bool {
     return true;
 }
 
+GetStdHandle : (std_handle : s32) -> ^void #extern("Kernel32.dll");
+WriteConsoleA : (handle : ^void, str : ^u8, length : s32, written : ^s32, reserved : s32) -> bool #extern("Kernel32.dll");
+
 print_string:(s : string) -> u64 {
-    write(STDOUT_FILENO, s.data, s.length -> u64);
+    handle := GetStdHandle(-11);
+    written : s32;
+    WriteConsoleA(handle, s.data, s.length -> s32, &written, 0);
+    return written -> u64;
 }
 
 print_string_c:(str : ^u8) -> u64 {
@@ -65,7 +71,9 @@ print:(fmt : string, args : ...) -> u64 {
             print_type(value.type);
         } else if at == '\\' && previous != '\\' {
         } else {
-            write(STDOUT_FILENO, &at, 1);
+            handle := GetStdHandle(-11);
+            written : s32;
+            WriteConsoleA(handle, &at, 1, &written, 0);
         }
         previous = at;
     }
@@ -427,63 +435,71 @@ unsigned_to_str_base16:(value : u64, bitsize : u64, leading_zeros : bool, capita
 print_s8:(value : s8) -> u64 {
     buffer: [32]u8;
     length := s64_to_str(value->s64, buffer);
-    write(STDOUT_FILENO, buffer->^void, length);
+    written : s32;
+    WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     return length;
 }
 
 print_s16:(value : s16) -> u64 {
     buffer: [32]u8;
     length := s64_to_str(value->s64, buffer);
-    write(STDOUT_FILENO, buffer->^void, length);
+    written : s32;
+    WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     return length;
 }
 
 print_s32:(value : s32) -> u64 {
     buffer: [32]u8;
+    written : s32;
     length := s64_to_str(value->s64, buffer);
-    write(STDOUT_FILENO, buffer->^void, length);
+    WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     return length;
 }
 
 print_s64:(value : s64) -> u64 {
     buffer: [32]u8;
+    written : s32;
     length := s64_to_str(value, buffer);
-    write(STDOUT_FILENO, buffer->^void, length);
+    WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     return length;
 }
 
 print_u8:(value : u8, base : s32) -> u64 {
     buffer : [16]u8;
+    written : s32;
     length := unsigned_to_str_base16(value->u64, 8, true, false, buffer);
-    write(STDOUT_FILENO, buffer->^void, length);
+    WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     return length;
 }
 
 print_u16:(value : u16, base : s32) -> u64 {
     buffer : [16]u8;
+    written : s32;
     length := unsigned_to_str_base16(value->u64, 16, true, false, buffer);
-    write(STDOUT_FILENO, buffer->^void, length);
+    WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     return length;
 }
 
 print_u32:(value : u32, base : s32) -> u64 {
     buffer : [16]u8;
+    written : s32;
     length := unsigned_to_str_base16(value->u64, 32, true, false, buffer);
-    write(STDOUT_FILENO, buffer->^void, length);
+    WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     return length;
 }
 
 print_u64:(value : u64, base : s32) -> u64 {
     length : u64;
+    written : s32;
     
     if base == 16 {
         buffer : [16]u8;
         length = unsigned_to_str_base16(value, 64, true, false, buffer);
-        write(STDOUT_FILENO, buffer->^void, length);
+        WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     } else if base == 10 {
         buffer : [32]u8;
         length = u64_to_str(value, buffer);
-        write(STDOUT_FILENO, buffer->^void, length);
+        WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     }
 
     return length;
@@ -558,13 +574,17 @@ r32_to_str:(v : r32, buffer : [32]u8) -> u64 {
 print_r32:(v : r32) -> u64 {
     buffer : [32]u8;
     length := r32_to_str(v, buffer);
-    write(STDOUT_FILENO, buffer->^void, length);
+    written : s32;
+    
+    WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     return length;
 }
 
 print_r64:(v : r64) -> u64 {
     buffer : [64]u8;
+    written : s32;
     length := r64_to_str(v, buffer);
-    write(STDOUT_FILENO, buffer->^void, length);
+
+    WriteConsoleA(GetStdHandle(-11), buffer->^void, length -> s32, &written, 0);
     return length;
 }

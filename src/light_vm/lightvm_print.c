@@ -267,6 +267,18 @@ print_cvt_instruction(FILE* out, Light_VM_Instruction instr, u64 imm)
             fprintf(out, ", ");
             print_float_register(out, instr.binary.src_reg);
             break;
+        case LVM_CVT_R64_S64:
+            fprintf(out, "cvtr64s64 ");
+            print_register(out, instr.binary.dst_reg, 8);
+            fprintf(out, ", ");
+            print_float_register(out, instr.binary.src_reg);
+            break;
+        case LVM_CVT_R64_S32:
+            fprintf(out, "cvtr64s32 ");
+            print_register(out, instr.binary.dst_reg, 4);
+            fprintf(out, ", ");
+            print_float_register(out, instr.binary.src_reg);
+            break;
         case LVM_CVT_SEXT:   
             fprintf(out, "cvtsext "); 
             print_register(out, instr.sext.dst_reg, instr.sext.dst_size);
@@ -535,6 +547,8 @@ light_vm_print_instruction(FILE* out, Light_VM_Instruction instr, uint64_t imm) 
         case LVM_CVT_S64_R32:
         case LVM_CVT_R32_R64:
         case LVM_CVT_R64_R32:
+        case LVM_CVT_R64_S64:
+        case LVM_CVT_R64_S32:
         case LVM_CVT_SEXT:
             print_cvt_instruction(out, instr, imm);
             break;

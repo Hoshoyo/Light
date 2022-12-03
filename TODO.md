@@ -1,5 +1,7 @@
 ## TODO
 
+TODO from toplevel.c:719 - this is the implementation of string literals inside if statements for C backend.
+
 ### Backend x86
 - x86 functions returning void are causing a crash when not explicitly using return
 - x86 backend passing array as an argument is doing it by copy, i think

@@ -87,6 +87,8 @@ typedef enum {
     LVM_CVT_R64_R32,
     LVM_CVT_U64_R32,
     LVM_CVT_U64_R64,
+    LVM_CVT_R64_S64,
+    LVM_CVT_R64_S32,
     LVM_CVT_SEXT,
 
     // Jump

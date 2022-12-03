@@ -582,6 +582,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
             }
 
             Light_Ast* arg = parse_decl_variable(parser, name, arg_type, args_scope, error, false);
+            arg->decl_variable.flags |= DECL_VARIABLE_FLAG_PROC_ARGUMENT;
             array_push(arguments, arg);
             array_push(args_types, arg_type);
 
@@ -631,23 +632,26 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
 
         // extern
         if(tag->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_EXTERN].data) {
-            flags |= DECL_PROC_FLAG_EXTERN;
             
-            *error |= parser_require_and_eat(parser, '(');
-            ReturnIfError();
+            if (lexer_peek(lexer)->type == '(')
+            {
+                *error |= parser_require_and_eat(parser, '(');
+                ReturnIfError();
+                flags |= DECL_PROC_FLAG_EXTERN;
             
-            external_library_name = lexer_next(lexer);
+                external_library_name = lexer_next(lexer);
 
-            if(external_library_name->type != TOKEN_LITERAL_STRING) {
-                *error |= parser_error_fatal(parser, external_library_name, "expected library name as a string literal\n");
+                if(external_library_name->type != TOKEN_LITERAL_STRING) {
+                    *error |= parser_error_fatal(parser, external_library_name, "expected library name as a string literal\n");
+                    ReturnIfError();
+                }
+
+                *error |= parser_require_and_eat(parser, ')');
+                ReturnIfError();
+
+                *error |= parser_require_and_eat(parser, ';');
                 ReturnIfError();
             }
-
-            *error |= parser_require_and_eat(parser, ')');
-            ReturnIfError();
-
-            *error |= parser_require_and_eat(parser, ';');
-            ReturnIfError();
 
             function_flags |= TYPE_FUNCTION_STDCALL;
         }
@@ -1491,6 +1495,16 @@ parse_type_procedure(Light_Parser* parser, Light_Scope* scope, u32* error) {
     }
 
     s32 args_count = (arguments_types) ? array_length(arguments_types) : 0;
+
+    if(lexer_peek(parser->lexer)->type == '#' && 
+        lexer_peek_n(parser->lexer, 1)->data == (u8*)light_special_idents_table[LIGHT_SPECIAL_IDENT_EXTERN].data && 
+        lexer_peek_n(parser->lexer, 2)->type != '(') 
+    {
+        lexer_next(parser->lexer); // eat #
+        lexer_next(parser->lexer); // eat extern
+        flags |= TYPE_FUNCTION_STDCALL;
+    }
+
     return type_new_function(arguments_types, return_type, args_count, all_args_internalized, flags);
 }
 static Light_Type*

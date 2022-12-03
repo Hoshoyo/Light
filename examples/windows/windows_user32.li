@@ -2,8 +2,8 @@ PeekMessageA : (msg : ^MSG, hwnd : ^void, msg_min_filter : u32, msg_max_filter :
 MessageBoxA : (hwnd : ^void, text: ^u8, caption : ^u8, type : u32) -> bool #extern("User32.dll");
 GetDC : (hwnd : ^void) -> ^void #extern("User32.dll");
 RegisterClassExA : (wnd_class : ^WNDCLASSEXA) -> s32 #extern("User32.dll");
-CreateWindowExA : (ex_style: u32, class_name : ^u8, window_name : ^u8, style : u32, x : s32, y : s32, width : s32, height : s32, parent : s32, menu : s32, hinstance : s32, lparam : s32) -> ^void #extern("User32.dll");
-DefWindowProcA : (window : ^void, msg : u32, wparam : ^void, lparam : ^void) -> ^void #extern("User32.dll");
+CreateWindowExA : (ex_style: u32, class_name : ^u8, window_name : ^u8, style : u32, x : s32, y : s32, width : s32, height : s32, parent : ^void, menu : ^void, hinstance : ^void, lparam : ^void) -> ^void #extern("User32.dll");
+DefWindowProcA : (window : ^void, msg : u32, wparam : ^u32, lparam : ^u32) -> ^void #extern("User32.dll");
 GetMessageA : (msg : ^MSG, hwnd : ^void, msg_filter_min : u32, msg_filter_max : u32) -> s32 #extern("User32.dll");
 TranslateMessage : (msg : ^MSG) -> s32 #extern("User32.dll");
 DispatchMessageA : (msg : ^MSG) -> s32 #extern("User32.dll");

@@ -370,6 +370,7 @@ type_hash(Light_Type* type) {
                 }
             }
 			hash = fnv_1_hash_combine(return_type_hash, proc_hash);
+            hash = fnv_1_hash_combine(hash, type->function.flags);
 		} break;
 		case TYPE_KIND_ARRAY:
 			hash = fnv_1_hash_combine(type_hash(type->array_info.array_of), type->array_info.dimension); break;
