@@ -40,8 +40,8 @@ lvm_ext_call proc
     ; preserve registers
     sub rsp, 64
     mov [rbp - 64], r8
-    mov [rbp - 56], rdi
-    mov [rbp - 48], rsi
+    mov [rbp - 56], rsi
+    mov [rbp - 48], rdi
     mov [rbp - 40], r15
     mov [rbp - 32], r14
     mov [rbp - 24], r13
@@ -49,6 +49,7 @@ lvm_ext_call proc
     mov [rbp - 8], rbx
 
     mov r10, rdx        ; r10 = funcptr
+    mov rsi, rcx
 
     mov rax, rcx        ; rax = struct*
     mov rbx, rcx
@@ -202,6 +203,11 @@ push_float:
 
 no_more_args:
     sub rsp, 32 ; 32 bytes of shadow space
+
+    ; clear the vm temp stack
+    mov dword ptr[rsi], 0
+    mov dword ptr[rsi + 4], 0
+
     call r10
 
     ; restore registers saved
@@ -214,7 +220,7 @@ no_more_args:
     mov r12, [rbp - 16]
     mov rbx, [rbp - 8]
 
-    movdqa xmmword ptr[r8], xmm0
+    movlpd qword ptr[r8], xmm0
 
     ; epilogue
     mov	rsp, rbp

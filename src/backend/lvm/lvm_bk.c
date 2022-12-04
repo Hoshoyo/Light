@@ -4,12 +4,16 @@
 #include <assert.h>
 #include <light_array.h>
 #include "../../../include/hoht.h"
+#include "../../top_typecheck.h"
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #endif
 
+#define HO_ASSEMBLER_IMPLEMENT
+#include "../../hassembler/hoasm.h"
+
 #define PRINT_LVM_INSTRUCTIONS 0
-#define DUMP_LVM_CODE 0
+#define DUMP_LVM_CODE 1
 
 typedef struct {
     const char* symbol;
@@ -1080,6 +1084,10 @@ lvmgen_expr_cast(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32
             // int -> ptr this is a no-op.
             return lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
         }
+        else if (cast_type->kind == TYPE_KIND_FUNCTION)
+        {
+            return lvmgen_expr(state, gen, expr->expr_unary.operand, flags|EXPR_FLAG_DEREFERENCE);
+        }
     }
     else
     {
@@ -1320,7 +1328,7 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
         if(expr->expr_proc_call.caller_expr->kind == AST_EXPRESSION_VARIABLE)
         {
             Light_Ast* decl = expr->expr_proc_call.caller_expr->expr_variable.decl;
-            if (decl->kind == AST_DECL_PROCEDURE)
+            if (decl->kind == AST_DECL_PROCEDURE && decl->decl_proc.extern_library_name)
             {
                 Light_Token* token = decl->decl_proc.extern_library_name;
 
@@ -1385,10 +1393,31 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
                 light_vm_push_fmt(state, "adds rsp, %d", gen->release_size_bytes - start_release);
                 gen->release_size_bytes = start_release;
             }
-            else if(decl->kind == AST_DECL_VARIABLE)
+            else if(decl->kind == AST_DECL_VARIABLE || (decl->kind == AST_DECL_PROCEDURE && !decl->decl_proc.extern_library_name))
             {
                 s32 start_release = gen->release_size_bytes;
                 s32 arg_size = 0;
+
+                if(decl->kind == AST_DECL_PROCEDURE && !decl->decl_proc.extern_library_name)
+                {
+                    s32 arg_size = 0;
+
+                    for(int i = expr->expr_proc_call.arg_count-1; i >= 0; --i)
+                    {
+                        Light_Ast* arg = expr->expr_proc_call.args[i];
+                        Expr_Result res = lvmgen_expr(state, gen, arg, EXPR_FLAG_DEREFERENCE);
+                        lvmg_push_result(state, res);
+                        arg_size += (LVM_PTRSIZE + gen->release_size_bytes);
+                    }
+
+                    Light_Type* return_type = type_alias_root(expr->type);
+                    if(return_type_requires_stackspace(return_type))
+                    {
+                        light_vm_push_fmt(state, "subs rsp, %d", return_type->size_bits / BITS_IN_BYTE);
+                        arg_size += (return_type->size_bits / BITS_IN_BYTE);
+                    }
+                    gen->release_size_bytes += arg_size;
+                }
 
                 for (int i = 0; i < expr->expr_proc_call.arg_count; ++i)
                 {
@@ -1931,7 +1960,13 @@ lvmgen_comm_return(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_
     if(stack_info->size_bytes > 0)
         light_vm_push(state, "mov rsp, rbp");
     light_vm_push(state, "pop rbp");
-    light_vm_push(state, "ret");
+
+    Light_Ast* proc = typecheck_decl_proc_from_scope(expr->scope_at);
+    if(proc->decl_proc.proc_type->function.flags & TYPE_FUNCTION_STDCALL) {
+        light_vm_push(state, "hlt");
+    } else {
+        light_vm_push(state, "ret");
+    }
 }
 
 static void
@@ -1957,11 +1992,16 @@ lvmgen_command(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info
     }
 }
 
-static void
-lvmgen_proc_decl(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
+u64 CALLBACK
+lvm_process_callback(Light_VM_State* state, void* entry)
 {
-    assert(proc->kind == AST_DECL_PROCEDURE);
+    light_vm_execute(state, entry, PRINT_LVM_INSTRUCTIONS, false);
+    return state->registers[R0];
+}
 
+static void
+lvmgem_proc_decl_lightcall(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
+{
     push_lexical_range(gen, state->code_offset, &proc->decl_proc.decl_lexical_range);
 
     // Generate the stack for the arguments
@@ -2015,6 +2055,79 @@ lvmgen_proc_decl(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
         light_vm_push_fmt(state, "mov rsp, rbp");
         light_vm_push(state, "pop rbp");
         light_vm_push(state, "ret");
+    }
+}
+
+static void
+lvmgen_proc_decl_stdcall(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
+{
+    u8* at = (u8*)state->code.block + state->code_offset;
+
+    proc->decl_proc.lvm_base_instruction = at;
+    at = emit_mov(0, at, mk_oi(RAX, (uint64_t)lvm_process_callback, 64));
+    at = emit_mov(0, at, mk_oi(RCX, (uint64_t)state, 64)); // @Important, this is only for windows bro
+    Instr_Emit_Result info = { 0 };
+    u8* entry = at;
+    at = emit_mov(&info, at, mk_oi(RDX, (uint64_t)0, 64)); // @Important, this is only for windows bro
+    at = emit_arithmetic(0, at, ARITH_SUB, mk_mi_direct(RSP, 32, 8));
+    at = emit_call(0, at, mk_m_direct(RAX));
+    at = emit_arithmetic(0, at, ARITH_ADD, mk_mi_direct(RSP, 32, 8));
+    at = hoasm_emit_ret(0, at, RET_NEAR, 0);
+   
+    state->code_offset += (at - ((u8*)state->code.block + state->code_offset));
+    
+    *(uint64_t*)(entry + info.immediate_offset) = (uint64_t)((u8*)state->code.block + state->code_offset);
+
+    int offset = 1 * LVM_PTRSIZE;
+
+    for (int i = 0; i < proc->decl_proc.argument_count; ++i)
+    {
+        Light_Ast* var = proc->decl_proc.arguments[i];
+        assert(var->kind == AST_DECL_VARIABLE);
+
+        var->decl_variable.stack_index = i;
+        var->decl_variable.stack_offset = offset;
+        var->decl_variable.stack_argument_offset = offset;
+        offset += align_to_ptrsize(var->decl_variable.type->size_bits / BITS_IN_BYTE);
+    }
+
+    // Generate body code
+    Light_Ast* body = proc->decl_proc.body;
+    if(body)
+    {
+        // Saves the previous stack frame base to return
+        Light_VM_Instruction_Info base = light_vm_push(state, "push rbp");
+        light_vm_push(state, "mov rbp, rsp");
+
+        // Allocate space in the stack for the temporary variables
+        Light_VM_Instruction_Info stack_alloc = light_vm_push(state, "subs rsp, 0xffffffff");
+
+        Stack_Info stack_info = { .offset = 0 };
+        for(int i = 0; i < body->comm_block.command_count; ++i)
+        {
+            Light_Ast* comm = body->comm_block.commands[i];
+            lvmgen_command(state, gen, &stack_info, comm);
+        }
+
+        // Patch the value of the instruction
+        light_vm_patch_instruction_immediate(stack_alloc, stack_info.size_bytes);
+
+        // Equivalent to the 'leave' instruction in x86-64,
+        // this puts the stack in the same state as it was before the function call.
+        light_vm_push_fmt(state, "mov rsp, rbp");
+        light_vm_push(state, "pop rbp");
+        light_vm_push(state, "hlt");
+    }
+}
+
+static void
+lvmgen_proc_decl(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
+{
+    assert(proc->kind == AST_DECL_PROCEDURE);
+    if((proc->decl_proc.proc_type->function.flags & TYPE_FUNCTION_STDCALL) && (!proc->decl_proc.extern_library_name)) {
+        lvmgen_proc_decl_stdcall(state, gen, proc);
+    } else {
+        lvmgem_proc_decl_lightcall(state, gen, proc);
     }
 }
 
@@ -2130,7 +2243,7 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
 #if DUMP_LVM_CODE
     light_vm_debug_dump_code(stdout, state, gen.debug_info);
 #endif
-    light_vm_execute(state, 0, PRINT_LVM_INSTRUCTIONS);
+    light_vm_execute(state, 0, PRINT_LVM_INSTRUCTIONS, true);
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL|LVM_PRINT_FLOATING_POINT_REGISTERS);
 }
 
@@ -2212,7 +2325,7 @@ lvm_generate_and_run_directive(Light_Ast* expr, bool generate)
         light_vm_patch_immediate_distance(g_runtime_generator.generator.proc_patch_calls[i].from, *info);
     }
 
-    light_vm_execute(g_runtime_generator.state, 0, false);
+    light_vm_execute(g_runtime_generator.state, 0, false, true);
     //light_vm_debug_dump_registers(stdout, g_runtime_generator.state, LVM_PRINT_DECIMAL);
 
     if(r.type == EXPR_RESULT_REG)

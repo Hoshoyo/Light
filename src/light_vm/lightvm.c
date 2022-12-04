@@ -6,6 +6,8 @@
 #include "common.h"
 #include <light_array.h>
 
+#include <windows.h>
+
 extern u16 cmp_flags_8(u8 l, u8 r);
 extern u16 cmp_flags_16(u16 l, u16 r);
 extern u16 cmp_flags_32(u32 l, u32 r);
@@ -22,6 +24,8 @@ light_vm_init() {
 
     state->code.block = calloc(1, SIZES_VM_MEMORY); // 1MB
     state->code.size_bytes = SIZES_VM_MEMORY;
+    DWORD prev_protect = 0;
+    VirtualProtect(state->code.block, SIZES_VM_MEMORY, PAGE_EXECUTE_READWRITE, &prev_protect);
 
     state->stack.block = calloc(1, SIZES_VM_MEMORY); // 1MB
     state->stack.size_bytes = SIZES_VM_MEMORY;
@@ -573,6 +577,8 @@ light_vm_execute_float_branch_instruction(Light_VM_State* state, Light_VM_Instru
     return branch;
 }
 
+u64 CALLBACK lvm_process_callback(Light_VM_State* state, void* entry);
+
 void
 light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
     void* address_of_imm = ((u8*)state->registers[LRIP]) + sizeof(Light_VM_Instruction); // address of immediate
@@ -597,7 +603,9 @@ light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instr
 
     // VolatileRegisters:
     u64 volatile flt_ret = 0;
+    u64 at = state->registers[LRIP];
     u64 res = lvm_ext_call(&state->ext_stack, jmp_address, (u64*)&flt_ret);
+    state->registers[LRIP] = at;
     state->registers[R0] = res;
     state->f32registers[FR0] = *(r32*)&flt_ret; // return value of r32 in FR0
     state->f64registers[FR4] = *(r64*)&flt_ret; // return value of r64 in FR4
@@ -1199,8 +1207,9 @@ dump_shit(Light_VM_State* state)
 }
 
 void
-light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
-    light_vm_reset(state);
+light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps, bool reset_state) {
+    if(reset_state)
+        light_vm_reset(state);
 
     if(entry_point != 0) {
         state->registers[LRIP] = (u64)entry_point;
@@ -1217,7 +1226,9 @@ light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
             light_vm_print_instruction(stdout, in, imm);
         }
 
-        if(in.type == LVM_HLT) break;
+        if (in.type == LVM_HLT) {
+            break;
+        }
 
         //system("cls");
         light_vm_execute_instruction(state, in);

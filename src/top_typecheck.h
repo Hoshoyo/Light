@@ -17,3 +17,4 @@ Light_Type_Error decl_check_redefinition(Light_Scope* scope, Light_Ast* node, Li
 Light_Type_Error top_typecheck(Light_Ast** top_level, Light_Scope* global_scope);
 void             typecheck_information_pass_decl(Light_Ast* node, u32 flags, u32* decl_error);
 Light_Type*      typecheck_resolve_type(Light_Scope* scope, Light_Type* type, u32 flags, u32* error);
+Light_Ast*       typecheck_decl_proc_from_scope(Light_Scope* scope);

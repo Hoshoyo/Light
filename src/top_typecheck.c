@@ -59,7 +59,7 @@ typecheck_remove_from_infer_queue(Light_Ast* node) {
     return true;
 }
 
-static Light_Ast* 
+Light_Ast* 
 typecheck_decl_proc_from_scope(Light_Scope* scope) {
     while(scope) {
         if(scope->flags & SCOPE_PROCEDURE_BODY) {

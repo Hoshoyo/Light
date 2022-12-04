@@ -330,7 +330,7 @@ void light_vm_debug_dump_variables(FILE* out, Light_VM_State* state, uint32_t fl
 // -------------------------------------
 // ----------- Execution ---------------
 // -------------------------------------
-void light_vm_execute(Light_VM_State* state, void* entry_point, int32_t print_steps);
+void light_vm_execute(Light_VM_State* state, void* entry_point, int32_t print_steps, int32_t reset_state);
 void light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr);
 void light_vm_reset(Light_VM_State* state);
 
