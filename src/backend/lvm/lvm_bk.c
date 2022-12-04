@@ -8,6 +8,9 @@
 #include <windows.h>
 #endif
 
+#define PRINT_LVM_INSTRUCTIONS 0
+#define DUMP_LVM_CODE 0
+
 typedef struct {
     const char* symbol;
     int         symbol_length;
@@ -1995,7 +1998,7 @@ lvmgen_proc_decl(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
 
         // Saves the first instruction for other procedures to call this.
         array_push(gen->proc_bases, base);
-        proc->decl_proc.lvm_base_instruction = &gen->proc_bases[array_length(gen->proc_bases) -1];
+        proc->decl_proc.lvm_base_instruction = base.absolute_address;
 
         Stack_Info stack_info = { .offset = 0 };
         for(int i = 0; i < body->comm_block.command_count; ++i)
@@ -2057,13 +2060,14 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     // Perform all patching needed
     for(int i = 0; i < array_length(gen.proc_patch_calls); ++i)
     {
-        Light_VM_Instruction_Info* to = (Light_VM_Instruction_Info*)((Light_Ast*)gen.proc_patch_calls[i].to_decl)->decl_proc.lvm_base_instruction;
+        void* to = (Light_VM_Instruction_Info*)((Light_Ast*)gen.proc_patch_calls[i].to_decl)->decl_proc.lvm_base_instruction;
         if (gen.proc_patch_calls[i].absolute)
         {
             if(to)
-                light_vm_patch_instruction_immediate(gen.proc_patch_calls[i].from, (int64_t)to->absolute_address);
+                light_vm_patch_instruction_immediate(gen.proc_patch_calls[i].from, (uint64_t)to);
             else
             {
+                // TODO(psv): compress this in a function, there is code duplication 
                 Light_Ast* decl = (Light_Ast*)gen.proc_patch_calls[i].to_decl;
                 Light_Token* token = decl->decl_proc.extern_library_name;
 
@@ -2104,12 +2108,12 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
                     symbol = hoht_get_value_from_index(&lib->symbols, idx);
                 }
 
-                light_vm_patch_instruction_immediate(gen.proc_patch_calls[i].from, (int64_t)symbol->proc_address);
+                light_vm_patch_instruction_immediate(gen.proc_patch_calls[i].from, (uint64_t)symbol->proc_address);
             }
         }
         else
         {
-            light_vm_patch_immediate_distance(gen.proc_patch_calls[i].from, *to);
+            light_vm_patch_immediate_distance_addr(gen.proc_patch_calls[i].from, to);
         }
     }
 
@@ -2123,8 +2127,10 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
 
     // -------------------------------------
     // Debug printout
+#if DUMP_LVM_CODE
     light_vm_debug_dump_code(stdout, state, gen.debug_info);
-    light_vm_execute(state, 0, true);
+#endif
+    light_vm_execute(state, 0, PRINT_LVM_INSTRUCTIONS);
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL|LVM_PRINT_FLOATING_POINT_REGISTERS);
 }
 
@@ -2206,7 +2212,7 @@ lvm_generate_and_run_directive(Light_Ast* expr, bool generate)
         light_vm_patch_immediate_distance(g_runtime_generator.generator.proc_patch_calls[i].from, *info);
     }
 
-    light_vm_execute(g_runtime_generator.state, 0, true);
+    light_vm_execute(g_runtime_generator.state, 0, false);
     //light_vm_debug_dump_registers(stdout, g_runtime_generator.state, LVM_PRINT_DECIMAL);
 
     if(r.type == EXPR_RESULT_REG)

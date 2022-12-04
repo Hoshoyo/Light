@@ -142,6 +142,7 @@ foo : () -> s32 {
 }
 */
 
+/*
 MessageBoxA : (hwnd : ^void, text: ^u8, caption : ^u8, type : u32) -> s32 #extern("User32.dll");
 
 main : () -> s32 {
@@ -153,3 +154,14 @@ main : () -> s32 {
 foo : () -> s32 {
     return 32;
 }
+*/
+
+main : () -> s32 {
+    //a := "Hello\0".data;
+    //print_string("Hello\n") -> s32;
+    
+    //print_bytes(a, 16);
+    return 0;
+}
+
+#import "../modules/w_print.li"

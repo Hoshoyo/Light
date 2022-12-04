@@ -306,6 +306,7 @@ Light_VM_Instruction_Info light_vm_current_instruction(Light_VM_State* state);
 void*                     light_vm_push_data_segment(Light_VM_State* vm_state, Light_VM_Data data);
 void*                     light_vm_push_bytes_data_segment(Light_VM_State* vm_state, uint8_t* bytes, int32_t byte_count);
 int64_t                   light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instruction_Info to);
+int64_t                   light_vm_patch_immediate_distance_addr(Light_VM_Instruction_Info from, void* to);
 void                      light_vm_patch_instruction_immediate(Light_VM_Instruction_Info instr, int64_t value);
 uint64_t                  light_vm_offset_from_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info from);
 uint8_t                   light_vm_patch_to_current_instruction(Light_VM_State* state, Light_VM_Instruction_Info to);

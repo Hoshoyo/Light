@@ -1,6 +1,11 @@
 #import "../examples/windows/windows.li"
 
 main : () -> s32 {
+	a := /*#run*/ foo();
+	return a;
+}
+
+foo : () -> s32 {
     window_class : WNDCLASSEXA;
 	window_class.cb_size = #size_of WNDCLASSEXA -> u32;
 	window_class.style = 0;
@@ -15,9 +20,8 @@ main : () -> s32 {
 	window_class.class_name = "MyClass\0".data;
 	window_class.icon_sm = null;
 
-	RegisterClassExA(&window_class);
-    //if RegisterClassExA(&window_class) == 0
-    //    return GetLastError();
+    if RegisterClassExA(&window_class) == 0
+        return GetLastError();
 
 	w := CreateWindowExA(0x00000100|0x00000200, 
 			window_class.class_name, 
@@ -38,11 +42,11 @@ main : () -> s32 {
 	msg : MSG;
     while GetMessageA(&msg, w, 0, 0) != 0
     {
-
+		TranslateMessage(&msg);
+		DispatchMessageA(&msg);
     }
 
-    //a := #run foo();
-    return 55;
+    return 0;
 }
 
 window_callback : (window : ^void, msg : u32, lparam: ^u32, wparam: ^u32) -> ^void #extern {

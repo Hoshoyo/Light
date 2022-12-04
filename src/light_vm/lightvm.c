@@ -12,18 +12,19 @@ extern u16 cmp_flags_32(u32 l, u32 r);
 extern u16 cmp_flags_64(u64 l, u64 r);
 extern u64 lvm_ext_call(void* stack, void* proc, u64* flt_ret);
 
+#define SIZES_VM_MEMORY (1024 * 1024 * 32)
 Light_VM_State*
 light_vm_init() {
     Light_VM_State* state = (Light_VM_State*)calloc(1, sizeof(*state));
 
-    state->data.block = calloc(1, 1024 * 1024); // 1MB
-    state->data.size_bytes = 1024 * 1024;
+    state->data.block = calloc(1, SIZES_VM_MEMORY); // 1MB
+    state->data.size_bytes = SIZES_VM_MEMORY;
 
-    state->code.block = calloc(1, 1024 * 1024); // 1MB
-    state->code.size_bytes = 1024 * 1024;
+    state->code.block = calloc(1, SIZES_VM_MEMORY); // 1MB
+    state->code.size_bytes = SIZES_VM_MEMORY;
 
-    state->stack.block = calloc(1, 1024 * 1024); // 1MB
-    state->stack.size_bytes = 1024 * 1024;
+    state->stack.block = calloc(1, SIZES_VM_MEMORY); // 1MB
+    state->stack.size_bytes = SIZES_VM_MEMORY;
 
     return state;
 }
@@ -166,6 +167,18 @@ light_vm_patch_immediate_distance(Light_VM_Instruction_Info from, Light_VM_Instr
         default: assert(0); break;
     }
     return ((u8*)to.absolute_address - (u8*)from.absolute_address);
+}
+
+int64_t
+light_vm_patch_immediate_distance_addr(Light_VM_Instruction_Info from, void* to) {
+    switch (((Light_VM_Instruction*)from.absolute_address)->imm_size_bytes) {
+    case 1: *(u8*)(from.absolute_address + 1) = (u8)((u8*)to - (u8*)from.absolute_address); break;
+    case 2: *(u16*)(from.absolute_address + 1) = (u16)((u8*)to - (u8*)from.absolute_address); break;
+    case 4: *(u32*)(from.absolute_address + 1) = (u32)((u8*)to - (u8*)from.absolute_address); break;
+    case 8: *(u64*)(from.absolute_address + 1) = (u64)((u8*)to - (u8*)from.absolute_address); break;
+    default: assert(0); break;
+    }
+    return ((u8*)to - (u8*)from.absolute_address);
 }
 
 Light_VM_Instruction_Info
@@ -1196,7 +1209,8 @@ light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps) {
     for(u64 i = 0;; ++i) {
         Light_VM_Instruction in = *(Light_VM_Instruction*)(state->registers[LRIP]);
 
-        if(print_steps) {
+        if(print_steps) 
+        {
             void* addr_of_imm = ((u8*)state->registers[LRIP]) + sizeof(Light_VM_Instruction); // address of immediate
             u64 imm = get_value_of_immediate(state, in, addr_of_imm);
             fprintf(stdout, PRINTF_S64 ": ", state->registers[LRIP]);
