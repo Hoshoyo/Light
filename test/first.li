@@ -9,7 +9,7 @@ foo : () -> s32 {
     window_class : WNDCLASSEXA;
 	window_class.cb_size = #size_of WNDCLASSEXA -> u32;
 	window_class.style = 0;
-	window_class.wndproc = DefWindowProcA;//null -> (^void, u32, ^u32, ^u32) -> ^void;
+	window_class.wndproc = window_callback;//null -> (^void, u32, ^u32, ^u32) -> ^void;
 	window_class.cb_cls_extra = 0;
 	window_class.cb_wnd_extra = 0;
 	window_class.h_instance = null;
@@ -46,10 +46,18 @@ foo : () -> s32 {
 		DispatchMessageA(&msg);
     }
 
-    return 0;
+    return 33;
 }
 
 window_callback : (window : ^void, msg : u32, lparam: ^u32, wparam: ^u32) -> ^void #extern {
-	MessageBoxA(null, "Hello\0".data, "World\0".data, 0);
-    return DefWindowProcA(window, msg, lparam, wparam);
+	if msg == WM_CLOSE {
+		ExitProcess(0);
+	} else {
+		a := DefWindowProcA(window, msg, lparam, wparam);
+		return a;
+	}
+	
+	return null;
 }
+
+#import "../modules/w_print.li"

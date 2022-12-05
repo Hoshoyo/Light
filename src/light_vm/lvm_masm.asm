@@ -34,7 +34,19 @@ cmp_flags_64 endp
 lvm_ext_call proc
 
     ; prologue
+
+    ; if rbp % 16 != 0
     push rbp
+    ; ((16 - (rax & 0xf)) & 0xf);
+    mov rax, rsp
+    add rax, 8
+    mov rdi, 16
+    and rax, 0fh
+    sub rdi, rax
+    and rdi, 0fh
+
+    sub rsp, rdi
+    push rdi
     mov rbp, rsp
 
     ; preserve registers
@@ -223,8 +235,10 @@ no_more_args:
     movlpd qword ptr[r8], xmm0
 
     ; epilogue
-    mov	rsp, rbp
-	pop	rbp
+    mov rsp, rbp
+	pop rcx
+    add rsp, rcx
+    pop rbp
 
 	ret
 lvm_ext_call endp

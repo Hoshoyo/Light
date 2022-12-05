@@ -1,0 +1,11 @@
+main : () -> r32 {
+    return stdcall();
+}
+
+stdcall: () -> r32 #extern {
+    return stdcall2();
+}
+
+stdcall2: () -> r32 #extern {
+    return 32.0;
+}

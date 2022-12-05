@@ -3,7 +3,7 @@ WS_EX_APPWINDOW     :u32: 0x40000;
 WS_EX_WINDOWEDGE    :u32: 0x100;
 WS_VISIBLE          :u32: 0x10000000;
 WS_OVERLAPPEDWINDOW :u32: 0xcf0000;
-WM_CLOSE            :s32: 0x10;
+WM_CLOSE            :u32: 0x10;
 PM_REMOVE           :u32: 0x1;
 MB_ICONERROR        :u32: 0x10;
 CW_USEDEFAULT       :s32: 0x80000000;
@@ -32,7 +32,6 @@ WNDCLASSEXA struct {
     cb_size       : u32;
     /* Win 3.x */
     style        : u32;
-    //wndproc      : (^void, u32, ^u32, ^u32) -> ^void;
     wndproc      :  (^void, u32, ^u32, ^u32) -> ^void #extern;
     cb_cls_extra : s32;
     cb_wnd_extra : s32;

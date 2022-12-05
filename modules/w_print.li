@@ -13,8 +13,8 @@ string_equal:(s1 : string, s2 : string) -> bool {
     return true;
 }
 
-GetStdHandle : (std_handle : s32) -> ^void #extern("Kernel32.dll");
-WriteConsoleA : (handle : ^void, str : ^u8, length : s32, written : ^s32, reserved : s32) -> bool #extern("Kernel32.dll");
+//GetStdHandle : (std_handle : s32) -> ^void #extern("Kernel32.dll");
+//WriteConsoleA : (handle : ^void, str : ^u8, length : s32, written : ^s32, reserved : s32) -> bool #extern("Kernel32.dll");
 
 print_string:(s : string) -> u64 {
     handle := GetStdHandle(-11);

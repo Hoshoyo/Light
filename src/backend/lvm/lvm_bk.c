@@ -13,7 +13,7 @@
 #include "../../hassembler/hoasm.h"
 
 #define PRINT_LVM_INSTRUCTIONS 0
-#define DUMP_LVM_CODE 1
+#define DUMP_LVM_CODE 0
 
 typedef struct {
     const char* symbol;
@@ -1396,6 +1396,7 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
             else if(decl->kind == AST_DECL_VARIABLE || (decl->kind == AST_DECL_PROCEDURE && !decl->decl_proc.extern_library_name))
             {
                 s32 start_release = gen->release_size_bytes;
+                /*
                 s32 arg_size = 0;
 
                 if(decl->kind == AST_DECL_PROCEDURE && !decl->decl_proc.extern_library_name)
@@ -1418,6 +1419,7 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
                     }
                     gen->release_size_bytes += arg_size;
                 }
+                */
 
                 for (int i = 0; i < expr->expr_proc_call.arg_count; ++i)
                 {
@@ -2062,8 +2064,80 @@ static void
 lvmgen_proc_decl_stdcall(Light_VM_State* state, LVM_Generator* gen, Light_Ast* proc)
 {
     u8* at = (u8*)state->code.block + state->code_offset;
-
     proc->decl_proc.lvm_base_instruction = at;
+    
+    s32 arg_size = 0;
+    for(int i = 0; i < proc->decl_proc.argument_count; ++i)
+    {
+        Light_Ast* var = proc->decl_proc.arguments[i];
+        arg_size += align_to_ptrsize(var->decl_variable.type->size_bits / BITS_IN_BYTE);
+    }
+
+    Light_Type* return_type = type_alias_root(proc->decl_proc.proc_type);
+    if(return_type_requires_stackspace(return_type))
+    {
+        arg_size += (return_type->size_bits / BITS_IN_BYTE);
+    }
+
+        /*
+        s32 arg_size = 0;
+
+        if(decl->kind == AST_DECL_PROCEDURE && !decl->decl_proc.extern_library_name)
+        {
+            s32 arg_size = 0;
+
+            for(int i = expr->expr_proc_call.arg_count-1; i >= 0; --i)
+            {
+                Light_Ast* arg = expr->expr_proc_call.args[i];
+                Expr_Result res = lvmgen_expr(state, gen, arg, EXPR_FLAG_DEREFERENCE);
+                lvmg_push_result(state, res);
+                arg_size += (LVM_PTRSIZE + gen->release_size_bytes);
+            }
+
+            Light_Type* return_type = type_alias_root(expr->type);
+            if(return_type_requires_stackspace(return_type))
+            {
+                light_vm_push_fmt(state, "subs rsp, %d", return_type->size_bits / BITS_IN_BYTE);
+                arg_size += (return_type->size_bits / BITS_IN_BYTE);
+            }
+            gen->release_size_bytes += arg_size;
+        }
+        */
+
+    // void* dst = (void*)(state->registers[LRSP] - LVM_PTRSIZE);
+    // sub rsp, arg_size
+    at = emit_mov(0, at, mk_oi(RSI, (uint64_t)&state->registers[LRSP], 64));
+    at = emit_mov(0, at, mk_rm_indirect(RAX, RSI, 0, 64));
+    at = emit_arithmetic(0, at, ARITH_SUB, mk_mi_direct(RAX, arg_size, 32));
+    at = emit_mov(0, at, mk_mr_indirect(RSI, RAX, 0, 64));
+
+    int offset = LVM_PTRSIZE;
+    int add_offset = 0;
+    for (int i = 0; i < proc->decl_proc.argument_count; ++i)
+    {
+        Light_Ast* var = proc->decl_proc.arguments[i];
+        assert(var->kind == AST_DECL_VARIABLE);
+
+        var->decl_variable.stack_index = i;
+        var->decl_variable.stack_offset = offset;
+        var->decl_variable.stack_argument_offset = offset;
+
+        at = emit_arithmetic(0, at, ARITH_ADD, mk_mi_direct(RAX, add_offset, 32));
+        if (i == 0)
+            at = emit_mov(0, at, mk_mr_indirect(RAX, RCX, 0, 64));
+        else if (i == 1)
+            at = emit_mov(0, at, mk_mr_indirect(RAX, RDX, 0, 64));
+        else if (i == 2)
+            at = emit_mov(0, at, mk_mr_indirect(RAX, R8, 0, 64));
+        else if (i == 3)
+            at = emit_mov(0, at, mk_mr_indirect(RAX, R9, 0, 64));
+        else
+            Unimplemented;
+
+        add_offset = align_to_ptrsize(var->decl_variable.type->size_bits / BITS_IN_BYTE);
+        offset += add_offset;
+    }
+
     at = emit_mov(0, at, mk_oi(RAX, (uint64_t)lvm_process_callback, 64));
     at = emit_mov(0, at, mk_oi(RCX, (uint64_t)state, 64)); // @Important, this is only for windows bro
     Instr_Emit_Result info = { 0 };
@@ -2077,19 +2151,6 @@ lvmgen_proc_decl_stdcall(Light_VM_State* state, LVM_Generator* gen, Light_Ast* p
     state->code_offset += (at - ((u8*)state->code.block + state->code_offset));
     
     *(uint64_t*)(entry + info.immediate_offset) = (uint64_t)((u8*)state->code.block + state->code_offset);
-
-    int offset = 1 * LVM_PTRSIZE;
-
-    for (int i = 0; i < proc->decl_proc.argument_count; ++i)
-    {
-        Light_Ast* var = proc->decl_proc.arguments[i];
-        assert(var->kind == AST_DECL_VARIABLE);
-
-        var->decl_variable.stack_index = i;
-        var->decl_variable.stack_offset = offset;
-        var->decl_variable.stack_argument_offset = offset;
-        offset += align_to_ptrsize(var->decl_variable.type->size_bits / BITS_IN_BYTE);
-    }
 
     // Generate body code
     Light_Ast* body = proc->decl_proc.body;
@@ -2116,6 +2177,7 @@ lvmgen_proc_decl_stdcall(Light_VM_State* state, LVM_Generator* gen, Light_Ast* p
         // this puts the stack in the same state as it was before the function call.
         light_vm_push_fmt(state, "mov rsp, rbp");
         light_vm_push(state, "pop rbp");
+        light_vm_push_fmt(state, "adds rsp, %d", arg_size);
         light_vm_push(state, "hlt");
     }
 }

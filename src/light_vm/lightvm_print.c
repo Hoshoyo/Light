@@ -742,7 +742,7 @@ light_vm_debug_dump_code(FILE* out, Light_VM_State* state, Light_VM_DebugInfo* d
                 break;
             default: break;
         }
-        fprintf(out, "  ");
+        fprintf(out, "%lld  ", i - sizeof(Light_VM_Instruction));
         light_vm_print_instruction(out, inst, imm);
         i += inst.imm_size_bytes;
     }

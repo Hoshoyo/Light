@@ -1,0 +1,69 @@
+LoadLibraryA:(filename : ^u8) -> ^void #extern("kernel32.dll");
+GetProcAddress:(module : ^void, proc_name : ^u8) -> ^void #extern("kernel32.dll");
+
+/*
+main : () -> s32 {
+    dll := LoadLibraryA("C:/dev/c/dll_callback/dllcallback.dll\0".data);
+
+    return test_wrapper(dll, 1, 2, 3);
+    if dll != null {
+        //make_number := GetProcAddress(dll, "make_number\0".data) -> () -> s32 #extern;
+        //if make_number -> ^void != null {
+        //    return make_number();
+        //}
+
+        test_args := GetProcAddress(dll, "test_args\0".data) -> (s32, s32, s32) -> s32 #extern;
+        if test_args -> ^void != null {
+            return test_args(1, 2, 3);
+        }
+    } else {
+        return -1;
+    }
+    return 0;
+
+}
+
+test_wrapper: (dll : ^void, a1 : s32, a2 : s32, a3 : s32) -> s32 #extern {
+    if dll != null {
+        test_args := GetProcAddress(dll, "test_args\0".data) -> (s32, s32, s32) -> s32 #extern;
+        if test_args -> ^void != null {
+            return test_args(1, 2, 3);
+        }
+    } else {
+        return -1;
+    }
+    return 0;
+}
+*/
+
+/*
+main: () -> s32 {
+    return foo(my_callback);
+}
+
+foo : (my_callback : () -> s32 #extern) -> s32 {
+    return my_callback();
+}
+
+my_callback: () -> s32 #extern {
+    return 45;
+}
+*/
+
+main : () -> s32 {
+    dll := LoadLibraryA("C:/dev/c/dll_callback/dllcallback.dll\0".data);
+
+    if dll != null {
+        make_callback := GetProcAddress(dll, "make_callback\0".data) -> ((s32, s32, s32) -> s32 #extern) -> s32 #extern;
+        if make_callback -> ^void != null {
+            return make_callback(foo);
+        }
+    } else {
+        return -1;
+    }
+    return -1;
+}
+
+foo : (a : s32, b : s32, c : s32) -> s32 #extern{
+    return 45 + a + b + c;
+}
