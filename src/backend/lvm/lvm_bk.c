@@ -1599,6 +1599,19 @@ lvmgen_expr_literal_array(Light_VM_State* state, LVM_Generator* gen, Light_Ast* 
 }
 
 static Expr_Result
+lvmgen_expr_compiler_gen(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
+{
+    //if(expr->expr_compiler_generated.kind == COMPILER_GENERATED_POINTER_TO_TYPE_INFO)
+    Expr_Result result = { 0 };
+    light_vm_push(state, "mov r0, 0");
+    result.type = EXPR_RESULT_REG;
+    result.reg = R0;
+    result.size_bytes = LVM_PTRSIZE;
+    return result;
+}
+
+
+static Expr_Result
 lvmgen_expr_literal_struct(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
     assert(expr->kind == AST_EXPRESSION_LITERAL_STRUCT);
@@ -1618,6 +1631,7 @@ lvmgen_expr_literal_struct(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
             LVM_Register aux = lvmg_reg_new(r, r);
             light_vm_push_fmt(state, "mov r%d, rsp", aux);
 
+            
             lvmg_copy(state, gen, r, (Location){.base = aux, .offset = off + LVM_PTRSIZE + r.temp_release_size_bytes }, inexpr->type);
         }
     }
@@ -1633,7 +1647,9 @@ lvmgen_expr_literal_struct(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
         .temp_release_size_bytes = expr->type->size_bits / BITS_IN_BYTE,
     };
 
-    gen->release_size_bytes += expr->type->size_bits / BITS_IN_BYTE;
+    light_vm_push_fmt(state, "adds rsp, %d", gen->release_size_bytes);
+
+    gen->release_size_bytes = expr->type->size_bits / BITS_IN_BYTE;
     
     // Address of the literal temporary
     light_vm_push_fmt(state, "pop r%d", result.reg);
@@ -1664,14 +1680,15 @@ lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flag
     Expr_Result result = {0};
     switch(expr->kind)
     {
-        case AST_EXPRESSION_LITERAL_PRIMITIVE: result = lvmgen_expr_literal_primitive(state, gen, expr, flags); break;
-        case AST_EXPRESSION_BINARY:            result = lvmgen_expr_binary(state, gen, expr, flags); break;
-        case AST_EXPRESSION_UNARY:             result = lvmgen_expr_unary(state, gen, expr, flags); break;
-        case AST_EXPRESSION_VARIABLE:          result = lvmgen_expr_variable(state, gen, expr, flags); break;
-        case AST_EXPRESSION_PROCEDURE_CALL:    result = lvmgen_expr_proc_call(state, gen, expr, flags); break;
-        case AST_EXPRESSION_DOT:               result = lvmgen_expr_dot(state, gen, expr, flags); break;
-        case AST_EXPRESSION_LITERAL_ARRAY:     result = lvmgen_expr_literal_array(state, gen, expr, flags); break;
-        case AST_EXPRESSION_LITERAL_STRUCT:    result = lvmgen_expr_literal_struct(state, gen, expr, flags); break;
+        case AST_EXPRESSION_LITERAL_PRIMITIVE:  result = lvmgen_expr_literal_primitive(state, gen, expr, flags); break;
+        case AST_EXPRESSION_BINARY:             result = lvmgen_expr_binary(state, gen, expr, flags); break;
+        case AST_EXPRESSION_UNARY:              result = lvmgen_expr_unary(state, gen, expr, flags); break;
+        case AST_EXPRESSION_VARIABLE:           result = lvmgen_expr_variable(state, gen, expr, flags); break;
+        case AST_EXPRESSION_PROCEDURE_CALL:     result = lvmgen_expr_proc_call(state, gen, expr, flags); break;
+        case AST_EXPRESSION_DOT:                result = lvmgen_expr_dot(state, gen, expr, flags); break;
+        case AST_EXPRESSION_LITERAL_ARRAY:      result = lvmgen_expr_literal_array(state, gen, expr, flags); break;
+        case AST_EXPRESSION_LITERAL_STRUCT:     result = lvmgen_expr_literal_struct(state, gen, expr, flags); break;
+        case AST_EXPRESSION_COMPILER_GENERATED: result = lvmgen_expr_compiler_gen(state, gen, expr, flags); break;
         default: Unreachable;
     }
     return result;

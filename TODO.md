@@ -1,6 +1,8 @@
 ## TODO
 
 TODO from toplevel.c:719 - this is the implementation of string literals inside if statements for C backend.
+need to cleanup naming with hoassembler, otherwise is gonna be hell
+Fix the external caller for linux
 
 ### Backend x86
 - x86 functions returning void are causing a crash when not explicitly using return

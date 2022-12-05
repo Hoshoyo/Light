@@ -755,6 +755,8 @@ ast_print_expr_literal_primitive(Light_Ast* expr, u32 flags, s32 indent_level) {
                 length += fprintf(out, "%.*s", TOKEN_STR(expr->expr_literal_primitive.token));
             else
                 length += fprintf(out, "0");
+
+            //ast_print_type(expr->type, flags, indent_level);
         }break;
         case LITERAL_POINTER: length += fprintf(out, "null"); break;
         default: length += fprintf(out, "<invalid literal>"); break;
