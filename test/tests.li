@@ -1,15 +1,6 @@
 //#import "test.li"
 
-main : () -> bool {
-	string_equal2("vec2", "hello");
-	
-	return false;
+main : () -> s32 {	
+	return a;
 }
-
-string_equal2:(s1 : string, s2 : string) -> bool {
-    if s1.length != s2.length return false;
-	for i:u32=0; i < s1.length; i += 1 {
-        if s1.data[i] != s2.data[i] return false;
-    }
-    return true;
-}
+a : s32 = 32;

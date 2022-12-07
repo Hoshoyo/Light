@@ -1598,6 +1598,12 @@ lvmgen_expr_literal_array(Light_VM_State* state, LVM_Generator* gen, Light_Ast* 
 }
 
 typedef struct {
+    u32 cap; 
+    u32 length; 
+    u8* data;
+} lvm_string;
+
+typedef struct {
     u32 kind;
     u32 flags;
     s64 type_size_bytes;
@@ -1628,7 +1634,7 @@ typedef struct {
             s32 arguments_count;
         } LVM_User_Type_Function;
         struct LVM_User_Type_Alias {
-            struct lvm_string { u32 cap; u32 length; u8* data; };
+            lvm_string name;
             void* alias_to_type_info;
         } LVM_User_Type_Alias;
     };
@@ -1650,7 +1656,7 @@ lvm_emit_type_table(Light_VM_State* state, LVM_Generator* gen, Light_Type** type
 
         at->kind = type->kind;
         at->flags = type->flags;
-        at->type_size_bytes = type->size_bits;
+        at->type_size_bytes = type->size_bits / BITS_IN_BYTE;
 
         switch(type->kind) {
             case TYPE_KIND_PRIMITIVE: {
@@ -1660,10 +1666,15 @@ lvm_emit_type_table(Light_VM_State* state, LVM_Generator* gen, Light_Type** type
                 at->pointer_to_type_info = 0;                
             } break;
             case TYPE_KIND_ALIAS: {
-                at->LVM_User_Type_Alias.cap = 0;
-                at->LVM_User_Type_Alias.length = type->alias.name->length;
-                at->LVM_User_Type_Alias.data = 0; // filled later
-                at->LVM_User_Type_Alias.alias_to_type_info = 0; // filled later
+                at->LVM_User_Type_Alias.name.cap = 0;
+                at->LVM_User_Type_Alias.name.length = type->alias.name->length;
+            } break;
+            case TYPE_KIND_STRUCT: {
+                at->LVM_User_Type_Struct.alignment = type->struct_info.alignment_bytes;
+                at->LVM_User_Type_Struct.fields_count = type->struct_info.fields_count;
+            } break;
+            case TYPE_KIND_ARRAY: {
+                at->LVM_User_Type_Array.dimension = type->array_info.dimension;
             } break;
             default: break;
         }
@@ -1687,12 +1698,52 @@ lvm_emit_type_table(Light_VM_State* state, LVM_Generator* gen, Light_Type** type
                 
                 memcpy(scratch, type->alias.name->data, type->alias.name->length);
                 state->data_offset += type->alias.name->length;
-                type_table_start[i].LVM_User_Type_Alias.data = scratch;
+                type_table_start[i].LVM_User_Type_Alias.name.data = scratch;
                 scratch += type->alias.name->length;
             } break;
+            case TYPE_KIND_STRUCT: {
+                // Field names
+                type_table_start[i].LVM_User_Type_Struct.fields_names = scratch;
+                u8* start = scratch;
+                for(int f = 0; f < type->struct_info.fields_count; ++f)
+                {
+                    lvm_string* ss = (lvm_string*)scratch;
+                    ss->cap = 0;
+                    ss->length = type->struct_info.fields[f]->decl_variable.name->length;
+                    scratch += sizeof(lvm_string);
+                }
+                for(int f = 0; f < type->struct_info.fields_count; ++f)
+                {
+                    lvm_string* ss = (lvm_string*)scratch;
+                    Light_Token* name = type->struct_info.fields[f]->decl_variable.name;
+                    memcpy(scratch, name->data, name->length);
+                    ((lvm_string*)start)[f].data = scratch;
+                    scratch += name->length;
+                }
+
+                // Offsets
+                type_table_start[i].LVM_User_Type_Struct.fields_offsets_bits = (s64*)scratch;
+                for(int f = 0; f < type->struct_info.fields_count; ++f)
+                {
+                    *(s64*)scratch = type->struct_info.offset_bits[f];
+                    scratch += sizeof(s64);
+                }
+
+                // Fields type infos
+                type_table_start[i].LVM_User_Type_Struct.fields_types_type_info = (LVM_User_Type_Info**)scratch;
+                for(int f = 0; f < type->struct_info.fields_count; ++f)
+                {
+                    *(LVM_User_Type_Info**)scratch = type_table_start + type->struct_info.fields[f]->decl_variable.type->type_table_index;
+                    scratch += sizeof(LVM_User_Type_Info*);
+                }
+
+                state->data_offset += (scratch - start);
+            } break;
+            case TYPE_KIND_ARRAY: {
+                type_table_start[i].LVM_User_Type_Array.array_of_type_info = type_table_start + type->array_info.array_of->type_table_index;
+            } break;
             default: break;
-        }
-        
+        }        
     }
 }
 

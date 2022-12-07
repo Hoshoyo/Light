@@ -6,7 +6,8 @@ main : () -> s32 {
     r : r64 = 3.1114; // this is busted
     pos : vec2;
     //return print_test2(11, a, 33 -> u32, 'c', b, true, 3.14, &a, r);
-    print_test2("hello", pos);
+    //print_test2("hello", pos);
+    print_test2([1,2,3], main);
     return 0;
 }
 
@@ -22,72 +23,108 @@ print_test2:(args : ...) -> s32 {
 
     for i :u64= 0; i < count; i += 1 {
         value := values[i];
-        type_info := value.type -> ^User_Type_Info;
-
-        if(type_info.kind == LIGHT_TYPE_KIND_PRIMITIVE) {
-            if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S64) {
-                v := *(value.value -> ^s64);
-                print_s64(v);
-            } else if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S32) {
-                v := *(value.value -> ^s32);
-                print_s32(v);
-            } else if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S16) {
-                v := *(value.value -> ^s16);
-                print_s16(v);
-            } else if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S8) {
-                v := *(value.value -> ^s8);
-                print_s8(v);
-            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U64) {
-                v := *(value.value -> ^u64);
-                print_string("0x");
-                print_u64(v, 16);
-            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U32) {
-                v := *(value.value -> ^u32);
-                print_string("0x");
-                print_u32(v, 16);
-            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U16) {
-                v := *(value.value -> ^u16);
-                print_string("0x");
-                print_u16(v, 16);
-            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U8) {
-                v := *(value.value -> ^u8);
-                print_string("0x");
-                print_u8(v, 16);
-            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_BOOL) {
-                v := *(value.value -> ^bool);
-                if v print_string("true");
-                else print_string("false");
-            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_R32) {
-                v := *(value.value -> ^r32);
-                print_r32(v);
-            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_R64) {
-                v := *(value.value -> ^r64);
-                print_r64(v);
-            }
-        } else if (type_info.kind == LIGHT_TYPE_KIND_POINTER) {
-            v := *(value.value -> ^u64);
-            print_string("0x");
-            print_u64(v, 16);
-        } else if(type_info.kind == LIGHT_TYPE_KIND_STRUCT) {
-            print_string("struct bro");
-        } else if(type_info.kind == LIGHT_TYPE_KIND_ALIAS) {
-            s := type_info.description.alias_desc.name;
-            if(string_equal(s, "string"))
-                print_string(*(value.value -> ^string));
-            else
-            {
-                print_string(s);
-                print_string(":{ ");
-                print_string(" }");
-            }
-        } else {
-            print_string("unsupported type ");
-            print_s32(type_info.kind -> s32);
-        }
+        print_value_from_type_info(value.type, value.value);        
         print_string("\n");
     }
 
     return count -> s32;
+}
+
+print_value_from_type_info:(type_info : ^User_Type_Info, value : ^void) -> s64 {
+    if(type_info.kind == LIGHT_TYPE_KIND_PRIMITIVE) {
+        if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S64) {
+            v := *(value -> ^s64);
+            print_s64(v);
+        } else if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S32) {
+            v := *(value -> ^s32);
+            print_s32(v);
+        } else if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S16) {
+            v := *(value -> ^s16);
+            print_s16(v);
+        } else if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S8) {
+            v := *(value -> ^s8);
+            print_s8(v);
+        } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U64) {
+            v := *(value -> ^u64);
+            print_string("0x");
+            print_u64(v, 16);
+        } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U32) {
+            v := *(value -> ^u32);
+            print_string("0x");
+            print_u32(v, 16);
+        } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U16) {
+            v := *(value -> ^u16);
+            print_string("0x");
+            print_u16(v, 16);
+        } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U8) {
+            v := *(value -> ^u8);
+            print_string("0x");
+            print_u8(v, 16);
+        } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_BOOL) {
+            v := *(value -> ^bool);
+            if v print_string("true");
+            else print_string("false");
+        } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_R32) {
+            v := *(value -> ^r32);
+            print_r32(v);
+        } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_R64) {
+            v := *(value -> ^r64);
+            print_r64(v);
+        }
+    } else if (type_info.kind == LIGHT_TYPE_KIND_POINTER) {
+        v := *(value -> ^u64);
+        print_string("0x");
+        print_u64(v, 16);
+    } else if(type_info.kind == LIGHT_TYPE_KIND_STRUCT) {
+        print_struct(type_info, value);
+    } else if(type_info.kind == LIGHT_TYPE_KIND_ALIAS) {
+        s := type_info.description.alias_desc.name;
+        if(string_equal(s, "string"))
+            print_string(*(value -> ^string));
+        else
+        {
+            to := type_info.description.alias_desc.alias_to;
+            if(to.kind == LIGHT_TYPE_KIND_STRUCT)
+            {
+                print_string(s);
+                print_string(":");
+            }
+            print_value_from_type_info(to, value);
+        }
+    } else if(type_info.kind == LIGHT_TYPE_KIND_ARRAY) {
+        print_array(type_info, value);
+    } else if(type_info.kind == LIGHT_TYPE_KIND_FUNCTION) {
+        print_string("0x");
+        print_u64(*(value -> ^u64), 16);
+    } else {
+        print_string("unsupported type ");
+        print_s32(type_info.kind -> s32);
+    }
+}
+
+print_struct: (type_info : ^User_Type_Info, value : ^void) -> s32 {
+    print_string("{ ");
+    desc := type_info.description.struct_desc;
+    for i := 0; i < desc.fields_count; i += 1 {
+        if i > 0 print_string(", ");
+        print_string(desc.fields_names[i]);
+    }
+    print_string(" }");
+    return 0;
+}
+
+print_array: (type_info : ^User_Type_Info, value : ^void) -> s32 {
+    print_string("[ ");
+    desc := type_info.description.array_desc;
+    
+    for i :u64= 0; i < desc.dimension; i += 1 {
+        if i > 0 print_string(", ");
+        v := (value -> ^u8) + (desc.array_of -> ^User_Type_Info).type_size_bytes * i -> s64;
+        print_value_from_type_info(desc.array_of, v);
+    }
+    
+    print_string(" ]");
+    return 0;
 }
 
 /*
