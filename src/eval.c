@@ -408,6 +408,7 @@ eval_make_literal_from_type(Light_Scope* scope, Light_Type* type, void* memory) 
 
 bool
 eval_directive_run(Light_Ast* directive) {
+	#if 0
 	Light_Ast* expr = directive->expr_directive.expr;
 
 	void* literal_data = lvm_generate_and_run_directive(expr, !directive->expr_directive.generated_bytecode);
@@ -420,5 +421,6 @@ eval_directive_run(Light_Ast* directive) {
 		return true;
 	}
 	else
+	#endif
 		return false;
 }

@@ -1,7 +1,16 @@
 #import "io.li"
 #import "reflect.li"
 // System calls
-memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("C");
+memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("msvcrt.dll");
+
+/*
+memcpy : (dst : ^void, src : ^void, size : u64) -> ^void {
+    for i :u64= 0; i < size; i += 1 {
+        dst[i] = src[i];
+    }
+    return dst;
+}
+*/
 
 // Print generic
 
@@ -371,7 +380,7 @@ u64_to_str:(val : u64, buffer : [32]u8) -> u64 {
         return 1;
     }
 
-    auxbuffer := &b[32];
+    auxbuffer := &b[31];
     start := auxbuffer + sum;
 
     while val != 0 {
@@ -388,19 +397,18 @@ u64_to_str:(val : u64, buffer : [32]u8) -> u64 {
 
 s64_to_str:(val : s64, buffer : [32]u8) -> u64 {
     b : [32]u8;
-    sum : s32;
+    sum : s32 = 0;
 
     if val == 0 {
         buffer[0] = '0';
         return 1;
     }
-
     if val < 0 {
         val = -val;
         buffer[0] = '-';
         sum = 1;
     }
-    auxbuffer := &b[32];
+    auxbuffer := &b[31];
     start := auxbuffer + sum;
 
     while val != 0 {
