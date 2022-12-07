@@ -555,7 +555,7 @@ r32_to_str:(v : r32, buffer : [32]u8) -> u64 {
         v = -v;
     }
 
-    l += s64_to_str(v -> s64, (buffer->^u8 + l) -> [32]u8);
+    l += s64_to_str(v -> s64, buffer);
     precision := 6;
 
     fractional_part := v - ((v -> s32) -> r32);

@@ -4,6 +4,14 @@ TODO from toplevel.c:719 - this is the implementation of string literals inside 
 need to cleanup naming with hoassembler, otherwise is gonna be hell
 Fix the external caller for linux
 
+This cast is busted!
+main : () -> s64 {    
+    return 0x123456789abcd -> s64;
+}
+
+This is f*'d
+l += s64_to_str(v -> s64, (buffer->^u8 + l) -> [32]u8);
+
 ### Backend x86
 - x86 functions returning void are causing a crash when not explicitly using return
 - x86 backend passing array as an argument is doing it by copy, i think

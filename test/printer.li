@@ -1,8 +1,10 @@
-#import "../modules/reflect.li"
 #import "../modules/w_print.li"
 
 main : () -> s32 {    
-    return print_test2(11, 22, 33);
+    a : s64 = 0x123456789abcd; // 320255973501901
+    b : u64 = 0x123456789abcd;
+    r : r64 = 3.1114; // this is busted
+    return print_test2(11, a, 33 -> u32, 'c', b, true, 3.14, &a);
 }
 
 print_test2:(args : ...) -> s32 {
@@ -12,14 +14,58 @@ print_test2:(args : ...) -> s32 {
 
     for i :u64= 0; i < count; i += 1 {
         value := values[i];
-        v := *(value.value -> ^s32);
-        print_s32(v);
+        type_info := value.type -> ^User_Type_Info;
+
+        if(type_info.kind == LIGHT_TYPE_KIND_PRIMITIVE) {
+            if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S64) {
+                v := *(value.value -> ^s64);
+                print_s64(v);
+            } else if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S32) {
+                v := *(value.value -> ^s32);
+                print_s32(v);
+            } else if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S16) {
+                v := *(value.value -> ^s16);
+                print_s16(v);
+            } else if(type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_S8) {
+                v := *(value.value -> ^s8);
+                print_s8(v);
+            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U64) {
+                v := *(value.value -> ^u64);
+                print_string("0x");
+                print_u64(v, 16);
+            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U32) {
+                v := *(value.value -> ^u32);
+                print_string("0x");
+                print_u32(v, 16);
+            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U16) {
+                v := *(value.value -> ^u16);
+                print_string("0x");
+                print_u16(v, 16);
+            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_U8) {
+                v := *(value.value -> ^u8);
+                print_string("0x");
+                print_u8(v, 16);
+            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_BOOL) {
+                v := *(value.value -> ^bool);
+                if v print_string("true");
+                else print_string("false");
+            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_R32) {
+                v := *(value.value -> ^r32);
+                print_r32(v);
+            } else if (type_info.description.primitive == LIGHT_TYPE_PRIMITIVE_R64) {
+                v := *(value.value -> ^r64);
+                print_r64(v);
+            }
+        } else if (type_info.kind == LIGHT_TYPE_KIND_POINTER) {
+            v := *(value.value -> ^u64);
+            print_string("0x");
+            print_u64(v, 16);
+        }
         print_string("\n");
     }
 
     return count -> s32;
 }
-
 
 /*
 main : () -> s32 {
@@ -38,5 +84,21 @@ foo struct {
     a : vec2;
     b : s32;
     c : [4]s32;
+}
+*/
+
+/*
+main : () -> s64 {    
+    a : s64 = 0x123456789abcd;
+    return a;
+}
+*/
+
+/*
+#import "../modules/w_print.li"
+main : () -> s32 {    
+    v : r32 = 1.0;
+    print_r32(v);
+    return 0;
 }
 */

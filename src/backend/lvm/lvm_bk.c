@@ -5,6 +5,7 @@
 #include <light_array.h>
 #include "../../../include/hoht.h"
 #include "../../top_typecheck.h"
+#include "../../global_tables.h"
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #endif
@@ -75,7 +76,7 @@ typedef struct {
     Light_VM_Instruction_Info*    loop_continue;
 
     s32 release_size_bytes;
-
+    s32 type_table_dataseg_offset;
 
     Light_VM_DebugInfo* debug_info;
 
@@ -1580,15 +1581,96 @@ lvmgen_expr_literal_array(Light_VM_State* state, LVM_Generator* gen, Light_Ast* 
     return result;
 }
 
+typedef struct {
+    u32 kind;
+    u32 flags;
+    s64 type_size_bytes;
+    union {
+        u32   primitive;
+        void* pointer_to_type_info;
+        struct LVM_User_Type_Array {
+            void* array_of_type_info;
+            u64   dimension;
+        } LVM_User_Type_Array;
+        struct LVM_User_Type_Struct {
+            void** fields_types_type_info;
+            void* fields_names;
+            s64* fields_offsets_bits;
+            s32 fields_count;
+            s32 alignment;
+        } LVM_User_Type_Struct;
+        struct LVM_User_Type_Union {
+            void** fields_types_type_info;
+            void* fields_names;
+            s32 fields_count;
+            s32 alignment;
+        } LVM_User_Type_Union;
+        struct LVM_User_Type_Function {
+            void* return_type_type_info;
+            void** arguments_type;
+            void* arguments_name;
+            s32 arguments_count;
+        } LVM_User_Type_Function;
+        struct LVM_User_Type_Alias {
+            struct lvm_string { u32 cap; u32 length; u8* data; };
+            void* alias_to_type_info;
+        } LVM_User_Type_Alias;
+    };
+} LVM_User_Type_Info;
+
+static void
+lvm_emit_type_table(Light_VM_State* state, LVM_Generator* gen, Light_Type** type_table)
+{
+    s32 emit_count = 0;
+
+    gen->type_table_dataseg_offset = state->data_offset;
+    LVM_User_Type_Info* at = (LVM_User_Type_Info*)((char*)state->data.block + gen->type_table_dataseg_offset);
+
+    for (int i = 0; i < array_length(type_table); ++i)
+    {
+        Light_Type* type = type_table[i];
+        type->type_table_index = i;        
+
+        at->kind = type->kind;
+        at->flags = type->flags;
+        at->type_size_bytes = type->size_bits;
+
+        switch(type->kind) {
+            case TYPE_KIND_PRIMITIVE: {
+                at->primitive = type->primitive;
+            } break;
+            case TYPE_KIND_POINTER: {
+                at->pointer_to_type_info = 0;                
+            } break;
+            default: break;
+        }
+        at++;
+        emit_count++;
+    }
+    state->data_offset += (emit_count * sizeof(LVM_User_Type_Info));
+}
+
 static Expr_Result
 lvmgen_expr_compiler_gen(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, u32 flags)
 {
-    //if(expr->expr_compiler_generated.kind == COMPILER_GENERATED_POINTER_TO_TYPE_INFO)
+    if (expr->expr_compiler_generated.kind == COMPILER_GENERATED_POINTER_TO_TYPE_INFO && expr->expr_compiler_generated.type_value)
+    {
+        Light_Type* type = expr->expr_compiler_generated.type_value;
+        s32 table_index = type->type_table_index;
+
+        light_vm_push(state, "mov r0, rdp");
+        light_vm_push_fmt(state, "adds r0, %d", gen->type_table_dataseg_offset + table_index * sizeof(LVM_User_Type_Info));
+    }
+    else    
+    {
+        light_vm_push(state, "mov r0, 0");
+    }
+
     Expr_Result result = { 0 };
-    light_vm_push(state, "mov r0, 0");
     result.type = EXPR_RESULT_REG;
     result.reg = R0;
     result.size_bytes = LVM_PTRSIZE;
+
     return result;
 }
 
@@ -2206,6 +2288,8 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
 
     // Initialize external symbol hash table
     hoht_new(&gen.external_table, 512, sizeof(External_Lib), 0.5f, malloc, free);
+
+    lvm_emit_type_table(state, &gen, global_type_array);
 
     // -------------------------------------
     // Generate the code
