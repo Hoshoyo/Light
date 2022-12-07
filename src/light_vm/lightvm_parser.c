@@ -62,6 +62,12 @@ get_register(const char** at, u8* byte_size) {
     if(is_number(**at)) {
         reg = **at + R0 - '0';
         (*at)++;
+        if (is_number(**at))
+        {
+            reg *= 10;
+            reg += **at + R0 - '0';
+            (*at)++;
+        }
     } else {
         if(**at == 's') { // rsp
             (*at)++;

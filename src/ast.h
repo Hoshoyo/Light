@@ -305,6 +305,7 @@ typedef struct {
 	int32_t  alignment_bytes;
 	int32_t  stack_index;  			// Index from stack base
 	int32_t  stack_offset; 			// Offset from Stack base, when is a proc argument this is the local copy offset from BP
+	int32_t  datasegment_offset;
 	int32_t  stack_argument_offset;	// When the variable is a proc argument, this is the offset from BP in the caller space
 	int32_t  ir_temporary; 			// temporary index in the IR code
 	int32_t  ir_instr_index;

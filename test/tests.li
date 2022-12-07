@@ -1,6 +1,18 @@
 //#import "test.li"
 
 main : () -> s32 {	
-	return a;
+	return foo.BAR -> hello;
+	/*
+	b : hello;
+	a := &b;
+	*a = 3;
+	return b;
+	*/
 }
-a : s32 = 32;
+
+hello s32;
+
+foo enum {
+	FOO :: 1,
+	BAR :: 2,
+}

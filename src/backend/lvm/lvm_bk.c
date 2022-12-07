@@ -512,7 +512,7 @@ lvmgen_expr_literal_primitive(Light_VM_State* state, LVM_Generator* gen, Light_A
     else if(type_primitive_int(expr->type))
     {
         Light_VM_Instruction instr = {0};
-        switch(expr->type->primitive)
+        switch(type_alias_root(expr->type)->primitive)
         {
             case TYPE_PRIMITIVE_BOOL:
             case TYPE_PRIMITIVE_U8:
@@ -1242,75 +1242,91 @@ lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr,
     Light_Ast* decl = expr->expr_variable.decl;
     if (decl->kind == AST_DECL_VARIABLE)
     {
-        if(decl->decl_variable.storage_class == STORAGE_CLASS_STACK)
+        s32 offset = 0;
+        LVM_Register base_register = 0;
+
+        if (decl->decl_variable.storage_class == STORAGE_CLASS_STACK)
         {
-            if((flags & EXPR_FLAG_DEREFERENCE) && (expr->type->kind == TYPE_KIND_PRIMITIVE || expr->type->kind == TYPE_KIND_POINTER))
+            offset = expr->expr_variable.decl->decl_variable.stack_offset;
+            base_register = LRBP;
+        }
+        else if (decl->decl_variable.storage_class == STORAGE_CLASS_DATA_SEGMENT)
+        {
+            offset = expr->expr_variable.decl->decl_variable.datasegment_offset;
+            base_register = LRDP;
+        }
+        else
+            Unimplemented;
+
+        Light_Type* expr_type = type_alias_root(expr->type);
+
+        if((flags & EXPR_FLAG_DEREFERENCE) && (expr_type->kind == TYPE_KIND_PRIMITIVE || expr_type->kind == TYPE_KIND_POINTER))
+        {
+            if(type_primitive_float(expr_type))
             {
-                if(type_primitive_float(expr->type))
+                if(type_primitive_float32(expr_type))
                 {
-                    if(type_primitive_float32(expr->type))
-                    {
-                        result.reg = FR0;
-                        result.type = EXPR_RESULT_F32_REG;
-                        result.size_bytes = 4;
-                    }
-                    else
-                    {
-                        result.reg = EFR0;
-                        result.type = EXPR_RESULT_F64_REG;
-                        result.size_bytes = 8;
-                    }
-                    Light_VM_Instruction instr = {
-                        .type = LVM_FMOV,
-                        .imm_size_bytes = 4,
-                        .binary.addr_mode = FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG,
-                        .binary.dst_reg = result.reg,
-                        .binary.src_reg = LRBP,
-                        .binary.bytesize_pw2 = 2,
-                        .binary.is64bit = (result.type == EXPR_RESULT_F64_REG),
-                    };
-                    light_vm_push_instruction(state, instr, expr->expr_variable.decl->decl_variable.stack_offset);
+                    result.reg = FR0;
+                    result.type = EXPR_RESULT_F32_REG;
+                    result.size_bytes = 4;
                 }
                 else
                 {
-                    result.reg = R0;
-                    result.type = EXPR_RESULT_REG;
-                    result.size_bytes = expr->type->size_bits / BITS_IN_BYTE;
-
-                    Light_VM_Instruction instr = {
-                        .type = LVM_MOV,
-                        .imm_size_bytes = 4,
-                        .binary.bytesize_pw2 = bytesize_to_pw2(expr->type->size_bits / BITS_IN_BYTE),
-                        .binary.addr_mode = BIN_ADDR_MODE_REG_OFFSETED_TO_REG,
-                        .binary.dst_reg = result.reg,
-                        .binary.src_reg = LRBP,
-                    };
-                    light_vm_push_instruction(state, instr, expr->expr_variable.decl->decl_variable.stack_offset);
+                    result.reg = EFR0;
+                    result.type = EXPR_RESULT_F64_REG;
+                    result.size_bytes = 8;
                 }
+                Light_VM_Instruction instr = {
+                    .type = LVM_FMOV,
+                    .imm_size_bytes = 4,
+                    .binary.addr_mode = FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG,
+                    .binary.dst_reg = result.reg,
+                    .binary.src_reg = base_register,
+                    .binary.bytesize_pw2 = 2,
+                    .binary.is64bit = (result.type == EXPR_RESULT_F64_REG),
+                };
+                light_vm_push_instruction(state, instr, offset);
             }
             else
             {
                 result.reg = R0;
                 result.type = EXPR_RESULT_REG;
-                result.size_bytes = LVM_PTRSIZE;
-                light_vm_push_fmt(state, "mov r%d, rbp", result.reg);
-            
-                if(expr->expr_variable.decl->decl_variable.stack_offset < 0)
-                    light_vm_push_fmt(state, "subs r%d, %d", result.reg, -expr->expr_variable.decl->decl_variable.stack_offset);
-                else
-                    light_vm_push_fmt(state, "adds r%d, %d", result.reg, expr->expr_variable.decl->decl_variable.stack_offset);
+                result.size_bytes = expr_type->size_bits / BITS_IN_BYTE;
 
-                Light_Ast* dd = expr->expr_variable.decl;
-                Light_Type* tt = type_alias_root(dd->decl_variable.type);
-                if ((dd->decl_variable.flags & DECL_VARIABLE_FLAG_PROC_ARGUMENT) && (tt->kind == TYPE_KIND_STRUCT || tt->kind == TYPE_KIND_ARRAY || tt->kind == TYPE_KIND_UNION))
-                    light_vm_push_fmt(state, "mov r%d, [r%d]", result.reg, result.reg);
-                if (tt->kind == TYPE_KIND_FUNCTION && flags & EXPR_FLAG_DEREFERENCE)
-                    light_vm_push_fmt(state, "mov r%d, [r%d]", result.reg, result.reg);
+                Light_VM_Instruction instr = {
+                    .type = LVM_MOV,
+                    .imm_size_bytes = 4,
+                    .binary.bytesize_pw2 = bytesize_to_pw2(expr_type->size_bits / BITS_IN_BYTE),
+                    .binary.addr_mode = BIN_ADDR_MODE_REG_OFFSETED_TO_REG,
+                    .binary.dst_reg = result.reg,
+                    .binary.src_reg = base_register,
+                };
+                light_vm_push_instruction(state, instr, offset);
             }
         }
         else
         {
-            Unimplemented;
+            result.reg = R0;
+            result.type = EXPR_RESULT_REG;
+            result.size_bytes = LVM_PTRSIZE;
+            if (base_register == LRBP)
+                light_vm_push_fmt(state, "mov r%d, rbp", result.reg);
+            else if (base_register == LRDP)
+                light_vm_push_fmt(state, "mov r%d, rdp", result.reg);
+            else
+                Unreachable;
+            
+            if(offset < 0)
+                light_vm_push_fmt(state, "subs r%d, %d", result.reg, -offset);
+            else
+                light_vm_push_fmt(state, "adds r%d, %d", result.reg, offset);
+
+            Light_Ast* dd = expr->expr_variable.decl;
+            Light_Type* tt = type_alias_root(dd->decl_variable.type);
+            if ((dd->decl_variable.flags & DECL_VARIABLE_FLAG_PROC_ARGUMENT) && (tt->kind == TYPE_KIND_STRUCT || tt->kind == TYPE_KIND_ARRAY || tt->kind == TYPE_KIND_UNION))
+                light_vm_push_fmt(state, "mov r%d, [r%d]", result.reg, result.reg);
+            if (tt->kind == TYPE_KIND_FUNCTION && flags & EXPR_FLAG_DEREFERENCE)
+                light_vm_push_fmt(state, "mov r%d, [r%d]", result.reg, result.reg);
         }
     }
     else if (decl->kind == AST_DECL_CONSTANT) 
@@ -1319,8 +1335,6 @@ lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr,
     }
     else if (decl->kind == AST_DECL_PROCEDURE)
     {
-        // light_vm_patch_instruction_immediate
-        //Light_VM_Instruction_Info mov_instr = light_vm_push_fmt(state, "mov r%d, 0xffffffffffffffff", result.reg);
         if(decl->decl_proc.lvm_base_instruction)
             light_vm_push_fmt(state, "mov r%d, 0x%llx", result.reg, (uint64_t)decl->decl_proc.lvm_base_instruction);
         else
@@ -1494,6 +1508,24 @@ lvmgen_expr_proc_call(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr
     return lvmg_reg_for_type(expr->type);
 }
 
+#include "../../symbol_table.h"
+
+static Light_Ast*
+decl_from_name(Light_Scope* scope, Light_Token* name) {
+    Light_Symbol s = {0};
+    s.token = name;
+
+    Symbol_Table* symbol_table = (Symbol_Table*)scope->symb_table;
+
+    if(!symbol_table) return 0;
+
+    s32 index = 0;
+    if(symbol_table_entry_exist(symbol_table, s, &index, 0)) {
+        return symbol_table->entries[index].data.decl;
+    }
+    return 0;
+}
+
 // Given an integer register and a dot field accessing expression of a struct or union
 // retreives the address of that struct's data in memory in the register.
 // Performs dereferencing in case the left side of the expression is a pointer type.
@@ -1502,39 +1534,51 @@ static Expr_Result
 lvmgen_expr_dot(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, Stack_Info* stack_info, u32 flags)
 {
     Light_Type* left_type = type_alias_root(expr->expr_dot.left->type);
-    u32 f = (flags & ~EXPR_FLAG_DEREFERENCE) | ((left_type->kind == TYPE_KIND_POINTER) ? EXPR_FLAG_DEREFERENCE : 0);
-    Expr_Result res = lvmgen_expr(state, gen, expr->expr_dot.left, stack_info, f);
 
-    if(left_type->kind == TYPE_KIND_POINTER)
+    if (left_type->kind == TYPE_KIND_ENUM)
     {
-        if(type_alias_root(left_type->pointer_to)->kind == TYPE_KIND_STRUCT)
+        Light_Ast* c = decl_from_name(left_type->enumerator.enum_scope, expr->expr_dot.identifier);
+        assert(c->kind == AST_DECL_CONSTANT);
+        //emit_expression(literal_decls, buffer, c->decl_constant.value);
+        Expr_Result res = lvmgen_expr(state, gen, c->decl_constant.value, stack_info, EXPR_FLAG_DEREFERENCE);
+        return res;
+    }
+    else
+    {
+        u32 f = (flags & ~EXPR_FLAG_DEREFERENCE) | ((left_type->kind == TYPE_KIND_POINTER) ? EXPR_FLAG_DEREFERENCE : 0);
+        Expr_Result res = lvmgen_expr(state, gen, expr->expr_dot.left, stack_info, f);
+
+        if (left_type->kind == TYPE_KIND_POINTER)
         {
-            s64 offset = type_struct_field_offset_bits(left_type->pointer_to, expr->expr_dot.identifier->data) / BITS_IN_BYTE;
+            if (type_alias_root(left_type->pointer_to)->kind == TYPE_KIND_STRUCT)
+            {
+                s64 offset = type_struct_field_offset_bits(left_type->pointer_to, expr->expr_dot.identifier->data) / BITS_IN_BYTE;
+                light_vm_push_fmt(state, "adds r%d, %d", res.reg, (s32)offset);
+            }
+            else
+            {
+                // Offset of an union is always 0, therefore no need to add anything
+                assert(type_alias_root(left_type->pointer_to)->kind == TYPE_KIND_UNION);
+            }
+        }
+        else if (left_type->kind == TYPE_KIND_STRUCT)
+        {
+            s64 offset = type_struct_field_offset_bits(expr->expr_dot.left->type, expr->expr_dot.identifier->data) / BITS_IN_BYTE;
             light_vm_push_fmt(state, "adds r%d, %d", res.reg, (s32)offset);
         }
         else
         {
             // Offset of an union is always 0, therefore no need to add anything
-            assert(type_alias_root(left_type->pointer_to)->kind == TYPE_KIND_UNION);
+            assert(left_type->kind == TYPE_KIND_UNION);
         }
-    }
-    else if(left_type->kind == TYPE_KIND_STRUCT)
-    {
-        s64 offset = type_struct_field_offset_bits(expr->expr_dot.left->type, expr->expr_dot.identifier->data) / BITS_IN_BYTE;
-        light_vm_push_fmt(state, "adds r%d, %d", res.reg, (s32)offset);
-    }
-    else
-    {
-        // Offset of an union is always 0, therefore no need to add anything
-        assert(left_type->kind == TYPE_KIND_UNION);
-    }
 
-    if (flags & EXPR_FLAG_DEREFERENCE)
-    {
-        return lvmg_deref_auto(state, expr->type, res.reg);
-    }
+        if (flags & EXPR_FLAG_DEREFERENCE)
+        {
+            return lvmg_deref_auto(state, expr->type, res.reg);
+        }
 
-    return res;
+        return res;
+    }
 }
 
 static Expr_Result
@@ -1857,26 +1901,39 @@ lvmgen_expr(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, Stack_In
 static void
 lvmgen_decl_variable(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* decl)
 {
-    if(!(decl->decl_variable.flags & DECL_VARIABLE_FLAG_ADDR_CALCULATED))
+    if(decl->decl_variable.storage_class == STORAGE_CLASS_STACK)
     {
-        decl->decl_variable.stack_index  = stack_info->index++;
-        decl->decl_variable.stack_offset = stack_info->offset - align_to_ptrsize(decl->decl_variable.type->size_bits / 8);
-        decl->decl_variable.flags        |= DECL_VARIABLE_FLAG_ADDR_CALCULATED;
-        stack_info->offset               -= align_to_ptrsize(decl->decl_variable.type->size_bits / 8);
-        stack_info->size_bytes           += align_to_ptrsize(decl->decl_variable.type->size_bits / 8);
+        if(!(decl->decl_variable.flags & DECL_VARIABLE_FLAG_ADDR_CALCULATED))
+        {
+            decl->decl_variable.stack_index  = stack_info->index++;
+            decl->decl_variable.stack_offset = stack_info->offset - align_to_ptrsize(decl->decl_variable.type->size_bits / 8);
+            decl->decl_variable.flags        |= DECL_VARIABLE_FLAG_ADDR_CALCULATED;
+            stack_info->offset               -= align_to_ptrsize(decl->decl_variable.type->size_bits / 8);
+            stack_info->size_bytes           += align_to_ptrsize(decl->decl_variable.type->size_bits / 8);
+
+            if(decl->decl_variable.assignment)
+            {
+                Expr_Result right_res = lvmgen_expr(state, gen, decl->decl_variable.assignment, stack_info, EXPR_FLAG_DEREFERENCE);                
+                lvmg_copy(state, gen, right_res, (Location){ .base = LRBP, .offset = decl->decl_variable.stack_offset}, decl->decl_variable.type);                
+            }
+        }
+    }
+    else if(decl->decl_variable.storage_class == STORAGE_CLASS_DATA_SEGMENT)
+    {
+        Light_Type* type = decl->decl_variable.type;
+        decl->decl_variable.datasegment_offset = state->data_offset;
+        state->data_offset += (type->size_bits / BITS_IN_BYTE);
+        decl->decl_variable.flags |= DECL_VARIABLE_FLAG_ADDR_CALCULATED;
 
         if(decl->decl_variable.assignment)
         {
             Expr_Result right_res = lvmgen_expr(state, gen, decl->decl_variable.assignment, stack_info, EXPR_FLAG_DEREFERENCE);
-            if(decl->decl_variable.storage_class == STORAGE_CLASS_STACK)
-            {
-                lvmg_copy(state, gen, right_res, (Location){ .base = LRBP, .offset = decl->decl_variable.stack_offset}, decl->decl_variable.type);
-            }
-            else
-            {
-                Unimplemented;
-            }
+            lvmg_copy(state, gen, right_res, (Location) { .base = LRDP, .offset = decl->decl_variable.datasegment_offset }, decl->decl_variable.type);
         }
+    }
+    else
+    {
+        Unreachable;
     }
 }
 
@@ -2386,17 +2443,28 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     hoht_new(&gen.external_table, 512, sizeof(External_Lib), 0.5f, malloc, free);
 
     lvm_emit_type_table(state, &gen, global_type_array);
+   
+    // Generate all global variables first
+    for(int i = 0; i < array_length(ast); ++i)
+    {
+        if(ast[i]->kind == AST_DECL_VARIABLE)
+            lvmgen_decl_variable(state, &gen, 0, ast[i]);
+    }
 
     // -------------------------------------
     // Generate the code
-    Light_VM_Instruction_Info start = light_vm_push(state, "call 0xff");
+    Light_VM_Instruction_Info start = light_vm_push(state, "call 0xffffffff");
     light_vm_push(state, "hlt");
-    light_vm_patch_from_to_current_instruction(state, start);
 
+    // Generate code
     for(int i = 0; i < array_length(ast); ++i)
     {
         if(ast[i]->kind == AST_DECL_PROCEDURE)
+        {
+            if(ast[i]->decl_proc.flags & DECL_PROC_FLAG_MAIN)
+                light_vm_patch_from_to_current_instruction(state, start);
             lvmgen_proc_decl(state, &gen, ast[i]);
+        }
     }
 
     light_vm_push(state, "ret");
