@@ -294,19 +294,19 @@ get_signed_value_of_immediate(Light_VM_State* state, Light_VM_Instruction instr,
     return value;
 }
 
-#define EXECUTE_ARITH_UNSIGNED(OP) switch(instr.binary.bytesize) { \
-        case 1: *(u8*)dst = *(u8*)dst OP *(u8*)src; break; \
-        case 2: *(u16*)dst = *(u16*)dst OP *(u16*)src; break; \
-        case 4: *(u32*)dst = *(u32*)dst OP *(u32*)src; break; \
-        case 8: *(u64*)dst = *(u64*)dst OP *(u64*)src; break; \
+#define EXECUTE_ARITH_UNSIGNED(OP) switch(instr.binary.bytesize_pw2) { \
+        case 0: *(u8*)dst = *(u8*)dst OP *(u8*)src; break; \
+        case 1: *(u16*)dst = *(u16*)dst OP *(u16*)src; break; \
+        case 2: *(u32*)dst = *(u32*)dst OP *(u32*)src; break; \
+        case 3: *(u64*)dst = *(u64*)dst OP *(u64*)src; break; \
         default: assert(0); break; \
     } \
 
-#define EXECUTE_ARITH_SIGNED(OP) switch(instr.binary.bytesize) { \
-        case 1: *(s8*)dst = *(s8*)dst OP *(s8*)src; break; \
-        case 2: *(s16*)dst = *(s16*)dst OP *(s16*)src; break; \
-        case 4: *(s32*)dst = *(s32*)dst OP *(s32*)src; break; \
-        case 8: *(s64*)dst = *(s64*)dst OP *(s64*)src; break; \
+#define EXECUTE_ARITH_SIGNED(OP) switch(instr.binary.bytesize_pw2) { \
+        case 0: *(s8*)dst = *(s8*)dst OP *(s8*)src; break; \
+        case 1: *(s16*)dst = *(s16*)dst OP *(s16*)src; break; \
+        case 2: *(s32*)dst = *(s32*)dst OP *(s32*)src; break; \
+        case 3: *(s64*)dst = *(s64*)dst OP *(s64*)src; break; \
         default: assert(0); break; \
     } \
 
@@ -365,11 +365,11 @@ light_vm_execute_binary_arithmetic_instruction(Light_VM_State* state, Light_VM_I
     switch(instr.type) {
         u64 flags = 0;
         case LVM_CMP: {
-            switch(instr.binary.bytesize) {
-                case 1: flags = cmp_flags_8(*(u8*)dst, *(u8*)src); break;
-                case 2: flags = cmp_flags_16(*(u16*)dst, *(u16*)src); break;
-                case 4: flags = cmp_flags_32(*(u32*)dst, *(u32*)src); break;
-                case 8: flags = cmp_flags_64(*(u64*)dst, *(u64*)src); break;
+            switch(instr.binary.bytesize_pw2) {
+                case 0: flags = cmp_flags_8(*(u8*)dst, *(u8*)src); break;
+                case 1: flags = cmp_flags_16(*(u16*)dst, *(u16*)src); break;
+                case 2: flags = cmp_flags_32(*(u32*)dst, *(u32*)src); break;
+                case 3: flags = cmp_flags_64(*(u64*)dst, *(u64*)src); break;
                 default: assert(0); break;
             }
             state->rflags.carry = (flags >> 8) & 0x1;
@@ -379,11 +379,11 @@ light_vm_execute_binary_arithmetic_instruction(Light_VM_State* state, Light_VM_I
         }break;
 
         case LVM_MOV: {
-            switch(instr.binary.bytesize) {
-                case 1: *(u8*)dst  = *(u8*)src; break;
-                case 2: *(u16*)dst = *(u16*)src; break;
-                case 4: *(u32*)dst = *(u32*)src; break;
-                case 8: *(u64*)dst = *(u64*)src; break;
+            switch(instr.binary.bytesize_pw2) {
+                case 0: *(u8*)dst  = *(u8*)src; break;
+                case 1: *(u16*)dst = *(u16*)src; break;
+                case 2: *(u32*)dst = *(u32*)src; break;
+                case 3: *(u64*)dst = *(u64*)src; break;
                 default: assert(0); break;
             }
         }break;
@@ -974,11 +974,11 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             advance_ip = true;
             break;
         case LVM_CVT_S64_R64:
-            state->f64registers[instr.binary.dst_reg + FR4] = (r64)(s64)state->registers[instr.binary.src_reg];
+            state->f64registers[instr.binary.dst_reg] = (r64)(s64)state->registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_S32_R64:
-            state->f64registers[instr.binary.dst_reg + FR4] = (r64)(s32)state->registers[instr.binary.src_reg];
+            state->f64registers[instr.binary.dst_reg] = (r64)(s32)state->registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_S64_R32:
@@ -986,7 +986,7 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             advance_ip = true;
             break;
         case LVM_CVT_R32_R64:
-            state->f64registers[instr.binary.dst_reg + FR4] = (r64)state->f32registers[instr.binary.src_reg];
+            state->f64registers[instr.binary.dst_reg] = (r64)state->f32registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_R64_R32:
@@ -994,11 +994,11 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
             advance_ip = true;
             break;
         case LVM_CVT_R64_S64:
-            state->f64registers[instr.binary.dst_reg + FR4] = (r64)(s64)state->registers[instr.binary.src_reg];
+            state->registers[instr.binary.dst_reg] = (s64)state->f64registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_R64_S32:
-            state->f64registers[instr.binary.dst_reg + FR4] = (r64)(s32)state->registers[instr.binary.src_reg];
+            state->registers[instr.binary.dst_reg] = (s32)state->f64registers[instr.binary.src_reg];
             advance_ip = true;
             break;
         case LVM_CVT_SEXT: {

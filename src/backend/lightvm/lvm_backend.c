@@ -1613,10 +1613,6 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     state->loop_continue = array_new(Light_VM_Instruction_Info);
     state->proc_patch_calls = array_new(Patch_Procs);
 
-    //light_vm_push(state, "mov r0, 33");
-    //light_vm_push(state, "push r0");
-    //light_vm_push(state, "push r0");
-
     Light_VM_Instruction_Info start = light_vm_push(state, "call 0xff");
     light_vm_push(state, "hlt");
     light_vm_patch_from_to_current_instruction(state, start);

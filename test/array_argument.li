@@ -1,0 +1,21 @@
+/*
+main : () -> s32 {
+    b : [4]u8 = [1,2,3,4];
+
+    foo((b -> ^u8) -> [4]u8);
+
+    return (b[0] + b[1]) -> s32;
+}
+
+foo:(a : [4]u8) -> s32 {
+    a[0] = 55;
+    return 0;
+}
+*/
+
+
+#import "../modules/w_print.li"
+
+main: () -> u64 {
+    return print_r64(3.14);
+}

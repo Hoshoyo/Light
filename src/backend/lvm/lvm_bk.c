@@ -135,6 +135,16 @@ register_size_suffix(uint64_t size)
     }
 }
 
+static s32 bytesize_to_pw2(s32 b) {
+    switch(b) {
+        case 1: return 0;
+        case 2: return 1;
+        case 4: return 2;
+        case 8: return 3;
+        default: return 0;
+    }
+}
+
 static Light_VM_Instruction
 mk_bin_instr(LVM_Instr_Type type, Expr_Result left, Expr_Result right)
 {
@@ -145,7 +155,7 @@ mk_bin_instr(LVM_Instr_Type type, Expr_Result left, Expr_Result right)
     {
         case EXPR_RESULT_REG: {
             instr.binary.addr_mode = BIN_ADDR_MODE_REG_TO_REG;
-            instr.binary.bytesize = left.size_bytes;
+            instr.binary.bytesize_pw2 = bytesize_to_pw2(left.size_bytes);
             instr.binary.dst_reg = left.reg;
             instr.binary.src_reg = right.reg;            
         } break;
@@ -509,7 +519,7 @@ lvmgen_expr_literal_primitive(Light_VM_State* state, LVM_Generator* gen, Light_A
             case TYPE_PRIMITIVE_S8: {
                 instr.type = LVM_MOV;
                 instr.imm_size_bytes = 1;
-                instr.binary.bytesize = 1;
+                instr.binary.bytesize_pw2 = 0;
                 instr.binary.dst_reg = result.reg;
                 instr.binary.addr_mode = BIN_ADDR_MODE_IMM_TO_REG;
                 light_vm_push_instruction(state, instr, expr->expr_literal_primitive.value_u8);                
@@ -518,7 +528,7 @@ lvmgen_expr_literal_primitive(Light_VM_State* state, LVM_Generator* gen, Light_A
             case TYPE_PRIMITIVE_S16: {
                 instr.type = LVM_MOV;
                 instr.imm_size_bytes = 2;
-                instr.binary.bytesize = 2;
+                instr.binary.bytesize_pw2 = 1;
                 instr.binary.dst_reg = result.reg;
                 instr.binary.addr_mode = BIN_ADDR_MODE_IMM_TO_REG;
                 light_vm_push_instruction(state, instr, expr->expr_literal_primitive.value_u16);                
@@ -527,7 +537,7 @@ lvmgen_expr_literal_primitive(Light_VM_State* state, LVM_Generator* gen, Light_A
             case TYPE_PRIMITIVE_S32: {
                 instr.type = LVM_MOV;
                 instr.imm_size_bytes = 4;
-                instr.binary.bytesize = 4;
+                instr.binary.bytesize_pw2 = 2;
                 instr.binary.dst_reg = result.reg;
                 instr.binary.addr_mode = BIN_ADDR_MODE_IMM_TO_REG;
                 light_vm_push_instruction(state, instr, expr->expr_literal_primitive.value_u32);                
@@ -536,7 +546,7 @@ lvmgen_expr_literal_primitive(Light_VM_State* state, LVM_Generator* gen, Light_A
             case TYPE_PRIMITIVE_S64: {
                 instr.type = LVM_MOV;
                 instr.imm_size_bytes = 8;
-                instr.binary.bytesize = 8;
+                instr.binary.bytesize_pw2 = 3;
                 instr.binary.dst_reg = result.reg;
                 instr.binary.addr_mode = BIN_ADDR_MODE_IMM_TO_REG;
                 light_vm_push_instruction(state, instr, expr->expr_literal_primitive.value_u64);                
@@ -1096,6 +1106,10 @@ lvmgen_expr_cast(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, Sta
         {
             return lvmgen_expr(state, gen, expr->expr_unary.operand, stack_info, flags|EXPR_FLAG_DEREFERENCE);
         }
+        else if (cast_type->kind == TYPE_KIND_ARRAY)
+        {
+            return lvmgen_expr(state, gen, expr->expr_unary.operand, stack_info, flags | EXPR_FLAG_DEREFERENCE);
+        }
     }
     else
     {
@@ -1249,9 +1263,11 @@ lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr,
                     Light_VM_Instruction instr = {
                         .type = LVM_FMOV,
                         .imm_size_bytes = 4,
-                        .ifloat.addr_mode = FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG,
-                        .ifloat.dst_reg = result.reg,
-                        .ifloat.src_reg = LRBP,
+                        .binary.addr_mode = FLOAT_ADDR_MODE_REG_OFFSETED_TO_REG,
+                        .binary.dst_reg = result.reg,
+                        .binary.src_reg = LRBP,
+                        .binary.bytesize_pw2 = 2,
+                        .binary.is64bit = (result.type == EXPR_RESULT_F64_REG),
                     };
                     light_vm_push_instruction(state, instr, expr->expr_variable.decl->decl_variable.stack_offset);
                 }
@@ -1264,7 +1280,7 @@ lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr,
                     Light_VM_Instruction instr = {
                         .type = LVM_MOV,
                         .imm_size_bytes = 4,
-                        .binary.bytesize = expr->type->size_bits / BITS_IN_BYTE,
+                        .binary.bytesize_pw2 = bytesize_to_pw2(expr->type->size_bits / BITS_IN_BYTE),
                         .binary.addr_mode = BIN_ADDR_MODE_REG_OFFSETED_TO_REG,
                         .binary.dst_reg = result.reg,
                         .binary.src_reg = LRBP,
@@ -1625,6 +1641,7 @@ lvm_emit_type_table(Light_VM_State* state, LVM_Generator* gen, Light_Type** type
 
     gen->type_table_dataseg_offset = state->data_offset;
     LVM_User_Type_Info* at = (LVM_User_Type_Info*)((char*)state->data.block + gen->type_table_dataseg_offset);
+    LVM_User_Type_Info* type_table_start = at;
 
     for (int i = 0; i < array_length(type_table); ++i)
     {
@@ -1642,12 +1659,41 @@ lvm_emit_type_table(Light_VM_State* state, LVM_Generator* gen, Light_Type** type
             case TYPE_KIND_POINTER: {
                 at->pointer_to_type_info = 0;                
             } break;
+            case TYPE_KIND_ALIAS: {
+                at->LVM_User_Type_Alias.cap = 0;
+                at->LVM_User_Type_Alias.length = type->alias.name->length;
+                at->LVM_User_Type_Alias.data = 0; // filled later
+                at->LVM_User_Type_Alias.alias_to_type_info = 0; // filled later
+            } break;
             default: break;
         }
         at++;
         emit_count++;
     }
     state->data_offset += (emit_count * sizeof(LVM_User_Type_Info));
+
+    u8* scratch = (u8*)at;
+    // patch all extra data
+    for (int i = 0; i < array_length(type_table); ++i)
+    {
+        Light_Type* type = type_table[i];
+
+        switch(type->kind) {
+            case TYPE_KIND_POINTER: {
+                type_table_start[i].pointer_to_type_info = type_table_start + type->pointer_to->type_table_index;
+            } break;
+            case TYPE_KIND_ALIAS: {
+                type_table_start[i].LVM_User_Type_Alias.alias_to_type_info = type_table_start + type->alias.alias_to->type_table_index;
+                
+                memcpy(scratch, type->alias.name->data, type->alias.name->length);
+                state->data_offset += type->alias.name->length;
+                type_table_start[i].LVM_User_Type_Alias.data = scratch;
+                scratch += type->alias.name->length;
+            } break;
+            default: break;
+        }
+        
+    }
 }
 
 static Expr_Result
@@ -2039,8 +2085,7 @@ lvmgen_comm_return(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_
             lvmg_move_to(state, r, LVM_RETURN_REGISTER);
     }
 
-    if(stack_info->size_bytes > 0)
-        light_vm_push(state, "mov rsp, rbp");
+    light_vm_push(state, "mov rsp, rbp");
     light_vm_push(state, "pop rbp");
 
     Light_Ast* proc = typecheck_decl_proc_from_scope(expr->scope_at);
@@ -2124,7 +2169,7 @@ lvmgem_proc_decl_lightcall(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
         var->decl_variable.stack_index = i;
         var->decl_variable.stack_offset = offset;
         var->decl_variable.stack_argument_offset = offset;
-        offset += align_to_ptrsize(var->decl_variable.type->size_bits / BITS_IN_BYTE);
+        offset += align_to_ptrsize(MIN(var->decl_variable.type->size_bits / BITS_IN_BYTE, LVM_PTRSIZE));
     }
     
     // Generate body code

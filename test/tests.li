@@ -1,18 +1,15 @@
 //#import "test.li"
 
-main : () -> s32 {
-	a := 3;
-	b : ^s32;
-	//a = 4 + 2 * a;
-	//a = a;
-	a = -2 + 4;
-	//b = &a + 20;
+main : () -> bool {
+	string_equal2("vec2", "hello");
+	
+	return false;
+}
 
-	//c := 3;
-	//*(b + 1 + c) = a;
-
-	//d : ^^s32;
-	//d = &b;
-	//a = **d;
-	return 0;
+string_equal2:(s1 : string, s2 : string) -> bool {
+    if s1.length != s2.length return false;
+	for i:u32=0; i < s1.length; i += 1 {
+        if s1.data[i] != s2.data[i] return false;
+    }
+    return true;
 }

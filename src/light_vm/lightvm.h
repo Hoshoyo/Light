@@ -155,10 +155,11 @@ typedef struct {
 } Light_VM_Float_Flags_Register;
 
 typedef struct {
-    uint32_t src_reg     : 4;
-    uint32_t dst_reg     : 4;
-    uint32_t bytesize    : 4;
-    uint32_t addr_mode   : 4;
+    uint32_t src_reg      : 4;
+    uint32_t dst_reg      : 4;
+    uint32_t addr_mode    : 4;
+    uint32_t is64bit      : 1;
+    uint32_t bytesize_pw2 : 3;
 } Light_VM_Instruction_Binary;
 
 typedef struct {

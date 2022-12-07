@@ -411,7 +411,7 @@ s64_to_str:(val : s64, buffer : [32]u8) -> u64 {
     auxbuffer := &b[31];
     start := auxbuffer + sum;
 
-    while val != 0 {
+    while val != 0 {        
         rem := val % 10;
         val /= 10;
         *auxbuffer = '0' + rem -> u8;
@@ -523,7 +523,7 @@ r64_to_str:(v : r64, buffer : [64]u8) -> u64 {
     }
 
     l += s64_to_str(v->s64, (buffer->^u8 + l) -> [32]u8);
-    precision := 6;
+    precision := 12;
 
     fractional_part := v - ((v -> s64) -> r64);
 

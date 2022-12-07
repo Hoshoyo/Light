@@ -4,7 +4,15 @@ main : () -> s32 {
     a : s64 = 0x123456789abcd; // 320255973501901
     b : u64 = 0x123456789abcd;
     r : r64 = 3.1114; // this is busted
-    return print_test2(11, a, 33 -> u32, 'c', b, true, 3.14, &a);
+    pos : vec2;
+    //return print_test2(11, a, 33 -> u32, 'c', b, true, 3.14, &a, r);
+    print_test2("hello", pos);
+    return 0;
+}
+
+vec2 struct {
+    x : r32;
+    y : r32;
 }
 
 print_test2:(args : ...) -> s32 {
@@ -60,6 +68,21 @@ print_test2:(args : ...) -> s32 {
             v := *(value.value -> ^u64);
             print_string("0x");
             print_u64(v, 16);
+        } else if(type_info.kind == LIGHT_TYPE_KIND_STRUCT) {
+            print_string("struct bro");
+        } else if(type_info.kind == LIGHT_TYPE_KIND_ALIAS) {
+            s := type_info.description.alias_desc.name;
+            if(string_equal(s, "string"))
+                print_string(*(value.value -> ^string));
+            else
+            {
+                print_string(s);
+                print_string(":{ ");
+                print_string(" }");
+            }
+        } else {
+            print_string("unsupported type ");
+            print_s32(type_info.kind -> s32);
         }
         print_string("\n");
     }

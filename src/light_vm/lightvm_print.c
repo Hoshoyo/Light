@@ -72,6 +72,16 @@ void print_immediate_signed(FILE* out, u8 byte_size, u64 imm) {
     }
 }
 
+static s32 bytesize_pw2_to_bytesize(s32 b) {
+    switch(b) {
+        case 0: return 1;
+        case 1: return 2;
+        case 2: return 4;
+        case 3: return 8;
+        default: return 1;
+    }
+}
+
 void
 print_binary_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
     switch(instr.type) {
@@ -96,36 +106,36 @@ print_binary_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
     }
     switch(instr.binary.addr_mode) {
         case BIN_ADDR_MODE_REG_TO_REG:{
-            print_register(out, instr.binary.dst_reg, instr.binary.bytesize);
+            print_register(out, instr.binary.dst_reg, bytesize_pw2_to_bytesize(instr.binary.bytesize_pw2));
             fprintf(out, ", ");
-            print_register(out, instr.binary.src_reg, instr.binary.bytesize);
+            print_register(out, instr.binary.src_reg, bytesize_pw2_to_bytesize(instr.binary.bytesize_pw2));
         }break;
         case BIN_ADDR_MODE_REG_TO_MEM:{
             fprintf(out, "[");
             print_register(out, instr.binary.dst_reg, 8);
             fprintf(out, "], ");
-            print_register(out, instr.binary.src_reg, instr.binary.bytesize);
+            print_register(out, instr.binary.src_reg, bytesize_pw2_to_bytesize(instr.binary.bytesize_pw2));
         }break;
         case BIN_ADDR_MODE_REG_TO_IMM_MEM:{
             fprintf(out, "[");
             print_immediate(out, instr.imm_size_bytes, immediate);
             fprintf(out, "], ");
-            print_register(out, instr.binary.src_reg, instr.binary.bytesize);
+            print_register(out, instr.binary.src_reg, bytesize_pw2_to_bytesize(instr.binary.bytesize_pw2));
         }break;
         case BIN_ADDR_MODE_MEM_TO_REG:{
-            print_register(out, instr.binary.dst_reg, instr.binary.bytesize);
+            print_register(out, instr.binary.dst_reg, bytesize_pw2_to_bytesize(instr.binary.bytesize_pw2));
             fprintf(out, ", [");
             print_register(out, instr.binary.src_reg, 8);
             fprintf(out, "]");
         }break;
         case BIN_ADDR_MODE_MEM_IMM_TO_REG:{
-            print_register(out, instr.binary.dst_reg, instr.binary.bytesize);
+            print_register(out, instr.binary.dst_reg, bytesize_pw2_to_bytesize(instr.binary.bytesize_pw2));
             fprintf(out, ", [");
             print_immediate(out, instr.imm_size_bytes, immediate);
             fprintf(out, "]");
         }break;
         case BIN_ADDR_MODE_IMM_TO_REG:{
-            print_register(out, instr.binary.dst_reg, instr.binary.bytesize);
+            print_register(out, instr.binary.dst_reg, bytesize_pw2_to_bytesize(instr.binary.bytesize_pw2));
             fprintf(out, ", ");
             print_immediate(out, instr.imm_size_bytes, immediate);
         }break;
@@ -135,10 +145,10 @@ print_binary_instruction(FILE* out, Light_VM_Instruction instr, u64 immediate) {
             fprintf(out, " + ");
             print_immediate_signed(out, instr.imm_size_bytes, immediate);
             fprintf(out, "], ");
-            print_register(out, instr.binary.src_reg, instr.binary.bytesize);
+            print_register(out, instr.binary.src_reg, bytesize_pw2_to_bytesize(instr.binary.bytesize_pw2));
         }break;
         case BIN_ADDR_MODE_REG_OFFSETED_TO_REG: {
-            print_register(out, instr.binary.dst_reg, instr.binary.bytesize);
+            print_register(out, instr.binary.dst_reg, bytesize_pw2_to_bytesize(instr.binary.bytesize_pw2));
             fprintf(out, ", [");
             print_register(out, instr.binary.src_reg, 8);
             fprintf(out, " + ");

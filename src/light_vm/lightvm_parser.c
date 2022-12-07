@@ -359,6 +359,16 @@ is_positive(uint64_t value, uint8_t size_bytes) {
     return 0;
 }
 
+static s32 bytesize_to_pw2(s32 b) {
+    switch(b) {
+        case 1: return 0;
+        case 2: return 1;
+        case 4: return 2;
+        case 8: return 3;
+        default: return 0;
+    }
+}
+
 Light_VM_Instruction
 light_vm_instruction_get(const char* s, uint64_t* immediate) {
     Light_VM_Instruction instruction = {0};
@@ -417,11 +427,11 @@ light_vm_instruction_get(const char* s, uint64_t* immediate) {
                 EAT_COMMA;
                 u8 byte_size = 0;
                 instruction.binary.src_reg = get_register(&at, &byte_size);
-                instruction.binary.bytesize = byte_size;
+                instruction.binary.bytesize_pw2 = bytesize_to_pw2(byte_size);
             } else {
                 u8 byte_size = 0;
                 instruction.binary.dst_reg = get_register(&at, &byte_size);
-                instruction.binary.bytesize = byte_size;
+                instruction.binary.bytesize_pw2 = bytesize_to_pw2(byte_size);
                 EAT_COMMA;
                 if(*at == '[') {
                     at++;
