@@ -6,6 +6,7 @@
 #include "../../../include/hoht.h"
 #include "../../top_typecheck.h"
 #include "../../global_tables.h"
+#include "../../utils/os.h"
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #endif
@@ -1335,6 +1336,10 @@ lvmgen_expr_variable(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr,
     }
     else if (decl->kind == AST_DECL_PROCEDURE)
     {
+        result.reg = R0;
+        result.type = EXPR_RESULT_REG;
+        result.size_bytes = LVM_PTRSIZE;
+
         if(decl->decl_proc.lvm_base_instruction)
             light_vm_push_fmt(state, "mov r%d, 0x%llx", result.reg, (uint64_t)decl->decl_proc.lvm_base_instruction);
         else
@@ -1720,6 +1725,9 @@ lvm_emit_type_table(Light_VM_State* state, LVM_Generator* gen, Light_Type** type
             case TYPE_KIND_ARRAY: {
                 at->LVM_User_Type_Array.dimension = type->array_info.dimension;
             } break;
+            case TYPE_KIND_FUNCTION: {
+                at->LVM_User_Type_Function.arguments_count = type->function.arguments_count;
+            } break;
             default: break;
         }
         at++;
@@ -1785,6 +1793,17 @@ lvm_emit_type_table(Light_VM_State* state, LVM_Generator* gen, Light_Type** type
             } break;
             case TYPE_KIND_ARRAY: {
                 type_table_start[i].LVM_User_Type_Array.array_of_type_info = type_table_start + type->array_info.array_of->type_table_index;
+            } break;
+            case TYPE_KIND_FUNCTION: {
+                type_table_start[i].LVM_User_Type_Function.return_type_type_info = type_table_start + type->function.return_type->type_table_index;
+                u8* start = scratch;
+                type_table_start[i].LVM_User_Type_Function.arguments_type = (LVM_User_Type_Info**)scratch;
+                for(int f = 0; f < type->function.arguments_count; ++f)
+                {
+                    *(LVM_User_Type_Info**)scratch = type_table_start + type->function.arguments_type[f]->type_table_index;
+                    scratch += sizeof(LVM_User_Type_Info*);
+                }
+                state->data_offset += (scratch - start);
             } break;
             default: break;
         }        
@@ -1976,14 +1995,25 @@ lvmgen_comm_if(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info
         base_case = light_vm_push(state, "beq 0xffffffff");
     }
 
-    for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
-        if(gen->short_circuit_jmps[i].short_circuit_index == 1)
+    for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0 ; --i)
+        if (gen->short_circuit_jmps[i].short_circuit_index == 1)
+        {
             light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
+            array_remove(gen->short_circuit_jmps, i);
+        }
 
     lvmgen_command(state, gen, stack_info, comm->comm_if.body_true);
     Light_VM_Instruction_Info skip_true = light_vm_push(state, "jmp 0xffffffff");
 
     Light_VM_Instruction_Info else_block = light_vm_current_instruction(state);
+
+    for (int i = array_length(gen->short_circuit_jmps)-1; i >= 0; --i)
+        if (gen->short_circuit_jmps[i].short_circuit_index == -1)
+        {
+            light_vm_patch_immediate_distance(gen->short_circuit_jmps[i], else_block);
+            array_remove(gen->short_circuit_jmps, i);
+        }
+
     if(no_short_circuit)
     {
         light_vm_patch_immediate_distance(base_case, else_block);
@@ -1991,11 +2021,7 @@ lvmgen_comm_if(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info
     if(comm->comm_if.body_false)
     {
         lvmgen_command(state, gen, stack_info, comm->comm_if.body_false);
-    }
-    
-    for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
-        if(gen->short_circuit_jmps[i].short_circuit_index == -1)
-            light_vm_patch_immediate_distance(gen->short_circuit_jmps[i], else_block);
+    }    
 
     array_clear(gen->short_circuit_jmps);
     light_vm_patch_from_to_current_instruction(state, skip_true);
@@ -2025,9 +2051,12 @@ lvmgen_comm_while(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_i
         base_case = light_vm_push(state, "beq 0xffffffff");
     }
 
-    for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
-        if(gen->short_circuit_jmps[i].short_circuit_index == 1)
+    for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0; --i)
+        if (gen->short_circuit_jmps[i].short_circuit_index == 1)
+        {
             light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
+            array_remove(gen->short_circuit_jmps, i);
+        }
 
     lvmgen_command(state, gen, stack_info, comm->comm_while.body);
 
@@ -2053,9 +2082,12 @@ lvmgen_comm_while(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_i
     Light_VM_Instruction_Info while_end = light_vm_current_instruction(state);
     if(no_short_circuit)
         light_vm_patch_immediate_distance(base_case, while_end);
-    for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
-        if(gen->short_circuit_jmps[i].short_circuit_index == -1)
+    for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0; --i)
+        if (gen->short_circuit_jmps[i].short_circuit_index == -1)
+        {
             light_vm_patch_immediate_distance(gen->short_circuit_jmps[i], while_end);
+            array_remove(gen->short_circuit_jmps, i);
+        }
     array_clear(gen->short_circuit_jmps);
 
     // Patch breaks
@@ -2101,9 +2133,12 @@ lvmgen_comm_for(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_inf
         base_case = light_vm_push(state, "beq 0xffffffff");
     }
 
-    for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
-        if(gen->short_circuit_jmps[i].short_circuit_index == 1)
+    for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0; --i)
+        if (gen->short_circuit_jmps[i].short_circuit_index == 1)
+        {
             light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
+            array_remove(gen->short_circuit_jmps, i);
+        }
 
     lvmgen_command(state, gen, stack_info, comm->comm_for.body);
 
@@ -2133,9 +2168,12 @@ lvmgen_comm_for(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_inf
     Light_VM_Instruction_Info while_end = light_vm_current_instruction(state);
     if(no_short_circuit)
         light_vm_patch_immediate_distance(base_case, while_end);
-    for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
-        if(gen->short_circuit_jmps[i].short_circuit_index == -1)
+    for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0; --i)
+        if (gen->short_circuit_jmps[i].short_circuit_index == -1)
+        {
             light_vm_patch_immediate_distance(gen->short_circuit_jmps[i], while_end);
+            array_remove(gen->short_circuit_jmps, i);
+        }
     array_clear(gen->short_circuit_jmps);
 
     // Patch breaks
@@ -2196,7 +2234,7 @@ lvmgen_comm_return(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_
     light_vm_push(state, "mov rsp, rbp");
     light_vm_push(state, "pop rbp");
 
-    Light_Ast* proc = typecheck_decl_proc_from_scope(expr->scope_at);
+    Light_Ast* proc = typecheck_decl_proc_from_scope(comm->scope_at);
     if(proc->decl_proc.proc_type->function.flags & TYPE_FUNCTION_STDCALL) {
         light_vm_push(state, "hlt");
     } else {
@@ -2220,6 +2258,7 @@ lvmgen_command(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info
         case AST_COMMAND_FOR:        lvmgen_comm_for(state, gen, stack_info, comm); break;
         case AST_COMMAND_BREAK:      lvmgen_comm_break(state, gen, comm); break;
         case AST_COMMAND_CONTINUE:   lvmgen_comm_continue(state, gen, comm); break;
+        case AST_DECL_CONSTANT: break;
         /*
         case AST_DECL_PROCEDURE:     Unimplemented; break;
         */
@@ -2443,7 +2482,6 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     hoht_new(&gen.external_table, 512, sizeof(External_Lib), 0.5f, malloc, free);
 
     lvm_emit_type_table(state, &gen, global_type_array);
-   
     // Generate all global variables first
     for(int i = 0; i < array_length(ast); ++i)
     {
@@ -2504,6 +2542,10 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
                 }
 
                 u64 symbol_hash = fnv_1_hash(decl->decl_proc.name->data, decl->decl_proc.name->length);
+                if (strncmp(decl->decl_proc.name->data, "glClearColor", decl->decl_proc.name->length) == 0)
+                {
+                    int x = 0;
+                }
                 External_Symbol* symbol = hoht_get_value_hashed(&lib->symbols, symbol_hash);
                 if (!symbol)
                 {
@@ -2537,12 +2579,14 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     array_free(gen.loop_breaks);
     array_free(gen.loop_continue);
     array_free(gen.proc_patch_calls);
-
     // -------------------------------------
     // Debug printout
 #if DUMP_LVM_CODE
     light_vm_debug_dump_code(stdout, state, gen.debug_info);
 #endif
-    light_vm_execute(state, 0, PRINT_LVM_INSTRUCTIONS, true);
+
+    r64 start_exe_time = os_time_us(); 
+    light_vm_execute(state, 0, PRINT_LVM_INSTRUCTIONS, true);    
+    r64 end_exe_time = os_time_us(); 
     light_vm_debug_dump_registers(stdout, state, LVM_PRINT_DECIMAL|LVM_PRINT_FLOATING_POINT_REGISTERS);
 }

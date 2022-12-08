@@ -1,61 +1,12 @@
-#import "../modules/print.li"
-#import "../modules/hash_table.li"
-#import "../modules/io.li"
-#import "../modules/base.li"
+main : () -> s32 {    
+    if false && true
+    {
+        while false
+        {     
+            if false {
+            }
+        }
+    }
 
-fnv_1_hash:(s : ^u8, length : u64) -> u64 {
-	hash :u64= 14695981039346656037;
-	fnv_prime :u64= 1099511628211;
-	for i :u64= 0; i < length; i += 1 {
-		hash = hash * fnv_prime;
-		hash = hash ^ s[i] -> u64;
-	}
-	return hash;
-}
-
-Hash_Table_Entry struct {
-	next  : ^Hash_Table_Entry;
-	hash  : u64;
-	value : ^void;
-}
-
-Hash_Table struct {
-	max_entries  : s64;
-	element_size : s64;
-	entries : ^Hash_Table_Entry;
-}
-
-hash_table_new:(initial_count : s64, element_size : s64) -> Hash_Table {
-	table := Hash_Table:{
-		initial_count,
-		element_size,
-		// allocate space for all initial elements
-		malloc((initial_count -> s64 * (#size_of Hash_Table_Entry + element_size -> s64 - #size_of ^void)) -> u64)
-	};
-	return table;
-}
-
-hash_table_add:(table : ^Hash_Table, key : ^void, key_size_bytes : u32, data : ^void) -> u64 {
-
-	hash := fnv_1_hash(key, key_size_bytes -> u64);
-	index := hash % table.max_entries -> u64;
-
-	if table.entries[index].hash == hash {
-		// the entry already exists
-		return index;
-	} else if table.entries[index].hash != 0 {
-		// the entry collided
-		// TODO(psv):
-	} else {
-		table.entries[index].hash = hash;
-		memcpy(&table.entries[index].value, data, table.element_size -> u64);
-	}
-
-}
-
-main : () -> s32 {
-	table := hash_table_new(32, #size_of s32);
-	one := 1;
-	hash_table_add(&table, "one".data, "one".length, &one);
     return 0;
 }

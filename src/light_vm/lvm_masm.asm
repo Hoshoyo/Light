@@ -92,7 +92,7 @@ arg0_float:
     ; assume that if we got here arg0 is float
     cmp r12d, 0
     je arg1
-    movdqa xmm0, xmmword ptr[rbx]
+    movlpd xmm0, qword ptr[rbx]
     add rbx, 8
     dec r12d
     inc r14
@@ -111,7 +111,7 @@ arg1:
 arg1_float:
     cmp r12d, 0
     je arg2
-    movdqa xmm1, xmmword ptr[rbx]
+    movlpd xmm1, qword ptr[rbx]
     add rbx, 8
     dec r12d
     inc r14
@@ -130,7 +130,7 @@ arg2:
 arg2_float:
     cmp r12d, 0
     je arg3
-    movdqa xmm2, xmmword ptr[rbx]
+    movlpd xmm2, qword ptr[rbx]
     add rbx, 8
     dec r12d
     inc r14
@@ -149,7 +149,7 @@ arg3:
 arg3_float:
     cmp r12d, 0
     je end_reg_args
-    movdqa xmm2, xmmword ptr[rbx]
+    movlpd xmm3, qword ptr[rbx]
     add rbx, 8
     dec r12d
     inc r14

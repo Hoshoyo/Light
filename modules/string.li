@@ -1,0 +1,7 @@
+string_equal:(s1 : string, s2 : string) -> bool {
+    if s1.length != s2.length return false;
+    for i:u32=0; i < s1.length; i += 1 {
+        if s1.data[i] != s2.data[i] return false;
+    }
+    return true;
+}

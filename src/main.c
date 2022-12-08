@@ -126,11 +126,11 @@ int main(int argc, char** argv) {
 
     double total_elapsed = (os_time_us() - start) / 1000.0;
     if(!quiet) {
-        printf("- elapsed time: (backend: %s)\n\n", backend_to_string(backend));
+        printf("\n- elapsed time: (backend: %s)\n\n", backend_to_string(backend));
         printf("  lexing:          %.2f ms\n", lexing_elapsed);
         printf("  parse:           %.2f ms\n", parse_elapsed);
         printf("  type check:      %.2f ms\n", tcheck_elapsed);
-        printf("  x86 generation:  %.2f ms\n", backend_gen_time);
+        printf("  backend gen:     %.2f ms\n", backend_gen_time);
         printf("  total:           %.2f ms\n", total_elapsed);
         printf("\n");
     }

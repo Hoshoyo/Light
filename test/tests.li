@@ -1,18 +1,22 @@
-//#import "test.li"
+#import "../modules/light_print.li"
 
-main : () -> s32 {	
-	return foo.BAR -> hello;
-	/*
-	b : hello;
-	a := &b;
-	*a = 3;
-	return b;
-	*/
+main : () -> u32 {	
+	//print_string("Hello");
+	//s := "Hoshoyo";
+	//printf("Hello %, my name is %\n", 4, s);
+	b : u64 = 0x123456789abcd;
+	a : s64 = 0x123456789abcd; // 320255973501901
+	f : hello;
+
+	//return printf("% % % % % % %", 11, a, 33 -> u32, 'c', b, true, 3.14, &a);
+	//return printf("$ $ $ $ $ $ $", 11, a, 33 -> u32, 'c', b, true, 3.14, &a);
+	//printf("main is a $\n", foo);
+	printf("Alias is %\n", #size_of hello);
+	return 0;
 }
 
 hello s32;
 
-foo enum {
-	FOO :: 1,
-	BAR :: 2,
+foo : (a : s32) -> s32 {
+	return 0;
 }

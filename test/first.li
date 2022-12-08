@@ -1,15 +1,104 @@
 #import "../examples/windows/windows.li"
+#import "engine/ho_gl.li"
+#import "../modules/light_print.li"
 
-main : () -> s32 {
-	a := foo();
-	return a;
+running := true;
+
+window_callback : (window : ^void, msg : u32, lparam: ^u32, wparam: ^u32) -> ^void #extern {
+	if msg == WM_CLOSE {
+		running = false;
+	} else {
+		return DefWindowProcA(window, msg, lparam, wparam);
+	}
+	
+	return null;
 }
 
-foo : () -> s32 {
+HANDLE ^void;
+HDC ^void;
+HGLRC ^void;
+
+
+WGL_CONTEXT_MAJOR_VERSION_ARB :: 0x2091;
+WGL_CONTEXT_MINOR_VERSION_ARB :: 0x2092;
+WGL_CONTEXT_FLAGS_ARB         :: 0x2094;
+
+wglCreateContext : (dc : HDC) -> HGLRC #extern("opengl32.dll");
+wglMakeCurrent : (dc : HDC, rc : HGLRC) -> bool #extern("opengl32.dll");
+wglGetProcAddress : (name : ^u8) -> (HDC, HGLRC, ^s32) -> HGLRC #extern #extern("opengl32.dll");
+wglDeleteContext : (rc : HGLRC) -> void #extern("opengl32.dll");
+
+Window struct {
+	width  : s32;
+	height : s32;
+	handle : HANDLE;
+	dc     : HDC;
+	rc     : HGLRC;
+}
+
+opengl_init: (window : ^Window) {
+	window.dc = GetDC(window.handle);
+	pfd : PIXELFORMATDESCRIPTOR;
+	pfd.nSize = #size_of PIXELFORMATDESCRIPTOR -> u16;
+	pfd.nVersion = 1;
+	pfd.iLayerType = PFD_MAIN_PLANE;
+	pfd.dwFlags = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
+	pfd.cDepthBits = 32;
+	pfd.cColorBits = 24;
+	pfd.iPixelType = PFD_TYPE_RGBA;
+
+	pixel_format := ChoosePixelFormat(window.dc, &pfd);
+	if (!SetPixelFormat(window.dc, pixel_format, &pfd))
+	{
+		printf("Could not set a pixel format\n");
+	}
+
+	temp_context := wglCreateContext(window.dc);
+	if !wglMakeCurrent(window.dc, temp_context)
+	{
+		printf("Could not create an OpenGL context.\n Make sure OpenGL compatible drivers are installed.\n");
+	}
+	attribs :=
+	[
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+		WGL_CONTEXT_FLAGS_ARB, 0, 0
+	];
+
+	wglCreateContextAttribsARB : (HDC, HGLRC, ^s32) -> HGLRC #extern;
+	wglCreateContextAttribsARB = wglGetProcAddress("wglCreateContextAttribsARB\0".data);
+
+	if wglCreateContextAttribsARB -> ^void != null {
+		window.rc = wglCreateContextAttribsARB(window.dc, null, attribs -> ^s32);
+		if window.rc != null
+		{
+			wglMakeCurrent(null, null);
+			wglDeleteContext(temp_context);
+			wglMakeCurrent(window.dc, window.rc);
+		}
+		else
+		{
+			printf("Could not create OpenGL core context\n");
+		}
+	}
+	else
+	{
+		printf("Could not create OpenGL core context\n");
+	}
+
+	if hogl_init_extensions() == -1
+	{
+		printf("Could not load OpenGL extensions\n");
+	}
+
+	return;
+}
+
+main : () -> s32 {
     window_class : WNDCLASSEXA;
 	window_class.cb_size = #size_of WNDCLASSEXA -> u32;
 	window_class.style = 0;
-	window_class.wndproc = window_callback;//null -> (^void, u32, ^u32, ^u32) -> ^void;
+	window_class.wndproc = window_callback;
 	window_class.cb_cls_extra = 0;
 	window_class.cb_wnd_extra = 0;
 	window_class.h_instance = null;
@@ -38,24 +127,25 @@ foo : () -> s32 {
 	
 	if w == null
 		return GetLastError();
+
+	win : Window;
+	win.handle = w;
+	opengl_init(&win);
+
+	glClearColor(0.2, 0.2, 0.2, 1.0);
 	
-	msg : MSG;
-    while GetMessageA(&msg, w, 0, 0) != 0
-    {
-		TranslateMessage(&msg);
-		DispatchMessageA(&msg);
-    }
+	while running {
+		msg : MSG;
+		while PeekMessageA(&msg, w, 0, 0, 1) != 0
+		{
+			TranslateMessage(&msg);
+			DispatchMessageA(&msg);
+		}
+
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		SwapBuffers(win.dc);
+	}
 
     return 33;
-}
-
-window_callback : (window : ^void, msg : u32, lparam: ^u32, wparam: ^u32) -> ^void #extern {
-	if msg == WM_CLOSE {
-		ExitProcess(0);
-	} else {
-		a := DefWindowProcA(window, msg, lparam, wparam);
-		return a;
-	}
-	
-	return null;
 }

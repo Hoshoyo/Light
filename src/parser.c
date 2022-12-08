@@ -471,7 +471,7 @@ parse_decl_procedure(Light_Parser* parser, Light_Token* name, Light_Scope* scope
     // a normal procedure declaration instead of a type declaration.
     if( lexer_peek(lexer)->type == '(' &&
         lexer_peek_n(lexer, 1)->type == TOKEN_IDENTIFIER && 
-        (lexer_peek_n(lexer, 2)->type == ':' || lexer_peek_n(lexer, 2)->type == ','))
+        (lexer_peek_n(lexer, 2)->type == ':' /* || lexer_peek_n(lexer, 2)->type == ','*/))
     {
         // Normal declaration
     } else if(

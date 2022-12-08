@@ -76,7 +76,7 @@ print_value_from_type_info:(type_info : ^User_Type_Info, value : ^void) -> s64 {
         print_string("0x");
         print_u64(v, 16);
     } else if(type_info.kind == LIGHT_TYPE_KIND_STRUCT) {
-        print_struct(type_info, value);
+        print_struct_value(type_info, value);
     } else if(type_info.kind == LIGHT_TYPE_KIND_ALIAS) {
         s := type_info.description.alias_desc.name;
         if(string_equal(s, "string"))
@@ -92,7 +92,7 @@ print_value_from_type_info:(type_info : ^User_Type_Info, value : ^void) -> s64 {
             print_value_from_type_info(to, value);
         }
     } else if(type_info.kind == LIGHT_TYPE_KIND_ARRAY) {
-        print_array(type_info, value);
+        print_array_value(type_info, value);
     } else if(type_info.kind == LIGHT_TYPE_KIND_FUNCTION) {
         print_string("0x");
         print_u64(*(value -> ^u64), 16);
@@ -102,7 +102,7 @@ print_value_from_type_info:(type_info : ^User_Type_Info, value : ^void) -> s64 {
     }
 }
 
-print_struct: (type_info : ^User_Type_Info, value : ^void) -> s32 {
+print_struct_value: (type_info : ^User_Type_Info, value : ^void) -> s32 {
     print_string("{ ");
     desc := type_info.description.struct_desc;
     for i := 0; i < desc.fields_count; i += 1 {
@@ -113,7 +113,7 @@ print_struct: (type_info : ^User_Type_Info, value : ^void) -> s32 {
     return 0;
 }
 
-print_array: (type_info : ^User_Type_Info, value : ^void) -> s32 {
+print_array_value: (type_info : ^User_Type_Info, value : ^void) -> s32 {
     print_string("[ ");
     desc := type_info.description.array_desc;
     

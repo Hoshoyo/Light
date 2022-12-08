@@ -4,6 +4,10 @@ TODO from toplevel.c:719 - this is the implementation of string literals inside 
 need to cleanup naming with hoassembler, otherwise is gonna be hell
 Fix the external caller for linux
 
+// This causes a crash
+m := (index % 3) == 2 && index > 0;
+if m { }
+
 This cast is busted!
 main : () -> s64 {    
     return 0x123456789abcd -> s64;
@@ -11,6 +15,15 @@ main : () -> s64 {
 
 This is f*'d
 l += s64_to_str(v -> s64, (buffer->^u8 + l) -> [32]u8);
+
+comparing a casted external procedure to a null gives an assertion
+if glClearColor -> ^void != null {
+
+This without the cast to u64 causes an assert
+INVALID_HANDLE_VALUE :: ((-1 -> u64) -> ^void);
+
+this causes a strange error
+if (size != null) *size = total_read -> u64;
 
 ### Backend x86
 - x86 functions returning void are causing a crash when not explicitly using return
