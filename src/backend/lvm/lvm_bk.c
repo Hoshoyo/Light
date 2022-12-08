@@ -766,8 +766,9 @@ lvmgen_expr_binary_logical(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
     };
     assert(type_primitive_bool(expr->expr_binary.left->type) && type_primitive_bool(expr->expr_binary.right->type));
 
+    Short_Circuit_Helper* last_helper = gen->short_circuit;
     Short_Circuit_Helper sc_helper = {0};
-    if(!gen->short_circuit)
+    if(!gen->short_circuit || !gen->short_circuit->short_circuit)
     {
         gen->short_circuit = &sc_helper;
     }
@@ -922,6 +923,8 @@ lvmgen_expr_binary_logical(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
         array_free(gen->short_circuit->short_circuit_jmps); 
         gen->short_circuit = 0;
     }
+
+    gen->short_circuit = last_helper;
 
     return result;
 }
@@ -1989,6 +1992,7 @@ lvmgen_comm_assignment(Light_VM_State* state, LVM_Generator* gen, Stack_Info* st
 void
 lvmgen_comm_if(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm)
 {
+    Short_Circuit_Helper* last_helper = gen->short_circuit;
     Short_Circuit_Helper sc_helper = {
         .short_circuit = true,
         .short_circuit_if = true,
@@ -2037,13 +2041,15 @@ lvmgen_comm_if(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info
     }    
 
     array_free(sc_helper.short_circuit_jmps);
-    gen->short_circuit = 0;
+    sc_helper.short_circuit_jmps = 0;
+    gen->short_circuit = last_helper;
     light_vm_patch_from_to_current_instruction(state, skip_true);
 }
 
 static void
 lvmgen_comm_while(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm)
 {
+    Short_Circuit_Helper* last_helper = gen->short_circuit;
     Short_Circuit_Helper sc_helper = {
         .short_circuit = true,
         .short_circuit_if = false,
@@ -2101,8 +2107,9 @@ lvmgen_comm_while(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_i
     for(int i = 0; i < array_length(sc_helper.short_circuit_jmps); ++i)
         if (sc_helper.short_circuit_jmps[i].short_circuit_index == -1)
             light_vm_patch_immediate_distance(sc_helper.short_circuit_jmps[i], while_end);
-    array_free(sc_helper.short_circuit_jmps);
-    gen->short_circuit = 0;
+    //array_free(sc_helper.short_circuit_jmps);
+    sc_helper.short_circuit_jmps = 0;
+    gen->short_circuit = last_helper;
 
     // Patch breaks
     for(int i = array_length(gen->loop_breaks) - 1; i >= 0; --i)
@@ -2129,6 +2136,7 @@ lvmgen_comm_for(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_inf
             lvmgen_command(state, gen, stack_info, comm->comm_for.prologue[i]);
     }
     
+    Short_Circuit_Helper* last_helper = gen->short_circuit;
     Short_Circuit_Helper sc_helper = {
         .short_circuit = true,
         .short_circuit_if = false,
@@ -2190,7 +2198,8 @@ lvmgen_comm_for(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_inf
             light_vm_patch_immediate_distance(sc_helper.short_circuit_jmps[i], while_end);
 
     array_free(sc_helper.short_circuit_jmps);
-    gen->short_circuit = 0;
+    sc_helper.short_circuit_jmps = 0;
+    gen->short_circuit = last_helper;
 
     // Patch breaks
     for(int i = array_length(gen->loop_breaks) - 1; i >= 0; --i)
