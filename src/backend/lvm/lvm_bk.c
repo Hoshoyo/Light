@@ -64,14 +64,18 @@ typedef struct {
 } LVM_Instruction_Patch;
 
 typedef struct {
-    // Current generation state for short circuit
     bool                          short_circuit;
     bool                          short_circuit_if;
     int32_t                       short_circuit_current_true;
     int32_t                       short_circuit_current_false;
+    Light_VM_Instruction_Info*    short_circuit_jmps;
+} Short_Circuit_Helper;
+
+typedef struct {
+    // Current generation state for short circuit
+    Short_Circuit_Helper*         short_circuit;
 
     Patch_Procs*                  proc_patch_calls;
-    Light_VM_Instruction_Info*    short_circuit_jmps;
     Light_VM_Instruction_Info*    proc_bases;
     Light_VM_Instruction_Info*    loop_breaks;
     Light_VM_Instruction_Info*    loop_continue;
@@ -762,16 +766,23 @@ lvmgen_expr_binary_logical(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
     };
     assert(type_primitive_bool(expr->expr_binary.left->type) && type_primitive_bool(expr->expr_binary.right->type));
 
-    bool sc = gen->short_circuit;
+    Short_Circuit_Helper sc_helper = {0};
+    if(!gen->short_circuit)
+    {
+        gen->short_circuit = &sc_helper;
+    }
+
+    bool sc = gen->short_circuit->short_circuit;
     int prev_false;
     int this_false;
     int prev_true;
     int this_true;
     if(!sc) 
     { 
-        gen->short_circuit = true;
-        gen->short_circuit_current_true = 1;
-        gen->short_circuit_current_false = -1;
+        gen->short_circuit->short_circuit = true;
+        gen->short_circuit->short_circuit_current_true = 1;
+        gen->short_circuit->short_circuit_current_false = -1;
+        gen->short_circuit->short_circuit_jmps = array_new(Light_VM_Instruction_Info);
         this_true = 1;
         this_false = -1;
     }
@@ -781,60 +792,60 @@ lvmgen_expr_binary_logical(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
         flags &= ~EXPR_FLAG_INVERTED_SHORT_CIRCUIT;
         if(expr->expr_binary.op == OP_BINARY_LOGIC_OR)
         {
-            prev_true = gen->short_circuit_current_true++;
-            this_true = gen->short_circuit_current_true;
+            prev_true = gen->short_circuit->short_circuit_current_true++;
+            this_true = gen->short_circuit->short_circuit_current_true;
 
             Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, stack_info, flags|EXPR_FLAG_DEREFERENCE);
             {
                 light_vm_push_fmt(state, "cmp r%db, 1", left.reg);
                 Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
-                info.short_circuit_index = gen->short_circuit_current_false;
-                array_push(gen->short_circuit_jmps, info);
+                info.short_circuit_index = gen->short_circuit->short_circuit_current_false;
+                array_push(gen->short_circuit->short_circuit_jmps, info);
             }
 
-            for(int i = array_length(gen->short_circuit_jmps) - 1; i >= 0; --i)
-                if(gen->short_circuit_jmps[i].short_circuit_index == this_true)
+            for(int i = array_length(gen->short_circuit->short_circuit_jmps) - 1; i >= 0; --i)
+                if(gen->short_circuit->short_circuit_jmps[i].short_circuit_index == this_true)
                 {
-                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
-                    array_remove(gen->short_circuit_jmps, i);
+                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit->short_circuit_jmps[i]);
+                    array_remove(gen->short_circuit->short_circuit_jmps, i);
                 }
-            gen->short_circuit_current_true = prev_true;
+            gen->short_circuit->short_circuit_current_true = prev_true;
 
             Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, stack_info, flags|EXPR_FLAG_DEREFERENCE);
             {
                 light_vm_push_fmt(state, "cmp r%db, 1", right.reg);
                 Light_VM_Instruction_Info info2 = light_vm_push(state, "beq 0xffffffff");
-                info2.short_circuit_index = gen->short_circuit_current_false;
-                array_push(gen->short_circuit_jmps, info2);
+                info2.short_circuit_index = gen->short_circuit->short_circuit_current_false;
+                array_push(gen->short_circuit->short_circuit_jmps, info2);
             }
         }
         else
         {
-            prev_false = gen->short_circuit_current_false--;
-            this_false = gen->short_circuit_current_false;
+            prev_false = gen->short_circuit->short_circuit_current_false--;
+            this_false = gen->short_circuit->short_circuit_current_false;
 
             Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, stack_info, flags|EXPR_FLAG_DEREFERENCE);
             {
                 light_vm_push_fmt(state, "cmp r%db, 1", left.reg);
                 Light_VM_Instruction_Info info = light_vm_push(state, "bne 0xffffffff");
-                info.short_circuit_index = gen->short_circuit_current_true;
-                array_push(gen->short_circuit_jmps, info);
+                info.short_circuit_index = gen->short_circuit->short_circuit_current_true;
+                array_push(gen->short_circuit->short_circuit_jmps, info);
             }
 
-            for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0 ; --i)
-                if(gen->short_circuit_jmps[i].short_circuit_index == this_false)
+            for(int i = array_length(gen->short_circuit->short_circuit_jmps)-1; i >= 0 ; --i)
+                if(gen->short_circuit->short_circuit_jmps[i].short_circuit_index == this_false)
                 {
-                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
-                    array_remove(gen->short_circuit_jmps, i);
+                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit->short_circuit_jmps[i]);
+                    array_remove(gen->short_circuit->short_circuit_jmps, i);
                 }
-            gen->short_circuit_current_false = prev_false;
+            gen->short_circuit->short_circuit_current_false = prev_false;
 
             Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, stack_info, flags|EXPR_FLAG_DEREFERENCE);
             {
                 light_vm_push_fmt(state, "cmp r%db, 1", right.reg);
                 Light_VM_Instruction_Info info2 = light_vm_push(state, "beq 0xffffffff");
-                info2.short_circuit_index = gen->short_circuit_current_false;
-                array_push(gen->short_circuit_jmps, info2);
+                info2.short_circuit_index = gen->short_circuit->short_circuit_current_false;
+                array_push(gen->short_circuit->short_circuit_jmps, info2);
             }
         }
     }
@@ -842,72 +853,75 @@ lvmgen_expr_binary_logical(Light_VM_State* state, LVM_Generator* gen, Light_Ast*
     {
         if(expr->expr_binary.op == OP_BINARY_LOGIC_AND)
         {
-            prev_true = gen->short_circuit_current_true++;
-            this_true = gen->short_circuit_current_true;
+            prev_true = gen->short_circuit->short_circuit_current_true++;
+            this_true = gen->short_circuit->short_circuit_current_true;
 
             Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, stack_info, flags|EXPR_FLAG_DEREFERENCE);
             {
                 light_vm_push_fmt(state, "cmp r%db, 0", left.reg);
                 Light_VM_Instruction_Info info = light_vm_push(state, "beq 0xffffffff");
-                info.short_circuit_index = gen->short_circuit_current_false;
-                array_push(gen->short_circuit_jmps, info);
+                info.short_circuit_index = gen->short_circuit->short_circuit_current_false;
+                array_push(gen->short_circuit->short_circuit_jmps, info);
             }
 
-            for(int i = array_length(gen->short_circuit_jmps) - 1; i >= 0; --i)
-                if(gen->short_circuit_jmps[i].short_circuit_index == this_true)
+            for(int i = array_length(gen->short_circuit->short_circuit_jmps) - 1; i >= 0; --i)
+                if(gen->short_circuit->short_circuit_jmps[i].short_circuit_index == this_true)
                 {
-                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
-                    array_remove(gen->short_circuit_jmps, i);
+                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit->short_circuit_jmps[i]);
+                    array_remove(gen->short_circuit->short_circuit_jmps, i);
                 }
-            gen->short_circuit_current_true = prev_true;
+            gen->short_circuit->short_circuit_current_true = prev_true;
 
             Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, stack_info, flags|EXPR_FLAG_DEREFERENCE);
             {
                 light_vm_push_fmt(state, "cmp r%db, 0", right.reg);
                 Light_VM_Instruction_Info info2 = light_vm_push(state, "beq 0xffffffff");
-                info2.short_circuit_index = gen->short_circuit_current_false;
-                array_push(gen->short_circuit_jmps, info2);
+                info2.short_circuit_index = gen->short_circuit->short_circuit_current_false;
+                array_push(gen->short_circuit->short_circuit_jmps, info2);
             }
         }
         else
         {
-            prev_false = gen->short_circuit_current_false--;
-            this_false = gen->short_circuit_current_false;
+            prev_false = gen->short_circuit->short_circuit_current_false--;
+            this_false = gen->short_circuit->short_circuit_current_false;
 
             Expr_Result left = lvmgen_expr(state, gen, expr->expr_binary.left, stack_info, flags|EXPR_FLAG_DEREFERENCE);
             {
                 light_vm_push_fmt(state, "cmp r%db, 0", left.reg);
                 Light_VM_Instruction_Info info = light_vm_push(state, "bne 0xffffffff");
-                info.short_circuit_index = gen->short_circuit_current_true;
-                array_push(gen->short_circuit_jmps, info);
+                info.short_circuit_index = gen->short_circuit->short_circuit_current_true;
+                array_push(gen->short_circuit->short_circuit_jmps, info);
             }
 
-            for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0 ; --i)
-                if(gen->short_circuit_jmps[i].short_circuit_index == this_false)
+            for(int i = array_length(gen->short_circuit->short_circuit_jmps)-1; i >= 0 ; --i)
+                if(gen->short_circuit->short_circuit_jmps[i].short_circuit_index == this_false)
                 {
-                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
-                    array_remove(gen->short_circuit_jmps, i);
+                    light_vm_patch_from_to_current_instruction(state, gen->short_circuit->short_circuit_jmps[i]);
+                    array_remove(gen->short_circuit->short_circuit_jmps, i);
                 }
-            gen->short_circuit_current_false = prev_false;
+            gen->short_circuit->short_circuit_current_false = prev_false;
 
             Expr_Result right = lvmgen_expr(state, gen, expr->expr_binary.right, stack_info, flags|EXPR_FLAG_DEREFERENCE);
             {
                 light_vm_push_fmt(state, "cmp r%db, 0", right.reg);
                 Light_VM_Instruction_Info info2 = light_vm_push(state, "beq 0xffffffff");
-                info2.short_circuit_index = gen->short_circuit_current_false;
-                array_push(gen->short_circuit_jmps, info2);
+                info2.short_circuit_index = gen->short_circuit->short_circuit_current_false;
+                array_push(gen->short_circuit->short_circuit_jmps, info2);
             }
         }
     }
 
-    if(!gen->short_circuit_if && !sc)
+    if(!gen->short_circuit->short_circuit_if && !sc)
     {
         Light_VM_Instruction_Info end_branch = light_vm_current_instruction(state);
-        for(int i = 0; i < array_length(gen->short_circuit_jmps); ++i)
-            light_vm_patch_immediate_distance(gen->short_circuit_jmps[i], end_branch);
+        for(int i = 0; i < array_length(gen->short_circuit->short_circuit_jmps); ++i)
+            light_vm_patch_immediate_distance(gen->short_circuit->short_circuit_jmps[i], end_branch);
     }
 
-    if(!sc) array_clear(gen->short_circuit_jmps);
+    if (!sc) { 
+        array_free(gen->short_circuit->short_circuit_jmps); 
+        gen->short_circuit = 0;
+    }
 
     return result;
 }
@@ -1186,7 +1200,7 @@ lvmgen_expr_unary(Light_VM_State* state, LVM_Generator* gen, Light_Ast* expr, St
             {
                 result = lvmgen_expr(state, gen, expr->expr_unary.operand->expr_unary.operand, stack_info, flags|EXPR_FLAG_DEREFERENCE);
             }
-            else if(gen->short_circuit && expr->expr_unary.operand->kind == AST_EXPRESSION_BINARY && 
+            else if(gen->short_circuit && gen->short_circuit->short_circuit && expr->expr_unary.operand->kind == AST_EXPRESSION_BINARY && 
                 (expr->expr_unary.operand->expr_binary.op == OP_BINARY_LOGIC_AND || expr->expr_unary.operand->expr_binary.op == OP_BINARY_LOGIC_OR))
             {
                 result = lvmgen_expr(state, gen, expr->expr_unary.operand, stack_info, flags|EXPR_FLAG_DEREFERENCE|EXPR_FLAG_INVERTED_SHORT_CIRCUIT);
@@ -1975,44 +1989,43 @@ lvmgen_comm_assignment(Light_VM_State* state, LVM_Generator* gen, Stack_Info* st
 void
 lvmgen_comm_if(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm)
 {
-    gen->short_circuit = true;
-    gen->short_circuit_if = true;
-    gen->short_circuit_current_true = 1;
-    gen->short_circuit_current_false = -1;
+    Short_Circuit_Helper sc_helper = {
+        .short_circuit = true,
+        .short_circuit_if = true,
+        .short_circuit_current_true = 1,
+        .short_circuit_current_false = -1,
+        .short_circuit_jmps = array_new(Light_VM_Instruction_Info),
+    };
+    gen->short_circuit = &sc_helper;
+
     Expr_Result res = lvmgen_expr(state, gen, comm->comm_if.condition, stack_info, EXPR_FLAG_DEREFERENCE);
     assert(res.type == EXPR_RESULT_REG);
-    gen->short_circuit = false;
-    gen->short_circuit_if = false;
+    sc_helper.short_circuit = false;
+    sc_helper.short_circuit_if = false;
 
     // If there is nothing in the array, that means no AND/OR were generated,
     // in this case, just evaluate the final result and branch according to that.
     // We can't do this by branching inside because there can ban casts to bool.
     Light_VM_Instruction_Info base_case = {0};
-    bool no_short_circuit = array_length(gen->short_circuit_jmps) == 0;
+    bool no_short_circuit = array_length(sc_helper.short_circuit_jmps) == 0;
     if(no_short_circuit)
     {
         light_vm_push_fmt(state, "cmp r%db, 0", res.reg);
         base_case = light_vm_push(state, "beq 0xffffffff");
     }
 
-    for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0 ; --i)
-        if (gen->short_circuit_jmps[i].short_circuit_index == 1)
-        {
-            light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
-            array_remove(gen->short_circuit_jmps, i);
-        }
+    for(int i = 0; i < array_length(sc_helper.short_circuit_jmps); ++i)
+        if (sc_helper.short_circuit_jmps[i].short_circuit_index == 1)
+            light_vm_patch_from_to_current_instruction(state, gen->short_circuit->short_circuit_jmps[i]);
 
     lvmgen_command(state, gen, stack_info, comm->comm_if.body_true);
     Light_VM_Instruction_Info skip_true = light_vm_push(state, "jmp 0xffffffff");
 
     Light_VM_Instruction_Info else_block = light_vm_current_instruction(state);
 
-    for (int i = array_length(gen->short_circuit_jmps)-1; i >= 0; --i)
-        if (gen->short_circuit_jmps[i].short_circuit_index == -1)
-        {
-            light_vm_patch_immediate_distance(gen->short_circuit_jmps[i], else_block);
-            array_remove(gen->short_circuit_jmps, i);
-        }
+    for (int i = 0; i < array_length(sc_helper.short_circuit_jmps); ++i)
+        if (sc_helper.short_circuit_jmps[i].short_circuit_index == -1)
+            light_vm_patch_immediate_distance(sc_helper.short_circuit_jmps[i], else_block);
 
     if(no_short_circuit)
     {
@@ -2023,40 +2036,43 @@ lvmgen_comm_if(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info
         lvmgen_command(state, gen, stack_info, comm->comm_if.body_false);
     }    
 
-    array_clear(gen->short_circuit_jmps);
+    array_free(sc_helper.short_circuit_jmps);
+    gen->short_circuit = 0;
     light_vm_patch_from_to_current_instruction(state, skip_true);
 }
 
 static void
 lvmgen_comm_while(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_info, Light_Ast* comm)
 {
-    gen->short_circuit = true;
-    gen->short_circuit_if = true;
-    gen->short_circuit_current_true = 1;
-    gen->short_circuit_current_false = -1;
+    Short_Circuit_Helper sc_helper = {
+        .short_circuit = true,
+        .short_circuit_if = false,
+        .short_circuit_current_true = 1,
+        .short_circuit_current_false = -1,
+        .short_circuit_jmps = array_new(Light_VM_Instruction_Info),
+    };
+    gen->short_circuit = &sc_helper;
+
     Light_VM_Instruction_Info start = light_vm_current_instruction(state);
     Expr_Result res = lvmgen_expr(state, gen, comm->comm_while.condition, stack_info, EXPR_FLAG_DEREFERENCE);
     assert(res.type == EXPR_RESULT_REG);
-    gen->short_circuit = false;
-    gen->short_circuit_if = false;
+    sc_helper.short_circuit = false;
+    sc_helper.short_circuit_if = false;
 
     // If there is nothing in the array, that means no AND/OR were generated,
     // in this case, just evaluate the final result and branch according to that.
     // We can't do this by branching inside because there can ban casts to bool.
     Light_VM_Instruction_Info base_case = {0};
-    bool no_short_circuit = array_length(gen->short_circuit_jmps) == 0;
+    bool no_short_circuit = array_length(sc_helper.short_circuit_jmps) == 0;
     if(no_short_circuit)
     {
         light_vm_push(state, "cmp r0, 0");
         base_case = light_vm_push(state, "beq 0xffffffff");
     }
 
-    for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0; --i)
-        if (gen->short_circuit_jmps[i].short_circuit_index == 1)
-        {
-            light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
-            array_remove(gen->short_circuit_jmps, i);
-        }
+    for(int i = 0; i < array_length(sc_helper.short_circuit_jmps); ++i)
+        if (sc_helper.short_circuit_jmps[i].short_circuit_index == 1)
+            light_vm_patch_from_to_current_instruction(state, sc_helper.short_circuit_jmps[i]);
 
     lvmgen_command(state, gen, stack_info, comm->comm_while.body);
 
@@ -2082,13 +2098,11 @@ lvmgen_comm_while(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_i
     Light_VM_Instruction_Info while_end = light_vm_current_instruction(state);
     if(no_short_circuit)
         light_vm_patch_immediate_distance(base_case, while_end);
-    for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0; --i)
-        if (gen->short_circuit_jmps[i].short_circuit_index == -1)
-        {
-            light_vm_patch_immediate_distance(gen->short_circuit_jmps[i], while_end);
-            array_remove(gen->short_circuit_jmps, i);
-        }
-    array_clear(gen->short_circuit_jmps);
+    for(int i = 0; i < array_length(sc_helper.short_circuit_jmps); ++i)
+        if (sc_helper.short_circuit_jmps[i].short_circuit_index == -1)
+            light_vm_patch_immediate_distance(sc_helper.short_circuit_jmps[i], while_end);
+    array_free(sc_helper.short_circuit_jmps);
+    gen->short_circuit = 0;
 
     // Patch breaks
     for(int i = array_length(gen->loop_breaks) - 1; i >= 0; --i)
@@ -2115,30 +2129,33 @@ lvmgen_comm_for(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_inf
             lvmgen_command(state, gen, stack_info, comm->comm_for.prologue[i]);
     }
     
-    gen->short_circuit = true;
-    gen->short_circuit_current_true = 1;
-    gen->short_circuit_current_false = -1;
+    Short_Circuit_Helper sc_helper = {
+        .short_circuit = true,
+        .short_circuit_if = false,
+        .short_circuit_current_true = 1,
+        .short_circuit_current_false = -1,
+        .short_circuit_jmps = array_new(Light_VM_Instruction_Info),
+    };
+    gen->short_circuit = &sc_helper;
+
     Light_VM_Instruction_Info start = light_vm_current_instruction(state);
     Expr_Result res = lvmgen_expr(state, gen, comm->comm_for.condition, stack_info, EXPR_FLAG_DEREFERENCE);
-    gen->short_circuit = false;
+    sc_helper.short_circuit = false;
 
     // If there is nothing in the array, that means no AND/OR were generated,
     // in this case, just evaluate the final result and branch according to that.
     // We can't do this by branching inside because there can ban casts to bool.
     Light_VM_Instruction_Info base_case = {0};
-    bool no_short_circuit = array_length(gen->short_circuit_jmps) == 0;
+    bool no_short_circuit = array_length(sc_helper.short_circuit_jmps) == 0;
     if(no_short_circuit)
     {
         light_vm_push(state, "cmp r0, 0");
         base_case = light_vm_push(state, "beq 0xffffffff");
     }
 
-    for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0; --i)
-        if (gen->short_circuit_jmps[i].short_circuit_index == 1)
-        {
-            light_vm_patch_from_to_current_instruction(state, gen->short_circuit_jmps[i]);
-            array_remove(gen->short_circuit_jmps, i);
-        }
+    for(int i = 0; i < array_length(sc_helper.short_circuit_jmps); ++i)
+        if (sc_helper.short_circuit_jmps[i].short_circuit_index == 1)
+            light_vm_patch_from_to_current_instruction(state, sc_helper.short_circuit_jmps[i]);
 
     lvmgen_command(state, gen, stack_info, comm->comm_for.body);
 
@@ -2168,13 +2185,12 @@ lvmgen_comm_for(Light_VM_State* state, LVM_Generator* gen, Stack_Info* stack_inf
     Light_VM_Instruction_Info while_end = light_vm_current_instruction(state);
     if(no_short_circuit)
         light_vm_patch_immediate_distance(base_case, while_end);
-    for(int i = array_length(gen->short_circuit_jmps)-1; i >= 0; --i)
-        if (gen->short_circuit_jmps[i].short_circuit_index == -1)
-        {
-            light_vm_patch_immediate_distance(gen->short_circuit_jmps[i], while_end);
-            array_remove(gen->short_circuit_jmps, i);
-        }
-    array_clear(gen->short_circuit_jmps);
+    for(int i = 0; i < array_length(sc_helper.short_circuit_jmps); ++i)
+        if (sc_helper.short_circuit_jmps[i].short_circuit_index == -1)
+            light_vm_patch_immediate_distance(sc_helper.short_circuit_jmps[i], while_end);
+
+    array_free(sc_helper.short_circuit_jmps);
+    gen->short_circuit = 0;
 
     // Patch breaks
     for(int i = array_length(gen->loop_breaks) - 1; i >= 0; --i)
@@ -2470,7 +2486,6 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
     Light_VM_State* state = light_vm_init();
 
     LVM_Generator gen = {0};
-    gen.short_circuit_jmps = array_new(Light_VM_Instruction_Info);
     gen.proc_bases         = array_new(Light_VM_Instruction_Info);
     gen.loop_breaks        = array_new(Light_VM_Instruction_Info);
     gen.loop_continue      = array_new(Light_VM_Instruction_Info);
@@ -2574,7 +2589,6 @@ lvm_generate(Light_Ast** ast, Light_Scope* global_scope)
 
     // -------------------------------------
     // Free everything
-    array_free(gen.short_circuit_jmps);
     array_free(gen.proc_bases);
     array_free(gen.loop_breaks);
     array_free(gen.loop_continue);

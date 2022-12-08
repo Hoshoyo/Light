@@ -1,5 +1,5 @@
-main : () -> s32 {    
-    if false && true
+main : () -> s32 {   
+    if true && true
     {
         while false
         {     
