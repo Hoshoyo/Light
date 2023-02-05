@@ -34,7 +34,7 @@ iri_value_new_signed(int byte_size, uint64_t v)
 IR_Instruction
 iri_new(IR_Instruction_Type type, IR_Reg t1, IR_Reg t2, IR_Reg t3, IR_Value imm, int byte_size)
 {
-    assert(byte_size <= type_pointer_size_bytes());
+    //assert(byte_size <= type_pointer_size_bytes());
     IR_Instruction inst = {0};
     inst.type = type;
     inst.t1 = t1;

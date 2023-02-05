@@ -227,11 +227,11 @@ load_internal_modules(Light_Parser* parser, Light_Scope* global_scope, Light_Bac
         } break;
         case BACKEND_C: {
             ast = load_internal_module(parser, global_scope, (char*)module_base_str_64bit, sizeof(module_base_str_64bit));
-            //ast = load_internal_module(parser, global_scope, module_reflect_str_64bit, sizeof(module_reflect_str_64bit));
+            ast = load_internal_module(parser, global_scope, module_reflect_str_64bit, sizeof(module_reflect_str_64bit));
         } break;
         case BACKEND_LIGHT_VM: {
             ast = load_internal_module(parser, global_scope, (char*)module_base_str_64bit, sizeof(module_base_str_64bit));
-            //ast = load_internal_module(parser, global_scope, module_reflect_str_64bit, sizeof(module_reflect_str_64bit));
+            ast = load_internal_module(parser, global_scope, module_reflect_str_64bit, sizeof(module_reflect_str_64bit));
         } break;
     }
     

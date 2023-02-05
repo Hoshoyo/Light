@@ -172,6 +172,7 @@ ir_gen_cvt_to_r32(IR_Generator* gen, Light_Ast* expr, IR_Reg op_temp)
         }
         // the other conversion is useless, since it is from r32 to r32
     }
+    ir_free_reg(gen, op_temp);
     return t;
 }
 
@@ -199,6 +200,7 @@ ir_gen_cvt_to_r64(IR_Generator* gen, Light_Ast* expr, IR_Reg op_temp)
         }
         // the other conversion is useless, since it is from r64 to r64
     }
+    ir_free_reg(gen, op_temp);
     return t;
 }
 
@@ -218,6 +220,8 @@ ir_gen_cvt_to_bool(IR_Generator* gen, Light_Ast* expr, int op_temp)
 
     // mov 1 if the value is different from 0
     iri_emit_cmov(gen, IR_CMOVNE, IR_REG_NONE, t, (IR_Value){.type = IR_VALUE_U8, .v_u8 = 1}, cast_type->size_bits / 8);
+
+    ir_free_reg(gen, op_temp);
 
     return t;
 }
@@ -531,6 +535,12 @@ ir_gen_expr_binary_float(IR_Generator* gen, Light_Ast* expr, bool load, bool ins
         case OP_BINARY_MINUS:           instr_type = IR_SUBF; break;
         case OP_BINARY_MULT:            instr_type = IR_MULF; break;
         case OP_BINARY_DIV:             instr_type = IR_DIVF; break;
+
+        case OP_BINARY_LT:
+        case OP_BINARY_LE:
+        case OP_BINARY_GT:
+        case OP_BINARY_GE:
+        case OP_BINARY_EQUAL:
         case OP_BINARY_NOT_EQUAL:   return ir_gen_expr_cond(gen, expr, t1, t2, t3, true);
         default: assert(0); break;
     }
@@ -1281,7 +1291,7 @@ calc_command_stack_size(Light_Ast* comm)
                 stack_size_bytes += calc_block_stack_size(comm->comm_if.body_false);
         } break;
         case AST_COMMAND_WHILE: {
-            if(comm->comm_while.body)
+            if(comm->comm_while.body && comm->comm_while.body->kind == AST_COMMAND_BLOCK)
                 stack_size_bytes += calc_block_stack_size(comm->comm_while.body);
         } break;
         case AST_COMMAND_FOR: {
@@ -1289,7 +1299,7 @@ calc_command_stack_size(Light_Ast* comm)
             {
                 stack_size_bytes += calc_commands_stack_size(comm->comm_for.prologue);
             }
-            if(comm->comm_for.body)
+            if(comm->comm_for.body && comm->comm_for.body->kind == AST_COMMAND_BLOCK)
             {
                 stack_size_bytes += calc_block_stack_size(comm->comm_for.body);
             }

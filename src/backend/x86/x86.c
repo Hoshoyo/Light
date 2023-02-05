@@ -83,7 +83,7 @@ x86_reg32_to_byte_size(X64_Register reg, int byte_size)
         case 4: {
             return reg;
         } break;
-        default: return REG_NONE;
+        default: assert(0); return REG_NONE;
     }
     return REG_NONE;
 }

@@ -64,7 +64,11 @@ static void
 emit_type_end(catstring* buffer, Light_Type* type) {
     switch(type->kind) {
         case TYPE_KIND_ARRAY:{
-            catsprint(buffer, ")[%u]", type->array_info.dimension);
+            if (type->array_info.dimension == 0) {
+                catsprint(buffer, ")[]");
+            } else {
+                catsprint(buffer, ")[%u]", type->array_info.dimension);
+            }
             emit_type_end(buffer, type->array_info.array_of);
         } break;
         case TYPE_KIND_FUNCTION:{
@@ -501,7 +505,14 @@ emit_expression(catstring* literal_decls, catstring* buffer, Light_Ast* node) {
             emit_typed_declaration(&after, node->type, &name, 0);
 
             if(node->expr_literal_array.raw_data) {
-                catsprint(&after, " = \"%s*\";\n", node->expr_literal_array.data_length_bytes - 1, node->expr_literal_array.data);
+                //catsprint(&after, " = \"%s*\";\n", node->expr_literal_array.data_length_bytes, node->expr_literal_array.data);
+                catsprint(&after, " = \"");
+                for(int i = 0; i < node->expr_literal_array.data_length_bytes; ++i) {
+                    char b[] = "\\x00";
+                    sprintf(b, "\\x%02x", (node->expr_literal_array.data[i]));
+                    catsprint(&after, "%s", b);
+                }
+                catsprint(&after, "\";\n");
             } else {
                 catsprint(&after, " = {");
                 for(u64 i = 0; i < array_length(node->expr_literal_array.array_exprs); ++i) {
@@ -715,10 +726,11 @@ emit_command(catstring* buffer, Light_Ast* node) {
             bool body_false_is_block = node->comm_if.body_false && node->comm_if.body_false->kind == AST_COMMAND_BLOCK;
 
             // Conditional expression
-            catsprint(buffer, "if (");
-            // TODO(psv): literal declarations
-            emit_expression(0, buffer, node->comm_if.condition);
-            catsprint(buffer, ")");
+            catstring c = { 0 };
+            catsprint(&c, "if (");
+            emit_expression(buffer, &c, node->comm_if.condition);
+            catsprint(&c, ")");
+            catstring_append(buffer, &c);
 
             // True body
             if (!body_true_is_block)
@@ -744,10 +756,11 @@ emit_command(catstring* buffer, Light_Ast* node) {
             assert(node->comm_while.body->comm_block.block_scope);
             catsprint(buffer, "label_continue_%d:\n", (u64)node->comm_while.body->comm_block.block_scope->id);
 
-            catsprint(buffer, "while (");
-            // TODO(psv): literal declarations
-            emit_expression(0, buffer, node->comm_while.condition);
-            catsprint(buffer, ") {\n");
+            catstring c = { 0 };
+            catsprint(&c, "while (");
+            emit_expression(buffer, &c, node->comm_while.condition);
+            catsprint(&c, ") {\n");
+            catstring_append(buffer, &c);
             emit_command(buffer, node->comm_while.body);
             catsprint(buffer, "}\n");
 
@@ -783,14 +796,15 @@ emit_command(catstring* buffer, Light_Ast* node) {
                 }
             }
 
-            catsprint(buffer, "while(");
-            // TODO(psv): literal_declarations
+            catstring c = { 0 };
+            catsprint(&c, "while(");
             if(node->comm_for.condition) {
-                emit_expression(0, buffer, node->comm_for.condition);
+                emit_expression(buffer, &c, node->comm_for.condition);
             } else {
-                catsprint(buffer, "true");    
+                catsprint(&c, "true");    
             }
-            catsprint(buffer, ")");
+            catsprint(&c, ")");
+            catstring_append(buffer, &c);
 
             catsprint(buffer, "{");
             emit_command(buffer, node->comm_for.body);
