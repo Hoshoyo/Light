@@ -2440,7 +2440,7 @@ lvmgen_proc_decl_stdcall(Light_VM_State* state, LVM_Generator* gen, Light_Ast* p
     at = emit_arithmetic(0, at, ARITH_SUB, mk_mi_direct(RSP, 32, 8));
     at = emit_call(0, at, mk_m_direct(RAX));
     at = emit_arithmetic(0, at, ARITH_ADD, mk_mi_direct(RSP, 32, 8));
-    at = hoasm_emit_ret(0, at, RET_NEAR, 0);
+    at = emit_ret(0, at, RET_NEAR, 0);
    
     state->code_offset += (at - ((u8*)state->code.block + state->code_offset));
     

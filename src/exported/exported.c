@@ -32,8 +32,6 @@ light_lex_parse_string(const char* str, int length_bytes)
     return ast;
 }
 
-Light_Ast* light_lex
-
 Light_Ast**
 light_typeinfer_check(Light_Ast** ast)
 {

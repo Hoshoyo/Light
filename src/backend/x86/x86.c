@@ -1,5 +1,5 @@
 #include "x86.h"
-#include "../../assembler/assembler.h"
+#include "../../hassembler/hoasm.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <stdio.h>
@@ -83,21 +83,21 @@ x86_reg32_to_byte_size(X64_Register reg, int byte_size)
         case 4: {
             return reg;
         } break;
-        default: assert(0); return REG_NONE;
+        default: assert(0); return REGISTER_NONE;
     }
-    return REG_NONE;
+    return REGISTER_NONE;
 }
 
 static X64_Register
 ir_to_x86_Reg(IR_Reg r, int byte_size)
 {
-    if (r == IR_REG_NONE) return REG_NONE;
+    if (r == IR_REG_NONE) return REGISTER_NONE;
     // 8 16 32
     X64_Register n[][4] = {
-        {REG_NONE, REG_NONE, REG_NONE, REG_NONE},
-        {BL,   BX,   REG_NONE, EBX},
-        {CL,   CX,   REG_NONE, ECX},
-        {DL,   DX,   REG_NONE, EDX},
+        {REGISTER_NONE, REGISTER_NONE, REGISTER_NONE, REGISTER_NONE},
+        {BL,   BX,   REGISTER_NONE, EBX},
+        {CL,   CX,   REGISTER_NONE, ECX},
+        {DL,   DX,   REGISTER_NONE, EDX},
     };
 
     switch(r)
@@ -108,12 +108,12 @@ ir_to_x86_Reg(IR_Reg r, int byte_size)
                 case 1:  return AL;
                 case 2: return AX;
                 case 4: return EAX;
-                default: return REG_NONE;
+                default: return REGISTER_NONE;
             }
         } break;
         case IR_REG_INSTR_PTR:{
             // should not be used directly
-            return REG_NONE;
+            return REGISTER_NONE;
         } break;
         case IR_REG_STACK_BASE: {
             switch(byte_size)
@@ -121,7 +121,7 @@ ir_to_x86_Reg(IR_Reg r, int byte_size)
                 case 1:  return BPL;
                 case 2: return BP;
                 case 4: return EBP;
-                default: return REG_NONE;
+                default: return REGISTER_NONE;
             }
         } break;
         case IR_REG_STACK_PTR: {
@@ -130,14 +130,14 @@ ir_to_x86_Reg(IR_Reg r, int byte_size)
                 case 1:  return SPL;
                 case 2: return SP;
                 case 4: return ESP;
-                default: return REG_NONE;
+                default: return REGISTER_NONE;
             }
         } break;
         default:
             return n[r][byte_size - 1];
         break;
     }
-    return REG_NONE;
+    return REGISTER_NONE;
 }
 
 Instr_Emit_Result
@@ -147,10 +147,7 @@ x86_emit_lea(X86_Emitter* em, IR_Instruction* instr)
     X64_Register rdst = ir_to_x86_Reg(instr->t3, instr->byte_size);
     X64_Register rsrc = ir_to_x86_Reg(instr->t1, instr->byte_size);
 
-    em->at = emit_lea(&info, em->at, instr->byte_size * 8, INDIRECT_DWORD_DISPLACED,
-        rdst, rsrc,
-        (instr->imm.type == IR_VALUE_S8) ? instr->imm.v_s8 : 0, 
-        (instr->imm.type == IR_VALUE_S32) ? instr->imm.v_s32 : 0);
+    em->at = emit_lea(&info, em->at, mk_rm_indirect(rdst, rsrc, instr->imm.v_s32, instr->byte_size * 8));
 
     return info;
 }
@@ -166,7 +163,7 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
     {
         // imm to reg
         u8* patch_addr = em->at;
-        em->at = emit_mov_oi(&info, em->at, rdst, (Int_Value){.v64 = instr->imm.v_u64});
+        em->at = emit_mov(&info, em->at, mk_oi(rdst, instr->imm.v_u64, 32));
 
         if(instr->flags & IIR_FLAG_INSTRUCTION_OFFSET)
         {
@@ -209,8 +206,7 @@ x86_emit_mov(X86_Emitter* em, IR_Instruction* instr, int index)
     else
     {
         // reg to reg
-        em->at = emit_mov_reg(&info, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, 
-            instr->byte_size * 8, rdst, rsrc, 0, 0);
+        em->at = emit_mov(&info, em->at, mk_mr_direct(rdst, rsrc));
     }
     return info;
 }
@@ -226,10 +222,18 @@ x86_emit_store(X86_Emitter* em, IR_Instruction* instr)
     if(instr->imm.type == IR_VALUE_S8) mode = INDIRECT_BYTE_DISPLACED;
     else if(instr->imm.type == IR_VALUE_S32) mode = INDIRECT_DWORD_DISPLACED;
 
-    em->at = emit_mov_reg(&info, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, mode, 
-        instr->byte_size * 8, rdst, rsrc,
-        (instr->imm.type == IR_VALUE_S8) ? instr->imm.v_s8 : 0,
-        (instr->imm.type == IR_VALUE_S32) ? instr->imm.v_s32 : 0);
+    switch(mode)
+    {
+        case INDIRECT: {
+            em->at = emit_mov(&info, em->at, mk_mr_indirect(rdst, rsrc, 0, instr->byte_size * 8));
+        } break;
+        case INDIRECT_BYTE_DISPLACED: {
+            em->at = emit_mov(&info, em->at, mk_mr_indirect(rdst, rsrc, instr->imm.v_s8, instr->byte_size * 8));
+        } break;
+        case INDIRECT_DWORD_DISPLACED: {
+            em->at = emit_mov(&info, em->at, mk_mr_indirect(rdst, rsrc, instr->imm.v_s32, instr->byte_size * 8));
+        } break;
+    }
     return info;
 }
 
@@ -244,10 +248,18 @@ x86_emit_load(X86_Emitter* em, IR_Instruction* instr)
     if(instr->imm.type == IR_VALUE_S8) mode = INDIRECT_BYTE_DISPLACED;
     else if(instr->imm.type == IR_VALUE_S32) mode = INDIRECT_DWORD_DISPLACED;
 
-    em->at = emit_mov_reg(&info, em->at, (instr->byte_size == 1) ? MOV_RM8 : MOV_RM, mode, 
-        instr->byte_size * 8, rsrc, rdst,
-        (instr->imm.type == IR_VALUE_S8) ? instr->imm.v_s8 : 0,
-        (instr->imm.type == IR_VALUE_S32) ? instr->imm.v_s32 : 0);
+    switch(mode)
+    {
+        case INDIRECT: {
+            em->at = emit_mov(&info, em->at, mk_rm_indirect(rdst, rsrc, 0, instr->byte_size * 8));
+        } break;
+        case INDIRECT_BYTE_DISPLACED: {
+            em->at = emit_mov(&info, em->at, mk_rm_indirect(rdst, rsrc, instr->imm.v_s8, instr->byte_size * 8));
+        } break;
+        case INDIRECT_DWORD_DISPLACED: {
+            em->at = emit_mov(&info, em->at, mk_rm_indirect(rdst, rsrc, instr->imm.v_s32, instr->byte_size * 8));
+        } break;
+    }
     return info;
 }
 
@@ -299,8 +311,7 @@ x86_emit_shift(X86_Emitter* em, IR_Instruction* instr)
     if(op1_in_cl)
     {
         // mov ecx to eax
-        em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, instr->byte_size * 8,
-            x86_reg32_to_byte_size(EAX, instr->byte_size), rop1, 0, 0);
+        em->at = emit_mov(&info, em->at, mk_mr_direct(rop1, x86_reg32_to_byte_size(EAX, instr->byte_size)));
         rop1 = x86_reg32_to_byte_size(EAX, instr->byte_size);
     }
 
@@ -308,23 +319,23 @@ x86_emit_shift(X86_Emitter* em, IR_Instruction* instr)
     {
         // push ecx
         // mov to ecx
-        em->at = emit_push_reg(0, em->at, DIRECT, ECX, 0, 0);
-        em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, instr->byte_size * 8, 
-            x86_reg32_to_byte_size(ECX, instr->byte_size), rop2, 0, 0);
+        em->at = emit_push(0, em->at, mk_o(ECX));
+        em->at = emit_mov(&info, em->at, mk_mr_direct(rop2, x86_reg32_to_byte_size(ECX, instr->byte_size)));
     }
 
     // shl op1, ecx
-    em->at = emit_shift_reg(&info, em->at, instr->byte_size * 8, (instr->type == IR_SHL) ? SHL : SHR,
-        DIRECT, rop1, 0, 0);
+    if (instr->type == IR_SHL)
+        em->at = emit_shld(&info, em->at, mk_mrc_direct(rop1, x86_reg32_to_byte_size(EAX, instr->byte_size)));
+    else
+        em->at = emit_shrd(&info, em->at, mk_mrc_direct(rop1, x86_reg32_to_byte_size(EAX, instr->byte_size)));
 
     if(op2_not_in_cl)
     {
-        em->at = emit_pop_reg(0, em->at, ECX);
+        em->at = emit_pop(0, em->at, mk_o(ECX));
     }
 
     // mov to rdst
-    em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, instr->byte_size * 8,
-        rdst, rop1, 0, 0);
+    em->at = emit_mov(&info, em->at, mk_mr_direct(rdst, rop1, 0, instr->byte_size * 8));
 
     return info;
 }
@@ -348,9 +359,10 @@ x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
     // we need to save edx, since the result of the multiplication is always on edx
     if(not_edx)
     {
-        em->at = emit_push_reg(0, em->at, DIRECT, EDX, 0, 0);
+        em->at = emit_push(0, em->at, mk_o(EDX));
         // EDX needs to be zero to not cause integer overflow
-        em->at = emit_arith_mr(0, ARITH_XOR, em->at, EDX, EDX, DIRECT, 0, 0);
+        //em->at = emit_arith_mr(0, ARITH_XOR, em->at, EDX, EDX, DIRECT, 0, 0);
+        em->at = emit_arithmetic(&info, em->at, ARITH_XOR, mk_mr_direct(rdst, rop1));
     }
     else
     {
@@ -363,8 +375,7 @@ x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
     }
 
     // mov op2 to eax
-    em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, 
-        instr->byte_size * 8, x86_reg32_to_byte_size(EAX, instr->byte_size), rop2, 0, 0);
+    em->at = emit_mov(&info, em->at, mk_mr_direct(rop2, x86_reg32_to_byte_size(RAX, instr->byte_size), 0, instr->byte_size * 8));
 
     if(op1_in_eax) {
         em->at = emit_pop_reg(0, em->at, rop2);
