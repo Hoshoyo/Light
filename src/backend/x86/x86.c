@@ -335,7 +335,7 @@ x86_emit_shift(X86_Emitter* em, IR_Instruction* instr)
     }
 
     // mov to rdst
-    em->at = emit_mov(&info, em->at, mk_mr_direct(rdst, rop1, 0, instr->byte_size * 8));
+    em->at = emit_mov(&info, em->at, mk_mr_direct(rdst, rop1));
 
     return info;
 }
@@ -366,35 +366,34 @@ x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
     }
     else
     {
-        em->at = emit_arith_mr(0, ARITH_XOR, em->at, EDX, EDX, DIRECT, 0, 0);
+        em->at = emit_arithmetic(0, em->at, ARITH_XOR, mk_mr_direct(EDX, EDX));
     }
 
     bool op1_in_eax = (rop1 == AL || rop1 == AX || rop1 == EAX);
     if(op1_in_eax) {
-        em->at = emit_push_reg(0, em->at, DIRECT, EAX, 0, 0);
+        em->at = emit_push(0, em->at, mk_o(EAX));
     }
 
     // mov op2 to eax
-    em->at = emit_mov(&info, em->at, mk_mr_direct(rop2, x86_reg32_to_byte_size(RAX, instr->byte_size), 0, instr->byte_size * 8));
+    em->at = emit_mov(&info, em->at, mk_mr_direct(rop2, x86_reg32_to_byte_size(RAX, instr->byte_size)));
 
     if(op1_in_eax) {
-        em->at = emit_pop_reg(0, em->at, rop2);
-        em->at = emit_mul(&info, em->at, instr->byte_size * 8, x86_ir_mul_to_x86_arith(instr), rop2, DIRECT, 0, 0);
+        em->at = emit_pop(0, em->at, mk_o(rop2));
+        em->at = emit_mul(&info, em->at, mk_m_direct(rop2));
     } else {
-        em->at = emit_mul(&info, em->at, instr->byte_size * 8, x86_ir_mul_to_x86_arith(instr), rop1, DIRECT, 0, 0);
+        em->at = emit_mul(&info, em->at, mk_m_direct(rop1));
     }
 
     // move result that is in eax/edx to the destination register
     {
         X64_Register result_reg = (instr->type == IR_MOD) ? EDX : EAX;
-        em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, 
-            instr->byte_size * 8, rdst, x86_reg32_to_byte_size(result_reg, instr->byte_size), 0, 0);
+        em->at = emit_mov(0, em->at, mk_mr_direct(rdst, result_reg));
     }
 
     // pop back edx if it was not the result in the first place
     if(not_edx)
     {
-        em->at = emit_pop_reg(0, em->at, EDX);
+        em->at = emit_pop(0, em->at, mk_o(EDX));
     }
 
     return info;
@@ -410,11 +409,9 @@ x86_emit_not_neg(X86_Emitter* em, IR_Instruction* instr)
     // mov op1 to dest and then neg it
     if(rop1 != rdst)
     {
-        em->at = emit_mov_reg(0, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, 
-            instr->byte_size * 8, rdst, rop1, 0, 0);
+        em->at = emit_mov(0, em->at, mk_mr_direct(rdst, rop1));
     }
-    em->at = emit_mul(&info, em->at, instr->byte_size * 8, x86_ir_mul_to_x86_arith(instr),
-        rdst, DIRECT, 0, 0);
+    em->at = emit_mul(&info, em->at, mk_m_direct(rdst));
 
     return info;
 }
@@ -430,18 +427,18 @@ x86_emit_arith(X86_Emitter* em, IR_Instruction* instr)
     if(instr->imm.type != IR_VALUE_NONE)
     {
         // add rdst, imm -> reg
-        em->at = emit_arith_mi(&info, em->at, x86_ir_arith_to_x86_arith(instr), DIRECT, rop1, (Int_Value){.v64 = instr->imm.v_u64}, 0, 0);
+        em->at = emit_arithmetic(&info, em->at, x86_ir_arith_to_x86_arith(instr), mk_mi_direct(rop1, instr->imm.v_u32, 0));
     }
     else
     {
         // add rop1, rop2 -> rop1
-        em->at = emit_arith_mr(&info, x86_ir_arith_to_x86_arith(instr), em->at, rop1, rop2, DIRECT, 0, 0);
+        em->at = emit_arithmetic(&info, em->at, x86_ir_arith_to_x86_arith(instr), mk_mr_direct(rop1, rop2));
     }
 
     if (rop1 != rdst)
     {
         // mov rop2 -> rdst
-        em->at = emit_mov_reg(0, em->at, MOV_MR, DIRECT, instr->byte_size, rdst, rop1, 0, 0);
+        em->at = emit_mov(0, em->at, mk_mr_direct(rdst, rop1));
     }
     return info;
 }
@@ -456,12 +453,11 @@ x86_emit_cvt_si(X86_Emitter* em, IR_Instruction* instr)
     // src is < dest, convert with sign extension
     if(instr->src_byte_size < instr->dst_byte_size)
     {
-        em->at = emit_movsx(&info, em->at, DIRECT, instr->src_byte_size * 8, instr->dst_byte_size * 8,
-            rdst, rop1, 0, 0);
+        em->at = emit_movsx(&info, em->at, mk_rm_direct(rdst, rop1));
     }
     else if(rop1 != rdst)
     {
-        em->at = emit_mov_reg(0, em->at, MOV_MR, DIRECT, instr->byte_size * 8, rdst, rop1, 0, 0);
+        em->at = emit_movsx(0, em->at, mk_rm_direct(rdst, rop1));
     }
 
     return info;
@@ -477,12 +473,11 @@ x86_emit_cvt_ui(X86_Emitter* em, IR_Instruction* instr)
     // src is < dest, convert with zero extension
     if(instr->src_byte_size < instr->dst_byte_size)
     {
-        em->at = emit_movzx(&info, em->at, DIRECT, instr->src_byte_size * 8, instr->dst_byte_size * 8,
-            rdst, rop1, 0, 0);
+        em->at = emit_movzx(&info, em->at, mk_rm_direct(rdst, rop1));
     }
     else if (rop1 != rdst)
     {
-        em->at = emit_mov_reg(0, em->at, MOV_MR, DIRECT, instr->byte_size * 8, rdst, rop1, 0, 0);
+        em->at = emit_mov(0, em->at, mk_mr_direct(rdst, rop1));
     }
 
     return info;
@@ -495,7 +490,7 @@ x86_emit_cvt_r32_r64(X86_Emitter* em, IR_Instruction* instr)
     X64_XMM_Register rop1 = instr->t1;
     X64_XMM_Register rdst = instr->t3;
 
-    em->at = emit_cvt(&info, em->at, SSE_CVT_F64_F32, DIRECT, rop1, rdst, 0, 0, true);
+    em->at = emit_cvtps2pd(&info, em->at, mk_a_direct(rop1, rdst));
 
     return info;
 }
@@ -507,7 +502,7 @@ x86_emit_cvt_r64_r32(X86_Emitter* em, IR_Instruction* instr)
     X64_XMM_Register rop1 = instr->t1;
     X64_XMM_Register rdst = instr->t3;
 
-    em->at = emit_cvt(&info, em->at, SSE_CVT_F64_F32, DIRECT, rop1, rdst, 0, 0, false);
+    em->at = emit_cvtpd2ps(&info, em->at, mk_a_direct(rop1, rdst));
 
     return info;
 }
@@ -519,7 +514,7 @@ x86_emit_cvt_float_si(X86_Emitter* em, IR_Instruction* instr)
     X64_XMM_Register rop1 = instr->t1;
     X64_Register rdst = ir_to_x86_Reg(instr->t3, instr->src_byte_size);
 
-    em->at = emit_cvt(&info, em->at, SSE_CVT_F32_INT32, DIRECT, rop1, rdst, 0, 0, instr->src_byte_size == 4);
+    em->at = emit_cvtps2pi(&info, em->at, mk_a_direct(rop1, rdst));
 
     return info;
 }
@@ -534,11 +529,10 @@ x86_emit_cvt_si_float(X86_Emitter* em, IR_Instruction* instr)
     // first convert to 32 bit integer
     if(instr->src_byte_size < 32)
     {
-        em->at = emit_movsx(&info, em->at, DIRECT, instr->src_byte_size * 8, instr->dst_byte_size * 8,
-            rdst, rop1, 0, 0);
+        em->at = emit_movsx(0, em->at, mk_rm_direct(rdst, rop1));
     }
 
-    em->at = emit_cvt(&info, em->at, SSE_CVT_INT32_F32, DIRECT, rop1, rdst, 0, 0, instr->dst_byte_size == 4);
+    em->at = emit_cvtpi2ps(&info, em->at, mk_a_direct(rop1, rdst));
 
     return info;
 }
@@ -552,12 +546,11 @@ x86_emit_lnot(X86_Emitter* em, IR_Instruction* instr)
 
     if(rop1 != rdst)
     {
-        em->at = emit_mov_reg(&info, em->at, (instr->byte_size == 1) ? MOV_MR8 : MOV_MR, DIRECT, 
-            instr->byte_size * 8, rdst, rop1, 0, 0);
+        em->at = emit_mov(&info, em->at, mk_mr_direct(rdst, rop1));
     }
 
     // xor op1, 1
-    em->at = emit_arith_mi(0, em->at, ARITH_XOR, DIRECT, rdst, (Int_Value){.v64 = 1}, 0, 0);
+    em->at = emit_arithmetic(0, em->at, ARITH_XOR, mk_mi_direct(rdst, 1, 0));
 
     return info;
 }
@@ -603,7 +596,7 @@ x86_emit_cmp(X86_Emitter* em, IR_Instruction* instr)
     X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->byte_size);
     X64_Register rop2 = ir_to_x86_Reg(instr->t2, instr->byte_size);
 
-    em->at = emit_arith_mr(&info, ARITH_CMP, em->at, rop1, rop2, DIRECT, 0, 0);
+    em->at = emit_arithmetic(&info, em->at, ARITH_CMP, mk_mr_direct(rop1, rop2));
 
     return info;
 }
@@ -616,11 +609,10 @@ x86_emit_cmov(X86_Emitter* em, IR_Instruction* instr)
     X64_Register rdst = ir_to_x86_Reg(instr->t3, instr->byte_size);
 
     // mov eax, imm
-    em->at = emit_mov_oi(&info, em->at, x86_reg32_to_byte_size(EAX, instr->byte_size), (Int_Value){.v64 = instr->imm.v_u64});
+    em->at = emit_mov(&info, em->at, mk_oi(EAX, instr->imm.v_u32, 0));
 
     // cmov dst, eax
-    em->at = emit_cmov_reg(0, em->at, DIRECT, x86_ir_cmov_to_x86_cmov(instr), 
-        instr->byte_size * 8, x86_reg32_to_byte_size(EAX, instr->byte_size), rdst, 0, 0);
+    em->at = emit_cmovcc(0, em->at, x86_ir_cmov_to_x86_cmov(instr), mk_rm_direct(rdst, EAX));
 
     return info;
 }
@@ -631,12 +623,12 @@ x86_emit_hlt(X86_Emitter* em, IR_Instruction* instr)
     Instr_Emit_Result info = {0};
 
     if(em->backend == BACKEND_X86_PECOFF) {
-        em->at = emit_ret(&info, em->at, RET_NEAR);
+        em->at = emit_ret(&info, em->at, RET_NEAR, 0);
     } else if(em->backend == BACKEND_X86_ELF || em->backend == BACKEND_X86_RAWX) {
         // mov ebx, eax
-        em->at = emit_mov_reg(&info, em->at, MOV_MR, DIRECT, 32, EBX, EAX, 0, 0);
+        em->at = emit_mov(&info, em->at, mk_mr_direct(EBX, EAX));
         // mov eax, 1
-        em->at = emit_mov_oi(0, em->at, EAX, (Int_Value){.v32 = 1});
+        em->at = emit_mov(0, em->at, mk_oi(EAX, 1, 0));
         // int 0x80
         em->at = emit_int(0, em->at, 0x80);
     } else {
@@ -652,11 +644,11 @@ x86_emit_ret(X86_Emitter* em, IR_Instruction* instr)
     
     if(instr->imm.type == IR_VALUE_S32)
     {
-        em->at = emit_ret_stack_pop(&info, em->at, RET_NEAR_STACK_POP, (uint16_t)instr->imm.v_s32);
+        em->at = emit_ret(&info, em->at, RET_NEAR, instr->imm.v_u16);
     }
     else
     {
-        em->at = emit_ret(&info, em->at, RET_NEAR);     // TODO(psv): ret far?
+        em->at = emit_ret(&info, em->at, RET_NEAR, 0); // TODO(psv): ret far?
     }
 
     return info;
@@ -670,13 +662,14 @@ x86_emit_pop(X86_Emitter* em, IR_Instruction* instr)
     if(instr->flags & IIR_FLAG_IS_FP_OPERAND1)
     {
         X64_XMM_Register rop = instr->t1 - IR_REG_PROC_RETF;
-        em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT, rop, ESP, (instr->byte_size == 4), 0, 0);
-        em->at = emit_pop_reg(&info, em->at, EAX);
+        em->at = emit_movss(&info, em->at, mk_mr_indirect(ESP, rop, 0, instr->byte_size)); // TODO(psv): check this
+        //em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT, rop, ESP, (instr->byte_size == 4), 0, 0);
+        em->at = emit_pop(&info, em->at, mk_o(EAX));
     }
     else
     {
         X64_Register rop = ir_to_x86_Reg(instr->t1, instr->byte_size);
-        em->at = emit_pop_reg(&info, em->at, rop);
+        em->at = emit_pop(&info, em->at, mk_o(rop));
     }
 
     return info;
@@ -690,13 +683,14 @@ x86_emit_push(X86_Emitter* em, IR_Instruction* instr)
     {
         X64_XMM_Register rop = instr->t1 - IR_REG_PROC_RETF;
         // allocate space for the xmm register
-        em->at = emit_push_reg(&info, em->at, DIRECT, EAX, 0, 0);
-        em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT, rop, ESP, (instr->byte_size == 4), 0, 0);
+        em->at = emit_push(&info, em->at, mk_o(EAX));
+        em->at = emit_movss(&info, em->at, mk_mr_indirect(ESP, rop, 0, instr->byte_size)); // TODO(psv): check this
+        //em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT, rop, ESP, (instr->byte_size == 4), 0, 0);
     }
     else
     {
         X64_Register rop = ir_to_x86_Reg(instr->t1, instr->byte_size);
-        em->at = emit_push_reg(&info, em->at, DIRECT, rop, 0, 0);
+        em->at = emit_push(&info, em->at, mk_o(rop));
     }
 
     return info;
@@ -708,10 +702,10 @@ x86_emit_cond_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
     Instr_Emit_Result info = {0};
     X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->byte_size);
 
-    em->at = emit_arith_mi(&info, em->at, ARITH_CMP, DIRECT, rop1, (Int_Value){.v64 = 0}, 0, 0);
+    em->at = emit_arithmetic(&info, em->at, ARITH_CMP, mk_mi_direct(rop1, 0, 0));
 
     u8* jmp_addr = em->at;
-    em->at = emit_jmp_cond_rel32(&info, em->at, (instr->type == IR_JRZ) ? JZ : JNZ, 0);
+    em->at = emit_jcc(&info, em->at, (instr->type == IR_JRZ) ? JZ : JNZ, 0, 32);
 
     X86_Patch patch = {0};
     patch.generate_relocation = false;
@@ -732,7 +726,7 @@ x86_emit_call(X86_Emitter* em, IR_Instruction* instr, int index)
     Instr_Emit_Result info = {0};
     X64_Register rop1 = ir_to_x86_Reg(instr->t1, instr->byte_size);
 
-    em->at = emit_call_reg(&info, em->at, DIRECT, rop1, 0, 0);
+    em->at = emit_call(&info, em->at, mk_m_direct(rop1));
 
     return info;
 }
@@ -743,7 +737,7 @@ x86_emit_rjmp(X86_Emitter* em, IR_Instruction* instr, int index)
     Instr_Emit_Result info = {0};
 
     u8* jmp_addr = em->at;
-    em->at = emit_jmp_rel_unconditional(&info, em->at, instr->byte_size * 8, (Int_Value){0});
+    em->at = emit_jmp(&info, em->at, mk_d(0xFFFFFFFF));
 
     X86_Patch patch = {0};
     patch.generate_relocation = false;
@@ -767,7 +761,10 @@ x86_emit_movf(X86_Emitter* em, IR_Instruction* instr)
 
     if (instr->t1 != IR_REG_NONE)
     {
-        em->at = emit_movs_direct(&info, em->at, rdst, src, (instr->byte_size) == 32);
+        if((instr->byte_size) == 4)
+            em->at = emit_movss(&info, em->at, mk_a_direct(rdst, src));
+        else
+            em->at = emit_movsd(&info, em->at, mk_a_direct(rdst, src));            
     }
     else
     {
@@ -778,7 +775,10 @@ x86_emit_movf(X86_Emitter* em, IR_Instruction* instr)
             memcpy(data.reg_size_data, &instr->imm.v_r64, 8);
 
         int patch_offset = (em->at - em->base);
-        em->at = emit_movs_ds_to_reg(&info, em->at, rdst, instr->byte_size == 4, 0);
+        if(instr->byte_size == 4)
+            em->at = emit_movss(&info, em->at, mk_a_indirect(rdst, src, 0xFFFFFFFF, 64));
+        else
+            em->at = emit_movsd(&info, em->at, mk_a_indirect(rdst, src, 0xFFFFFFFF, 64));
         data.patch_offset = patch_offset + info.diplacement_offset;
         em->data_offset += instr->byte_size;
 
@@ -797,12 +797,17 @@ x86_emit_loadf(X86_Emitter* em, IR_Instruction* instr)
 
     if(instr->imm.type == IR_VALUE_S32)
     {
-        em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT_DWORD_DISPLACED, rdst, rop1, instr->byte_size == 4, 0,
-            instr->imm.v_s32);
+        if(instr->byte_size == 4)
+            em->at = emit_movss(&info, em->at, mk_rm_indirect(rdst, rop1, instr->imm.v_s32, 64));
+        else
+            em->at = emit_movsd(&info, em->at, mk_rm_indirect(rdst, rop1, instr->imm.v_s32, 64));
     }
     else
     {
-        em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT, rdst, rop1, instr->byte_size == 4, 0, 0);
+        if(instr->byte_size == 4)
+            em->at = emit_movss(&info, em->at, mk_rm_indirect(rdst, rop1, 0, 64));
+        else
+            em->at = emit_movsd(&info, em->at, mk_rm_indirect(rdst, rop1, 0, 64));
     }
 
     return info;
@@ -817,12 +822,17 @@ x86_emit_storef(X86_Emitter* em, IR_Instruction* instr)
 
     if(instr->imm.type == IR_VALUE_S32)
     {
-        em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT_DWORD_DISPLACED, rop, rdest, instr->byte_size == 4, 0,
-            instr->imm.v_s32);
+        if(instr->byte_size == 4)
+            em->at = emit_movss(&info, em->at, mk_mr_indirect(rdest, rop, instr->imm.v_s32, 64));
+        else
+            em->at = emit_movsd(&info, em->at, mk_mr_indirect(rdest, rop, instr->imm.v_s32, 64));
     }
     else
     {
-        em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT_BYTE_DISPLACED, rop, rdest, instr->byte_size == 4, 0, 0);
+        if(instr->byte_size == 4)
+            em->at = emit_movss(&info, em->at, mk_mr_indirect(rdest, rop, 0, 64));
+        else
+            em->at = emit_movsd(&info, em->at, mk_mr_indirect(rdest, rop, 0, 64));
     }
 
     return info;
@@ -844,10 +854,16 @@ x86_emit_arithf(X86_Emitter* em, IR_Instruction* instr)
     }
 
     // mov rop1 -> dst
-    em->at = emit_movs_direct(0, em->at, rdst, rop1, instr->byte_size == 4);
+    if(instr->byte_size == 4)
+        em->at = emit_movss(0, em->at, mk_a_direct(rdst, rop1));
+    else
+        em->at = emit_movsd(0, em->at, mk_a_direct(rdst, rop1));
 
     // adds rdst, rop2
-    em->at = emit_arith_sse(&info, em->at, x86_ir_arithf_to_x86_arithf(instr), rdst, rop2, instr->byte_size == 4);
+    if(instr->byte_size == 4)
+        em->at = emit_addps(&info, em->at, mk_a_direct(rdst, rop2));
+    else
+        em->at = emit_addpd(&info, em->at, mk_a_direct(rdst, rop2));
 
     return info;
 }
@@ -859,7 +875,10 @@ x86_emit_cmpf(X86_Emitter* em, IR_Instruction* instr)
     X64_XMM_Register rop1 = instr->t1;
     X64_XMM_Register rop2 = instr->t2;
 
-    em->at = emit_comiss_sse(&info, em->at, rop1, rop2);
+    if(instr->byte_size == 4)
+        em->at = emit_comiss(&info, em->at, mk_a_direct(rop1, rop2));
+    else
+        em->at = emit_comisd(&info, em->at, mk_a_direct(rop1, rop2));
 
     return info;
 }
@@ -876,21 +895,22 @@ x86_emit_clear(X86_Emitter* em, IR_Instruction* instr)
     if(rnbyte != ECX)
     {
         // push ecx
-        em->at = emit_push_reg(0, em->at, DIRECT, ECX, 0, 0);
+        em->at = emit_push(0, em->at, mk_o(ECX));
         // mov ecx, imm
-        em->at = emit_mov_reg(0, em->at, MOV_MR, DIRECT, instr->byte_size * 8, ECX, rnbyte, 0, 0);
+        em->at = emit_mov(0, em->at, mk_mr_direct(ECX, rnbyte));
     }
 
     // clear eax
-    em->at = emit_arith_mr(0, ARITH_XOR, em->at, EAX, EAX, DIRECT, 0, 0);
+    em->at = emit_arithmetic(0, em->at, ARITH_XOR, mk_rm_direct(EAX, EAX));
 
-    em->at = emit_lea(0, em->at, instr->byte_size * 8, INDIRECT_DWORD_DISPLACED, EDI, rdst, 0, instr->imm.v_s32);
+    em->at = emit_lea(0, em->at, mk_rm_indirect(EDI, rdst, instr->imm.v_s32, 64)); // TODO(psv): check this
+    //em->at = emit_lea(0, em->at, instr->byte_size * 8, INDIRECT_DWORD_DISPLACED, EDI, rdst, 0, instr->imm.v_s32);
 
-    em->at = emit_rep_stos(&info, em->at, 8);
+    em->at = emit_stos(&info, em->at, 8);
 
     if(rnbyte != ECX)
     {
-        em->at = emit_pop_reg(0, em->at, ECX);
+        em->at = emit_pop(0, em->at, mk_o(ECX));
     }
 
     return info;
@@ -904,22 +924,20 @@ x86_emit_copy(X86_Emitter* em, IR_Instruction* instr)
     X64_Register rdest = ir_to_x86_Reg(instr->t3, instr->byte_size);
 
     // mov esi, src
-    em->at = emit_mov_reg(&info, em->at, MOV_MR, DIRECT, instr->byte_size * 8,
-        ESI, rsrc, 0, 0);
+    em->at = emit_mov(&info, em->at, mk_mr_direct(ESI, rsrc));
 
     // mov edi, dst
-    em->at = emit_mov_reg(0, em->at, MOV_MR, DIRECT, instr->byte_size * 8,
-        EDI, rdest, 0, 0);
+    em->at = emit_mov(&info, em->at, mk_mr_direct(EDI, rdest));
 
     // push ecx
-    em->at = emit_push_reg(0, em->at, DIRECT, ECX, 0, 0);
+    em->at = emit_push(0, em->at, mk_o(ECX));
     
     // mov ecx, imm
-    em->at = emit_mov_oi(0, em->at, ECX, (Int_Value){.v32 = instr->imm.v_s32});
+    em->at = emit_mov(0, em->at, mk_oi(ECX, instr->imm.v_s32, 0));
     
-    em->at = emit_rep_movs(0, em->at, 8);
+    em->at = emit_movs(0, em->at, 8);
 
-    em->at = emit_pop_reg(0, em->at, ECX);
+    em->at = emit_pop(0, em->at, mk_o(ECX));
 
     return info;
 }
