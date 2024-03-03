@@ -388,7 +388,17 @@ emit_expression_binary(catstring* literal_decls, catstring* buffer, Light_Ast* n
         emit_expression(literal_decls, buffer, node->expr_binary.right);
         catsprint(buffer, "]");
     } else {
-        emit_expression(literal_decls, buffer, node->expr_binary.left);
+        
+        //if(node->expr_binary.left->type )
+        if(node->expr_binary.left->type->kind == TYPE_KIND_POINTER && node->expr_binary.left->type->pointer_to == type_primitive_get(TYPE_PRIMITIVE_VOID))
+        {
+            catsprint(buffer, "((char*)(");
+            emit_expression(literal_decls, buffer, node->expr_binary.left);
+            catsprint(buffer, "))");
+        }
+        else
+            emit_expression(literal_decls, buffer, node->expr_binary.left);
+        
         emit_binop(buffer, node->expr_binary.op);
         emit_expression(literal_decls, buffer, node->expr_binary.right);
     }

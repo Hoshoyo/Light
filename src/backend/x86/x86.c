@@ -14,6 +14,8 @@
     NOTE(psv): Apparently idata without any imports crashes the executable
 */
 
+#define POINTER_SIZE_BYTES 8
+
 typedef struct {
     u8* base;
     u8* at;
@@ -95,9 +97,9 @@ ir_to_x86_Reg(IR_Reg r, int byte_size)
     // 8 16 32
     X64_Register n[][4] = {
         {REGISTER_NONE, REGISTER_NONE, REGISTER_NONE, REGISTER_NONE},
-        {BL,   BX,   REGISTER_NONE, EBX},
-        {CL,   CX,   REGISTER_NONE, ECX},
-        {DL,   DX,   REGISTER_NONE, EDX},
+        {BL,   BX, EBX, RBX},
+        {CL,   CX, ECX, RCX},
+        {DL,   DX, EDX, RDX},
     };
 
     switch(r)
@@ -108,6 +110,7 @@ ir_to_x86_Reg(IR_Reg r, int byte_size)
                 case 1:  return AL;
                 case 2: return AX;
                 case 4: return EAX;
+                case 8: return RAX;
                 default: return REGISTER_NONE;
             }
         } break;
@@ -121,6 +124,7 @@ ir_to_x86_Reg(IR_Reg r, int byte_size)
                 case 1:  return BPL;
                 case 2: return BP;
                 case 4: return EBP;
+                case 8: return RBP;
                 default: return REGISTER_NONE;
             }
         } break;
@@ -130,6 +134,7 @@ ir_to_x86_Reg(IR_Reg r, int byte_size)
                 case 1:  return SPL;
                 case 2: return SP;
                 case 4: return ESP;
+                case 8: return RSP;
                 default: return REGISTER_NONE;
             }
         } break;
@@ -319,7 +324,7 @@ x86_emit_shift(X86_Emitter* em, IR_Instruction* instr)
     {
         // push ecx
         // mov to ecx
-        em->at = emit_push(0, em->at, mk_o(ECX));
+        em->at = emit_push(0, em->at, mk_o(RCX));
         em->at = emit_mov(&info, em->at, mk_mr_direct(rop2, x86_reg32_to_byte_size(ECX, instr->byte_size)));
     }
 
@@ -331,7 +336,7 @@ x86_emit_shift(X86_Emitter* em, IR_Instruction* instr)
 
     if(op2_not_in_cl)
     {
-        em->at = emit_pop(0, em->at, mk_o(ECX));
+        em->at = emit_pop(0, em->at, mk_o(RCX));
     }
 
     // mov to rdst
@@ -359,7 +364,7 @@ x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
     // we need to save edx, since the result of the multiplication is always on edx
     if(not_edx)
     {
-        em->at = emit_push(0, em->at, mk_o(EDX));
+        em->at = emit_push(0, em->at, mk_o(RDX));
         // EDX needs to be zero to not cause integer overflow
         //em->at = emit_arith_mr(0, ARITH_XOR, em->at, EDX, EDX, DIRECT, 0, 0);
         em->at = emit_arithmetic(&info, em->at, ARITH_XOR, mk_mr_direct(rdst, rop1));
@@ -371,14 +376,15 @@ x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
 
     bool op1_in_eax = (rop1 == AL || rop1 == AX || rop1 == EAX);
     if(op1_in_eax) {
-        em->at = emit_push(0, em->at, mk_o(EAX));
+        em->at = emit_push(0, em->at, mk_o(RAX));
     }
 
     // mov op2 to eax
     em->at = emit_mov(&info, em->at, mk_mr_direct(rop2, x86_reg32_to_byte_size(RAX, instr->byte_size)));
 
     if(op1_in_eax) {
-        em->at = emit_pop(0, em->at, mk_o(rop2));
+        X64_Register rop_push = ir_to_x86_Reg(rop2, POINTER_SIZE_BYTES);
+        em->at = emit_pop(0, em->at, mk_o(rop_push));
         em->at = emit_mul(&info, em->at, mk_m_direct(rop2));
     } else {
         em->at = emit_mul(&info, em->at, mk_m_direct(rop1));
@@ -393,7 +399,7 @@ x86_emit_mul(X86_Emitter* em, IR_Instruction* instr)
     // pop back edx if it was not the result in the first place
     if(not_edx)
     {
-        em->at = emit_pop(0, em->at, mk_o(EDX));
+        em->at = emit_pop(0, em->at, mk_o(RDX));
     }
 
     return info;
@@ -664,11 +670,11 @@ x86_emit_pop(X86_Emitter* em, IR_Instruction* instr)
         X64_XMM_Register rop = instr->t1 - IR_REG_PROC_RETF;
         em->at = emit_movss(&info, em->at, mk_mr_indirect(ESP, rop, 0, instr->byte_size)); // TODO(psv): check this
         //em->at = emit_movs_mem_to_reg(&info, em->at, INDIRECT, rop, ESP, (instr->byte_size == 4), 0, 0);
-        em->at = emit_pop(&info, em->at, mk_o(EAX));
+        em->at = emit_pop(&info, em->at, mk_o(RAX));
     }
     else
     {
-        X64_Register rop = ir_to_x86_Reg(instr->t1, instr->byte_size);
+        X64_Register rop = ir_to_x86_Reg(instr->t1, POINTER_SIZE_BYTES);
         em->at = emit_pop(&info, em->at, mk_o(rop));
     }
 
@@ -683,13 +689,13 @@ x86_emit_push(X86_Emitter* em, IR_Instruction* instr)
     {
         X64_XMM_Register rop = instr->t1 - IR_REG_PROC_RETF;
         // allocate space for the xmm register
-        em->at = emit_push(&info, em->at, mk_o(EAX));
+        em->at = emit_push(&info, em->at, mk_o(RAX));
         em->at = emit_movss(&info, em->at, mk_mr_indirect(ESP, rop, 0, instr->byte_size)); // TODO(psv): check this
         //em->at = emit_movs_reg_to_mem(&info, em->at, INDIRECT, rop, ESP, (instr->byte_size == 4), 0, 0);
     }
     else
     {
-        X64_Register rop = ir_to_x86_Reg(instr->t1, instr->byte_size);
+        X64_Register rop = ir_to_x86_Reg(instr->t1, POINTER_SIZE_BYTES);
         em->at = emit_push(&info, em->at, mk_o(rop));
     }
 
@@ -895,7 +901,7 @@ x86_emit_clear(X86_Emitter* em, IR_Instruction* instr)
     if(rnbyte != ECX)
     {
         // push ecx
-        em->at = emit_push(0, em->at, mk_o(ECX));
+        em->at = emit_push(0, em->at, mk_o(RCX));
         // mov ecx, imm
         em->at = emit_mov(0, em->at, mk_mr_direct(ECX, rnbyte));
     }
@@ -910,7 +916,7 @@ x86_emit_clear(X86_Emitter* em, IR_Instruction* instr)
 
     if(rnbyte != ECX)
     {
-        em->at = emit_pop(0, em->at, mk_o(ECX));
+        em->at = emit_pop(0, em->at, mk_o(RCX));
     }
 
     return info;
@@ -930,14 +936,14 @@ x86_emit_copy(X86_Emitter* em, IR_Instruction* instr)
     em->at = emit_mov(&info, em->at, mk_mr_direct(EDI, rdest));
 
     // push ecx
-    em->at = emit_push(0, em->at, mk_o(ECX));
+    em->at = emit_push(0, em->at, mk_o(RCX));
     
     // mov ecx, imm
     em->at = emit_mov(0, em->at, mk_oi(ECX, instr->imm.v_s32, 0));
     
     em->at = emit_movs(0, em->at, 8);
 
-    em->at = emit_pop(0, em->at, mk_o(ECX));
+    em->at = emit_pop(0, em->at, mk_o(RCX));
 
     return info;
 }

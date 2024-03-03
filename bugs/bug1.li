@@ -8,3 +8,5 @@ main : () -> s32 {
     a := GetStdHandle(-11);
     return 0;
 }
+
+// return *(val -> s32^) -> u64;

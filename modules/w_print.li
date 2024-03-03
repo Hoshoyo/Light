@@ -1,4 +1,4 @@
-#import "io.li"
+//#import "io.li"
 #import "reflect.li"
 // System calls
 memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("msvcrt.dll");
@@ -54,6 +54,7 @@ print_test:(args : ...) -> u64 {
         print_type(value.type);
         print_string("\n");
     }
+    return count;
 }
 
 // TODO(psv): make it faster
@@ -87,14 +88,18 @@ print:(fmt : string, args : ...) -> u64 {
         }
         previous = at;
     }
+
+    return length;
 } 
 
 print_bytes:(v : ^u8, count : s32) -> u64 {
+    len : u64;
     for i := 0; i < count; i += 1 {
-        if i > 0 print_string(", ");
-        print_string("0x");
-        print_u8(v[i], 16);
+        if i > 0 len += print_string(", ");
+        len += print_string("0x");
+        len += print_u8(v[i], 16);
     }
+    return len;
 }
 
 print_value_literal_string:(v : User_Type_Value) -> u64 {
@@ -121,31 +126,33 @@ print_value_literal_string:(v : User_Type_Value) -> u64 {
             res.data = *(vv -> ^^u8);
         }
     }
-    print_string(res);
+    return print_string(res);
 }
 
 print_value_literal_struct:(v : User_Type_Value) -> u64 {
     t := v.type;
     val := v.value; // ^void
 
-    print_string("{ ");
+    count := print_string("{ ");
 
     s_type := t.description.struct_desc;
 
     for i := 0; i < s_type.fields_count; i += 1 {
-        if i > 0 print_string(", ");
+        if i > 0 count += print_string(", ");
         ftype := s_type.fields_types[i];
         offset := s_type.fields_offsets_bits[i] / 8;
-        vv := val + offset;
+        vv := (val -> ^u8) + offset;
         type_val := User_Type_Value:{vv, ftype};
-        print_value_literal(type_val);
+        count += print_value_literal(type_val);
     }
 
-    print_string(" }");
+    count += print_string(" }");
+
+    return count;
 }
 
 print_value_literal_union:(v : User_Type_Value) -> u64 {
-    
+    return 0;
 }
 
 print_value_literal_array:(v : User_Type_Value) -> u64 {
@@ -155,16 +162,17 @@ print_value_literal_array:(v : User_Type_Value) -> u64 {
     array_type := t.description.array_desc;
     element_type := array_type.array_of;
 
-    print_string("[");
+    count := print_string("[");
 
     for i :u64= 0; i < array_type.dimension; i += 1 {
-        if i > 0 print_string(", ");
-        offset := val + element_type.type_size_bytes->u64 * i;
+        if i > 0 count += print_string(", ");
+        offset := (val -> ^u8) + element_type.type_size_bytes->u64 * i;
         type_val := User_Type_Value:{offset, element_type};
-        print_value_literal(type_val);
+        count += print_value_literal(type_val);
     }
 
-    print_string("]");
+    count += print_string("]");
+    return count;
 }
 
 print_value_literal:(v : User_Type_Value) -> u64 {

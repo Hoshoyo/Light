@@ -5,5 +5,5 @@ main : () -> s32 {
             result += x + y;
         }
     }
-    return result;
+    return result; // 900
 }

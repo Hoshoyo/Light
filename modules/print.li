@@ -118,7 +118,7 @@ print_value_literal_struct:(v : User_Type_Value) -> u64 {
         if i > 0 print_string(", ");
         ftype := s_type.fields_types[i];
         offset := s_type.fields_offsets_bits[i] / 8;
-        vv := val + offset;
+        vv := (val -> ^u8) + offset;
         type_val := User_Type_Value:{vv, ftype};
         print_value_literal(type_val);
     }
@@ -141,7 +141,7 @@ print_value_literal_array:(v : User_Type_Value) -> u64 {
 
     for i :u64= 0; i < array_type.dimension; i += 1 {
         if i > 0 print_string(", ");
-        offset := val + element_type.type_size_bytes->u64 * i;
+        offset := (val -> ^u8) + element_type.type_size_bytes->u64 * i;
         type_val := User_Type_Value:{offset, element_type};
         print_value_literal(type_val);
     }
