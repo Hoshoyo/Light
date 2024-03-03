@@ -1,0 +1,202 @@
+#import "../../../modules/base.li"
+#import "../../../modules/windows/print.li"
+#import "../../../modules/windows/wgl.li"
+#import "../../../modules/windows/windows.li"
+#import "../../../modules/windows/ho_gl.li"
+
+#import "renderer.li"
+
+Window struct {
+	width  : s32;
+	height : s32;
+	handle : HANDLE;
+	dc     : HDC;
+	rc     : HGLRC;
+}
+
+opengl_init: (window : ^Window) {
+	window.dc = GetDC(window.handle);
+	pfd : PIXELFORMATDESCRIPTOR;
+	pfd.nSize = #size_of PIXELFORMATDESCRIPTOR -> u16;
+	pfd.nVersion = 1;
+	pfd.iLayerType = PFD_MAIN_PLANE;
+	pfd.dwFlags = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
+	pfd.cDepthBits = 32;
+	pfd.cColorBits = 24;
+	pfd.iPixelType = PFD_TYPE_RGBA;
+
+	pixel_format := ChoosePixelFormat(window.dc, &pfd);
+	if (!SetPixelFormat(window.dc, pixel_format, &pfd))
+		print("Could not set a pixel format %\n", GetLastError());
+
+	temp_context := wglCreateContext(window.dc);
+	if !wglMakeCurrent(window.dc, temp_context)
+		print("Could not create an OpenGL context.\n Make sure OpenGL compatible drivers are installed.\n");
+	attribs :=
+	[
+		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+		WGL_CONTEXT_MINOR_VERSION_ARB, 3,
+		WGL_CONTEXT_FLAGS_ARB, 0, 0
+	];
+
+	wglCreateContextAttribsARB : (HDC, HGLRC, ^s32) -> HGLRC #extern;
+	wglCreateContextAttribsARB = wglGetProcAddress("wglCreateContextAttribsARB\0".data) ->  (HDC, HGLRC, ^s32) -> HGLRC #extern;
+
+	if wglCreateContextAttribsARB -> ^void != null {
+		window.rc = wglCreateContextAttribsARB(window.dc, null, attribs -> ^s32);
+		if window.rc != null
+		{
+			if !wglMakeCurrent(null, null) {
+				print("Could not make current\n");
+			}
+			wglDeleteContext(temp_context);
+			if !wglMakeCurrent(window.dc, window.rc) {
+				print("Could not make current\n");
+			}
+		}
+		else
+			print("Could not create OpenGL core context\n");
+	}
+	else
+		print("Could not create OpenGL core context\n");
+
+	if hogl_init_extensions() == -1
+		print("Could not load OpenGL extensions\n");
+
+	wglSwapIntervalEXT := wglGetProcAddress("wglSwapIntervalEXT\0".data) -> (u32) -> void #extern;
+
+	if wglSwapIntervalEXT != (null -> (u32) -> void #extern) {
+		wglSwapIntervalEXT(1);
+	}
+
+	return;
+}
+
+window_callback : (window : ^void, msg : u32, lparam: ^u32, wparam: ^u32) -> ^void #extern {
+	if msg == WM_CLOSE {
+		ExitProcess(0);
+	} else {
+		return DefWindowProcA(window, msg, lparam, wparam);
+	}
+	
+	return null;
+}
+
+main : () -> s32 {
+	WINDOW_WIDTH :: 1024;
+	WINDOW_HEIGHT :: 768;
+
+    window_class : WNDCLASSEXA;
+	window_class.cb_size = #size_of WNDCLASSEXA -> u32;
+	window_class.style = 0;
+	window_class.wndproc = window_callback;
+	window_class.cb_cls_extra = 0;
+	window_class.cb_wnd_extra = 0;
+	window_class.h_instance = null;
+	window_class.h_icon = null;
+	window_class.h_cursor = null;
+	window_class.h_brush = null;
+	window_class.menu_name = null;
+	window_class.class_name = "HelloLightClass\0".data;
+	window_class.icon_sm = null;
+
+    if RegisterClassExA(&window_class) == 0 {
+		print("Could not register window class %\n", GetLastError());
+        return 1;
+	}
+
+	win : Window;
+	win.width = WINDOW_WIDTH;
+	win.height = WINDOW_HEIGHT;
+
+    win.handle = CreateWindowExA(
+        WS_EX_ACCEPTFILES | WS_EX_APPWINDOW | WS_EX_WINDOWEDGE, 
+        window_class.class_name, 
+        "Hello Light\0".data, 
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE, 
+        CW_USEDEFAULT, CW_USEDEFAULT, 
+        win.width, win.height, null, null, null, null);
+
+    if win.handle == null {
+        print("Error creating window %\n", GetLastError());
+        return 1;
+    }
+
+	opengl_init(&win);
+
+	render_context_init();
+
+    glClearColor(0.2, 0.2, 0.2, 1.0);
+
+	freq : s64;
+	QueryPerformanceFrequency(&freq);
+
+	dt : r32 = 1.0 / 60.0;
+
+	keys : [256]bool;
+
+    while true 
+    {
+		start_time : s64;
+		QueryPerformanceCounter(&start_time);
+
+		msg : MSG;
+		while PeekMessageA(&msg, win.handle, 0, 0, 1) != 0
+		{
+			if msg.message == WM_KEYDOWN {
+				if (msg.wparam -> s32) < 256 {
+					keys[msg.wparam -> s32] = true;
+				}
+			} else if msg.message == WM_KEYUP {
+				if (msg.wparam -> s32) < 256 {
+					keys[msg.wparam -> s32] = false;
+				}
+			}
+
+			TranslateMessage(&msg);
+			DispatchMessageA(&msg);
+		}
+
+		input(keys, dt);
+        render(win.width, win.height, dt);
+
+		SwapBuffers(win.dc);
+
+		end_time : s64;
+		QueryPerformanceCounter(&end_time);
+		dt = ((end_time - start_time) -> r32) / (freq -> r32);
+	}
+
+    return 0;
+}
+
+position : vec2;
+SPEED :: 200.0;
+
+input : (keys : [256]bool, dt : r32) {	
+	if keys['A'] {
+		position.x -= SPEED * dt;
+	} 
+	if keys['D'] {
+		position.x += SPEED * dt;
+	} 
+	if keys['W'] {
+		position.y += SPEED * dt;
+	}
+	if keys['S'] {
+		position.y -= SPEED * dt;
+	}
+}
+
+render : (width : s32, height : s32, dt : r32) {
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glViewport(0, 0, width, height);
+	wnd_ctx.width = width;
+	wnd_ctx.height = height;
+
+	q := quad_new(position, 100.0, 100.0, vec4:{1.0, 0.0, 1.0, 1.0});
+	render_quad_immediate(&q);
+
+	render_immediate_flush();
+}

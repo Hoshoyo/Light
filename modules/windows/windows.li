@@ -19,14 +19,8 @@ POINT struct {
     y : s32;
 }
 
-MSG struct {
-    hwnd    : ^void;
-    message : u32;
-    wparam  : ^void;
-    lparam  : ^void;
-    time    : u32;
-    point   : POINT;
-}
+HANDLE ^void;
+HDC ^void;
 
 WNDCLASSEXA struct {
     cb_size       : u32;

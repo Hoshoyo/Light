@@ -9,4 +9,9 @@ main : () -> s32 {
     return 0;
 }
 
-// return *(val -> s32^) -> u64;
+// return *(val -> s32^) -> u64; // CRASH
+// GL_POLYGON : GLenum : 0x0009; // CRASH
+
+// Global strings crashes in the vm
+
+// /* /* */ crashes

@@ -1146,6 +1146,7 @@ light_vm_execute_instruction(Light_VM_State* state, Light_VM_Instruction instr) 
         case LVM_HLT: break;
 
         default: {
+            assert(0 && "Invalid instruction\n");
         }break;
     }
     if(advance_ip) {

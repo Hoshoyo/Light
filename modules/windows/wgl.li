@@ -3,6 +3,10 @@ wglMakeCurrent : (hdc : ^void, render_ctx : ^void) -> bool #extern("OpenGL32.dll
 wglGetProcAddress : (str : ^u8) -> ^void #extern("OpenGL32.dll");
 wglDeleteContext : (render_ctx : ^void) -> bool #extern("OpenGL32.dll");
 
+glViewport : (x : GLint, y : GLint, w : GLsizei, h : GLsizei) -> void #extern("OpenGL32.dll");
+
 WGL_CONTEXT_MAJOR_VERSION_ARB :: 0x2091;
 WGL_CONTEXT_MINOR_VERSION_ARB :: 0x2092;
 WGL_CONTEXT_FLAGS_ARB         :: 0x2094;
+
+HGLRC ^void;

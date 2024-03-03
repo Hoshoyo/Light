@@ -9,3 +9,14 @@ TranslateMessage : (msg : ^MSG) -> s32 #extern("User32.dll");
 DispatchMessageA : (msg : ^MSG) -> s32 #extern("User32.dll");
 
 WM_QUIT : u32 : 0x12;
+WM_KEYDOWN : u32 : 0x100;
+WM_KEYUP : u32 : 0x101;
+
+MSG struct {
+    hwnd    : ^void;
+    message : u32;
+    wparam  : ^void;
+    lparam  : ^void;
+    time    : u32;
+    point   : POINT;
+}
