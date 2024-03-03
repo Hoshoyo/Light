@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "usage: %s filename\n", argv[0]);
         return 1;
     }
-    s32 backend = BACKEND_X86_PECOFF;
+    s32 backend = BACKEND_LIGHT_VM;
     g_compilation_settings.bitsize = 32;
     if(argc >= 3) {
         char* backend_str = argv[2];
