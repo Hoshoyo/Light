@@ -291,22 +291,25 @@ lvmg_next(Expr_Result r)
 static void
 lvmg_pop_next(Light_VM_State* state, Expr_Result r, Expr_Result* out)
 {
-    r = lvmg_next(r);
-    switch(r.type)
+    if(r.type == out->type)
     {
-        case EXPR_RESULT_REG: {
-            out->reg = r.reg;
-            light_vm_push_fmt(state, "pop r%d", r.reg);
-        } break;
-        case EXPR_RESULT_F32_REG: {
-            out->freg = r.freg;
-            light_vm_push_fmt(state, "fpop fr%d", r.freg);
-        } break;
-        case EXPR_RESULT_F64_REG: {
-            out->efreg = r.efreg;
-            light_vm_push_fmt(state, "fpop efr%d", r.efreg);
-        } break;
-        default: Unreachable;
+        r = lvmg_next(r);
+        switch(r.type)
+        {
+            case EXPR_RESULT_REG: {
+                out->reg = r.reg;
+                light_vm_push_fmt(state, "pop r%d", r.reg);
+            } break;
+            case EXPR_RESULT_F32_REG: {
+                out->freg = r.freg;
+                light_vm_push_fmt(state, "fpop fr%d", r.freg);
+            } break;
+            case EXPR_RESULT_F64_REG: {
+                out->efreg = r.efreg;
+                light_vm_push_fmt(state, "fpop efr%d", r.efreg);
+            } break;
+            default: Unreachable;
+        }
     }
 }
 

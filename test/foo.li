@@ -1,12 +1,9 @@
-main : () -> s32 {   
-    if true && true
-    {
-        while false
-        {     
-            if false {
-            }
-        }
-    }
+//#import "../modules/base.li"
+//#import "../modules/w_print.li"
 
-    return 0;
+main : () -> s32 {   
+    a := 47;
+    b := 5;
+
+    return a % b;
 }

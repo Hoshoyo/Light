@@ -47,7 +47,8 @@ int_arithmetic : () {
     print("% * % = %\n", a, b, a * b);
     print("% / % = %\n", a, b, a / b);
     print("% / % = %\n", b, a, b / a);
-    print("% \\% % = %\n", a, b, a % b); // Wrong result
+    print("% \\% % = %\n", a, b, a % b);
+    print("% \\% % = %\n", b, a, b % a);
     print("% & % = %\n", a, b, a & b);
     print("% | % = %\n", a, b, a | b);
     print("% ^ % = %\n", a, b, a ^ b);
@@ -399,7 +400,7 @@ main : () -> s32 {
     //command_for();
     //command_break();
     //command_continue();
-    command_assigment();
+    //command_assigment();
     
     print("---\n\n");
     return 0;
