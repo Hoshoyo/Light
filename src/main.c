@@ -31,24 +31,20 @@ int main(int argc, char** argv) {
         return 1;
     }
     s32 backend = BACKEND_C;
-    g_compilation_settings.bitsize = 32;
+    g_compilation_settings.bitsize = 64;
     if(argc >= 3) {
         char* backend_str = argv[2];
         if(strcmp(backend_str, "-x86coff") == 0) {
             backend = BACKEND_X86_PECOFF;
-            g_compilation_settings.bitsize = 32;
         } else if(strcmp(backend_str, "-x86elf") == 0) {
             backend = BACKEND_X86_ELF;
-            g_compilation_settings.bitsize = 32;
         } else if(strcmp(backend_str, "-x86rawx") == 0) {
             backend = BACKEND_X86_RAWX;
             g_compilation_settings.bitsize = 32;
         } else if(strcmp(backend_str, "-c") == 0) {
             backend = BACKEND_C;
-            g_compilation_settings.bitsize = 64;
         } else if(strcmp(backend_str, "-lightvm") == 0) {
             backend = BACKEND_LIGHT_VM;
-            g_compilation_settings.bitsize = 64;
         } else {
             fprintf(stderr, "invalid backend '%s'\n", argv[2]);
             return 1;

@@ -1,5 +1,5 @@
+/*
 #import "math.li"
-
 Vertex_3D struct {
 	position           : vec3;
 	texture_alpha      : r32;
@@ -373,3 +373,5 @@ void main()
 	final_color = diff * color;
 	//final_color = vec4(1.0, 0.0, 0.0, 1.0);
 }";
+
+*/

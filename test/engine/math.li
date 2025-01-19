@@ -1,3 +1,4 @@
+/*
 sqrtf:(v : r32) -> r32 #extern("m");
 tanf:(v : r32) -> r32 #extern("m");
 cosf:(v : r32) -> r32 #extern("m");
@@ -6,7 +7,6 @@ fabsf:(v : r32) -> r32 #extern("m");
 acosf:(v : r32) -> r32 #extern("m");
 atanf:(v : r32) -> r32 #extern("m");
 fabs:(v : r64) -> r64 #extern("m");
-
 DEGTORAD:(degree : r32) -> r32 { return ((degree) * (3.141592654 / 180.0)); }
 RADTODEG:(radian : r32) -> r32 { return ((radian) * (180.0 / 3.141592654)); }
 
@@ -212,3 +212,4 @@ perspective:(fovy : r32, aspect : r32, zNear : r32, zFar : r32) -> mat4 {
 
     return result;
 }
+*/

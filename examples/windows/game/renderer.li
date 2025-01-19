@@ -1,4 +1,6 @@
+
 #import "../../../modules/windows/math.li"
+
 Vertex_3D struct {
 	position           : vec3;
 	texture_alpha      : r32;
@@ -44,7 +46,6 @@ ImmediateContext struct {
 	shader_translation_matrix_location : s32;
 	shader_text_location : s32;
 }
-
 imm_ctx : ImmediateContext;
 
 calloc : (count : u64, size : u64) -> ^void #extern("msvcrt.dll");
@@ -89,7 +90,7 @@ shader_load :(vert_shader : string, frag_shader : string) -> GLuint {
 	if compile_status == 0 {
 		error_buffer : [512]^s8;
 		glGetShaderInfoLog(fs_id, 512, null, error_buffer -> ^s8);
-		print("Fragment shader error: ");
+		print("Fragment shader error: %", frag_shader);
 		//print_string_c(error_buffer -> ^u8);
 		return (-1 -> GLuint);
 	}
@@ -111,12 +112,15 @@ shader_load :(vert_shader : string, frag_shader : string) -> GLuint {
 	}
 
 	glValidateProgram(shader_id);
-
     return shader_id;
 }
 
-load_basic_vshader : () -> string {
-	basic_vshader := "#version 330 core
+valid_glid : (id : u32) -> bool {
+	return (id >= 0 && id < (-1 -> u32));
+}
+
+render_context_init : () {
+	vshader := "#version 330 core
 	layout(location = 0) in vec3 v_vertex;
 	layout(location = 1) in vec2 v_tcoords;
 	layout(location = 2) in vec3 v_normals;
@@ -137,11 +141,8 @@ load_basic_vshader : () -> string {
 		o_normals = vec3(u_model * vec4(v_normals, 0.0));
 		o_tolight = vec3(30.0, 30.0, -30.0) - world_pos;
 	}\0";
-	return basic_vshader;
-}
 
-load_basic_fshader : () -> string {
-	basic_fshader := "#version 330 core
+	fshader := "#version 330 core
 	in vec2 o_tcoords;
 	in vec3 o_normals;
 	in vec3 o_tolight;
@@ -158,10 +159,14 @@ load_basic_fshader : () -> string {
 		//color = vec4(o_normals, 1.0);
 	}\0";
 
-	return basic_fshader;
-}
+	imm_ctx.shader_3D = shader_load(vshader, fshader);
+	assert(valid_glid(imm_ctx.shader_3D));
+	
+	// Start batch size
+	batch_size :s64= 1024 * 64;
+	imm_ctx.quad_max_count = batch_size;
 
-load_quad_vshader : () -> string {
+	// Shader setup
 	quad_vshader := "#version 330 core
 	layout(location = 0) in vec3 v_vertex;
 	layout(location = 1) in vec2 v_tcoords;
@@ -185,10 +190,6 @@ load_quad_vshader : () -> string {
 		o_is_text = v_is_text;
 	}\0";
 
-	return quad_vshader;
-}
-
-load_quad_fshader : () -> string {
 	quad_fshader := "#version 330 core
 	in vec2 o_tcoords;
 	in vec4 o_color;
@@ -204,27 +205,7 @@ load_quad_fshader : () -> string {
 		color = mix(o_color, texture(u_text, o_tcoords), o_texture_alpha);
 		color = vec4(o_color.rgb, o_color.a * max(color.r, o_is_text));
 	}\0";
-	return quad_fshader;
-}
 
-
-valid_glid : (id : u32) -> bool {
-	return (id >= 0 && id < (-1 -> u32));
-}
-
-render_context_init : () {
-	vshader := load_basic_vshader();
-	fshader := load_basic_fshader();
-	imm_ctx.shader_3D = shader_load(vshader, fshader);
-	assert(valid_glid(imm_ctx.shader_3D));
-
-	// Start batch size
-	batch_size :s64= 1024 * 64;
-	imm_ctx.quad_max_count = batch_size;
-
-	// Shader setup
-	quad_vshader := load_quad_vshader();
-	quad_fshader := load_quad_fshader();
 	imm_ctx.shader = shader_load(quad_vshader, quad_fshader);
 	assert(valid_glid(imm_ctx.shader));
 
