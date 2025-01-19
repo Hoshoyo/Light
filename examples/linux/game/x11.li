@@ -477,7 +477,7 @@ XAnyEvent struct {
 	window     : u64;
 }
 
-XEvent struct {
+XEvent union {
 	type              : s32;
 	xany              : XAnyEvent;
 	xkey              : XKeyEvent;
