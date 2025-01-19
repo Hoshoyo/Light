@@ -6,6 +6,8 @@
 .vscode/
 misc/
 
+examples/**/*.c
+
 # User-specific files
 *.exe
 *.suo

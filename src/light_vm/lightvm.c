@@ -1240,9 +1240,10 @@ light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps, boo
             break;
         }
 
+        light_vm_execute_instruction(state, in);
+        
         // Debug stuff
         #if 0
-        light_vm_execute_instruction(state, in);
         dump_shit(state);
         //light_vm_debug_dump_variables(stdout, state, 0);
         #endif        

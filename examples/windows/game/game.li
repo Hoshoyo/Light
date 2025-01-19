@@ -152,12 +152,14 @@ main : () -> s32 {
 		while PeekMessageA(&msg, win.handle, 0, 0, 1) != 0
 		{
 			if msg.message == WM_KEYDOWN {
-				if (msg.wparam -> s32) < 256 {
-					keys[msg.wparam -> s32] = true;
+				wc := (msg.wparam -> s64) -> s32;
+				if wc < 256 {
+					keys[wc] = true;
 				}
 			} else if msg.message == WM_KEYUP {
-				if (msg.wparam -> s32) < 256 {
-					keys[msg.wparam -> s32] = false;
+				wc := (msg.wparam -> s64) -> s32;
+				if wc < 256 {
+					keys[wc] = false;
 				}
 			}
 
