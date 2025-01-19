@@ -737,6 +737,7 @@ XSetErrorHandler : (errorHandler : (^Display, ^XErrorEvent) -> s32) -> (^Display
 XFreeColormap : (display : ^Display, cmap : Colormap) -> s32 #extern("X11");
 XFree : (data : ^void) -> s32 #extern("X11");
 XSync : (display : ^Display, discard : bool) -> s32 #extern("X11");
+XPending : (display : ^Display) -> s32 #extern("X11");
 
 DefaultScreen : (dpy : ^Display) -> s32 {
 	return (*dpy).default_screen;
