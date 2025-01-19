@@ -6,7 +6,12 @@
 #include "common.h"
 #include <light_array.h>
 
+#if defined(_WIN64)
 #include <windows.h>
+#else defined(__linux__)
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 
 extern u16 cmp_flags_8(u8 l, u8 r);
 extern u16 cmp_flags_16(u16 l, u16 r);
@@ -24,8 +29,12 @@ light_vm_init() {
 
     state->code.block = calloc(1, SIZES_VM_MEMORY); // 1MB
     state->code.size_bytes = SIZES_VM_MEMORY;
-    DWORD prev_protect = 0;
+#if defined(_WIN64)
+    DWORD prev_protect = 0; 
     VirtualProtect(state->code.block, SIZES_VM_MEMORY, PAGE_EXECUTE_READWRITE, &prev_protect);
+#else defined(__linux__)
+    mprotect(state->code.block, SIZES_VM_MEMORY, PROT_READ | PROT_WRITE | PROT_EXEC) == -1);
+#endif
 
     state->stack.block = calloc(1, SIZES_VM_MEMORY); // 1MB
     state->stack.size_bytes = SIZES_VM_MEMORY;
@@ -577,7 +586,7 @@ light_vm_execute_float_branch_instruction(Light_VM_State* state, Light_VM_Instru
     return branch;
 }
 
-u64 CALLBACK lvm_process_callback(Light_VM_State* state, void* entry);
+u64 lvm_process_callback(Light_VM_State* state, void* entry);
 
 void
 light_vm_execute_external_call_instruction(Light_VM_State* state, Light_VM_Instruction instr) {
@@ -1207,8 +1216,6 @@ dump_shit(Light_VM_State* state)
     }
 }
 
-static int dump_stuff = 0;
-
 void
 light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps, bool reset_state) {
     if(reset_state)
@@ -1233,13 +1240,12 @@ light_vm_execute(Light_VM_State* state, void* entry_point, bool print_steps, boo
             break;
         }
 
-        if(dump_stuff)
-            system("cls");
+        // Debug stuff
+        #if 0
         light_vm_execute_instruction(state, in);
-        
-        if(dump_stuff)
-            dump_shit(state);
+        dump_shit(state);
         //light_vm_debug_dump_variables(stdout, state, 0);
+        #endif        
     }
 }
 
