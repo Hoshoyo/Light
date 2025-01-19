@@ -1,17 +1,15 @@
-#import "../modules/light_print.li"
+#import "../modules/windows/print.li"
 
-main : () -> u32 {	
-	//print_string("Hello");
-	//s := "Hoshoyo";
-	//printf("Hello %, my name is %\n", 4, s);
+main : () -> s32 {	
 	b : u64 = 0x123456789abcd;
 	a : s64 = 0x123456789abcd; // 320255973501901
 	f : hello;
 
-	//return printf("% % % % % % %", 11, a, 33 -> u32, 'c', b, true, 3.14, &a);
-	//return printf("$ $ $ $ $ $ $", 11, a, 33 -> u32, 'c', b, true, 3.14, &a);
-	//printf("main is a $\n", foo);
-	printf("Alias is %\n", #size_of hello);
+	print("% % % % % % %\n", 11, a, 33 -> u32, 'c', b, true, 3.14, &a);
+	print("$ $ $ $ $ $ $\n", 11, a, 33 -> u32, 'c', b, true, 3.14, &a);
+	print("main is a $\n", foo);
+	print("Alias is % bytes in size\n", #size_of hello);
+
 	return 0;
 }
 

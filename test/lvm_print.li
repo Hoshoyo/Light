@@ -7,10 +7,8 @@ foo : () -> s32 {
     return 0;
 }
 
-string struct {
-    capacity : u32;
-    length   : u32;
-    data     : ^u8;
+main : () -> s32 {
+    return foo();
 }
 
 MessageBoxA:(win : u64, text : ^u8, caption : ^u8, type : u32) -> void #extern("user32");

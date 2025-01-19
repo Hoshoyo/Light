@@ -1,0 +1,16 @@
+#import "../../modules/windows/print.li"
+
+factorial : (num : s32) -> s32 {
+    if num <= 1 {
+        return 1;
+    } else {
+        return num * factorial(num - 1);
+    }
+}
+
+main : () -> s32 {
+    number := 5;
+    result := factorial(number);
+    print("Factorial of % is %\n", number, result);
+    return result;
+}

@@ -1,4 +1,4 @@
-#import "../modules/print.li"
+#import "../modules/windows/print.li"
 
 main : () -> s32 {
     //print_s8(32);
@@ -28,9 +28,9 @@ main : () -> s32 {
     i := 3.14;
     j := 2.22234;
 
-    //print("foo", a, b, c, d, e, f, g, h, i, j, true, false, &a, "hello", [1, 2, 3]);
-    print("foo", &[1,2], main);
-    //print_bytes(&[1, 2]->^u8, 8);
+    print("foo % % % % % % % % % % % % % % %\n", a, b, c, d, e, f, g, h, i, j, true, false, &a, "hello", [1, 2, 3]);
+    print("foo % %\n", &[1,2], main);
+    print_bytes(&[1, 2]->^u8, 8);
 
     return 0;
 }

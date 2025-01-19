@@ -15,20 +15,45 @@ The language is currently under development and is very unstable.
 * [ ] Code introspection
 * [ ] Embedded build system support
 
-## Example
+## [Simple Example](./examples/windows/factorial.li)
 ```go
+// No ifdef equivalents for now so we must do this for Windows
+#import "../../modules/windows/print.li"
 
-main :: () -> s32 {
-  print("Hello World\n");
-  return 0;
+// Linux equivalent
+// #import "../../modules/linux/print.li"
+
+factorial : (num : s32) -> s32 {
+    if num <= 1 {
+        return 1;
+    } else {
+        return num * factorial(num - 1);
+    }
 }
 
+main : () -> s32 {
+    number := 5;
+    result := factorial(number);
+    print("Factorial of % is %\n", number, result);
+    return result;
+}
 ```
 
-You can find more examples in the `test` directory.
 You can find more examples for windows and linux on [examples/windows](./examples/windows) and [examples/linux](./examples/linux)
 
+To compile them, run from the root directory (on Windows):
 
+```bash
+bin\light.exe examples\windows\game\game.li
+examples\windows\game\game.exe
+```
+
+Or for linux:
+
+```bash
+bin/light examples/linux/game/game.li
+./examples/linux/game/game
+```
 
 ## Build
 
