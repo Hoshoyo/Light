@@ -1,4 +1,4 @@
-#import "../modules/windows/print.li"
+#import "../../modules/windows/print.li"
 
 float_arithmetic : () {
     a := 3.14;
@@ -240,7 +240,7 @@ structs : () {
     print("v.y = %\n", v.y);
     print("v.x + v.y + v.z = %\n", v.x + v.y + v.z);
 
-    //print("ar = %\n", ar); // @TODO error
+    print("ar = %\n", ar);
     print("ar[1].y = %\n", ar[1].y);
 }
 

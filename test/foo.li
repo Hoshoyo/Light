@@ -1,9 +1,20 @@
-//#import "../modules/base.li"
-//#import "../modules/w_print.li"
+#import "../modules/windows/print.li"
+
+vec3 struct {
+    x : r32;
+    y : r32;
+    z : r32;
+}
+
+structs : () {
+    v : vec3 = vec3:{ 1.0, 2.0, 3.0 };
+    ar := [vec3:{1.0, 2.0, 3.0}, vec3:{4.0, 5.0, 6.0}, vec3:{7.0, 8.0, 9.0}];
+
+    print("ar = %\n", ar); // @TODO error
+}
 
 main : () -> s32 {   
-    a := 47;
-    b := 5;
+    structs();
 
-    return a % b;
+    return 0;
 }
