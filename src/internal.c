@@ -219,16 +219,13 @@ Light_Ast**
 load_internal_modules(Light_Parser* parser, Light_Scope* global_scope, Light_Backend backend) {
     Light_Ast** ast = 0;
     switch(backend) {
-        case BACKEND_X86_ELF:
-        case BACKEND_X86_PECOFF:
         case BACKEND_X86_RAWX: {
             ast = load_internal_module(parser, global_scope, (char*)module_base_str_32bit, sizeof(module_base_str_32bit));
             ast = load_internal_module(parser, global_scope, module_reflect_str_32bit, sizeof(module_reflect_str_32bit));
         } break;
-        case BACKEND_C: {
-            ast = load_internal_module(parser, global_scope, (char*)module_base_str_64bit, sizeof(module_base_str_64bit));
-            ast = load_internal_module(parser, global_scope, module_reflect_str_64bit, sizeof(module_reflect_str_64bit));
-        } break;
+        case BACKEND_X86_ELF:
+        case BACKEND_X86_PECOFF:
+        case BACKEND_C:
         case BACKEND_LIGHT_VM: {
             ast = load_internal_module(parser, global_scope, (char*)module_base_str_64bit, sizeof(module_base_str_64bit));
             ast = load_internal_module(parser, global_scope, module_reflect_str_64bit, sizeof(module_reflect_str_64bit));

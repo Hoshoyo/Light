@@ -24,10 +24,13 @@ int main(int argc, char** argv) {
     light_set_global_tables(argv[0]);
 
     if(argc < 2) {
-        fprintf(stderr, "usage: %s filename\n", argv[0]);
+        fprintf(stderr, "usage: %s filename <backend>\n\n", argv[0]);
+        fprintf(stderr, "choosing a backend\n");
+        fprintf(stderr, "  - c        Generates a C file and compiles using the current platform C compiler\n");
+        fprintf(stderr, "  - lightvm  Compiles into the internal VM bytecode and runs it immediately\n");
         return 1;
     }
-    s32 backend = BACKEND_LIGHT_VM;
+    s32 backend = BACKEND_C;
     g_compilation_settings.bitsize = 32;
     if(argc >= 3) {
         char* backend_str = argv[2];
