@@ -1168,7 +1168,7 @@ void
 backend_c_compile_with_cl(Light_Ast** ast, const char* filename, const char* working_directory) {
     char command_buffer[2048] = {0};
     #if defined(_WIN32) || defined(_WIN64)
-    sprintf(command_buffer, "cl /nologo /Zi %s%s.c /Fe:%s%s.exe /link user32.lib kernel32.lib gdi32.lib", 
+    sprintf(command_buffer, "cl /nologo /Zi %s%s.c /Fe:%s%s.exe /link user32.lib kernel32.lib gdi32.lib opengl32.lib", 
         working_directory, filename, working_directory, filename);
     #endif
     system(command_buffer);

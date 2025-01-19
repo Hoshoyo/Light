@@ -7,10 +7,12 @@ DefWindowProcA : (window : ^void, msg : u32, wparam : ^u32, lparam : ^u32) -> ^v
 GetMessageA : (msg : ^MSG, hwnd : ^void, msg_filter_min : u32, msg_filter_max : u32) -> s32 #extern("User32.dll");
 TranslateMessage : (msg : ^MSG) -> s32 #extern("User32.dll");
 DispatchMessageA : (msg : ^MSG) -> s32 #extern("User32.dll");
+GetClientRect : (window : ^void, rc : ^RECT) -> bool #extern("User32.dll");
 
-WM_QUIT : u32 : 0x12;
+WM_QUIT    : u32 : 0x12;
+WM_SIZE    : u32 : 0x5;
 WM_KEYDOWN : u32 : 0x100;
-WM_KEYUP : u32 : 0x101;
+WM_KEYUP   : u32 : 0x101;
 
 MSG struct {
     hwnd    : ^void;
@@ -19,4 +21,11 @@ MSG struct {
     lparam  : ^void;
     time    : u32;
     point   : POINT;
+}
+
+RECT struct {
+    left   : LONG;
+    top    : LONG;
+    right  : LONG;
+    bottom : LONG;
 }

@@ -72,11 +72,19 @@ opengl_init: (window : ^Window) {
 	return;
 }
 
-window_callback : (window : ^void, msg : u32, lparam: ^u32, wparam: ^u32) -> ^void #extern {
+global_running := 1;
+
+window_callback : (window : ^void, msg : u32, wparam : ^u32, lparam : ^u32) -> ^void #extern {
 	if msg == WM_CLOSE {
-		ExitProcess(0);
+		global_running = 0;
+	} else if msg == WM_SIZE {
+		width := (lparam -> u64) & 0xffff;
+		height := (lparam -> u64) >> 16;
+		glViewport(0, 0, width->GLsizei, height->GLsizei);
+		wnd_ctx.width = width -> s32;
+		wnd_ctx.height = height -> s32;
 	} else {
-		return DefWindowProcA(window, msg, lparam, wparam);
+		return DefWindowProcA(window, msg, wparam, lparam);
 	}
 	
 	return null;
@@ -135,7 +143,7 @@ main : () -> s32 {
 
 	keys : [256]bool;
 
-    while true 
+    while global_running != 0
     {
 		start_time : s64;
 		QueryPerformanceCounter(&start_time);
@@ -171,7 +179,7 @@ main : () -> s32 {
 }
 
 position : vec2;
-SPEED :: 200.0;
+SPEED :: 500.0;
 
 input : (keys : [256]bool, dt : r32) {	
 	if keys['A'] {
@@ -190,10 +198,6 @@ input : (keys : [256]bool, dt : r32) {
 
 render : (width : s32, height : s32, dt : r32) {
 	glClear(GL_COLOR_BUFFER_BIT);
-
-	glViewport(0, 0, width, height);
-	wnd_ctx.width = width;
-	wnd_ctx.height = height;
 
 	q := quad_new(position, 100.0, 100.0, vec4:{1.0, 0.0, 1.0, 1.0});
 	render_quad_immediate(&q);

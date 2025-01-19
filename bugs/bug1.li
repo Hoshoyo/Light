@@ -15,3 +15,5 @@ main : () -> s32 {
 // Global strings crashes in the vm
 
 // /* /* */ crashes
+
+// Callback for WndProc crashes when using any print

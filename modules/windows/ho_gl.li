@@ -2779,4 +2779,6 @@ hogl_init_extensions:() -> s32 {
     glVertexAttribLPointer = (wglGetProcAddress("glVertexAttribLPointer\0".data) -> ^void) -> (GLuint, GLint, GLenum, GLsizei, ^GLvoid) -> void #extern;
     glVertexBindingDivisor = (wglGetProcAddress("glVertexBindingDivisor\0".data) -> ^void) -> (GLuint, GLuint) -> void #extern;
     glVertexArrayBindingDivisor = (wglGetProcAddress("glVertexArrayBindingDivisor\0".data) -> ^void) -> (GLuint, GLuint, GLuint) -> void #extern;
+
+    return 0;
 }

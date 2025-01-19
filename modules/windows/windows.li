@@ -21,6 +21,7 @@ POINT struct {
 
 HANDLE ^void;
 HDC ^void;
+LONG u32;
 
 WNDCLASSEXA struct {
     cb_size       : u32;

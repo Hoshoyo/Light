@@ -1,6 +1,7 @@
-#import "../examples/windows/windows.li"
-#import "engine/ho_gl.li"
-#import "../modules/light_print.li"
+//#import "engine/gl.li"
+#import "../modules/windows/ho_gl.li"
+#import "../modules/windows/windows.li"
+#import "../modules/windows/print.li"
 
 running := true;
 
@@ -14,10 +15,7 @@ window_callback : (window : ^void, msg : u32, lparam: ^u32, wparam: ^u32) -> ^vo
 	return null;
 }
 
-HANDLE ^void;
-HDC ^void;
 HGLRC ^void;
-
 
 WGL_CONTEXT_MAJOR_VERSION_ARB :: 0x2091;
 WGL_CONTEXT_MINOR_VERSION_ARB :: 0x2092;
@@ -50,13 +48,13 @@ opengl_init: (window : ^Window) {
 	pixel_format := ChoosePixelFormat(window.dc, &pfd);
 	if (!SetPixelFormat(window.dc, pixel_format, &pfd))
 	{
-		printf("Could not set a pixel format\n");
+		print("Could not set a pixel format\n");
 	}
 
 	temp_context := wglCreateContext(window.dc);
 	if !wglMakeCurrent(window.dc, temp_context)
 	{
-		printf("Could not create an OpenGL context.\n Make sure OpenGL compatible drivers are installed.\n");
+		print("Could not create an OpenGL context.\n Make sure OpenGL compatible drivers are installed.\n");
 	}
 	attribs :=
 	[
@@ -78,17 +76,17 @@ opengl_init: (window : ^Window) {
 		}
 		else
 		{
-			printf("Could not create OpenGL core context\n");
+			print("Could not create OpenGL core context\n");
 		}
 	}
 	else
 	{
-		printf("Could not create OpenGL core context\n");
+		print("Could not create OpenGL core context\n");
 	}
 
 	if hogl_init_extensions() == -1
 	{
-		printf("Could not load OpenGL extensions\n");
+		print("Could not load OpenGL extensions\n");
 	}
 
 	return;

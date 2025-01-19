@@ -1,11 +1,5 @@
 #import "x11.li"
-#import "../modules/reflect.li"
-
-string struct {
-	capacity : u64;
-	length   : u64;
-	data     : ^u8;
-}
+//#import "../modules/reflect.li"
 
 memcpy : (dst : ^void, src : ^void, size : u64) -> ^void #extern("C");
 
@@ -77,7 +71,7 @@ s32_to_str : (val : s32, buffer : [16]u8) -> s64 {
 
     size := start - auxbuffer;
     memcpy((&buffer[sum]) -> ^void, (auxbuffer + 1) -> ^void, size -> u64);
-    return size;
+    return size -> s64;
 }
 
 u32_to_str_base16 : (value : u32, leading_zeros : bool, buffer : ^s8) -> s64
