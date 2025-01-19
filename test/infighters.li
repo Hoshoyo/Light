@@ -212,6 +212,7 @@ init_opengl : (display : ^Display) -> u64 {
 
 	print_string("Mapping window\n");
 	XMapWindow(display, win);
+	print_string("After Mapping window\n"); // @TODO why removing this crashes the application?
 
 	glXCreateContextAttribsARB := glXGetProcAddressARB("glXCreateContextAttribsARB".data) -> (^Display, GLXFBConfig, GLXContext, bool, ^s32) -> GLXContext;
 	ctx : GLXContext;

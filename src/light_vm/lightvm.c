@@ -8,7 +8,7 @@
 
 #if defined(_WIN64)
 #include <windows.h>
-#else defined(__linux__)
+#elif defined(__linux__)
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
@@ -32,8 +32,8 @@ light_vm_init() {
 #if defined(_WIN64)
     DWORD prev_protect = 0; 
     VirtualProtect(state->code.block, SIZES_VM_MEMORY, PAGE_EXECUTE_READWRITE, &prev_protect);
-#else defined(__linux__)
-    mprotect(state->code.block, SIZES_VM_MEMORY, PROT_READ | PROT_WRITE | PROT_EXEC) == -1);
+#elif defined(__linux__)
+    mprotect(state->code.block, SIZES_VM_MEMORY, PROT_READ | PROT_WRITE | PROT_EXEC);
 #endif
 
     state->stack.block = calloc(1, SIZES_VM_MEMORY); // 1MB
@@ -160,7 +160,7 @@ light_vm_push_r64_to_datasegment(Light_VM_State* state, r64 f) {
 }
 
 void
-light_vm_patch_instruction_immediate(Light_VM_Instruction_Info instr, s64 value) {
+light_vm_patch_instruction_immediate(Light_VM_Instruction_Info instr, int64_t value) {
     switch(((Light_VM_Instruction*)instr.absolute_address)->imm_size_bytes) {
         case 1: *(u8*) (instr.absolute_address + 1) = (u8) (value); break;
         case 2: *(u16*)(instr.absolute_address + 1) = (u16)(value); break;
@@ -371,8 +371,8 @@ light_vm_execute_binary_arithmetic_instruction(Light_VM_State* state, Light_VM_I
         }break;
     }
 
+    u64 flags = 0;
     switch(instr.type) {
-        u64 flags = 0;
         case LVM_CMP: {
             switch(instr.binary.bytesize_pw2) {
                 case 0: flags = cmp_flags_8(*(u8*)dst, *(u8*)src); break;

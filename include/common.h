@@ -10,7 +10,7 @@ typedef unsigned long long int u64;
 typedef long long int s64;
 #endif
 
-typedef char s8;
+typedef signed char s8;
 typedef short s16;
 typedef int s32;
 

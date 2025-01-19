@@ -2314,7 +2314,10 @@ stack_patch_instructions(Stack_Info* stack_info)
 
 // This functions receives any callbacks from the system or any other C libraries.
 // it will switch back to the LVM interpreter and return to the caller appropriately.
-u64 CALLBACK
+u64 
+#ifdef _WIN64
+CALLBACK
+#endif
 lvm_process_callback(Light_VM_State* state, void* entry)
 {
     light_vm_execute(state, entry, PRINT_LVM_INSTRUCTIONS, false);

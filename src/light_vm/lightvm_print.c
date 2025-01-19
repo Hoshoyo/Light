@@ -642,16 +642,16 @@ light_vm_debug_dump_registers(FILE* out, Light_VM_State* state, u32 flags) {
         fprintf(out, "R4: %ld \t R5: %ld\n", state->registers[R4], state->registers[R5]);
         fprintf(out, "R6: %ld \t R7: %ld\n", state->registers[R6], state->registers[R7]);
         fprintf(out, "\n");
-        fprintf(out, "RSP: %ld \t RBP: %ld\n", state->registers[RSP], state->registers[RBP]);
-        fprintf(out, "RIP: %ld \t RDP: %ld\n", state->registers[RIP], state->registers[RDP]);
+        fprintf(out, "RSP: %ld \t RBP: %ld\n", state->registers[LRSP], state->registers[LRBP]);
+        fprintf(out, "RIP: %ld \t RDP: %ld\n", state->registers[LRIP], state->registers[LRDP]);
     } else {
         fprintf(out, "R0: 0x%lx \t R1: 0x%lx\n", state->registers[R0], state->registers[R1]);
         fprintf(out, "R2: 0x%lx \t R3: 0x%lx\n", state->registers[R2], state->registers[R3]);
         fprintf(out, "R4: 0x%lx \t R5: 0x%lx\n", state->registers[R4], state->registers[R5]);
         fprintf(out, "R6: 0x%lx \t R7: 0x%lx\n", state->registers[R6], state->registers[R7]);
         fprintf(out, "\n");
-        fprintf(out, "RSP: 0x%lx \t RBP: 0x%lx\n", state->registers[RSP], state->registers[RBP]);
-        fprintf(out, "RIP: 0x%lx \t RDP: 0x%lx\n", state->registers[RIP], state->registers[RDP]);
+        fprintf(out, "RSP: 0x%lx \t RBP: 0x%lx\n", state->registers[LRSP], state->registers[LRBP]);
+        fprintf(out, "RIP: 0x%lx \t RDP: 0x%lx\n", state->registers[LRIP], state->registers[LRDP]);
     }
     if(flags & LVM_PRINT_FLOATING_POINT_REGISTERS) {
         fprintf(out, "\n");
